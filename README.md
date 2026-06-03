@@ -29,6 +29,8 @@ Requires Python 3.11 and [`uv`](https://docs.astral.sh/uv/) (`brew install uv` o
 ```bash
 git clone <repo> && cd food-safety-intelligence
 uv sync --extra dev          # creates .venv, installs deps
+uv run nbstripout --install  # one-time: wire the git filter that
+                             # strips notebook outputs on commit
 cp .env.example .env         # default settings work; edit if needed
 
 # One-time data pull (or copy from teammate's data/raw/ to skip this — ~15 min)
