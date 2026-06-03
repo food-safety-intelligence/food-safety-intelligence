@@ -35,9 +35,15 @@ Three product questions the UI must answer for any restaurant:
 - **Label**: `y_fail_or_critical_next_180d` — 1 if the restaurant has a Fail
   result OR a priority violation (codes 1–29) within 180 days of the
   `as_of_date`, else 0.
-- **Prediction unit**: one row per `(license_id, as_of_date)` rolling daily,
-  where `as_of_date = max(inspection_date_seen_so_far) + 1d`. Per-restaurant-
-  per-day, not per-scheduled-inspection.
+- **Prediction unit (MVP)**: one row per `(license_id, inspection_date)`.
+  `as_of_date` is a synonym of `inspection_date` for the parquet contract;
+  for scoring the web app, we anchor on each license's **most recent**
+  inspection. Per-restaurant-per-day rolling (`as_of_date = inspection_date
+  + 1d`, one row per license per day) was the original Phase 4 design and
+  remains the target — see Roadmap. The MVP simplification is intentional:
+  we evaluate the model honestly on chronological splits of all inspections,
+  but only score the latest per license for the demo. Switching to daily
+  rolling is feature-engineering work, not a model change.
 - Time-aware train/val/test split (chronological cutoffs, never random shuffle)
 - LogReg baseline → XGBoost, both calibrated
 - SHAP explainability (TreeExplainer for XGBoost; coefficients for logreg)

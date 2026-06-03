@@ -51,11 +51,14 @@ the full schema.
 **Producer**: `src/foodsafety/features/build.py` (Bella + Deepak).
 **Consumers**: model training, batch scoring.
 
-`as_of_date` is per-restaurant-per-day rolling. For each license, we generate
-prediction rows daily starting from the first post-burn-in inspection. The
-canonical convention: `as_of_date = inspection_date + 1d` for each inspection
-seen so far at that license. Other anchoring schemes (e.g. weekly) are valid
-but must be documented in `modeling_decisions.md`.
+`as_of_date` is one row per inspection in the MVP — `as_of_date =
+inspection_date` is set as a synonym in `features/build.py`. The Phase-4
+design called for per-restaurant-per-day rolling (`as_of_date =
+inspection_date + 1d`); that's the target but is **not** what currently
+ships. `scores.parquet` uses the latest inspection per license as its
+anchor; the modeling parquet keeps all inspections so chronological eval
+splits remain honest. Switching to daily rolling is a build-step change,
+not a contract change.
 
 | Column | dtype | Nullable | Description |
 |---|---|---|---|
@@ -64,7 +67,8 @@ but must be documented in `modeling_decisions.md`.
 | `prior_*` features | various | varies | **MUST use `.shift()` or `event_date < as_of_date` guards.** Examples below. |
 | `static_*` features | various | varies | Facility-level constants that don't change over time (facility_type, risk tier, zip). |
 
-**Required `prior_*` features (Phase 4 deliverable)**:
+**Required `prior_*` features** (canonical 26-feature contract — single
+source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`):
 
 | Column | dtype | Description |
 |---|---|---|
@@ -72,9 +76,13 @@ but must be documented in `modeling_decisions.md`.
 | `prior_fails` | `int` | Number of `Fail` results strictly before `as_of_date`. |
 | `prior_priority_violations` | `int` | Number of priority (code 1–29) violations strictly before `as_of_date`. |
 | `prior_core_violations` | `int` | Number of core (code 30+) violations strictly before `as_of_date`. |
+| `prior_fail_or_priority_events` | `int` | Combined count of failed inspections OR inspections with any priority violation, strictly before `as_of_date`. |
 | `days_since_last_inspection` | `float` | Days from most recent prior inspection to `as_of_date`. NaN if none. |
 | `days_since_last_fail` | `float` | Days from most recent prior `Fail` to `as_of_date`. NaN if none. |
-| `prior_fail_rate_2y` | `float` | Fails / inspections in the 2-year window strictly before `as_of_date`. NaN if denominator 0. |
+
+Note: `prior_fail_rate` / `prior_fail_rate_2y` ratio features were dropped
+in Phase 5 — tree models can reconstruct ratios from numerator + denominator
+and the ratios added noise without orthogonal signal.
 
 **Required `static_*` features**:
 
@@ -83,7 +91,27 @@ but must be documented in `modeling_decisions.md`.
 | `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". |
 | `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. |
 | `static_zip` | `category` | 5-digit ZIP. |
-| `static_zip3` | `category` | First 3 digits of ZIP (less sparse, better for tree models). |
+
+Note: `static_zip3` was dropped — strict subset of `static_zip` with no
+orthogonal information.
+
+**Required temporal features**:
+
+| Column | dtype | Description |
+|---|---|---|
+| `temporal_month` | `int` | Month 1–12 of `inspection_date`. |
+| `temporal_quarter` | `int` | Quarter 1–4 of `inspection_date`. |
+
+Note: `temporal_year` is excluded — it's time-anchored and doesn't
+generalise across the chronological train/test split. `temporal_dow` and
+`temporal_season` were dropped per Phase 5 ablation.
+
+**Required license-history features**:
+
+| Column | dtype | Description |
+|---|---|---|
+| `license_age_days` | `int` | Days between this license's first issuance and `as_of_date`. |
+| `license_n_history_rows` | `int` | Count of rows in licenses_historical for this license, strictly before `as_of_date`. |
 
 **Required keyword-flag features (Phase 4, hybrid NLP layer B)**:
 
@@ -93,13 +121,14 @@ after stripping the numbered codes. The exact keyword list lives in
 `flag_kw_temperature`, `flag_kw_rodent`, `flag_kw_raw_chicken`,
 `flag_kw_no_soap`, `flag_kw_expired`, `flag_kw_cross_contamination`.
 
-**Required complaint features (Phase 4)**:
-
-| Column | dtype | Description |
-|---|---|---|
-| `n_311_rodent_300m_90d` | `int` | Rodent complaints within 300m and 90 days before `as_of_date`. |
-| `n_311_sanitation_300m_90d` | `int` | Sanitation Code Violation complaints, same window. |
-| `n_311_restaurant_300m_180d` | `int` | "Restaurant Complaint" SRs near this facility in last 180d. |
+**311 spatial complaint features**: dropped from the production contract.
+The Phase-5 ablation showed `n_311_*` features sat at the bottom of XGBoost
+gain — violation-text keyword flags (`flag_kw_rodent`, `flag_kw_pest`,
+`flag_kw_sewage`) capture the same signal directly, with cleaner SHAP
+attribution. The CMU 2019 hindsight critique of Chicago's heat-map
+features reached the same conclusion. The BallTree code in
+`features/complaint_features.py` remains; it's just not wired into the
+build by default.
 
 **Optional (Phase 6, NLP layer C)**:
 
