@@ -49,6 +49,20 @@ export interface RestaurantScore {
   trend_ci_low?: number | null;
   trend_ci_high?: number | null;
   top_drivers: Driver[];
+  /**
+   * Server-computed percentile rank of this restaurant's `risk_score` in the
+   * full scored population (0–100). 100 = highest score in the dataset.
+   * Computed by `loadScores()` in scores-server.ts; not present in
+   * scores.json itself.
+   */
+  percentile_rank?: number;
+}
+
+/** Aggregate stats over the entire scored population. Computed server-side. */
+export interface PopulationStats {
+  total: number;
+  median: number;
+  mean: number;
 }
 
 export interface InspectionEvent {

@@ -1,5 +1,5 @@
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
-import type { RestaurantScore } from "@/lib/scores";
+import type { PopulationStats, RestaurantScore } from "@/lib/scores";
 import { trendDirection } from "@/lib/scores";
 import { ArcGauge } from "@/components/ArcGauge";
 import { TierPill } from "@/components/TierPill";
@@ -31,12 +31,25 @@ const TREND_META = {
  * primary visual; below it sits a minimal 90-day trend chart reconstructed
  * from the linear slope (we don't ship per-restaurant history in scores.json).
  */
-export function ScoreCard({ restaurant }: { restaurant: RestaurantScore }) {
+export function ScoreCard({
+  restaurant,
+  populationStats,
+}: {
+  restaurant: RestaurantScore;
+  populationStats?: PopulationStats;
+}) {
   const slope = restaurant.trend_slope_90d;
   const dir = trendDirection(slope);
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
   const sign = slope === null ? "" : slope > 0 ? "+" : slope < 0 ? "−" : "";
+
+  // Percentile rank reads honestly across every tier. "Top X%" alone gets
+  // misleading at the extremes (e.g. "top 0.00%" for the highest-scoring
+  // restaurant, "top 78%" for a low-risk place where "top" misframes it).
+  // "Ranks higher than X%" works for both directions.
+  const percentile = restaurant.percentile_rank ?? null;
+  const medianScore = populationStats?.median ?? null;
 
   return (
     <div className="rounded-3xl bg-card border border-line soft-shadow-lg p-7">
@@ -58,16 +71,32 @@ export function ScoreCard({ restaurant }: { restaurant: RestaurantScore }) {
       </div>
 
       <p className="text-[14px] text-muted leading-relaxed mt-4 text-center">
-        A typical Chicago restaurant scores{" "}
-        <span className="num font-medium text-ink">0.21</span>. This score is
-        in the{" "}
-        <span
-          className="serif italic text-terra"
-          style={{ fontSize: "1.15em" }}
-        >
-          top 1.7%
-        </span>{" "}
-        of currently active food licenses.
+        {medianScore !== null ? (
+          <>
+            A typical Chicago restaurant scores{" "}
+            <span className="num font-medium text-ink">
+              {medianScore.toFixed(2)}
+            </span>
+            .{" "}
+          </>
+        ) : null}
+        {percentile !== null ? (
+          <>
+            This restaurant ranks higher than{" "}
+            <span
+              className="serif italic text-terra"
+              style={{ fontSize: "1.15em" }}
+            >
+              {/* Floor instead of round — for the top-scoring restaurant the
+                  raw value is ~99.996, which .toFixed(1) rounds to "100.0%"
+                  and reads as a bug ("higher than 100%" is paradoxical). */}
+              {(Math.floor(percentile * 10) / 10).toFixed(1)}%
+            </span>{" "}
+            of currently active food licenses.
+          </>
+        ) : (
+          <>Compared against all currently active food licenses in Chicago.</>
+        )}
       </p>
 
       {/* Trend block */}
@@ -85,7 +114,11 @@ export function ScoreCard({ restaurant }: { restaurant: RestaurantScore }) {
         </div>
 
         <div className="flex justify-center">
-          <TrendChart score={restaurant.risk_score} slope={slope} />
+          <TrendChart
+            score={restaurant.risk_score}
+            slope={slope}
+            typicalScore={medianScore}
+          />
         </div>
 
         {slope !== null && (

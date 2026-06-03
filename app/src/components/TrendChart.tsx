@@ -21,12 +21,16 @@ const COLOR_BY_DIRECTION = {
 export function TrendChart({
   score,
   slope,
+  typicalScore = null,
   days = 90,
   width = 320,
   height = 96,
 }: {
   score: number;
   slope: number | null;
+  /** Population median, used for the dashed reference midline. Pass null to
+   * hide the reference. */
+  typicalScore?: number | null;
   days?: number;
   width?: number;
   height?: number;
@@ -43,7 +47,7 @@ export function TrendChart({
   const yFor = (s: number) => padY + h * (1 - clamp01(s));
   const xFor = (t: number) => padX + (w * t) / days; // t in [0, days]
 
-  const midlineY = yFor(0.21); // typical-score reference per ScoreCard copy
+  const midlineY = typicalScore !== null ? yFor(typicalScore) : null;
 
   if (slope === null) {
     // No chart at all when there's no trend to draw — a dashed line over
@@ -80,26 +84,30 @@ export function TrendChart({
       role="img"
       aria-label={`90-day score trajectory, ${direction}`}
     >
-      {/* Typical-score reference midline */}
-      <line
-        x1={padX}
-        x2={width - padX}
-        y1={midlineY}
-        y2={midlineY}
-        stroke="#EDE6D8"
-        strokeWidth={1}
-        strokeDasharray="2 4"
-      />
-      <text
-        x={width - padX}
-        y={midlineY - 4}
-        textAnchor="end"
-        fontSize={9}
-        fill="#9CA3AF"
-        fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-      >
-        typical 0.21
-      </text>
+      {/* Typical-score reference midline — population median, passed in. */}
+      {midlineY !== null && typicalScore !== null && (
+        <>
+          <line
+            x1={padX}
+            x2={width - padX}
+            y1={midlineY}
+            y2={midlineY}
+            stroke="#EDE6D8"
+            strokeWidth={1}
+            strokeDasharray="2 4"
+          />
+          <text
+            x={width - padX}
+            y={midlineY - 4}
+            textAnchor="end"
+            fontSize={9}
+            fill="#9CA3AF"
+            fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+          >
+            typical {typicalScore.toFixed(2)}
+          </text>
+        </>
+      )}
 
       {/* Area fill — soft tint of the direction colour */}
       <path d={areaPath} fill={color} fillOpacity={0.1} />

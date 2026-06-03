@@ -12,6 +12,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import {
   getInspectionHistory,
+  getPopulationStats,
   getRestaurant,
   loadScores,
 } from "@/lib/scores-server";
@@ -26,10 +27,11 @@ export default async function RestaurantDetailPage({
 }) {
   const { id } = await params;
 
-  const [restaurant, history, payload] = await Promise.all([
+  const [restaurant, history, payload, populationStats] = await Promise.all([
     getRestaurant(id),
     getInspectionHistory(id),
     loadScores(),
+    getPopulationStats(),
   ]);
 
   if (!restaurant) notFound();
@@ -82,7 +84,10 @@ export default async function RestaurantDetailPage({
           </div>
 
           <div className="col-span-12 lg:col-span-5">
-            <ScoreCard restaurant={restaurant} />
+            <ScoreCard
+              restaurant={restaurant}
+              populationStats={populationStats}
+            />
           </div>
         </section>
 
@@ -174,40 +179,6 @@ export default async function RestaurantDetailPage({
 
             <aside className="col-span-12 md:col-span-5 space-y-5">
               <ResultTally events={history} />
-
-              <div className="rounded-3xl bg-card border border-line soft-shadow p-6">
-                <div className="text-[11px] tracking-widest uppercase text-muted mb-3">
-                  Nearby complaints (300 m, 90 d)
-                </div>
-                <ul className="space-y-2 text-[14px]">
-                  <li className="flex justify-between">
-                    <span>Rodent / rat complaints</span>
-                    <span className="num font-medium">4</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>Sanitation code violations</span>
-                    <span className="num font-medium">2</span>
-                  </li>
-                  <li className="flex justify-between">
-                    <span>Garbage cart maintenance</span>
-                    <span className="num font-medium">1</span>
-                  </li>
-                  <li className="flex justify-between text-muted">
-                    <span>Restaurant complaints</span>
-                    <span className="num">0</span>
-                  </li>
-                </ul>
-              </div>
-
-              <div className="rounded-3xl bg-tint border border-line p-6">
-                <div className="text-[11px] tracking-widest uppercase text-teal mb-2">
-                  License history
-                </div>
-                <p className="text-[13.5px] leading-relaxed">
-                  Active license · renewed consistently. No license-status
-                  changes flagged in the public record.
-                </p>
-              </div>
             </aside>
           </div>
         </section>

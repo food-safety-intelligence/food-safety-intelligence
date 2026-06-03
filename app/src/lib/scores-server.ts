@@ -12,6 +12,7 @@ import path from "node:path";
 import type {
   InspectionEvent,
   PinSummary,
+  PopulationStats,
   RestaurantScore,
   ScoresPayload,
 } from "@/lib/scores";
@@ -20,6 +21,7 @@ import type {
 // production build of Next.js calls server modules per request; this cache
 // holds for the lifetime of the worker process.
 let cached: ScoresPayload | null = null;
+let cachedStats: PopulationStats | null = null;
 
 /**
  * Prefer the real scores.json (written by the Python pipeline's notebook 06)
@@ -51,8 +53,60 @@ export async function loadScores(): Promise<ScoresPayload> {
     payload.inspection_history = await loadInspectionHistory();
   }
 
+  augmentWithPercentiles(payload);
+
   cached = payload;
   return cached;
+}
+
+/**
+ * Compute each restaurant's percentile rank in the full distribution, plus
+ * population aggregate stats (median, mean). Mutates `payload.scores` in
+ * place by setting `percentile_rank` on each row, and stashes the stats in
+ * module-level `cachedStats`.
+ *
+ * O(N log N) sort + O(N log N) binary searches. Runs once per cold start.
+ */
+function augmentWithPercentiles(payload: ScoresPayload): void {
+  const sorted = payload.scores
+    .map((r) => r.risk_score)
+    .slice()
+    .sort((a, b) => a - b);
+  const n = sorted.length;
+  if (n === 0) return;
+
+  const rankBelow = (v: number): number => {
+    let lo = 0;
+    let hi = n;
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1;
+      if (sorted[mid] < v) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  };
+
+  let sum = 0;
+  for (const r of payload.scores) {
+    r.percentile_rank = (rankBelow(r.risk_score) / n) * 100;
+    sum += r.risk_score;
+  }
+  cachedStats = {
+    total: n,
+    median: sorted[Math.floor(n / 2)],
+    mean: sum / n,
+  };
+}
+
+export async function getPopulationStats(): Promise<PopulationStats> {
+  if (!cachedStats) {
+    await loadScores();
+  }
+  if (!cachedStats) {
+    // Empty dataset fallback. The web app degrades to a sensible default.
+    return { total: 0, median: 0, mean: 0 };
+  }
+  return cachedStats;
 }
 
 async function loadInspectionHistory(): Promise<
