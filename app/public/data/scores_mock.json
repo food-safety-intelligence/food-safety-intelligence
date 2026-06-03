@@ -1,0 +1,293 @@
+{
+  "schema_version": "0.1.0-mock",
+  "generated_at": "2026-06-02T16:42:00Z",
+  "as_of_date": "2026-06-02",
+  "is_mock": true,
+  "model_version": "v0.1-mock",
+  "label_window_days": 180,
+  "totals": {
+    "establishments": 28047,
+    "tier_counts": { "Low": 8302, "Moderate": 14891, "Elevated": 4442, "High": 412 },
+    "worsening_30d": 1108,
+    "improving_30d": 2237
+  },
+  "scores": [
+    {
+      "license_id": "1242184",
+      "dba_name": "Great Falafel",
+      "address": "500 W Diversey Pkwy",
+      "neighborhood": "Lakeview East",
+      "zip": "60614",
+      "facility_type": "Restaurant",
+      "lat": 41.9322,
+      "lon": -87.6418,
+      "risk_score": 0.82,
+      "risk_tier": "High",
+      "trend_slope_90d": 0.0048,
+      "trend_ci_low": 0.0021,
+      "trend_ci_high": 0.0079,
+      "top_drivers": [
+        {
+          "feature": "prior_priority_violations",
+          "value": "3",
+          "shap": 0.18,
+          "label": "3 priority violations in the prior 2 years",
+          "detail": "Recorded 2024-04, 2023-01, 2022-08 · code 1–29 family"
+        },
+        {
+          "feature": "n_311_rodent_300m_90d",
+          "value": "4",
+          "shap": 0.12,
+          "label": "4 rodent complaints within 300 m, last 90 days",
+          "detail": "311 reports of “Rodent Baiting / Rat Complaint”"
+        },
+        {
+          "feature": "flag_kw_temperature",
+          "value": "yes",
+          "shap": 0.09,
+          "label": "Temperature-related violation in recent history",
+          "detail": "Cold-holding cited 2024-04-12; below 41 °F at prep cooler"
+        },
+        {
+          "feature": "days_since_last_inspection",
+          "value": "412",
+          "shap": 0.07,
+          "label": "Last inspected 412 days ago",
+          "detail": "Cadence has lengthened; typical interval is 220–300 days"
+        },
+        {
+          "feature": "static_facility_type",
+          "value": "Restaurant in Risk-1 tract",
+          "shap": 0.03,
+          "label": "Facility type: Restaurant in a Risk-1 tract",
+          "detail": "Modest positive baseline relative to Risk-2 / Risk-3 tracts"
+        }
+      ]
+    },
+    {
+      "license_id": "1198033",
+      "dba_name": "Enchanting Cafe & Lounge",
+      "address": "300 E 75th St",
+      "neighborhood": "Greater Grand Crossing",
+      "zip": "60619",
+      "facility_type": "Restaurant",
+      "lat": 41.7589,
+      "lon": -87.6157,
+      "risk_score": 0.68,
+      "risk_tier": "High",
+      "trend_slope_90d": 0.0021,
+      "trend_ci_low": 0.0005,
+      "trend_ci_high": 0.0042,
+      "top_drivers": [
+        {
+          "feature": "prior_priority_violations",
+          "value": "2",
+          "shap": 0.14,
+          "label": "2 priority violations in the prior 2 years",
+          "detail": "Recorded 2025-08, 2024-11"
+        },
+        {
+          "feature": "n_311_sanitation_300m_90d",
+          "value": "3",
+          "shap": 0.10,
+          "label": "3 sanitation complaints nearby (90 d)",
+          "detail": "311 reports of “Sanitation Code Violation”"
+        },
+        {
+          "feature": "flag_kw_rodent",
+          "value": "yes",
+          "shap": 0.08,
+          "label": "Vermin/pest violation noted previously",
+          "detail": "Code 38 cited in 2024-11 re-inspection"
+        }
+      ]
+    },
+    {
+      "license_id": "2734519",
+      "dba_name": "Parlay at Joy District",
+      "address": "112–114 W Hubbard St",
+      "neighborhood": "River North",
+      "zip": "60654",
+      "facility_type": "Tavern",
+      "lat": 41.8901,
+      "lon": -87.6311,
+      "risk_score": 0.64,
+      "risk_tier": "Elevated",
+      "trend_slope_90d": -0.0005,
+      "trend_ci_low": -0.0021,
+      "trend_ci_high": 0.0011,
+      "top_drivers": [
+        {
+          "feature": "prior_fails",
+          "value": "1",
+          "shap": 0.11,
+          "label": "1 failed inspection in the prior 2 years",
+          "detail": "Recorded 2024-09"
+        },
+        {
+          "feature": "flag_kw_cross_contamination",
+          "value": "yes",
+          "shap": 0.07,
+          "label": "Cross-contamination violation cited previously",
+          "detail": "Code 03 — raw and ready-to-eat foods separation"
+        },
+        {
+          "feature": "days_since_last_inspection",
+          "value": "287",
+          "shap": 0.04,
+          "label": "Last inspected 287 days ago",
+          "detail": "Within typical cadence (220–300 days)"
+        }
+      ]
+    },
+    {
+      "license_id": "2841992",
+      "dba_name": "Homan Square Cafe Inc",
+      "address": "3517 W Arthington St",
+      "neighborhood": "East Garfield Park",
+      "zip": "60624",
+      "facility_type": "Restaurant",
+      "lat": 41.8742,
+      "lon": -87.7165,
+      "risk_score": 0.60,
+      "risk_tier": "Elevated",
+      "trend_slope_90d": 0.0011,
+      "trend_ci_low": -0.0002,
+      "trend_ci_high": 0.0024,
+      "top_drivers": [
+        {
+          "feature": "n_311_rodent_300m_90d",
+          "value": "5",
+          "shap": 0.13,
+          "label": "5 rodent complaints within 300 m, last 90 days",
+          "detail": "Cluster of complaints reported May 2026"
+        },
+        {
+          "feature": "prior_priority_violations",
+          "value": "1",
+          "shap": 0.06,
+          "label": "1 priority violation in the prior 2 years",
+          "detail": "Recorded 2025-02"
+        }
+      ]
+    },
+    {
+      "license_id": "1015872",
+      "dba_name": "Subway",
+      "address": "3800 W 103rd St",
+      "neighborhood": "Mount Greenwood",
+      "zip": "60655",
+      "facility_type": "Restaurant",
+      "lat": 41.7068,
+      "lon": -87.7188,
+      "risk_score": 0.56,
+      "risk_tier": "Elevated",
+      "trend_slope_90d": 0.0004,
+      "trend_ci_low": -0.0008,
+      "trend_ci_high": 0.0017,
+      "top_drivers": [
+        {
+          "feature": "flag_kw_temperature",
+          "value": "yes",
+          "shap": 0.08,
+          "label": "Temperature-related violation in recent history",
+          "detail": "Cold-holding cited 2025-03"
+        },
+        {
+          "feature": "days_since_last_inspection",
+          "value": "315",
+          "shap": 0.04,
+          "label": "Last inspected 315 days ago",
+          "detail": "Slightly above typical cadence"
+        }
+      ]
+    },
+    {
+      "license_id": "26755",
+      "dba_name": "Golden Wok Corporation",
+      "address": "4500 N Broadway",
+      "neighborhood": "Uptown",
+      "zip": "60640",
+      "facility_type": "Restaurant",
+      "lat": 41.9647,
+      "lon": -87.6592,
+      "risk_score": 0.24,
+      "risk_tier": "Moderate",
+      "trend_slope_90d": -0.0019,
+      "trend_ci_low": -0.0033,
+      "trend_ci_high": -0.0006,
+      "top_drivers": [
+        {
+          "feature": "prior_fails",
+          "value": "0",
+          "shap": -0.04,
+          "label": "No failed inspections on record",
+          "detail": "Eight inspections, all Pass or Pass w/ Conditions"
+        }
+      ]
+    },
+    {
+      "license_id": "1773390",
+      "dba_name": "Starbucks",
+      "address": "2545 N Lincoln Ave",
+      "neighborhood": "Lincoln Park",
+      "zip": "60614",
+      "facility_type": "Coffee shop",
+      "lat": 41.9290,
+      "lon": -87.6492,
+      "risk_score": 0.18,
+      "risk_tier": "Low",
+      "trend_slope_90d": -0.0008,
+      "trend_ci_low": -0.0018,
+      "trend_ci_high": 0.0002,
+      "top_drivers": [
+        {
+          "feature": "prior_fails",
+          "value": "0",
+          "shap": -0.06,
+          "label": "No failed inspections on record",
+          "detail": "Six Pass results since 2021"
+        }
+      ]
+    },
+    {
+      "license_id": "2398970",
+      "dba_name": "La Pasadita",
+      "address": "1132 N Ashland Ave",
+      "neighborhood": "Wicker Park",
+      "zip": "60622",
+      "facility_type": "Restaurant",
+      "lat": 41.9028,
+      "lon": -87.6678,
+      "risk_score": 0.14,
+      "risk_tier": "Low",
+      "trend_slope_90d": -0.0012,
+      "trend_ci_low": -0.0024,
+      "trend_ci_high": -0.0001,
+      "top_drivers": [
+        {
+          "feature": "prior_fails",
+          "value": "0",
+          "shap": -0.05,
+          "label": "No failed inspections on record",
+          "detail": "Consistent Pass results since 2019"
+        }
+      ]
+    }
+  ],
+  "inspection_history": {
+    "1242184": [
+      { "date": "2026-05-22", "type": "Canvass", "result": "Pass", "headline": "" },
+      { "date": "2025-11-14", "type": "Canvass", "result": "Pass w/ Conditions", "headline": "Code 32 — improper cooling within 4 hrs from 135 °F to 70 °F" },
+      { "date": "2024-05-04", "type": "Re-inspection", "result": "Pass w/ Conditions", "headline": "Code 14 — hand-wash sink supplied with soap, towel, warm water" },
+      { "date": "2024-04-12", "type": "Canvass", "result": "Fail", "headline": "Code 02 — cold-holding temperatures above 41 °F at prep cooler" },
+      { "date": "2023-09-08", "type": "Canvass", "result": "Pass", "headline": "" },
+      { "date": "2023-02-21", "type": "Re-inspection", "result": "Pass w/ Conditions", "headline": "Code 10 — hand-wash signage missing in food-prep area" },
+      { "date": "2023-01-19", "type": "Canvass", "result": "Fail", "headline": "Code 02 — improper hot-holding; chicken <135 °F in steam well" },
+      { "date": "2022-08-17", "type": "Canvass", "result": "Pass", "headline": "" },
+      { "date": "2022-02-02", "type": "Canvass", "result": "Pass w/ Conditions", "headline": "Code 36 — non-food contact surfaces" },
+      { "date": "2021-09-15", "type": "Canvass", "result": "Pass", "headline": "" },
+      { "date": "2021-03-08", "type": "Canvass", "result": "Pass", "headline": "" }
+    ]
+  }
+}

@@ -2,7 +2,14 @@
 # Anchored so the Python subpackage `src/foodsafety/data/` (which contains
 # `labels.py`) is NOT silently ignored by an unanchored `data/` pattern.
 /data/
-/app/public/data/
+# Web-app generated JSONs are gitignored except the small demo fallback —
+# loader in scores-server.ts falls back to scores_mock.json when scores.json
+# is absent, so a fresh clone can render without running the pipeline first.
+# Note: a leaf-level pattern is required here. Git's negation rule does NOT
+# re-include files whose parent directory is excluded, so we can't write
+# `/app/public/data/` + `!scores_mock.json`.
+/app/public/data/*.json
+!/app/public/data/scores_mock.json
 **/_partial_*/
 
 # Saved model files
