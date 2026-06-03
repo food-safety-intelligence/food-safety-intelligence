@@ -22,7 +22,6 @@ export function ArcGauge({
   const cy = size / 2;
   const r = size / 2 - 22;
   const startAngle = 135; // degrees from 3 o'clock, going CCW
-  const endAngle = -135; // 135° + 270° span
   const sweep = 270;
 
   const trackPath = arcPath(cx, cy, r, startAngle, sweep);

@@ -191,10 +191,19 @@ function PinLayer({
 
   useEffect(() => {
     if (!map) return;
-    syncFromMap();
+    // Don't call syncFromMap() synchronously here — that's the
+    // react-hooks/set-state-in-effect anti-pattern (cascading renders).
+    // Defer the initial read to the map's "load" event (if not yet loaded)
+    // or the next microtask. Subsequent updates come from pan/zoom events.
+    if (map.loaded()) {
+      queueMicrotask(syncFromMap);
+    } else {
+      map.once("load", syncFromMap);
+    }
     map.on("moveend", syncFromMap);
     map.on("zoomend", syncFromMap);
     return () => {
+      map.off("load", syncFromMap);
       map.off("moveend", syncFromMap);
       map.off("zoomend", syncFromMap);
     };

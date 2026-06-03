@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Filter, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import type { PinSummary, RestaurantScore, RiskTier } from "@/lib/scores";
 import { TIER_HEX, TIER_TEXT_CLASS } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
