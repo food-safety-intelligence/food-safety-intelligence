@@ -12,6 +12,16 @@ import { cn } from "@/lib/utils";
 
 const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
 
+/** Common shape for side-list rows. PinSummary rows set trend to null. */
+type ListRow = {
+  license_id: string;
+  dba_name: string;
+  address: string;
+  risk_score: number;
+  risk_tier: RiskTier;
+  trend_slope_90d: number | null;
+};
+
 /**
  * Map-first home shell — the design's "Chicago Safety Map" screen, scaled
  * for desktop. Layout:
@@ -42,27 +52,56 @@ export function MapExplorer({
     new Set(ALL_TIERS),
   );
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return scores
-      .filter((r) => activeTiers.has(r.risk_tier))
-      .filter((r) =>
-        q
-          ? `${r.dba_name} ${r.address} ${r.neighborhood}`
-              .toLowerCase()
-              .includes(q)
+  const trimmedQuery = query.trim().toLowerCase();
+  const hasQuery = trimmedQuery.length > 0;
+
+  // Map: filter by tier always; filter by query across the FULL pin set when
+  // present. Without a query the map still shows zoom-aware density from all
+  // ~23k pins; with a query the result narrows to typed-name matches.
+  const visiblePins = useMemo(() => {
+    return pins
+      .filter((p) => activeTiers.has(p.risk_tier))
+      .filter((p) =>
+        hasQuery
+          ? `${p.dba_name} ${p.address}`.toLowerCase().includes(trimmedQuery)
           : true,
       );
-  }, [scores, query, activeTiers]);
+  }, [pins, activeTiers, hasQuery, trimmedQuery]);
 
-  // The map gets the FULL pin set (all ~23k restaurants) so it can do
-  // zoom-aware density on its own. The side list still works against the
-  // smaller scoresfull-feature top-N for fast search + rich rows. Tier-chip
-  // filtering applies to both.
-  const visiblePins = useMemo(
-    () => pins.filter((p) => activeTiers.has(p.risk_tier)),
-    [pins, activeTiers],
-  );
+  // Side list: with no query we render the rich top-200 from `scores` (has
+  // trend slopes); with a query we search the FULL pin set so a name like
+  // "Starbucks" at rank 5,000 is findable. Capped at 200 results.
+  const listRows = useMemo<ListRow[]>(() => {
+    if (!hasQuery) {
+      return scores
+        .filter((r) => activeTiers.has(r.risk_tier))
+        .slice()
+        .sort((a, b) => b.risk_score - a.risk_score)
+        .slice(0, 200)
+        .map<ListRow>((r) => ({
+          license_id: r.license_id,
+          dba_name: r.dba_name,
+          address: r.address,
+          risk_score: r.risk_score,
+          risk_tier: r.risk_tier,
+          trend_slope_90d: r.trend_slope_90d,
+        }));
+    }
+    return pins
+      .filter((p) => activeTiers.has(p.risk_tier))
+      .filter((p) =>
+        `${p.dba_name} ${p.address}`.toLowerCase().includes(trimmedQuery),
+      )
+      .slice(0, 200)
+      .map<ListRow>((p) => ({
+        license_id: p.license_id,
+        dba_name: p.dba_name,
+        address: p.address,
+        risk_score: p.risk_score,
+        risk_tier: p.risk_tier,
+        trend_slope_90d: null,
+      }));
+  }, [scores, pins, activeTiers, hasQuery, trimmedQuery]);
 
   const toggleTier = (tier: RiskTier) => {
     setActiveTiers((prev) => {
@@ -114,7 +153,7 @@ export function MapExplorer({
               ))}
               <span className="grow" />
               <span className="text-[11px] text-muted mr-2">
-                {filtered.length.toLocaleString()} shown
+                {visiblePins.length.toLocaleString()} on map
               </span>
             </div>
           </div>
@@ -131,59 +170,62 @@ export function MapExplorer({
         <div className="rounded-3xl bg-card border border-line soft-shadow flex flex-col h-full overflow-hidden">
           <div className="px-5 py-4 border-b border-line bg-cream/40">
             <h2 className="font-semibold tracking-tight text-[15px]">
-              {query
-                ? `Matching "${query}"`
-                : "Highest-risk · live"}
+              {hasQuery ? `Matching "${query}"` : "Highest-risk · live"}
             </h2>
             <p className="text-[11px] text-muted mt-0.5">
-              {filtered.length.toLocaleString()} restaurants ·{" "}
-              {(totalEstablishments ?? scores.length).toLocaleString()} indexed
+              {hasQuery ? (
+                <>
+                  {listRows.length.toLocaleString()} of{" "}
+                  {pins.length.toLocaleString()} match
+                </>
+              ) : (
+                <>
+                  Top {listRows.length} ·{" "}
+                  {(totalEstablishments ?? scores.length).toLocaleString()} indexed
+                </>
+              )}
             </p>
           </div>
 
           <ul className="flex-1 overflow-y-auto divide-y divide-line">
-            {filtered.length === 0 && (
+            {listRows.length === 0 && (
               <li className="px-5 py-8 text-[13px] text-muted text-center">
                 No restaurants match these filters.
               </li>
             )}
-            {filtered
-              .slice()
-              .sort((a, b) => b.risk_score - a.risk_score)
-              .slice(0, 200)
-              .map((r) => (
-                <li key={r.license_id}>
-                  <Link
-                    href={`/restaurant/${r.license_id}`}
-                    className="flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors"
+            {listRows.map((r) => (
+              <li key={r.license_id}>
+                <Link
+                  href={`/restaurant/${r.license_id}`}
+                  className="flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors"
+                >
+                  <div
+                    className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
+                    style={{ background: TIER_HEX[r.risk_tier] }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-[13.5px] leading-tight truncate">
+                      {r.dba_name}
+                    </div>
+                    <div className="text-[11.5px] text-muted truncate mt-0.5">
+                      {r.address}
+                    </div>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      <TierPill tier={r.risk_tier} size="sm" />
+                      <TrendIndicator slope={r.trend_slope_90d} />
+                    </div>
+                  </div>
+                  <div
+                    className={cn(
+                      "num text-[18px] font-medium tabular-nums leading-none",
+                      TIER_TEXT_CLASS[r.risk_tier],
+                    )}
                   >
-                    <div
-                      className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
-                      style={{ background: TIER_HEX[r.risk_tier] }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-[13.5px] leading-tight truncate">
-                        {r.dba_name}
-                      </div>
-                      <div className="text-[11.5px] text-muted truncate mt-0.5">
-                        {r.address}
-                      </div>
-                      <div className="flex items-center gap-2 mt-1.5">
-                        <TierPill tier={r.risk_tier} size="sm" />
-                        <TrendIndicator slope={r.trend_slope_90d} />
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "num text-[18px] font-medium tabular-nums leading-none",
-                        TIER_TEXT_CLASS[r.risk_tier],
-                      )}
-                    >
-                      {r.risk_score.toFixed(2)}
-                    </div>
-                  </Link>
-                </li>
-              ))}
+                    {r.risk_score.toFixed(2)}
+                  </div>
+                </Link>
+              </li>
+            ))}
           </ul>
         </div>
       </aside>
