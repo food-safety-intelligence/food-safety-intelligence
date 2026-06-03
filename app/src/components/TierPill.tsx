@@ -1,0 +1,51 @@
+import { cn } from "@/lib/utils";
+import type { RiskTier } from "@/lib/scores";
+
+interface TierPillProps {
+  tier: RiskTier;
+  size?: "sm" | "md";
+  withCount?: number;
+  className?: string;
+}
+
+/**
+ * Risk-tier badge. The four tier variants are spelled out so Tailwind 4 can
+ * see the class strings statically and emit them into the build. Don't
+ * compute these strings — Tailwind 4's CSS-first scanning won't find them
+ * if they're built from template literals.
+ */
+export function TierPill({
+  tier,
+  size = "md",
+  withCount,
+  className,
+}: TierPillProps) {
+  const sizing =
+    size === "sm" ? "text-[10.5px] px-2 py-0.5" : "text-[12px] px-3.5 py-1.5";
+
+  const variant = {
+    Low: "bg-tier-low-bg text-tier-low-fg",
+    Moderate: "bg-tier-mod-bg text-tier-mod-fg",
+    Elevated: "bg-tier-elev-bg text-tier-elev-fg",
+    High: "bg-tier-high-bg text-tier-high-fg",
+  }[tier];
+
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full font-medium tracking-[0.04em]",
+        sizing,
+        variant,
+        className,
+      )}
+    >
+      <span className="w-[7px] h-[7px] rounded-full bg-current" />
+      {tier}
+      {withCount !== undefined && (
+        <span className="num text-[11px] opacity-75 ml-0.5">
+          {withCount.toLocaleString()}
+        </span>
+      )}
+    </span>
+  );
+}

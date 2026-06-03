@@ -1,0 +1,58 @@
+import Link from "next/link";
+import { MapPin } from "lucide-react";
+
+/**
+ * Top-of-page header. Server component — no client interactivity needed.
+ *
+ * `activeNav` lets each page hint which item to highlight. Hard-coded
+ * navigation is fine for this iteration; we'll lift to a config when more
+ * routes land.
+ */
+export type NavItem = "search" | "caregivers" | "how" | "sources";
+
+const NAV: { id: NavItem; label: string; href: string }[] = [
+  { id: "search", label: "Search", href: "/" },
+  { id: "caregivers", label: "For caregivers", href: "/caregivers" },
+  { id: "how", label: "How this works", href: "/how-it-works" },
+  { id: "sources", label: "Sources", href: "/sources" },
+];
+
+export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
+  return (
+    <header className="pt-6">
+      <div className="max-w-[1240px] mx-auto px-8 flex items-center justify-between">
+        <Link href="/" className="flex items-center gap-3 group">
+          <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-sage/15">
+            <MapPin className="w-[18px] h-[18px] text-sage" strokeWidth={2} />
+          </span>
+          <div className="leading-tight">
+            <div className="text-[16px] font-semibold tracking-tight group-hover:text-teal transition-colors">
+              Food Safety
+            </div>
+            <div className="text-[11px] text-muted tracking-wide">
+              Chicago · public-data preview
+            </div>
+          </div>
+        </Link>
+        <nav className="flex items-center gap-1 text-[13px]">
+          {NAV.map((item) => {
+            const active = item.id === activeNav;
+            return (
+              <Link
+                key={item.id}
+                href={item.href}
+                className={
+                  active
+                    ? "px-3 py-1.5 rounded-full bg-ink text-cream"
+                    : "px-3 py-1.5 rounded-full hover:bg-tint transition-colors"
+                }
+              >
+                {item.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
+    </header>
+  );
+}

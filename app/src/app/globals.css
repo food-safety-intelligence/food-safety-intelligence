@@ -1,0 +1,105 @@
+@import "tailwindcss";
+
+/*
+ * Clinical Quiet theme — warm-clean patient-portal palette.
+ * Tailwind 4 reads custom tokens from @theme; they become available as
+ * `bg-cream`, `text-ink`, etc. throughout the app.
+ *
+ * Font variables (--font-manrope, --font-instrument, --font-plex-sans) are
+ * supplied by `next/font/google` in `src/app/layout.tsx`. We alias them to
+ * the canonical Tailwind names so utilities like `font-sans` and `font-serif`
+ * just work without per-class font references.
+ */
+@theme inline {
+  --color-cream:  #F6F1E9;
+  --color-card:   #FFFFFF;
+  --color-ink:    #2B3239;
+  --color-muted:  #6B7280;
+  --color-line:   #E6DFD3;
+  --color-tint:   #EDE6D8;
+
+  /* Risk-tier palette — intentionally muted, not alarming */
+  --color-sage:   #7A8F6A;  /* Low */
+  --color-amber:  #D4A571;  /* Moderate */
+  --color-coral:  #DA8A6C;  /* Elevated */
+  --color-terra:  #B8634A;  /* High */
+  --color-teal:   #486073;  /* links / accents */
+
+  /* Tier-pill background tints */
+  --color-tier-low-bg:    #EAEDDE;
+  --color-tier-low-fg:    #445539;
+  --color-tier-mod-bg:    #F4E9D5;
+  --color-tier-mod-fg:    #7A5A24;
+  --color-tier-elev-bg:   #F2DBCB;
+  --color-tier-elev-fg:   #8B4C30;
+  --color-tier-high-bg:   #E7C9BE;
+  --color-tier-high-fg:   #7B3C26;
+
+  --font-sans:  var(--font-manrope);
+  --font-serif: var(--font-instrument);
+  --font-num:   var(--font-plex-sans);
+
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 2rem;
+}
+
+body {
+  background: var(--color-cream);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "ss01", "kern", "cv11";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Utility classes shared across pages — kept minimal so the rest of the
+ * styling stays as Tailwind utility classes co-located with the JSX.
+ */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+}
+
+.num {
+  font-family: var(--font-num);
+  font-feature-settings: "tnum";
+  letter-spacing: -0.01em;
+}
+
+.soft-shadow {
+  box-shadow: 0 1px 2px rgba(43, 50, 57, 0.04), 0 8px 24px rgba(43, 50, 57, 0.04);
+}
+
+.soft-shadow-lg {
+  box-shadow: 0 1px 2px rgba(43, 50, 57, 0.05), 0 24px 48px rgba(43, 50, 57, 0.06);
+}
+
+/* Restyle the maplibre popup so it matches the Clinical Quiet card system —
+ * rounded, soft-shadowed, ink-toned border. Default maplibre popups look
+ * generic; this pulls them into the design system.
+ */
+.maplibregl-popup.fsi-popup .maplibregl-popup-content {
+  padding: 14px 16px 14px 16px;
+  border-radius: 16px;
+  background: #FFFFFF;
+  border: 1px solid var(--color-line);
+  box-shadow: 0 1px 2px rgba(43, 50, 57, 0.05), 0 18px 36px rgba(43, 50, 57, 0.10);
+  font-family: var(--font-sans);
+}
+.maplibregl-popup.fsi-popup .maplibregl-popup-tip {
+  border-top-color: #FFFFFF !important;
+}
+/* The map control buttons + attribution chip — soften so they don't fight
+ * the Clinical Quiet palette. */
+.maplibregl-ctrl-group {
+  border-radius: 12px !important;
+  overflow: hidden;
+  border: 1px solid var(--color-line) !important;
+  box-shadow: 0 1px 2px rgba(43, 50, 57, 0.05), 0 8px 20px rgba(43, 50, 57, 0.06) !important;
+}
+.maplibregl-ctrl-attrib {
+  border-radius: 8px 0 0 0 !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(6px);
+  font-family: var(--font-sans);
+  font-size: 10px !important;
+}
