@@ -1,5 +1,8 @@
-# Data — reproducible from notebooks/scripts, never commit
-data/
+# Data — reproducible from notebooks/scripts, never commit.
+# Anchored so the Python subpackage `src/foodsafety/data/` (which contains
+# `labels.py`) is NOT silently ignored by an unanchored `data/` pattern.
+/data/
+/app/public/data/
 **/_partial_*/
 
 # Saved model files
