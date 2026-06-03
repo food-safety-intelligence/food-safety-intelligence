@@ -32,23 +32,40 @@ uv sync --extra dev          # creates .venv, installs deps
 uv run nbstripout --install  # one-time: wire the git filter that
                              # strips notebook outputs on commit
 cp .env.example .env         # default settings work; edit if needed
-
-# One-time data pull (or copy from teammate's data/raw/ to skip this — ~15 min)
-make data
-
-# End-to-end: build features → train baseline + XGBoost → write scores.parquet → export JSON
-make all
 ```
+
+**Current pipeline state (MVP, 2026-06):** data fetch + feature build run
+from notebooks; training + scoring + export are scripted.
+
+```bash
+# 1. Data fetch + features (notebooks today; will be scripted post-MVP):
+#    Open in Jupyter/VS Code and run top-to-bottom:
+#      notebooks/00_feasibility_eda.ipynb     -> data/raw/*.parquet
+#      notebooks/02_label_construction.ipynb  -> data/processed/inspections_labeled.parquet
+#      notebooks/03_feature_engineering.ipynb -> data/processed/features.parquet
+
+# 2. Retrain + score + export (one command):
+make retrain     # writes data/models/baseline_sigmoid_<date>.joblib
+                 # + data/predictions/scores.parquet
+                 # + app/public/data/scores.json
+
+# 3. Inspection-history sidecar for the detail page:
+make history     # writes app/public/data/inspection_history.json
+```
+
+The web app falls back to `scores_mock.json` (9 KB, checked in) when the
+real `scores.json` hasn't been generated — fresh clones can run the UI
+without the Python pipeline.
 
 ### Web app (Next.js)
 
-Requires Node 20+ and pnpm (or npm). After `make all` has produced
-`app/public/data/scores.json`:
+Requires Node 20+. Works against the mock fixture on a fresh clone; reads
+the real `scores.json` automatically once you generate it above.
 
 ```bash
 cd app
-pnpm install        # or: npm install
-pnpm dev            # http://localhost:3000
+npm install
+npm run dev      # http://localhost:3000
 ```
 
 ## Project layout
