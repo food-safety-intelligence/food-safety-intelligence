@@ -44,6 +44,7 @@ def build_features(
     drop_burnin: bool = True,
     drop_invalid_license: bool = True,
     drop_non_modelable: bool = True,
+    drop_right_truncated: bool = False,
 ) -> pd.DataFrame:
     """End-to-end feature build.
 
@@ -59,6 +60,12 @@ def build_features(
         drop_invalid_license: drop rows with ``license_id`` in {"", "0"}.
         drop_non_modelable: drop rows whose ``results`` is not in
             ``MODELABLE_RESULTS``.
+        drop_right_truncated: drop rows whose forward 180-day window extends
+            past the dataset max date. Those labels are under-counted (we
+            haven't observed the full window yet) so they bias eval metrics
+            — but the FEATURES are valid for scoring. Default ``False`` so
+            the parquet preserves them; the trainer filters them out before
+            train/val/test, then scores against the full set.
 
     Returns:
         New DataFrame. Original inputs not mutated.
@@ -100,5 +107,13 @@ def build_features(
         df = df[~df["license_id"].isin({"", "0"})]
     if drop_non_modelable:
         df = df[df["results"].isin(MODELABLE_RESULTS)]
+    if drop_right_truncated:
+        # Anchors whose 180-day forward window extends past the dataset's
+        # latest inspection date have under-counted labels: any future Fail
+        # we haven't observed becomes a silent 0. Keep them out of training
+        # AND eval — otherwise held-out metrics are biased (the test split is
+        # the most affected since it's the most recent slice; on the current
+        # snapshot about half of the test rows are right-truncated).
+        df = df[~df["right_truncated"]]
 
     return df.reset_index(drop=True)

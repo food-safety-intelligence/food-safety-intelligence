@@ -102,8 +102,32 @@ def main() -> None:
     if LABEL_COL not in features.columns:
         raise SystemExit(f"features.parquet missing {LABEL_COL} column")
 
+    # We split features into two views:
+    #   • `features_modelable` — used for train/val/test. Drops rows whose
+    #     180-day forward window extends past the dataset max date: their
+    #     labels are under-counted (any unseen future Fail becomes y=0) so
+    #     they'd bias eval metrics. The test split is the worst affected
+    #     since it's the most recent slice.
+    #   • `features` (unchanged) — used for SCORING the home page. The
+    #     features themselves are valid even when the label is unreliable,
+    #     and we don't want to drop ~3% of restaurants whose most-recent
+    #     inspection happens to fall in the trailing 180 days.
+    if "right_truncated" in features.columns:
+        features_modelable = features.loc[~features["right_truncated"]].reset_index(
+            drop=True
+        )
+        n_dropped = len(features) - len(features_modelable)
+        if n_dropped:
+            print(
+                f"  filtered {n_dropped:,} right-truncated rows from modeling "
+                f"({n_dropped / len(features):.1%} of input); full set retained "
+                f"for scoring"
+            )
+    else:
+        features_modelable = features
+
     print(f"Temporal split (train_end={TRAIN_END}, val_end={VAL_END})")
-    split = temporal_split(features, train_end=TRAIN_END, val_end=VAL_END)
+    split = temporal_split(features_modelable, train_end=TRAIN_END, val_end=VAL_END)
     print(
         f"  train n={len(split.train):,}  val n={len(split.val):,}  test n={len(split.test):,}"
     )
