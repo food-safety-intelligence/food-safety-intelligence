@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Great Falafel · Food Safety · Chicago</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Manrope:wght@300;400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        cream:'#F6F1E9', card:'#FFFFFF', ink:'#2B3239', muted:'#6B7280',
+        line:'#E6DFD3', sage:'#7A8F6A', amber:'#D4A571', coral:'#DA8A6C',
+        terra:'#B8634A', teal:'#486073', tint:'#EDE6D8',
+      },
+      fontFamily:{
+        sans:['Manrope','ui-sans-serif','system-ui','sans-serif'],
+        serif:['"Instrument Serif"','Georgia','serif'],
+        num:['"IBM Plex Sans"','ui-sans-serif','sans-serif']
+      },
+      borderRadius:{'4xl':'2rem'}
+    }
+  }
+}
+</script>
+<style>
+  html,body{background:#F6F1E9;}
+  body{font-family:'Manrope',ui-sans-serif,system-ui,sans-serif;color:#2B3239;font-feature-settings:"ss01","kern","cv11";}
+  .serif{font-family:'Instrument Serif',Georgia,serif;font-weight:400;}
+  .num{font-family:'IBM Plex Sans',ui-sans-serif,sans-serif;font-feature-settings:"tnum";letter-spacing:-0.01em;}
+  .soft-shadow{box-shadow:0 1px 2px rgba(43,50,57,.04),0 8px 24px rgba(43,50,57,.04);}
+  .soft-shadow-lg{box-shadow:0 1px 2px rgba(43,50,57,.05),0 24px 48px rgba(43,50,57,.06);}
+  .tier-pill{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:9999px;font-size:12px;letter-spacing:0.04em;font-weight:500;}
+  .tier-high{background:#E7C9BE;color:#7B3C26;}
+  .tier-dot{width:7px;height:7px;border-radius:9999px;background:currentColor;}
+  .nav-link{padding:6px 12px;border-radius:9999px;}
+  .nav-link.active{background:#2B3239;color:#F6F1E9;}
+  .nav-link:not(.active):hover{background:#EDE6D8;}
+  /* score bar with marker */
+  .gauge {position:relative;height:14px;border-radius:9999px;
+    background:linear-gradient(90deg,#EAEDDE 0%, #EAEDDE 20%, #F4E9D5 20%, #F4E9D5 40%, #F2DBCB 40%, #F2DBCB 65%, #E7C9BE 65%, #E7C9BE 100%);}
+  .gauge-marker{position:absolute;top:-7px;width:4px;height:28px;background:#2B3239;border-radius:2px;}
+  .gauge-marker::after{content:'';position:absolute;top:-7px;left:-5px;width:14px;height:14px;border-radius:9999px;background:#2B3239;}
+  .driver-bar{height:6px;background:#EDE6D8;border-radius:9999px;overflow:hidden;}
+  .driver-fill{height:100%;background:#B8634A;border-radius:9999px;}
+  .driver-fill-neutral{background:#9CA59A;}
+  /* vertical timeline */
+  .v-line{position:absolute;left:11px;top:0;bottom:0;width:2px;background:#E6DFD3;}
+  .v-dot{width:24px;height:24px;border-radius:9999px;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:white;}
+  .v-pass{background:#7A8F6A;}
+  .v-cond{background:#D4A571;}
+  .v-fail{background:#B8634A;}
+</style>
+</head>
+<body class="text-ink antialiased">
+
+<header class="pt-6">
+  <div class="max-w-[1240px] mx-auto px-8 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-full bg-sage/15">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8F6A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 2a7 7 0 0 0-7 7c0 4.5 4 8 7 13 3-5 7-8.5 7-13a7 7 0 0 0-7-7z"/>
+          <circle cx="12" cy="9" r="2.5"/>
+        </svg>
+      </span>
+      <div class="leading-tight">
+        <div class="text-[16px] font-semibold tracking-tight">Food Safety</div>
+        <div class="text-[11px] text-muted tracking-wide">Chicago · public-data preview</div>
+      </div>
+    </a>
+    <nav class="flex items-center gap-1 text-[13px]">
+      <a class="nav-link" href="index.html">Search</a>
+      <a class="nav-link" href="#">For caregivers</a>
+      <a class="nav-link" href="#">How this works</a>
+      <a class="nav-link" href="#">Sources</a>
+    </nav>
+  </div>
+  <div class="max-w-[1240px] mx-auto px-8 mt-5">
+    <a href="index.html" class="inline-flex items-center gap-2 text-[13px] text-teal hover:underline">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      Back to search
+    </a>
+  </div>
+</header>
+
+<main class="max-w-[1240px] mx-auto px-8 pt-8 pb-24">
+
+  <!-- Hero -->
+  <section class="grid grid-cols-12 gap-8 mb-10">
+    <div class="col-span-12 lg:col-span-7">
+      <p class="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">Restaurant profile</p>
+      <h1 class="text-[3.4rem] font-light leading-[1.04] tracking-tight">
+        <span class="serif italic text-[1.05em]" style="font-weight:400;">Great</span>
+        <span> Falafel</span>
+      </h1>
+      <p class="text-[16px] text-muted mt-4 leading-relaxed">
+        500 W Diversey Pkwy &nbsp;·&nbsp; Lakeview East &nbsp;·&nbsp; Chicago, IL 60614
+      </p>
+      <div class="flex flex-wrap gap-2 mt-4 items-center text-[12px] text-muted">
+        <span class="px-2.5 py-1 rounded-full bg-tint">License #1242184</span>
+        <span class="px-2.5 py-1 rounded-full bg-tint">Restaurant</span>
+        <span class="px-2.5 py-1 rounded-full bg-tint">CDPH Risk 1 (High)</span>
+        <span class="px-2.5 py-1 rounded-full bg-tint">Last inspected · 22 May 2026</span>
+      </div>
+    </div>
+
+    <!-- Score card -->
+    <div class="col-span-12 lg:col-span-5">
+      <div class="rounded-3xl bg-white border border-line soft-shadow-lg p-7">
+        <div class="text-[11px] tracking-widest uppercase text-muted">Predicted 180-day risk</div>
+        <div class="flex items-end gap-4 mt-2">
+          <div class="num text-[80px] leading-none font-medium tracking-tight">0.82</div>
+          <div class="mb-3">
+            <span class="tier-pill tier-high"><span class="tier-dot"></span>High</span>
+          </div>
+        </div>
+        <p class="text-[14px] text-muted leading-relaxed mt-2">
+          A typical Chicago restaurant scores
+          <span class="num font-medium text-ink">0.21</span>.
+          This score is in the
+          <span class="serif italic text-terra text-[18px] mx-0.5">top 1.7%</span>
+          of currently active food licenses.
+        </p>
+
+        <div class="mt-7">
+          <div class="flex justify-between text-[10.5px] tracking-widest uppercase text-muted mb-2">
+            <span>Low</span><span>Moderate</span><span>Elevated</span><span>High</span>
+          </div>
+          <div class="gauge">
+            <div class="gauge-marker" style="left:calc(82% - 2px);"></div>
+          </div>
+          <div class="flex justify-between text-[11px] text-muted/80 mt-1.5 num">
+            <span>0.00</span><span>0.20</span><span>0.40</span><span>0.65</span><span>1.00</span>
+          </div>
+        </div>
+
+        <div class="mt-7 pt-5 border-t border-line">
+          <div class="text-[11px] tracking-widest uppercase text-muted mb-2">90-day trend</div>
+          <div class="flex items-center gap-3">
+            <span class="inline-flex w-8 h-8 rounded-full bg-terra/15 items-center justify-center">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#B8634A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            </span>
+            <div>
+              <div class="font-semibold text-[15px]">Worsening</div>
+              <div class="num text-[12px] text-muted">+0.0048 / day · 95% CI [+0.0021, +0.0079]</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Drivers -->
+  <section class="mb-12">
+    <div class="grid grid-cols-12 gap-8 items-end mb-6">
+      <div class="col-span-12 lg:col-span-7">
+        <p class="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">What's driving the score</p>
+        <h2 class="text-[2rem] font-light leading-tight tracking-tight">
+          Five factors are doing most of the work.
+        </h2>
+        <p class="text-[15px] text-muted leading-relaxed mt-3 max-w-[60ch]">
+          The model attributes the score to recent priority violations and
+          neighborhood complaint density. The drivers below are sorted from
+          most to least influential.
+        </p>
+      </div>
+      <div class="col-span-12 lg:col-span-5 lg:text-right">
+        <a href="#" class="inline-flex items-center gap-2 text-[13px] text-teal hover:underline">
+          What is a priority violation?
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="rounded-3xl bg-white border border-line soft-shadow overflow-hidden">
+      <ol>
+        <li class="grid grid-cols-12 gap-4 items-center px-6 py-5 border-b border-line">
+          <div class="col-span-1 num text-muted text-[14px]">01</div>
+          <div class="col-span-6">
+            <div class="font-semibold">3 priority violations in the prior 2 years</div>
+            <div class="text-[12.5px] text-muted mt-0.5">Recorded 2024-04, 2023-01, 2022-08 · code 1–29 family</div>
+          </div>
+          <div class="col-span-4"><div class="driver-bar"><div class="driver-fill" style="width:82%;"></div></div></div>
+          <div class="col-span-1 num text-right font-medium text-terra">+0.18</div>
+        </li>
+        <li class="grid grid-cols-12 gap-4 items-center px-6 py-5 border-b border-line">
+          <div class="col-span-1 num text-muted text-[14px]">02</div>
+          <div class="col-span-6">
+            <div class="font-semibold">4 rodent complaints within 300 m, last 90 days</div>
+            <div class="text-[12.5px] text-muted mt-0.5">311 reports of "Rodent Baiting / Rat Complaint"</div>
+          </div>
+          <div class="col-span-4"><div class="driver-bar"><div class="driver-fill" style="width:55%;"></div></div></div>
+          <div class="col-span-1 num text-right font-medium text-terra">+0.12</div>
+        </li>
+        <li class="grid grid-cols-12 gap-4 items-center px-6 py-5 border-b border-line">
+          <div class="col-span-1 num text-muted text-[14px]">03</div>
+          <div class="col-span-6">
+            <div class="font-semibold">Temperature-related violation in recent history</div>
+            <div class="text-[12.5px] text-muted mt-0.5">Cold-holding cited 2024-04-12; below 41 °F at prep cooler</div>
+          </div>
+          <div class="col-span-4"><div class="driver-bar"><div class="driver-fill" style="width:41%;"></div></div></div>
+          <div class="col-span-1 num text-right font-medium text-terra">+0.09</div>
+        </li>
+        <li class="grid grid-cols-12 gap-4 items-center px-6 py-5 border-b border-line">
+          <div class="col-span-1 num text-muted text-[14px]">04</div>
+          <div class="col-span-6">
+            <div class="font-semibold">Last inspected 412 days ago</div>
+            <div class="text-[12.5px] text-muted mt-0.5">Cadence has lengthened; typical interval is 220–300 days</div>
+          </div>
+          <div class="col-span-4"><div class="driver-bar"><div class="driver-fill" style="width:32%;"></div></div></div>
+          <div class="col-span-1 num text-right font-medium text-terra">+0.07</div>
+        </li>
+        <li class="grid grid-cols-12 gap-4 items-center px-6 py-5">
+          <div class="col-span-1 num text-muted text-[14px]">05</div>
+          <div class="col-span-6">
+            <div class="font-semibold">Facility type: Restaurant in a Risk-1 tract</div>
+            <div class="text-[12.5px] text-muted mt-0.5">Modest positive baseline relative to Risk-2 / Risk-3 tracts</div>
+          </div>
+          <div class="col-span-4"><div class="driver-bar"><div class="driver-fill driver-fill-neutral" style="width:15%;"></div></div></div>
+          <div class="col-span-1 num text-right font-medium">+0.03</div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Caregiver guidance -->
+  <section class="mb-12">
+    <div class="rounded-3xl bg-tint border border-line p-7 grid grid-cols-12 gap-6 items-start">
+      <div class="col-span-12 md:col-span-2">
+        <span class="inline-flex w-12 h-12 rounded-2xl bg-white items-center justify-center soft-shadow">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#486073" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+          </svg>
+        </span>
+      </div>
+      <div class="col-span-12 md:col-span-10">
+        <p class="text-teal text-[12.5px] tracking-[0.18em] uppercase mb-2">A note for immunocompromised diners</p>
+        <p class="text-[16.5px] leading-relaxed text-ink/90">
+          Drivers 02 and 03 — recent rodent complaints and a temperature-related
+          violation — are the patterns your care team would most want you to consider.
+          Drivers like "long since last inspection" are administrative; they don't
+          tell you about the kitchen itself.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Inspection history -->
+  <section class="mb-12">
+    <div class="mb-6">
+      <p class="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">Inspection history</p>
+      <h2 class="text-[2rem] font-light leading-tight tracking-tight">
+        Eleven inspections on record. <span class="serif italic text-terra" style="font-size:1.05em;">Two failures.</span>
+      </h2>
+      <p class="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
+        Real Chicago Department of Public Health records, independent of the predicted
+        risk score above.
+      </p>
+    </div>
+
+    <div class="grid grid-cols-12 gap-6">
+      <div class="col-span-12 md:col-span-7">
+        <div class="rounded-3xl bg-white border border-line soft-shadow p-6 relative">
+          <div class="v-line"></div>
+          <ul class="space-y-5 relative">
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-pass">P</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold">Pass</div>
+                  <div class="num text-[12px] text-muted">22 May 2026</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Canvass · no violations cited</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-cond">!</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold">Pass with Conditions</div>
+                  <div class="num text-[12px] text-muted">14 Nov 2025</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Canvass · code 32 — improper cooling within 4 hrs</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-cond">!</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold">Pass with Conditions</div>
+                  <div class="num text-[12px] text-muted">04 May 2024</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Re-inspection · code 14 — handwashing supplies</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-fail">×</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold text-terra">Fail</div>
+                  <div class="num text-[12px] text-muted">12 Apr 2024</div>
+                </div>
+                <div class="text-[13.5px] mt-0.5">Canvass · <span class="font-medium">code 02 — cold-holding observed above 41 °F</span> at prep cooler</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-pass">P</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold">Pass</div>
+                  <div class="num text-[12px] text-muted">08 Sep 2023</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Canvass · no violations cited</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-cond">!</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold">Pass with Conditions</div>
+                  <div class="num text-[12px] text-muted">21 Feb 2023</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Re-inspection · code 10 — handwash signage</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4">
+              <span class="v-dot v-fail">×</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div class="font-semibold text-terra">Fail</div>
+                  <div class="num text-[12px] text-muted">19 Jan 2023</div>
+                </div>
+                <div class="text-[13.5px] mt-0.5">Canvass · <span class="font-medium">code 02 — improper hot-holding</span>, chicken &lt;135 °F</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4 opacity-70">
+              <span class="v-dot v-pass">P</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div>Pass</div>
+                  <div class="num text-[12px] text-muted">17 Aug 2022</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Canvass · no violations cited</div>
+              </div>
+            </li>
+            <li class="flex items-start gap-4 opacity-70">
+              <span class="v-dot v-cond">!</span>
+              <div class="flex-1">
+                <div class="flex items-baseline justify-between">
+                  <div>Pass with Conditions</div>
+                  <div class="num text-[12px] text-muted">02 Feb 2022</div>
+                </div>
+                <div class="text-[13px] text-muted mt-0.5">Canvass · code 36 — non-food contact surfaces</div>
+              </div>
+            </li>
+          </ul>
+          <a href="#" class="block text-center text-[13px] mt-6 text-teal hover:underline">Show 2 older inspections</a>
+        </div>
+      </div>
+
+      <aside class="col-span-12 md:col-span-5 space-y-5">
+        <div class="rounded-3xl bg-white border border-line soft-shadow p-6">
+          <div class="text-[11px] tracking-widest uppercase text-muted mb-3">Result tally</div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="v-dot v-pass">P</span>
+              <div class="flex-1 text-[14.5px]">Pass</div>
+              <div class="num font-medium">6</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="v-dot v-cond">!</span>
+              <div class="flex-1 text-[14.5px]">Pass with Conditions</div>
+              <div class="num font-medium">3</div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="v-dot v-fail">×</span>
+              <div class="flex-1 text-[14.5px]">Fail</div>
+              <div class="num font-medium">2</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="rounded-3xl bg-white border border-line soft-shadow p-6">
+          <div class="text-[11px] tracking-widest uppercase text-muted mb-3">Nearby complaints (300 m, 90 d)</div>
+          <ul class="space-y-2 text-[14px]">
+            <li class="flex justify-between"><span>Rodent / rat complaints</span><span class="num font-medium">4</span></li>
+            <li class="flex justify-between"><span>Sanitation code violations</span><span class="num font-medium">2</span></li>
+            <li class="flex justify-between"><span>Garbage cart maintenance</span><span class="num font-medium">1</span></li>
+            <li class="flex justify-between text-muted"><span>Restaurant complaints</span><span class="num">0</span></li>
+          </ul>
+        </div>
+
+        <div class="rounded-3xl bg-tint border border-line p-6">
+          <div class="text-[11px] tracking-widest uppercase text-teal mb-2">License history</div>
+          <p class="text-[13.5px] leading-relaxed">
+            Licensed since <span class="font-medium num">Mar 2014</span>. Renewed
+            consistently; no license-status changes flagged.
+          </p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- Caveat -->
+  <section class="rounded-3xl bg-white border border-line soft-shadow p-8 mb-8">
+    <p class="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">A note on this score</p>
+    <h3 class="text-[1.6rem] font-light leading-snug tracking-tight max-w-[40ch]">
+      What this number is, and what it
+      <span class="serif italic text-terra" style="font-size:1.08em;">isn't.</span>
+    </h3>
+    <div class="grid grid-cols-12 gap-6 mt-5 text-[15px] text-ink/85 leading-[1.7]">
+      <div class="col-span-12 md:col-span-6">
+        <p class="font-medium mb-2">It is a prediction.</p>
+        <p>
+          A model estimate, drawn from the public record, of whether this establishment
+          will fail an inspection or be cited for a priority violation in the next 180 days.
+        </p>
+      </div>
+      <div class="col-span-12 md:col-span-6">
+        <p class="font-medium mb-2">It is not a verdict.</p>
+        <p>
+          A "High" prediction does not mean this restaurant is unsafe to eat at today.
+          It means the patterns in the record resemble those that historically precede
+          a failed inspection.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <div class="text-center mt-10">
+    <a href="index.html" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      Back to search
+    </a>
+  </div>
+</main>
+
+<footer class="border-t border-line bg-cream/70">
+  <div class="max-w-[1240px] mx-auto px-8 py-8 text-[13px] text-muted">
+    A research preview · UC Berkeley MIDS Capstone
+  </div>
+</footer>
+</body>
+</html>

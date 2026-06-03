@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Chicago Pulse — Food Safety Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..800;1,6..72,400..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        navy:     '#0A1726',
+        ink:      '#08111C',
+        steel:    '#1A2A3D',
+        slate:    '#2F4159',
+        fog:      '#7E8FA8',
+        cream:    '#EFE7D6',
+        paper:    '#F7F1E1',
+        sand:     '#D7C9A8',
+        blue:     '#2189FF',
+        bluedark: '#0F5BBF',
+        red:      '#FF5C4D',
+        coral:    '#F77F60',
+        gold:     '#F5C443',
+        moss:     '#7BA882',
+      },
+      fontFamily: {
+        display: ['Newsreader','ui-serif','Georgia','serif'],
+        sans:    ['"IBM Plex Sans"','ui-sans-serif','system-ui','sans-serif'],
+        mono:    ['"IBM Plex Mono"','ui-monospace','monospace'],
+      },
+    }
+  }
+}
+</script>
+<style>
+  html,body{background:#0A1726;color:#EFE7D6;}
+  body{font-family:'IBM Plex Sans',ui-sans-serif,system-ui;font-feature-settings:"ss03","ss05","kern";}
+  .display{font-family:'Newsreader','ui-serif','Georgia',serif;letter-spacing:-0.018em;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-feature-settings:"tnum";}
+  /* topographic background */
+  .topo{
+    background:
+      radial-gradient(1200px 600px at 80% -200px, rgba(33,137,255,0.10), transparent 60%),
+      radial-gradient(1000px 500px at -10% 110%, rgba(255,92,77,0.07), transparent 60%),
+      #0A1726;
+    position: relative;
+  }
+  .topo::before{
+    content:"";
+    position:absolute;inset:0;pointer-events:none;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(126,143,168,0.08) 0 1px, transparent 1px 70px),
+      repeating-linear-gradient(90deg, rgba(126,143,168,0.06) 0 1px, transparent 1px 70px);
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 30%, black, transparent 80%);
+  }
+  .card{background:#EFE7D6;color:#0A1726;border-radius:18px;box-shadow:
+    0 1px 0 rgba(255,255,255,0.05) inset,
+    0 28px 60px rgba(0,0,0,0.45);
+  }
+  .card-dark{background:#13202F;color:#EFE7D6;border-radius:18px;border:1px solid rgba(126,143,168,0.18);}
+  .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:9999px;font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;}
+  .pill-low{background:rgba(123,168,130,0.12);color:#9CC2A2;border:1px solid rgba(123,168,130,0.3);}
+  .pill-mod{background:rgba(245,196,67,0.10);color:#F5C443;border:1px solid rgba(245,196,67,0.32);}
+  .pill-elev{background:rgba(247,127,96,0.12);color:#F77F60;border:1px solid rgba(247,127,96,0.32);}
+  .pill-high{background:#FF5C4D;color:#0A1726;border:1px solid #FF5C4D;}
+  .pill-dot{width:6px;height:6px;border-radius:9999px;background:currentColor;}
+  /* light variants for use on cream cards */
+  .pill-on-cream-low{background:#E1ECDB;color:#3F5D43;border:1px solid #B7CFBD;}
+  .pill-on-cream-mod{background:#F4E7B7;color:#7C5C12;border:1px solid #D8BF6A;}
+  .pill-on-cream-elev{background:#F5D7C7;color:#8C411F;border:1px solid #E2A07F;}
+  .pill-on-cream-high{background:#FF5C4D;color:#0A1726;border:1px solid #FF5C4D;}
+  /* map */
+  .pin{width:11px;height:11px;border-radius:9999px;border:2px solid #EFE7D6;box-shadow:0 0 0 1px #0A1726, 0 2px 6px rgba(0,0,0,0.4);}
+  .pin-pulse{position:relative;}
+  .pin-pulse::after{
+    content:"";position:absolute;inset:-6px;border-radius:9999px;
+    border:1px solid #FF5C4D;animation:pulse 2.4s infinite;opacity:0.7;
+  }
+  @keyframes pulse{
+    0%   { transform: scale(0.6); opacity: 0.8; }
+    100% { transform: scale(2.0); opacity: 0; }
+  }
+  .focus-ring:focus{outline:2px solid #2189FF;outline-offset:3px;}
+  .micro{font-size:10px;letter-spacing:0.18em;text-transform:uppercase;font-family:'IBM Plex Mono',monospace;}
+  .row:hover{background:rgba(247,241,225,0.04);}
+</style>
+</head>
+<body class="font-sans antialiased topo min-h-screen">
+
+<!-- Top bar -->
+<header class="relative z-10">
+  <div class="max-w-[1320px] mx-auto px-8 pt-6 pb-4 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3">
+      <span class="inline-flex items-center justify-center w-10 h-10 rounded-2xl bg-cream/10 border border-fog/30">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#EFE7D6" stroke-width="1.6">
+          <path d="M3 12h4l3-8 4 16 3-8h4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </span>
+      <div class="leading-tight">
+        <div class="text-[13px] text-fog mono uppercase tracking-[0.22em]">Chicago Pulse</div>
+        <div class="display text-[19px] italic font-medium" style="font-variation-settings:'opsz' 28;">Food Safety Intelligence</div>
+      </div>
+    </a>
+    <nav class="flex items-center gap-1 text-[13px] text-fog">
+      <a href="#" class="px-3 py-1.5 rounded-full bg-cream/10 text-cream">Live index</a>
+      <a href="#" class="px-3 py-1.5 rounded-full hover:bg-cream/5">By neighborhood</a>
+      <a href="#" class="px-3 py-1.5 rounded-full hover:bg-cream/5">Methodology</a>
+      <a href="#" class="px-3 py-1.5 rounded-full hover:bg-cream/5">For caregivers</a>
+    </nav>
+    <div class="flex items-center gap-3">
+      <span class="mono text-[11px] text-fog flex items-center gap-2">
+        <span class="w-1.5 h-1.5 bg-moss rounded-full"></span>
+        Index live · updated 16:42
+      </span>
+      <button class="px-3 py-1.5 rounded-full bg-blue/15 text-blue text-[12.5px] border border-blue/30 hover:bg-blue/20">
+        Sign in
+      </button>
+    </div>
+  </div>
+</header>
+
+<!-- Demo banner -->
+<div class="relative z-10 max-w-[1320px] mx-auto px-8">
+  <div class="card-dark px-4 py-2.5 flex items-center gap-3 text-[12.5px] text-fog">
+    <span class="pill-mod pill"><span class="pill-dot"></span>Preview</span>
+    <span>
+      Risk scores are <span class="text-cream">synthetic</span> — randomly generated for design review.
+      The model isn't trained yet.
+    </span>
+    <span class="mono ml-auto opacity-70">model v0.1-mock · 180d window</span>
+  </div>
+</div>
+
+<main class="relative z-10 max-w-[1320px] mx-auto px-8 pt-10 pb-24">
+
+  <!-- Hero -->
+  <section class="grid grid-cols-12 gap-8 mb-14">
+    <div class="col-span-12 lg:col-span-7">
+      <p class="mono micro text-blue mb-4">02 / 06 / 2026 · Chicago · 28,047 establishments</p>
+      <h1 class="display text-[5.2rem] leading-[0.95] font-medium">
+        Who's at risk
+        <span class="italic font-normal text-cream" style="font-variation-settings:'opsz' 72;">tonight?</span>
+      </h1>
+      <p class="text-[17.5px] text-fog leading-[1.55] mt-6 max-w-[58ch]">
+        A live, explainable risk index for every licensed food establishment in Chicago.
+        Predicted from inspections, complaints, and license history. Updated daily.
+        Built for diners, designed for caregivers.
+      </p>
+
+      <!-- Search -->
+      <div class="mt-7 card-dark p-2 flex items-center gap-3 max-w-[640px]">
+        <span class="pl-3 pr-1">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#EFE7D6" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+          </svg>
+        </span>
+        <input type="text" placeholder="search name, address, neighborhood…"
+               class="flex-1 bg-transparent text-[16px] placeholder:text-fog/70 focus:outline-none py-2.5">
+        <kbd class="mono text-[10px] text-fog/80 px-2 py-1 rounded-md bg-cream/5 border border-fog/20 mr-2">⌘ K</kbd>
+      </div>
+    </div>
+
+    <!-- Stat strip -->
+    <aside class="col-span-12 lg:col-span-5 grid grid-cols-2 gap-3 self-end">
+      <div class="card-dark p-4">
+        <div class="mono micro text-fog">Establishments</div>
+        <div class="display text-[44px] leading-none font-medium mt-2">28,047</div>
+        <div class="mono text-[11px] text-moss mt-2">+ 312 this month</div>
+      </div>
+      <div class="card-dark p-4">
+        <div class="mono micro text-fog">High-tier · now</div>
+        <div class="display text-[44px] leading-none font-medium mt-2 text-red">412</div>
+        <div class="mono text-[11px] text-fog mt-2">1.5% of active licenses</div>
+      </div>
+      <div class="card-dark p-4">
+        <div class="mono micro text-fog">Worsening · 30d</div>
+        <div class="display text-[44px] leading-none font-medium mt-2 text-coral">1,108</div>
+        <div class="mono text-[11px] text-fog mt-2">scores trending up</div>
+      </div>
+      <div class="card-dark p-4">
+        <div class="mono micro text-fog">Improving · 30d</div>
+        <div class="display text-[44px] leading-none font-medium mt-2 text-moss">2,237</div>
+        <div class="mono text-[11px] text-fog mt-2">scores trending down</div>
+      </div>
+    </aside>
+  </section>
+
+  <!-- Tier filter strip -->
+  <section class="mb-8">
+    <div class="card-dark px-4 py-3 flex flex-wrap items-center gap-3">
+      <span class="mono micro text-fog mr-2">Filter</span>
+      <button class="pill pill-low"><span class="pill-dot"></span>Low <span class="mono opacity-70 ml-1">8,302</span></button>
+      <button class="pill pill-mod"><span class="pill-dot"></span>Moderate <span class="mono opacity-70 ml-1">14,891</span></button>
+      <button class="pill pill-elev"><span class="pill-dot"></span>Elevated <span class="mono opacity-70 ml-1">4,442</span></button>
+      <button class="pill pill-high"><span class="pill-dot"></span>High <span class="mono opacity-70 ml-1">412</span></button>
+      <span class="grow"></span>
+      <span class="mono micro text-fog">Sort</span>
+      <select class="bg-cream/5 border border-fog/20 rounded-full px-3 py-1.5 text-[12px] text-cream focus:outline-none">
+        <option>Risk score, high → low</option>
+        <option>Trend slope, +/-</option>
+        <option>Distance from me</option>
+        <option>Recently inspected</option>
+      </select>
+    </div>
+  </section>
+
+  <!-- Map + leaderboard -->
+  <section class="grid grid-cols-12 gap-6 mb-14">
+    <div class="col-span-12 lg:col-span-8">
+      <div class="card-dark p-2 relative h-[500px] overflow-hidden">
+        <!-- topographic map -->
+        <svg class="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 800 500" preserveAspectRatio="none">
+          <defs>
+            <pattern id="topo-lines" x="0" y="0" width="800" height="500" patternUnits="userSpaceOnUse">
+              <path d="M0 80 Q 200 50, 400 110 T 800 100" stroke="#7E8FA8" stroke-width="0.6" fill="none"/>
+              <path d="M0 160 Q 200 130, 400 200 T 800 180" stroke="#7E8FA8" stroke-width="0.6" fill="none"/>
+              <path d="M0 250 Q 200 220, 400 290 T 800 280" stroke="#7E8FA8" stroke-width="0.6" fill="none"/>
+              <path d="M0 340 Q 200 310, 400 380 T 800 360" stroke="#7E8FA8" stroke-width="0.6" fill="none"/>
+              <path d="M0 430 Q 200 400, 400 460 T 800 440" stroke="#7E8FA8" stroke-width="0.6" fill="none"/>
+            </pattern>
+          </defs>
+          <rect width="800" height="500" fill="url(#topo-lines)"/>
+        </svg>
+        <!-- river -->
+        <svg class="absolute inset-0 w-full h-full" viewBox="0 0 800 500" preserveAspectRatio="none">
+          <path d="M 100 0 C 180 90, 90 180, 200 240 S 320 380, 380 500" stroke="#2189FF" stroke-opacity="0.45" stroke-width="3" fill="none"/>
+          <path d="M 100 0 C 180 90, 90 180, 200 240 S 320 380, 380 500" stroke="#2189FF" stroke-opacity="0.15" stroke-width="14" fill="none"/>
+        </svg>
+        <!-- compass card -->
+        <div class="absolute top-4 left-4 card-dark px-3 py-2 mono text-[10px] text-fog">
+          <div class="text-cream tracking-wider">CHICAGO · COOK CO.</div>
+          <div>41.88, −87.63 · zoom 11</div>
+        </div>
+        <!-- legend -->
+        <div class="absolute bottom-4 left-4 card-dark px-4 py-3 mono text-[10.5px]">
+          <div class="micro text-fog mb-2">Risk tier</div>
+          <div class="flex items-center gap-2 mb-1.5"><span class="pin" style="background:#9CC2A2;width:8px;height:8px;border-width:1.5px;"></span><span class="text-cream">Low</span><span class="text-fog ml-2">≤ 0.20</span></div>
+          <div class="flex items-center gap-2 mb-1.5"><span class="pin" style="background:#F5C443;width:8px;height:8px;border-width:1.5px;"></span><span class="text-cream">Moderate</span><span class="text-fog ml-2">≤ 0.40</span></div>
+          <div class="flex items-center gap-2 mb-1.5"><span class="pin" style="background:#F77F60;width:8px;height:8px;border-width:1.5px;"></span><span class="text-cream">Elevated</span><span class="text-fog ml-2">≤ 0.65</span></div>
+          <div class="flex items-center gap-2"><span class="pin" style="background:#FF5C4D;width:8px;height:8px;border-width:1.5px;"></span><span class="text-cream">High</span><span class="text-fog ml-2">&gt; 0.65</span></div>
+        </div>
+        <!-- scale -->
+        <div class="absolute bottom-4 right-4 mono text-[10px] text-fog">
+          <div class="flex items-end gap-1"><span class="w-12 h-[3px] bg-fog/60"></span><span>1 mi</span></div>
+        </div>
+
+        <!-- pins -->
+        <div class="absolute pin-pulse" style="left:48%; top:30%;"><div class="pin" style="background:#FF5C4D;"></div></div>
+        <div class="absolute" style="left:55%; top:64%;"><div class="pin" style="background:#FF5C4D;"></div></div>
+        <div class="absolute" style="left:52%; top:42%;"><div class="pin" style="background:#F77F60;"></div></div>
+        <div class="absolute" style="left:38%; top:51%;"><div class="pin" style="background:#F77F60;"></div></div>
+        <div class="absolute" style="left:32%; top:73%;"><div class="pin" style="background:#F77F60;"></div></div>
+        <div class="absolute" style="left:62%; top:18%;"><div class="pin" style="background:#F5C443;"></div></div>
+        <div class="absolute" style="left:46%; top:24%;"><div class="pin" style="background:#9CC2A2;"></div></div>
+        <div class="absolute" style="left:70%; top:38%;"><div class="pin" style="background:#9CC2A2;"></div></div>
+        <div class="absolute" style="left:28%; top:32%;"><div class="pin" style="background:#F5C443;"></div></div>
+        <div class="absolute" style="left:42%; top:68%;"><div class="pin" style="background:#F77F60;"></div></div>
+        <div class="absolute" style="left:58%; top:50%;"><div class="pin" style="background:#9CC2A2;"></div></div>
+        <div class="absolute" style="left:36%; top:39%;"><div class="pin" style="background:#F5C443;"></div></div>
+        <div class="absolute" style="left:64%; top:60%;"><div class="pin" style="background:#9CC2A2;"></div></div>
+        <div class="absolute" style="left:51%; top:80%;"><div class="pin" style="background:#F77F60;"></div></div>
+        <div class="absolute" style="left:25%; top:55%;"><div class="pin" style="background:#9CC2A2;"></div></div>
+        <div class="absolute" style="left:68%; top:75%;"><div class="pin" style="background:#F5C443;"></div></div>
+
+        <!-- floating callout -->
+        <div class="absolute" style="left:50%; top:28%;">
+          <div class="card -translate-x-1/2 translate-y-3 w-[260px] p-4">
+            <div class="flex items-center justify-between mb-2">
+              <span class="pill pill-on-cream-high"><span class="pill-dot"></span>High</span>
+              <span class="mono text-[16px] font-medium">0.82</span>
+            </div>
+            <div class="display text-[18px] italic font-medium leading-tight">Great Falafel</div>
+            <div class="text-[12px] text-slate mt-0.5">500 W Diversey Pkwy · Lakeview</div>
+            <div class="mt-3 flex items-center justify-between">
+              <span class="mono text-[11px] text-red flex items-center gap-1">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+                +0.0048/d
+              </span>
+              <a href="restaurant-detail.html" class="text-[12px] text-bluedark font-medium hover:underline">Open profile →</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <aside class="col-span-12 lg:col-span-4 flex flex-col">
+      <div class="card flex-1 p-5">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="display text-[1.5rem] font-medium italic">Highest-risk · live</h2>
+          <span class="mono text-[10px] text-slate/70 uppercase tracking-widest">Top 6</span>
+        </div>
+        <ol class="space-y-3">
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">01</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Great Falafel</div>
+                <div class="text-[11.5px] text-slate truncate">500 W Diversey Pkwy</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.82</div>
+                <div class="mono text-[10px] text-red mt-1 flex items-center justify-end gap-0.5">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+                  +0.0048
+                </div>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">02</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Enchanting Cafe & Lounge</div>
+                <div class="text-[11.5px] text-slate truncate">300 E 75th St</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.68</div>
+                <div class="mono text-[10px] text-red mt-1 flex items-center justify-end gap-0.5">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+                  +0.0021
+                </div>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">03</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Parlay at Joy District</div>
+                <div class="text-[11.5px] text-slate truncate">112–114 W Hubbard St</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.64</div>
+                <div class="mono text-[10px] text-slate mt-1 flex items-center justify-end gap-0.5">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
+                  −0.0005
+                </div>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">04</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Homan Square Cafe Inc</div>
+                <div class="text-[11.5px] text-slate truncate">3517 W Arthington St</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.60</div>
+                <div class="mono text-[10px] text-red mt-1 flex items-center justify-end gap-0.5">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/></svg>
+                  +0.0011
+                </div>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">05</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Subway · 103rd</div>
+                <div class="text-[11.5px] text-slate truncate">3800 W 103rd St</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.56</div>
+                <div class="mono text-[10px] text-coral mt-1 flex items-center justify-end gap-0.5">+0.0004</div>
+              </div>
+            </a>
+          </li>
+          <li>
+            <a href="restaurant-detail.html" class="flex items-center gap-3 p-2 -mx-2 rounded-xl hover:bg-navy/5 transition">
+              <span class="mono text-slate text-[12px] w-6">06</span>
+              <div class="flex-1 min-w-0">
+                <div class="font-semibold truncate">Three Brothers Gyros</div>
+                <div class="text-[11.5px] text-slate truncate">2919 N Milwaukee Ave</div>
+              </div>
+              <div class="text-right">
+                <div class="mono text-[20px] font-medium leading-none">0.59</div>
+                <div class="mono text-[10px] text-slate mt-1 flex items-center justify-end gap-0.5">+0.0007</div>
+              </div>
+            </a>
+          </li>
+        </ol>
+      </div>
+    </aside>
+  </section>
+
+  <!-- Big leaderboard -->
+  <section class="mb-14">
+    <div class="flex items-baseline justify-between mb-5">
+      <h2 class="display text-[2.2rem] font-medium">
+        The watchlist
+        <span class="italic font-normal text-fog text-[1.7rem]" style="font-variation-settings:'opsz' 72;">— sorted by risk score</span>
+      </h2>
+      <span class="mono micro text-fog">8 of 28,047 · view all →</span>
+    </div>
+
+    <div class="card-dark overflow-hidden">
+      <div class="grid grid-cols-12 px-6 py-3 micro text-fog border-b border-fog/15">
+        <div class="col-span-1">#</div>
+        <div class="col-span-3">Establishment</div>
+        <div class="col-span-3">Address</div>
+        <div class="col-span-2">Tier</div>
+        <div class="col-span-1 text-right">Score</div>
+        <div class="col-span-1 text-right">Δ 90d</div>
+        <div class="col-span-1"></div>
+      </div>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">01</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Great Falafel</div>
+          <div class="text-[12px] text-fog">Lakeview · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">500 W Diversey Pkwy</div>
+        <div class="col-span-2"><span class="pill pill-high"><span class="pill-dot"></span>High</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.82</div>
+        <div class="col-span-1 text-right mono text-[12px] text-red flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          +0.0048
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">02</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Enchanting Cafe & Lounge</div>
+          <div class="text-[12px] text-fog">Greater Grand Crossing · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">300 E 75th St</div>
+        <div class="col-span-2"><span class="pill pill-high"><span class="pill-dot"></span>High</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.68</div>
+        <div class="col-span-1 text-right mono text-[12px] text-red flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+          +0.0021
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">03</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Parlay at Joy District</div>
+          <div class="text-[12px] text-fog">River North · Tavern</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">112–114 W Hubbard St</div>
+        <div class="col-span-2"><span class="pill pill-elev"><span class="pill-dot"></span>Elevated</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.64</div>
+        <div class="col-span-1 text-right mono text-[12px] text-fog flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg>
+          −0.0005
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">04</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Homan Square Cafe Inc</div>
+          <div class="text-[12px] text-fog">East Garfield Park · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">3517 W Arthington St</div>
+        <div class="col-span-2"><span class="pill pill-elev"><span class="pill-dot"></span>Elevated</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.60</div>
+        <div class="col-span-1 text-right mono text-[12px] text-coral flex items-center justify-end gap-1">+0.0011</div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">05</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Subway</div>
+          <div class="text-[12px] text-fog">Mount Greenwood · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">3800 W 103rd St</div>
+        <div class="col-span-2"><span class="pill pill-elev"><span class="pill-dot"></span>Elevated</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.56</div>
+        <div class="col-span-1 text-right mono text-[12px] text-coral flex items-center justify-end gap-1">+0.0004</div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">06</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Golden Wok Corporation</div>
+          <div class="text-[12px] text-fog">Uptown · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">4500 N Broadway</div>
+        <div class="col-span-2"><span class="pill pill-mod"><span class="pill-dot"></span>Moderate</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.24</div>
+        <div class="col-span-1 text-right mono text-[12px] text-moss flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+          −0.0019
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center border-b border-fog/10">
+        <div class="col-span-1 mono text-fog">07</div>
+        <div class="col-span-3">
+          <div class="font-semibold">Starbucks</div>
+          <div class="text-[12px] text-fog">Lincoln Park · Coffee shop</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">2545 N Lincoln Ave</div>
+        <div class="col-span-2"><span class="pill pill-low"><span class="pill-dot"></span>Low</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.18</div>
+        <div class="col-span-1 text-right mono text-[12px] text-moss flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+          −0.0008
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+
+      <a href="restaurant-detail.html" class="row grid grid-cols-12 px-6 py-4 items-center">
+        <div class="col-span-1 mono text-fog">08</div>
+        <div class="col-span-3">
+          <div class="font-semibold">La Pasadita</div>
+          <div class="text-[12px] text-fog">Wicker Park · Restaurant</div>
+        </div>
+        <div class="col-span-3 text-fog text-[13px]">1132 N Ashland Ave</div>
+        <div class="col-span-2"><span class="pill pill-low"><span class="pill-dot"></span>Low</span></div>
+        <div class="col-span-1 text-right mono text-[18px] font-medium">0.14</div>
+        <div class="col-span-1 text-right mono text-[12px] text-moss flex items-center justify-end gap-1">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></svg>
+          −0.0012
+        </div>
+        <div class="col-span-1 text-right">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7E8FA8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- Note for caregivers strip -->
+  <section class="mb-10 card p-8 grid grid-cols-12 gap-6 items-center">
+    <div class="col-span-12 md:col-span-7">
+      <p class="mono micro text-bluedark mb-2">For caregivers · immunocompromised dining</p>
+      <h3 class="display text-[1.75rem] leading-tight font-medium">
+        The score gives you a number.
+        <span class="italic font-normal text-red"> The drivers tell you why.</span>
+      </h3>
+      <p class="text-[14.5px] text-slate mt-3 leading-relaxed max-w-[58ch]">
+        Two restaurants can have the same predicted risk for very different reasons. Recurring
+        temperature violations and nearby pest complaints are the patterns most relevant to
+        immunocompromised diners. We surface those drivers on every profile.
+      </p>
+    </div>
+    <div class="col-span-12 md:col-span-5 flex md:justify-end">
+      <a href="#" class="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-navy text-cream text-[14px] font-medium hover:bg-bluedark transition">
+        Caregiver guide
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+      </a>
+    </div>
+  </section>
+
+</main>
+
+<footer class="relative z-10 border-t border-fog/15">
+  <div class="max-w-[1320px] mx-auto px-8 py-8 flex flex-wrap items-center justify-between gap-6 text-[12.5px] text-fog">
+    <div>
+      <span class="text-cream">Chicago Pulse</span> · A research preview
+      · UC Berkeley MIDS Capstone
+    </div>
+    <div class="mono">© 2026 · model v0.1-mock</div>
+  </div>
+</footer>
+
+</body>
+</html>
