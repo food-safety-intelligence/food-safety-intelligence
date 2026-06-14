@@ -294,3 +294,23 @@ Process:
   `uv sync`. Web app runnable via `cd app && pnpm install && pnpm dev`.
 - Cache dir configurable via `FOODSAFETY_DATA_DIR` env var (defaults to `./data/`).
   This is the **only** future-proofing seam we leave for AWS.
+
+## Experiment tracking
+
+- Commit code **before** running a tracked experiment, so the run's provenance
+  (git SHA → run id) points to the exact committed code.
+- Flow: commit code → run the experiment (writes `reports/metrics/<run>.json`
+  plus the model + its `metadata.json` sidecar) → review the metrics → commit
+  the metrics JSON. **Never commit `data/` artifacts** (parquets/models) —
+  they're gitignored; the dataset is versioned by the `features_sha256` recorded
+  in the metadata, not by committing the file.
+- One experiment per commit boundary: re-running without committing in between
+  reuses the run id and overwrites the prior metrics file.
+
+## Before changing an area (AI agents + humans)
+
+- Read the relevant notebook's **markdown cells** — especially the header
+  (owner / date / train cutoff / label window / dataset version) and the handoff
+  (saved-artifact path + one-line metric) — and the source-of-truth docs
+  (`docs/interface_contracts.md`, `docs/data_dictionary.md`) before editing in
+  that area.
