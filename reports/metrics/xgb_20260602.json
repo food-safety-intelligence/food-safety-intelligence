@@ -1,0 +1,27 @@
+{
+  "model": "xgboost",
+  "val": {
+    "n": 16564,
+    "positive_rate": 0.105289,
+    "pr_auc": 0.258269,
+    "roc_auc": 0.743845,
+    "precision_at_5pct": 0.386007,
+    "precision_at_10pct": 0.309596,
+    "precision_at_20pct": 0.249925,
+    "top_decile_lift": 2.940449,
+    "brier_score": 0.085942,
+    "log_loss": 0.297604
+  },
+  "test": {
+    "n": 13070,
+    "positive_rate": 0.087452,
+    "pr_auc": 0.245489,
+    "roc_auc": 0.765906,
+    "precision_at_5pct": 0.351682,
+    "precision_at_10pct": 0.286917,
+    "precision_at_20pct": 0.232211,
+    "top_decile_lift": 3.28084,
+    "brier_score": 0.073084,
+    "log_loss": 0.278038
+  }
+}
