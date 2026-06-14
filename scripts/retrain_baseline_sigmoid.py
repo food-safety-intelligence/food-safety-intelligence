@@ -28,9 +28,7 @@ This script:
 
 from __future__ import annotations
 
-import hashlib
 import json
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -48,11 +46,10 @@ from foodsafety.models.baseline import (
 )
 from foodsafety.models.evaluate import evaluate
 from foodsafety.serve.predict_batch import (
-    RISK_TIER_THRESHOLDS,
     build_scores_table,
-    score_to_tier,
     write_scores_json,
 )
+from foodsafety.tracking import provenance
 from foodsafety.utils.time import temporal_split
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -68,37 +65,6 @@ TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 
 MODEL_VERSION = "baseline_logreg_sigmoid"
-
-
-def _git_info() -> dict:
-    """Best-effort current commit + dirty flag, for run provenance."""
-    try:
-        sha = subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True
-        ).strip()
-        dirty = bool(
-            subprocess.check_output(
-                ["git", "status", "--porcelain"], cwd=REPO_ROOT, text=True
-            ).strip()
-        )
-        return {"commit": sha, "short": sha[:9], "dirty": dirty}
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return {"commit": None, "short": "nogit", "dirty": None}
-
-
-def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
-    """Content hash of a file — a stable identity for the dataset version
-    (mtime changes on every rebuild even when content is identical)."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(chunk), b""):
-            h.update(block)
-    return h.hexdigest()
-
-
-def _feature_set_version(features: list[str]) -> str:
-    """Short hash of the ordered feature contract — changes iff features do."""
-    return hashlib.sha256("\n".join(features).encode()).hexdigest()[:12]
 
 
 def main() -> None:
@@ -173,20 +139,17 @@ def main() -> None:
     # features parquet — NOT its mtime, which changes on every rebuild), and
     # the feature-contract version, so a metrics record fully identifies what
     # produced it and same-day reruns don't collide.
-    today = datetime.now().strftime("%Y%m%d")
-    git = _git_info()
-    run_id = f"{today}_{git['short']}"
-    features_sha = _sha256_file(FEATURES_PATH)
-    fs_version = _feature_set_version(list(ALL_FEATURES))
+    prov = provenance(FEATURES_PATH, list(ALL_FEATURES), REPO_ROOT)
+    run_id = prov["run_id"]
 
     metadata = {
         "model": MODEL_VERSION,
         "run_id": run_id,
-        "git_commit": git["commit"],
-        "git_dirty": git["dirty"],
+        "git_commit": prov["git_commit"],
+        "git_dirty": prov["git_dirty"],
         "random_state": RANDOM_STATE,
         "date_trained": datetime.now().strftime("%Y-%m-%d"),
-        "calibration": "sigmoid (Platt) on val set, cv='prefit'",
+        "calibration": "sigmoid (Platt) on val (FrozenEstimator prefit)",
         "label_window_days": LABEL_WINDOW_DAYS,
         "right_truncation": {
             "filtered_from_modeling": int(n_dropped),
@@ -203,11 +166,11 @@ def main() -> None:
             "all": list(ALL_FEATURES),
             "label_col": LABEL_COL,
             "n_features": len(ALL_FEATURES),
-            "feature_set_version": fs_version,
+            "feature_set_version": prov["feature_set_version"],
         },
         "dataset": {
             "features_parquet": str(FEATURES_PATH.relative_to(REPO_ROOT)),
-            "features_sha256": features_sha,
+            "features_sha256": prov["features_sha256"],
             "rows_total": int(len(features)),
             "rows_modelable": int(len(features_modelable)),
         },
@@ -235,12 +198,12 @@ def main() -> None:
     report = {
         "model": MODEL_VERSION,
         "run_id": run_id,
-        "git_commit": git["commit"],
-        "git_dirty": git["dirty"],
+        "git_commit": prov["git_commit"],
+        "git_dirty": prov["git_dirty"],
         "calibration": "sigmoid",
         "right_truncation_filtered": int(n_dropped),
-        "feature_set_version": fs_version,
-        "features_sha256": features_sha,
+        "feature_set_version": prov["feature_set_version"],
+        "features_sha256": prov["features_sha256"],
         "val": val_metrics,
         "test": test_metrics,
     }
