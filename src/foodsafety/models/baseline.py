@@ -83,12 +83,20 @@ NUMERIC_FEATURES: list[str] = [
 ]
 
 CATEGORICAL_FEATURES: list[str] = [
-    "static_facility_type",
     "static_risk_tier",
-    "static_zip",
     # Scheduled visit trigger (Canvass / Complaint / Re-Inspection / License) —
     # known before the outcome, so leak-safe.
     "static_inspection_type",
+    # DROPPED for fairness + accuracy (ablation on the served model):
+    #   - `static_facility_type`: proxies for the cuisine/ethnicity of the
+    #     business; removing it is ~free (PR-AUC 0.3147→0.3139, precision@10%
+    #     0.352→0.355).
+    #   - `static_zip`: geographic proxy for race/income in highly segregated
+    #     Chicago; its sparse high-cardinality dummies also OVERFIT the
+    #     chronological split, so dropping it IMPROVES the model
+    #     (PR-AUC 0.3147→0.3188, precision@10% 0.352→0.367). Win-win — better
+    #     accuracy AND less geographic bias. (Geographic miscalibration is only
+    #     partly removed; the full disparate-impact audit needs a census join.)
     # `static_zip3` dropped — strict subset of `static_zip`, no orthogonal info.
     # `temporal_season` dropped — categorical bucket of `temporal_month`.
 ]
