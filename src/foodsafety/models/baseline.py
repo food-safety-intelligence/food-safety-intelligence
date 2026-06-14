@@ -88,9 +88,10 @@ CATEGORICAL_FEATURES: list[str] = [
     # known before the outcome, so leak-safe.
     "static_inspection_type",
     # DROPPED for fairness + accuracy (ablation on the served model):
-    #   - `static_facility_type`: proxies for the cuisine/ethnicity of the
-    #     business; removing it is ~free (PR-AUC 0.3147→0.3139, precision@10%
-    #     0.352→0.355).
+    #   - `static_facility_type`: only PARTLY correlates with immigrant/ethnic
+    #     business types, and its real risk signal is largely redundant with the
+    #     kept `static_risk_tier` (the city's Risk 1/2/3) — so removing it is
+    #     ~free (PR-AUC 0.3147→0.3139, precision@10% 0.352→0.355).
     #   - `static_zip`: geographic proxy for race/income in highly segregated
     #     Chicago; its sparse high-cardinality dummies also OVERFIT the
     #     chronological split, so dropping it IMPROVES the model
