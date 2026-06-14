@@ -1,0 +1,32 @@
+{
+  "model": "baseline",
+  "run_id": "20260614_3fa7cf934",
+  "git_commit": "3fa7cf93486dfb61f1a8a9f16ba2d3e6d77ba4d8",
+  "git_dirty": true,
+  "feature_set_version": "f0e0b9e0ce5b",
+  "features_sha256": "87b41485ba094fcb6cfe1cd3c8babf2e3d6ddef64aa7e77515433c3809eed13a",
+  "val": {
+    "n": 16564,
+    "positive_rate": 0.105289,
+    "pr_auc": 0.260098,
+    "roc_auc": 0.74503,
+    "precision_at_5pct": 0.373945,
+    "precision_at_10pct": 0.328908,
+    "precision_at_20pct": 0.253245,
+    "top_decile_lift": 3.123868,
+    "brier_score": 0.08571,
+    "log_loss": 0.297428
+  },
+  "test": {
+    "n": 13812,
+    "positive_rate": 0.088546,
+    "pr_auc": 0.265979,
+    "roc_auc": 0.779342,
+    "precision_at_5pct": 0.377713,
+    "precision_at_10pct": 0.313314,
+    "precision_at_20pct": 0.243576,
+    "top_decile_lift": 3.538425,
+    "brier_score": 0.0725,
+    "log_loss": 0.261251
+  }
+}
