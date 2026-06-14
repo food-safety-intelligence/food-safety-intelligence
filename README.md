@@ -87,7 +87,7 @@ npm run dev      # http://localhost:3000
 - **DE / loaders (Arun)**: `src/foodsafety/io/` — lift loader cell from `notebooks/01_dataset_overview_eda.ipynb`
 - **EDA / labels (Aurelia)**: `notebooks/01_dataset_overview_eda.ipynb`, then `02_label_construction.ipynb`
 - **Modeling (Bella + Deepak)**: `notebooks/04_baseline_logreg.ipynb`, then `05_xgboost_model.ipynb`
-- **Eval / SHAP (Bella)**: `notebooks/06_eval_and_calibration.ipynb`, `07_shap_explanations.ipynb`
+- **Eval / SHAP (Bella)**: `notebooks/06_eval_and_shap.ipynb`
 - **App (Aurelia + Jun)**: `app/src/app/page.tsx` against the mock `app/public/data/scores_mock.json` (converted from `tests/fixtures/scores_mock.parquet`)
 
 See `CLAUDE.md` for the full project rules and `docs/interface_contracts.md`
