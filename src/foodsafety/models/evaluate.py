@@ -54,6 +54,30 @@ def precision_at_k(
     return float(np.mean(y_true_arr[top_k]))
 
 
+def recall_at_k(
+    y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10
+) -> float:
+    """Recall (coverage) in the top ``k_frac`` fraction of predicted scores.
+
+    Of ALL restaurants that actually fail / incur a priority violation in the
+    window, what fraction land in the top K% we'd surface to an inspector?
+    The complement to ``precision_at_k`` for a capacity-limited triage tool:
+    precision = "how clean is the flagged list", recall = "how much of the
+    real risk did we catch".
+    """
+    if not 0 < k_frac <= 1:
+        raise ValueError(f"k_frac must be in (0, 1]; got {k_frac}")
+    y_true_arr = _as_array(y_true)
+    y_score_arr = _as_array(y_score)
+    total_pos = float(y_true_arr.sum())
+    if total_pos == 0:
+        return float("nan")
+    n = len(y_true_arr)
+    k = max(1, int(np.ceil(n * k_frac)))
+    order = np.argsort(-y_score_arr, kind="stable")
+    return float(y_true_arr[order[:k]].sum() / total_pos)
+
+
 def top_decile_lift(y_true: ArrayLike, y_score: ArrayLike) -> float:
     """precision@10% divided by the base positive rate.
 
@@ -126,6 +150,9 @@ class EvalReport:
     precision_at_5pct: float
     precision_at_10pct: float
     precision_at_20pct: float
+    recall_at_5pct: float
+    recall_at_10pct: float
+    recall_at_20pct: float
     top_decile_lift: float
     brier_score: float
     log_loss: float
@@ -139,6 +166,9 @@ class EvalReport:
             "precision_at_5pct": round(self.precision_at_5pct, 6),
             "precision_at_10pct": round(self.precision_at_10pct, 6),
             "precision_at_20pct": round(self.precision_at_20pct, 6),
+            "recall_at_5pct": round(self.recall_at_5pct, 6),
+            "recall_at_10pct": round(self.recall_at_10pct, 6),
+            "recall_at_20pct": round(self.recall_at_20pct, 6),
             "top_decile_lift": round(self.top_decile_lift, 6),
             "brier_score": round(self.brier_score, 6),
             "log_loss": round(self.log_loss, 6),
@@ -157,6 +187,9 @@ def evaluate(y_true: ArrayLike, y_score: ArrayLike) -> EvalReport:
         precision_at_5pct=precision_at_k(y_t, y_s, 0.05),
         precision_at_10pct=precision_at_k(y_t, y_s, 0.10),
         precision_at_20pct=precision_at_k(y_t, y_s, 0.20),
+        recall_at_5pct=recall_at_k(y_t, y_s, 0.05),
+        recall_at_10pct=recall_at_k(y_t, y_s, 0.10),
+        recall_at_20pct=recall_at_k(y_t, y_s, 0.20),
         top_decile_lift=top_decile_lift(y_t, y_s),
         brier_score=float(brier_score_loss(y_t, y_s)),
         log_loss=float(log_loss(y_t, np.clip(y_s, 1e-15, 1 - 1e-15))),

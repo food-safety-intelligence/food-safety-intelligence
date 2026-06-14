@@ -69,11 +69,9 @@ NUMERIC_FEATURES: list[str] = [
     # License-history features (joined from licenses_historical.parquet)
     "license_age_days",
     "license_n_history_rows",
-    # 311 spatial counts are deliberately omitted. They sat at the bottom of
-    # XGBoost gain in the Phase-5 ablation, and the violation-text flags
-    # (`flag_kw_rodent`, `flag_kw_pest`, `flag_kw_sewage`) already capture
-    # the same signal directly. Carnegie Mellon's 2019 hindsight critique of
-    # Chicago's heat-map features reached the same conclusion.
+    # 311 spatial counts re-tested in this stack and left OUT: served PR-AUC
+    # 0.3147 -> 0.3152 (~flat) for a slow BallTree build dependency, so the
+    # Phase-5 drop holds. Code remains in complaint_features.py if revisited.
 ]
 
 CATEGORICAL_FEATURES: list[str] = [
