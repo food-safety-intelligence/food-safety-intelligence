@@ -20,6 +20,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import NamedTuple
 
+import numpy as np
 import pandas as pd
 
 
@@ -88,6 +89,67 @@ def temporal_split(
         train_end=train_end_ts,
         val_end=val_end_ts,
     )
+
+
+def expanding_year_folds(
+    df: pd.DataFrame,
+    *,
+    date_col: str = "inspection_date",
+    embargo_days: int = 180,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Expanding-window cross-validation folds by calendar year, with an embargo.
+
+    Intended for the inner hyperparameter / calibration loop on the TRAIN
+    subset only (never across the train/val/test boundary — that defeats the
+    chronological guarantee ``temporal_split`` exists to enforce).
+
+    For each validation year Y (every distinct year after the earliest one
+    present), the fold is::
+
+        val   = rows whose date falls in calendar year Y
+        train = rows whose date is < (Y-01-01 minus ``embargo_days``)
+
+    The embargo drops the tail of train whose forward label window overlaps the
+    validation year. The label is ``*_next_180d``: an anchor inspected within
+    180 days of the year boundary "sees" outcomes that land inside the
+    validation period, so without the embargo the CV score is optimistic.
+    Quarterly folds are too small at this dataset's ~10% prevalence, hence
+    full-year folds. ``train`` expands each fold (all history before the
+    embargoed boundary), so later folds train on strictly more data.
+
+    Args:
+        df: input frame. Not mutated.
+        date_col: datetime column to fold on.
+        embargo_days: gap between train-end and val-start. Defaults to the
+            180-day label window.
+
+    Returns:
+        A list of ``(train_idx, val_idx)`` POSITIONAL-index arrays (suitable
+        for ``df.iloc[...]``), ordered by validation year. Folds whose train or
+        val side is empty are skipped — the earliest year is never a val fold
+        because it has no embargoed history before it.
+    """
+    if date_col not in df.columns:
+        raise ValueError(f"date_col {date_col!r} not in DataFrame columns")
+
+    dates = pd.to_datetime(df[date_col]).reset_index(drop=True)
+    if len(dates) == 0:
+        return []
+
+    years = sorted(dates.dt.year.unique())
+    folds: list[tuple[np.ndarray, np.ndarray]] = []
+    for y in years[1:]:
+        val_start = pd.Timestamp(year=int(y), month=1, day=1)
+        val_end = pd.Timestamp(year=int(y) + 1, month=1, day=1)
+        # Embargo: train must end 180d before the val year so a train anchor's
+        # forward label window can't peek into the validation period.
+        train_cut = val_start - pd.Timedelta(days=embargo_days)
+
+        train_idx = np.where((dates < train_cut).to_numpy())[0]
+        val_idx = np.where(((dates >= val_start) & (dates < val_end)).to_numpy())[0]
+        if len(train_idx) and len(val_idx):
+            folds.append((train_idx, val_idx))
+    return folds
 
 
 @dataclass(frozen=True)
