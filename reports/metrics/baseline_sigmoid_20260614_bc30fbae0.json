@@ -1,0 +1,40 @@
+{
+  "model": "baseline_logreg_sigmoid",
+  "run_id": "20260614_bc30fbae0",
+  "git_commit": "bc30fbae0a33fc0fa6e52b9b59a13e3d30ae5061",
+  "git_dirty": false,
+  "calibration": "sigmoid",
+  "right_truncation_filtered": 6804,
+  "feature_set_version": "f0e0b9e0ce5b",
+  "features_sha256": "af471ae5d6beae0d2c47ec744668f4039b0004e13d74fa88a3dbd8322f43e093",
+  "val": {
+    "n": 16564,
+    "positive_rate": 0.105289,
+    "pr_auc": 0.266565,
+    "roc_auc": 0.742319,
+    "precision_at_5pct": 0.369119,
+    "precision_at_10pct": 0.326494,
+    "precision_at_20pct": 0.251434,
+    "recall_at_5pct": 0.175459,
+    "recall_at_10pct": 0.310206,
+    "recall_at_20pct": 0.477638,
+    "top_decile_lift": 3.100941,
+    "brier_score": 0.086494,
+    "log_loss": 0.300578
+  },
+  "test": {
+    "n": 7008,
+    "positive_rate": 0.107877,
+    "pr_auc": 0.314682,
+    "roc_auc": 0.769237,
+    "precision_at_5pct": 0.433048,
+    "precision_at_10pct": 0.352354,
+    "precision_at_20pct": 0.285307,
+    "recall_at_5pct": 0.201058,
+    "recall_at_10pct": 0.32672,
+    "recall_at_20pct": 0.529101,
+    "top_decile_lift": 3.266264,
+    "brier_score": 0.085344,
+    "log_loss": 0.295769
+  }
+}
