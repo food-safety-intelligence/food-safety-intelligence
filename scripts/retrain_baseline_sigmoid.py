@@ -28,7 +28,9 @@ This script:
 
 from __future__ import annotations
 
+import hashlib
 import json
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -43,7 +45,7 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
-from foodsafety.config import RANDOM_STATE
+from foodsafety.config import LABEL_WINDOW_DAYS, RANDOM_STATE
 from foodsafety.models.baseline import (
     ALL_FEATURES,
     LABEL_COL,
@@ -62,6 +64,7 @@ FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
 MODELS_DIR = REPO_ROOT / "data" / "models"
 PRED_DIR = REPO_ROOT / "data" / "predictions"
 SCORES_JSON_PATH = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+REPORTS_METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 
 # Mirror the original training run's cutoffs so the comparison is apples-to-
 # apples. If those change, update both this constant AND the metadata audit.
@@ -69,6 +72,37 @@ TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 
 MODEL_VERSION = "baseline_logreg_sigmoid"
+
+
+def _git_info() -> dict:
+    """Best-effort current commit + dirty flag, for run provenance."""
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=REPO_ROOT, text=True
+        ).strip()
+        dirty = bool(
+            subprocess.check_output(
+                ["git", "status", "--porcelain"], cwd=REPO_ROOT, text=True
+            ).strip()
+        )
+        return {"commit": sha, "short": sha[:9], "dirty": dirty}
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return {"commit": None, "short": "nogit", "dirty": None}
+
+
+def _sha256_file(path: Path, chunk: int = 1 << 20) -> str:
+    """Content hash of a file — a stable identity for the dataset version
+    (mtime changes on every rebuild even when content is identical)."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for block in iter(lambda: f.read(chunk), b""):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _feature_set_version(features: list[str]) -> str:
+    """Short hash of the ordered feature contract — changes iff features do."""
+    return hashlib.sha256("\n".join(features).encode()).hexdigest()[:12]
 
 
 def _precision_at_k(y_true: np.ndarray, y_score: np.ndarray, frac: float) -> float:
@@ -125,6 +159,7 @@ def main() -> None:
             )
     else:
         features_modelable = features
+        n_dropped = 0
 
     print(f"Temporal split (train_end={TRAIN_END}, val_end={VAL_END})")
     split = temporal_split(features_modelable, train_end=TRAIN_END, val_end=VAL_END)
@@ -157,16 +192,30 @@ def main() -> None:
     print("Val:", json.dumps(val_metrics, indent=2))
     print("Test:", json.dumps(test_metrics, indent=2))
 
-    # Persist model + metadata (NEVER overwrite per CLAUDE.md — date-stamp it).
+    # --- Provenance / experiment-tracking fields (Tier-0) ------------------
+    # Tie this run to exact code (git SHA), exact data (content hash of the
+    # features parquet — NOT its mtime, which changes on every rebuild), and
+    # the feature-contract version, so a metrics record fully identifies what
+    # produced it and same-day reruns don't collide.
     today = datetime.now().strftime("%Y%m%d")
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODELS_DIR / f"baseline_sigmoid_{today}.joblib"
-    meta_path = MODELS_DIR / f"baseline_sigmoid_{today}_metadata.json"
-    joblib.dump(calibrated, model_path)
+    git = _git_info()
+    run_id = f"{today}_{git['short']}"
+    features_sha = _sha256_file(FEATURES_PATH)
+    fs_version = _feature_set_version(list(ALL_FEATURES))
+
     metadata = {
         "model": MODEL_VERSION,
+        "run_id": run_id,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
         "random_state": RANDOM_STATE,
         "date_trained": datetime.now().strftime("%Y-%m-%d"),
+        "calibration": "sigmoid (Platt) on val set, cv='prefit'",
+        "label_window_days": LABEL_WINDOW_DAYS,
+        "right_truncation": {
+            "filtered_from_modeling": int(n_dropped),
+            "kept_for_scoring": True,
+        },
         "split": {
             "train_end": TRAIN_END,
             "val_end": VAL_END,
@@ -174,17 +223,54 @@ def main() -> None:
             "val_n": len(split.val),
             "test_n": len(split.test),
         },
-        "features": {"all": list(ALL_FEATURES), "label_col": LABEL_COL},
+        "features": {
+            "all": list(ALL_FEATURES),
+            "label_col": LABEL_COL,
+            "n_features": len(ALL_FEATURES),
+            "feature_set_version": fs_version,
+        },
+        "dataset": {
+            "features_parquet": str(FEATURES_PATH.relative_to(REPO_ROOT)),
+            "features_sha256": features_sha,
+            "rows_total": int(len(features)),
+            "rows_modelable": int(len(features_modelable)),
+        },
         "metrics": {"val": val_metrics, "test": test_metrics},
-        "calibration": "sigmoid (Platt) on val set, cv='prefit'",
-        "features_parquet_mtime": (
-            datetime.fromtimestamp(FEATURES_PATH.stat().st_mtime).isoformat()
-        ),
     }
+
+    # Persist model + metadata (NEVER overwrite per CLAUDE.md — run-id stamps it).
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    model_path = MODELS_DIR / f"baseline_sigmoid_{run_id}.joblib"
+    meta_path = MODELS_DIR / f"baseline_sigmoid_{run_id}_metadata.json"
+    joblib.dump(calibrated, model_path)
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2)
     print(f"Saved model → {model_path}")
     print(f"Saved metadata → {meta_path}")
+
+    # RECONCILE: write the SERVED model's metrics to the git-tracked ledger
+    # (reports/metrics/), alongside baseline_*/xgb_* — so the numbers we cite
+    # describe the model that actually feeds scores.json. data/models/ is
+    # gitignored, so without this the served (sigmoid, RT-filtered) model had
+    # no tracked metrics, while the committed reports described a different
+    # (isotonic, unfiltered) model.
+    REPORTS_METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = REPORTS_METRICS_DIR / f"baseline_sigmoid_{run_id}.json"
+    report = {
+        "model": MODEL_VERSION,
+        "run_id": run_id,
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "calibration": "sigmoid",
+        "right_truncation_filtered": int(n_dropped),
+        "feature_set_version": fs_version,
+        "features_sha256": features_sha,
+        "val": val_metrics,
+        "test": test_metrics,
+    }
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+    print(f"Saved metrics report → {report_path}")
 
     # Sanity: confirm we got continuous probabilities this time.
     full_p = calibrated.predict_proba(features[ALL_FEATURES])[:, 1]
