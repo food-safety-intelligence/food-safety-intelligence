@@ -54,6 +54,9 @@ def add_inspection_features(
         prior_priority_violations    int   — count of prior priority (code 1-29) violations
         prior_core_violations        int   — count of prior core (code 30+) violations
         prior_fail_or_priority_events int  — count of prior is_fail_or_priority=True rows
+        prior_pass_w_conditions      int   — count of prior "Pass w/ Conditions" results
+        prior_reinspections          int   — count of prior Re-Inspection visits
+        prior_complaint_inspections  int   — count of prior Complaint-triggered visits
         prior_fail_rate              float — prior_fails / prior_inspections, NaN if no priors
         prior_event_rate             float — prior_fail_or_priority / prior_inspections, NaN if no priors
         days_since_last_inspection   float — days; NaN if this is the first inspection
@@ -76,6 +79,19 @@ def add_inspection_features(
     if "is_fail_or_priority" not in out.columns:
         out["is_fail_or_priority"] = (out["_is_fail_int"] == 1) | (out["_priority_int"] > 0)
     out["_event_int"] = out["is_fail_or_priority"].astype("int8")
+
+    # Building blocks for the new prior_* rollups: near-misses ("Pass w/
+    # Conditions") and the visit trigger (Re-Inspection / Complaint). The
+    # inspection_type column is absent in minimal test inputs → treat as
+    # no-signal so the module stays self-contained.
+    out["_pass_cond_int"] = (out["results"] == "Pass w/ Conditions").astype("int8")
+    _itype = (
+        out["inspection_type"].astype("string").fillna("").str.lower()
+        if "inspection_type" in out.columns
+        else pd.Series("", index=out.index)
+    )
+    out["_reinsp_int"] = _itype.str.contains("re-inspection|reinspection", regex=True).astype("int8")
+    out["_complaint_int"] = _itype.str.contains("complaint", regex=True).astype("int8")
 
     group = out.groupby(license_col, sort=False)
 
@@ -100,6 +116,17 @@ def add_inspection_features(
     ).astype("int32")
     out["prior_fail_or_priority_events"] = (
         group["_event_int"].cumsum() - out["_event_int"]
+    ).astype("int32")
+    # Prior near-misses and prior visit-trigger mix — same exclusive-cumsum
+    # guard (count over strictly-earlier rows at this license).
+    out["prior_pass_w_conditions"] = (
+        group["_pass_cond_int"].cumsum() - out["_pass_cond_int"]
+    ).astype("int32")
+    out["prior_reinspections"] = (
+        group["_reinsp_int"].cumsum() - out["_reinsp_int"]
+    ).astype("int32")
+    out["prior_complaint_inspections"] = (
+        group["_complaint_int"].cumsum() - out["_complaint_int"]
     ).astype("int32")
 
     # Ratios: only defined when there's at least one prior. NaN otherwise —
@@ -141,7 +168,12 @@ def add_inspection_features(
     )
 
     # Drop intermediate columns; they were named with `_` prefix on purpose.
-    return out.drop(columns=["_is_fail_int", "_priority_int", "_core_int", "_event_int"])
+    return out.drop(
+        columns=[
+            "_is_fail_int", "_priority_int", "_core_int", "_event_int",
+            "_pass_cond_int", "_reinsp_int", "_complaint_int",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------

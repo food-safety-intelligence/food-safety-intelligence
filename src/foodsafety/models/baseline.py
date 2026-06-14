@@ -52,6 +52,11 @@ NUMERIC_FEATURES: list[str] = [
     "prior_priority_violations",
     "prior_core_violations",
     "prior_fail_or_priority_events",
+    # Prior near-misses + visit-trigger history (leak-free cumsum rollups):
+    # repeated "Pass w/ Conditions", prior Re-Inspections, prior Complaint visits.
+    "prior_pass_w_conditions",
+    "prior_reinspections",
+    "prior_complaint_inspections",
     # Recency
     "days_since_last_inspection",
     "days_since_last_fail",
@@ -75,6 +80,9 @@ CATEGORICAL_FEATURES: list[str] = [
     "static_facility_type",
     "static_risk_tier",
     "static_zip",
+    # Scheduled visit trigger (Canvass / Complaint / Re-Inspection / License) —
+    # known before the outcome, so leak-safe.
+    "static_inspection_type",
     # `static_zip3` dropped — strict subset of `static_zip`, no orthogonal info.
     # `temporal_season` dropped — categorical bucket of `temporal_month`.
 ]
