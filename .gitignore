@@ -68,3 +68,6 @@ Thumbs.db
 
 # JupyterLab autosave/lock artifacts
 .~*.ipynb
+
+# Claude Code per-machine local settings (points memory at EFS; never share)
+.claude/settings.local.json
