@@ -55,7 +55,16 @@ model work — **without AWS or MLflow this iteration** (see CLAUDE.md scope).
   across baseline / xgb / served runs; the deployed model's performance is now
   tracked. No new infra or dependencies.
 - `git_dirty` is often `true` during notebook `--inplace` runs because the
-  notebook gains output cells — `git_commit` remains the reliable identity.
+  notebook gains output cells — `git_commit` remains the reliable identity
+  while the branch is live (but see the next point for after it merges).
+- **`git_commit` is a development-time anchor, not a permanent one.** Squash-merge
+  to `main` (and any git-spice restack along the way) rewrites/collapses the
+  per-run SHAs, so a committed metrics file's `git_commit` / `run_id` will not
+  resolve to a live commit after its branch merges. The permanent identity is
+  `features_sha256` (data) plus the metric values themselves, which survive any
+  rebase; the code is recoverable from whatever landed on `main`. Don't try to
+  re-stamp SHAs through a merge — lean on `features_sha256` when you need to know
+  what produced a number.
 - The script and notebooks both assemble metadata; duplication is mitigated by
   the shared `tracking.provenance()` helper.
 - Right-truncation filtering changes eval numbers vs the old unfiltered ones
