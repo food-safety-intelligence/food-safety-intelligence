@@ -60,6 +60,14 @@ NUMERIC_FEATURES: list[str] = [
     # Recency
     "days_since_last_inspection",
     "days_since_last_fail",
+    # Recency / last-outcome / trend (own-history only — individually fair, no
+    # neighborhood/demographic proxy). Tests whether recent history beats the
+    # lifetime prior_* totals on a non-stationary risk process.
+    "last_was_fail",
+    "prev_priority_violations",
+    "priority_violation_trend",
+    "prior_fails_365d",
+    "prior_priority_violations_365d",
     # Calendar. Deliberate omissions:
     #   - `temporal_year`: time-anchored, doesn't generalise across the
     #     chronological split (every test row has year > all train years).
