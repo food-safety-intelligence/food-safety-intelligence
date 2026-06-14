@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
+from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
@@ -101,15 +102,18 @@ class Driver:
 
 
 def _underlying_pipeline(model) -> Pipeline:
-    """Pull the inner Pipeline out of a CalibratedClassifierCV(prefit) wrapper.
+    """Pull the inner Pipeline out of a calibrated wrapper.
 
-    Our training code wraps the trained pipeline with ``cv='prefit'``
-    calibration, so the inner pipeline lives at
-    ``model.calibrated_classifiers_[0].estimator``. Other shapes are returned
-    unchanged.
+    Training wraps the fitted pipeline in ``FrozenEstimator`` before
+    calibration, so for a ``CalibratedClassifierCV`` the pipeline lives at
+    ``model.calibrated_classifiers_[0].estimator.estimator``. We unwrap the
+    FrozenEstimator layer if present. Other shapes are returned unchanged.
     """
     if isinstance(model, CalibratedClassifierCV):
-        return model.calibrated_classifiers_[0].estimator
+        inner = model.calibrated_classifiers_[0].estimator
+        if isinstance(inner, FrozenEstimator):
+            inner = inner.estimator
+        return inner
     return model
 
 

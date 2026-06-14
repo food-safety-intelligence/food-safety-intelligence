@@ -38,12 +38,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import (
-    average_precision_score,
-    brier_score_loss,
-    log_loss,
-    roc_auc_score,
-)
+from sklearn.frozen import FrozenEstimator
 
 from foodsafety.config import LABEL_WINDOW_DAYS, RANDOM_STATE
 from foodsafety.models.baseline import (
@@ -51,6 +46,7 @@ from foodsafety.models.baseline import (
     LABEL_COL,
     build_baseline_pipeline,
 )
+from foodsafety.models.evaluate import evaluate
 from foodsafety.serve.predict_batch import (
     RISK_TIER_THRESHOLDS,
     build_scores_table,
@@ -105,27 +101,6 @@ def _feature_set_version(features: list[str]) -> str:
     return hashlib.sha256("\n".join(features).encode()).hexdigest()[:12]
 
 
-def _precision_at_k(y_true: np.ndarray, y_score: np.ndarray, frac: float) -> float:
-    k = max(1, int(round(frac * len(y_true))))
-    top_idx = np.argsort(-y_score)[:k]
-    return float(y_true[top_idx].mean())
-
-
-def _evaluate(y_true: np.ndarray, y_proba: np.ndarray, label: str) -> dict:
-    return {
-        "n": int(len(y_true)),
-        "positive_rate": float(y_true.mean()),
-        "pr_auc": float(average_precision_score(y_true, y_proba)),
-        "roc_auc": float(roc_auc_score(y_true, y_proba)),
-        "precision_at_5pct": _precision_at_k(y_true, y_proba, 0.05),
-        "precision_at_10pct": _precision_at_k(y_true, y_proba, 0.10),
-        "precision_at_20pct": _precision_at_k(y_true, y_proba, 0.20),
-        "brier_score": float(brier_score_loss(y_true, y_proba)),
-        "log_loss": float(log_loss(y_true, y_proba, labels=[0, 1])),
-        "split": label,
-    }
-
-
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
     features = pd.read_parquet(FEATURES_PATH)
@@ -178,17 +153,18 @@ def main() -> None:
     base = build_baseline_pipeline()
     base.fit(X_train, y_train)
 
-    # Sigmoid (Platt) calibration fitted on val. cv='prefit' tells
-    # CalibratedClassifierCV to use the provided already-fit estimator.
-    print("Wrapping with CalibratedClassifierCV(method='sigmoid', cv='prefit')")
-    calibrated = CalibratedClassifierCV(base, method="sigmoid", cv="prefit")
+    # Sigmoid (Platt) calibration of the already-fit pipeline on val. Wrapping
+    # in FrozenEstimator marks `base` as pre-fit, so only the calibration
+    # mapping is learned — the base estimator is not refit.
+    print("Calibrating (sigmoid) on val without refitting the base estimator")
+    calibrated = CalibratedClassifierCV(FrozenEstimator(base), method="sigmoid")
     calibrated.fit(X_val, y_val)
 
     # Evaluate
     p_val = calibrated.predict_proba(X_val)[:, 1]
     p_test = calibrated.predict_proba(X_test)[:, 1]
-    val_metrics = _evaluate(y_val, p_val, "val")
-    test_metrics = _evaluate(y_test, p_test, "test")
+    val_metrics = evaluate(y_val, p_val).to_dict()
+    test_metrics = evaluate(y_test, p_test).to_dict()
     print("Val:", json.dumps(val_metrics, indent=2))
     print("Test:", json.dumps(test_metrics, indent=2))
 
