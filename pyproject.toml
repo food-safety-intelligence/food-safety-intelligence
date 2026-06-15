@@ -47,3 +47,14 @@ ignore = ["E501"]  # line length handled by formatter
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+
+[tool.uv.workspace]
+members = [
+    "food-safety-intelligence",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "jupyter>=1.1.1",
+]

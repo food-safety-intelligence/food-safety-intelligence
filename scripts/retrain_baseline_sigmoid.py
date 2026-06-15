@@ -36,6 +36,7 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 from sklearn.metrics import (
     average_precision_score,
     brier_score_loss,
@@ -94,6 +95,11 @@ def _evaluate(y_true: np.ndarray, y_proba: np.ndarray, label: str) -> dict:
 
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
+    if not FEATURES_PATH.exists():
+        raise SystemExit(
+            "Missing data artifact: data/processed/features.parquet was not found. "
+            "Run notebooks/03_feature_engineering.ipynb to generate the feature parquet before `make retrain`."
+        )
     features = pd.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}, dtypes verified for {len(ALL_FEATURES)} feature cols")
 
@@ -145,8 +151,8 @@ def main() -> None:
 
     # Sigmoid (Platt) calibration fitted on val. cv='prefit' tells
     # CalibratedClassifierCV to use the provided already-fit estimator.
-    print("Wrapping with CalibratedClassifierCV(method='sigmoid', cv='prefit')")
-    calibrated = CalibratedClassifierCV(base, method="sigmoid", cv="prefit")
+    print("Wrapping with CalibratedClassifierCV(method='sigmoid') on a FrozenEstimator")
+    calibrated = CalibratedClassifierCV(FrozenEstimator(base), method="sigmoid")
     calibrated.fit(X_val, y_val)
 
     # Evaluate
@@ -176,7 +182,7 @@ def main() -> None:
         },
         "features": {"all": list(ALL_FEATURES), "label_col": LABEL_COL},
         "metrics": {"val": val_metrics, "test": test_metrics},
-        "calibration": "sigmoid (Platt) on val set, cv='prefit'",
+        "calibration": "sigmoid (Platt) on val set with FrozenEstimator prefit wrapper",
         "features_parquet_mtime": (
             datetime.fromtimestamp(FEATURES_PATH.stat().st_mtime).isoformat()
         ),
