@@ -97,9 +97,10 @@ and the ratios added noise without orthogonal signal.
 
 | Column | dtype | Description |
 |---|---|---|
-| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". |
-| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. |
-| `static_zip` | `category` | 5-digit ZIP. |
+| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. **Model feature.** |
+| `static_inspection_type` | `category` | Canvass / Complaint / Re-Inspection / License — the visit trigger, known before the outcome (leak-safe). **Model feature.** |
+| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". In the parquet but **dropped from the model** (DR 0004). |
+| `static_zip` | `category` | 5-digit ZIP. In the parquet but **dropped from the model** (DR 0004). |
 
 Note: `static_zip3` was dropped — strict subset of `static_zip` with no
 orthogonal information. `static_facility_type` and `static_zip` were dropped

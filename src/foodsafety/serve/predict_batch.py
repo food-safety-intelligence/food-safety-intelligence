@@ -21,7 +21,7 @@ sufficient and matches what the detail page renders today.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Sequence
 
 import numpy as np
@@ -43,12 +43,14 @@ from foodsafety.explain.shap_drivers import (
 #   p50 ≈ 0.06   p90 ≈ 0.17   p99 ≈ 0.29   max = 1.00
 #
 # These thresholds split the population into:
-#   Low       ~33% — model is confident this restaurant is low-risk
-#   Moderate  ~45% — typical Chicago restaurant
-#   Elevated  ~20% — several risk signals present
-#   High      ~2%  — strong risk signals; warrants attention
+#   Low       — model is confident this restaurant is low-risk
+#   Moderate  — typical Chicago restaurant
+#   Elevated  — several risk signals present
+#   High      — strong risk signals; warrants attention
 #
-# Update `docs/interface_contracts.md` § 3 if these change again.
+# Canonical tier-share split lives in `docs/interface_contracts.md` § 3 (the
+# served script also prints the actual split at runtime). Specific percentages
+# were removed from this comment to avoid drift across three sources.
 RISK_TIER_THRESHOLDS = [
     (0.04, "Low"),
     (0.13, "Moderate"),
@@ -201,7 +203,7 @@ def write_scores_json(
     out_path,
     *,
     schema_version: str = "0.2.0",
-    model_version: str = "baseline_logreg_isotonic",
+    model_version: str = "baseline_logreg_sigmoid",
     label_window_days: int = 180,
     totals: dict | None = None,
 ) -> None:
@@ -234,7 +236,7 @@ def write_scores_json(
 
     payload = {
         "schema_version": schema_version,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "as_of_date": df["as_of_date"].max(),
         "is_mock": False,
         "model_version": model_version,

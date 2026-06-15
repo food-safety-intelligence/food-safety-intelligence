@@ -13,13 +13,14 @@ decision function ties). Tier counts stay roughly the same; the within-tier
 ranking becomes strictly ordered.
 
 Run with the project's Python:
-    PYTHONPATH=src /Users/jun/anaconda3/bin/python scripts/retrain_baseline_sigmoid.py
+    PYTHONPATH=src uv run python scripts/retrain_baseline_sigmoid.py
 
 This script:
   1. Loads features.parquet + chronologically splits on the cutoffs in
      `data/models/baseline_<date>_metadata.json` (2024-07-01 / 2025-07-01).
-  2. Fits the baseline pipeline on train, then wraps in
-     CalibratedClassifierCV(cv='prefit', method='sigmoid') on val.
+  2. Fits the baseline pipeline on train, then calibrates with
+     CalibratedClassifierCV(FrozenEstimator(base), method='sigmoid') on val
+     (sklearn 1.9 dropped cv='prefit'; FrozenEstimator marks base as prefit).
   3. Persists model + metadata under `data/models/baseline_<today>.joblib`.
   4. Scores every restaurant, writes:
        - data/predictions/scores.parquet
