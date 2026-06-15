@@ -21,18 +21,16 @@ sufficient and matches what the detail page renders today.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
 
 from foodsafety.explain.shap_drivers import (
-    Driver,
     linear_contributions,
     top_drivers_for_row,
 )
-
 
 # Tier thresholds calibrated to the actual score distribution.
 #
@@ -236,7 +234,7 @@ def write_scores_json(
 
     payload = {
         "schema_version": schema_version,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": datetime.now(UTC).isoformat(),
         "as_of_date": df["as_of_date"].max(),
         "is_mock": False,
         "model_version": model_version,
