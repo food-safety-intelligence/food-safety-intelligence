@@ -254,7 +254,9 @@ Workstreams + owners:
 
 Process:
 
-- Branch per workstream: `de/*`, `eda/*`, `mle/*`, `app/*`, `pm/*`.
+- Branch per **owner + workstream**: `<owner>/<workstream>-<short-desc>` — e.g.
+  `bella/mle-feature-refresh`, `arun/de-loader-fix`. Workstreams: `de`, `eda`,
+  `mle`, `app`, `pm`. (Applies to new branches; existing ones aren't retroactively renamed.)
 - Squash-merge to `main`. No direct pushes to `main`.
 - One reviewer required; backup owner is the default reviewer.
 - PR review SLA = 24h. If silent past 24h on a clearly-scoped workstream
