@@ -6,6 +6,13 @@ headlines. ROC-AUC is reported but never treated as the decision metric
 metric — "of the top 10% the model flags, how many actually fail?" — can be
 mediocre).
 
+**Accuracy is deliberately NOT reported.** With a ~11% positive rate, a
+do-nothing "always predict safe" classifier already scores ~89% accuracy while
+catching zero real risk, and ``class_weight='balanced'`` trades raw accuracy for
+recall on the minority — so the model's 0.5-threshold accuracy is actually
+*lower* than that trivial baseline. Accuracy is misleading under this imbalance;
+PR-AUC + precision/recall@k are the honest read.
+
 Every metric function here takes ``y_true`` and ``y_score`` as 1-D arrays;
 they don't depend on the estimator type, so the same code evaluates LogReg,
 XGBoost, and any future model.

@@ -70,5 +70,6 @@ exposure-bias check on `prior_*`.
   audit needs a **census join**; and the `prior_*` exposure bias suggests
   evaluating rate-normalized features (e.g. `prior_fail_rate`) — currently
   dropped as "noise" but worth revisiting on fairness grounds.
-- A one-time **leave-one-out ablation** is queued to find other dead/overfitting
-  features like `static_zip`.
+- A one-time **leave-one-out ablation** was run (2026-06-15): **no other overfitter
+  like `static_zip` remains** — the model is lean and the hand-picked keyword flags are
+  the top contributors. No further proxy/overfit removals are indicated from this pass.
