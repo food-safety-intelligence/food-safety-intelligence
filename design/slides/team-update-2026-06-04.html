@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Food Safety · team update · 2026-06-04</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  />
+  <style>
+    :root {
+      --cream: #f6f1e9;
+      --card: #ffffff;
+      --ink: #2b3239;
+      --muted: #6b7280;
+      --line: #e6dfd3;
+      --tint: #ede6d8;
+      --sage: #7a8f6a;
+      --amber: #d4a571;
+      --coral: #da8a6c;
+      --terra: #b8634a;
+      --teal: #486073;
+      --font-sans: "Manrope", system-ui, sans-serif;
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      scroll-snap-type: y mandatory;
+      overflow-y: scroll;
+      scroll-behavior: smooth;
+    }
+    .slide {
+      scroll-snap-align: start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 7vh 7vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1.4rem;
+      position: relative;
+    }
+    .eyebrow {
+      font-size: 12.5px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--sage);
+      font-weight: 600;
+    }
+    .title {
+      font-size: clamp(2.3rem, 5vw, 4.2rem);
+      font-weight: 300;
+      line-height: 1.05;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .accent {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--terra);
+    }
+    .subtitle {
+      font-size: clamp(1rem, 1.45vw, 1.2rem);
+      color: var(--muted);
+      max-width: 62ch;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .num {
+      font-family: var(--font-mono);
+      font-feature-settings: "tnum";
+    }
+    code, .mono { font-family: var(--font-mono); }
+    .grid { display: grid; gap: 1.25rem; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 1.25rem;
+      padding: 1.5rem;
+      box-shadow: 0 1px 2px rgba(43, 50, 57, 0.04),
+        0 8px 24px rgba(43, 50, 57, 0.04);
+    }
+    .card .label {
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .card .number {
+      font-family: var(--font-mono);
+      font-size: 2.6rem;
+      font-weight: 500;
+      line-height: 1;
+      margin-top: 0.4rem;
+      letter-spacing: -0.02em;
+    }
+    .card .caption {
+      color: var(--muted);
+      font-size: 0.85rem;
+      margin-top: 0.45rem;
+      line-height: 1.45;
+    }
+    ul.checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.7rem;
+    }
+    ul.checklist li {
+      display: grid;
+      grid-template-columns: 18px 1fr;
+      gap: 0.6rem;
+      align-items: start;
+      font-size: 0.98rem;
+      line-height: 1.5;
+    }
+    ul.checklist li::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--sage);
+      margin-top: 0.55rem;
+      grid-column: 1;
+    }
+    ul.checklist li.warn::before { background: var(--terra); }
+    ul.checklist li.next::before { background: var(--teal); }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+    .pill.muted  { background: var(--tint); color: var(--muted); }
+
+    /* Header progress bar + slide counter */
+    .progress {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: transparent;
+      z-index: 100;
+    }
+    .progress > span {
+      display: block;
+      height: 100%;
+      background: var(--terra);
+      width: 0%;
+      transition: width 0.2s ease;
+    }
+    .counter {
+      position: fixed;
+      bottom: 1.5vh;
+      right: 2vw;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      padding: 0.3rem 0.7rem;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+      z-index: 100;
+    }
+    .hint {
+      position: fixed;
+      bottom: 1.5vh;
+      left: 2vw;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      z-index: 100;
+      opacity: 0.8;
+    }
+
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .two-col { display: grid; grid-template-columns: 1.05fr 1fr; gap: 2.5rem; align-items: center; }
+    .two-col-img { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: center; }
+    @media (max-width: 880px) {
+      .two-col, .two-col-img, .grid-2, .grid-3, .grid-4, .stat-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+    .roadmap {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 0.6rem;
+      margin-top: 1.25rem;
+    }
+    .roadmap .step {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1rem;
+    }
+    .roadmap .step.done { background: var(--tint); border-color: var(--tint); }
+    .roadmap .step .stage {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .roadmap .step .name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-top: 0.4rem;
+      line-height: 1.3;
+    }
+    .roadmap .step .when {
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 0.4rem;
+    }
+    .tier-bar {
+      display: grid;
+      grid-template-columns: 25fr 62fr 11fr 2fr;
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+    }
+    .tier-bar > * { display: block; }
+    .tier-bar .l { background: #eaedde; }
+    .tier-bar .m { background: #f4e9d5; }
+    .tier-bar .e { background: #f2dbcb; }
+    .tier-bar .h { background: #e7c9be; }
+    .tier-legend {
+      display: grid;
+      grid-template-columns: repeat(4, auto);
+      gap: 1.5rem;
+      font-size: 0.85rem;
+      margin-top: 0.65rem;
+      color: var(--muted);
+    }
+    .tier-legend .dot {
+      display: inline-block;
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      margin-right: 0.4rem;
+      vertical-align: middle;
+    }
+    pre {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 1rem;
+      padding: 1rem 1.25rem;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      color: var(--ink);
+      overflow-x: auto;
+      line-height: 1.55;
+      white-space: pre;
+    }
+    pre.compact { padding: 0.85rem 1rem; font-size: 0.78rem; }
+    a { color: var(--teal); }
+    .screenshot {
+      border-radius: 1.1rem;
+      border: 1px solid var(--line);
+      background: var(--card);
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(43, 50, 57, 0.04),
+        0 14px 36px rgba(43, 50, 57, 0.08);
+    }
+    .screenshot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .regex-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .regex-table td, .regex-table th {
+      padding: 0.55rem 0.8rem;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .regex-table th {
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .regex-table td:first-child {
+      font-family: var(--font-mono);
+      color: var(--terra);
+      white-space: nowrap;
+      width: 36%;
+    }
+    .regex-table td:nth-child(2) {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      color: var(--ink);
+    }
+  </style>
+</head>
+<body>
+  <div class="progress"><span id="progress-fill"></span></div>
+  <div class="counter" id="counter">01 / 13</div>
+  <div class="hint">↓ scroll · ← → arrow keys · F fullscreen · ESC overview</div>
+
+  <!-- 01 - Title (minimal) -->
+  <section class="slide">
+    <h1 class="title">
+      Food Safety. <span class="accent">Where we are.</span>
+    </h1>
+    <p class="subtitle">
+      State of the model and the web app. What works, what is still rough,
+      and what we want to focus on next.
+    </p>
+    <p class="subtitle" style="margin-top: 1.5rem;">
+      <span class="pill muted">2026-06-04</span>
+      &nbsp;
+      <span class="pill muted">local dev only</span>
+      &nbsp;
+      <span class="pill muted">no AWS yet</span>
+    </p>
+  </section>
+
+  <!-- 02 - The product question -->
+  <section class="slide">
+    <p class="eyebrow">Product framing</p>
+    <h2 class="title">
+      Three questions the UI must answer
+    </h2>
+    <div class="grid grid-3" style="margin-top: 1rem;">
+      <div class="card">
+        <div class="label">01 · Risk</div>
+        <p style="font-size: 1.1rem; line-height: 1.45; margin-top: 0.5rem;">
+          Is the <span class="accent">predicted risk</span> elevated over the
+          next 180 days?
+        </p>
+      </div>
+      <div class="card">
+        <div class="label">02 · Trend</div>
+        <p style="font-size: 1.1rem; line-height: 1.45; margin-top: 0.5rem;">
+          Is it <span class="accent">improving, worsening, or stable</span>
+          over time?
+        </p>
+      </div>
+      <div class="card">
+        <div class="label">03 · Why</div>
+        <p style="font-size: 1.1rem; line-height: 1.45; margin-top: 0.5rem;">
+          What is <span class="accent">driving the signal</span>?
+        </p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1rem;">
+      Audience: Chicago consumers. The clearest user story is the
+      immunocompromised diner choosing for someone with cancer, transplant,
+      or another condition where the drivers matter more than the score.
+    </p>
+  </section>
+
+  <!-- 03 - Data -->
+  <section class="slide">
+    <p class="eyebrow">Data layer</p>
+    <h2 class="title">Four public Chicago datasets</h2>
+    <div class="grid grid-2" style="margin-top: 1rem;">
+      <div class="card">
+        <div class="label">Food Inspections</div>
+        <div class="number">310,882</div>
+        <p class="caption">inspections from 2010 to 2026-05. Labels and most prior-history features come from here.</p>
+      </div>
+      <div class="card">
+        <div class="label">311 Service Requests</div>
+        <div class="number">~3.2 M</div>
+        <p class="caption">8 food-relevant request types. BallTree-prepped for 300m / 90d joins (not yet wired into the production feature set).</p>
+      </div>
+      <div class="card">
+        <div class="label">Business Licenses (current)</div>
+        <div class="number">48,535</div>
+        <p class="caption">Facility type, risk tier, address, lat/lon, license age.</p>
+      </div>
+      <div class="card">
+        <div class="label">Business Licenses (historical)</div>
+        <div class="number">~640 K</div>
+        <p class="caption">License history rows for license_age_days and license_n_history_rows features.</p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1.25rem;">
+      Burn-in cutoff: <span class="num">2019-01-01</span>. Pre-2019
+      inspections seed <span class="mono">prior_*</span> features but never
+      become training labels. Chicago changed inspection procedures in
+      July 2018 so pre and post labels are not comparable.
+    </p>
+  </section>
+
+  <!-- 04 - Label + EDA findings -->
+  <section class="slide">
+    <p class="eyebrow">Target variable</p>
+    <h2 class="title">
+      <span class="accent">y_fail_or_critical_next_180d</span>
+    </h2>
+    <p class="subtitle">
+      For each inspection: in the next 180 days, does this restaurant get a
+      <strong>Fail</strong> result OR a <strong>priority violation</strong>
+      (Chicago codes 1 to 29)?
+    </p>
+    <div class="grid grid-2" style="margin-top: 1rem;">
+      <div class="card">
+        <div class="label">EDA findings that shaped the label</div>
+        <ul class="checklist" style="margin-top: 0.6rem;">
+          <li><span>Positive rate ≈ <span class="num">10.5%</span> on the chronological hold-out. Class-imbalanced but not extreme.</span></li>
+          <li><span>Pass-with-Conditions inspections can cite priority violations. Just predicting Fail would miss those.</span></li>
+          <li><span>180 days catches meaningful kitchen drift without right-truncating most rows.</span></li>
+          <li><span>July 2018 procedure change forces the 2019 burn-in cutoff.</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="label">Window mechanics</div>
+        <pre class="compact" style="margin-top: 0.5rem;">y = 1 if any inspection in
+        (inspection_date,
+         inspection_date + 180d]
+        has results == "Fail"
+        OR contains a priority code
+
+y = 0 otherwise
+y = NA on burn-in rows
+y = NA on right-truncated rows
+  (anchor + 180d > dataset max)</pre>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1rem;">
+      The forward window is right-exclusive of the inspection date itself.
+      We predict what happens after this visit, not on it.
+    </p>
+  </section>
+
+  <!-- 05 - Feature engineering overview + leak-free trick -->
+  <section class="slide">
+    <p class="eyebrow">Feature engineering · overview</p>
+    <h2 class="title">
+      26 features <span class="accent">leak-free by construction</span>
+    </h2>
+    <div class="two-col" style="margin-top: 1rem;">
+      <div>
+        <p class="subtitle" style="margin: 0 0 1rem;">
+          Three families. Every <code>prior_*</code> count is computed via
+          a <strong>cumsum minus self</strong> trick: at each row, sum the
+          flag column over all rows for the same license, then subtract the
+          row's own value. The result is the count strictly before this
+          anchor. No <span class="mono">.shift()</span> bookkeeping, no
+          off-by-one, no leakage.
+        </p>
+        <pre class="compact">df["prior_fails"] = (
+    df.groupby("license_id")["is_fail"]
+      .cumsum()
+    - df["is_fail"]
+)</pre>
+      </div>
+      <div>
+        <div class="card">
+          <div class="label">Numeric · 11</div>
+          <p style="margin: 0.4rem 0 0 0; font-size: 0.92rem; line-height: 1.5;">
+            <code>prior_inspections</code>, <code>prior_fails</code>,
+            <code>prior_priority_violations</code>,
+            <code>prior_core_violations</code>,
+            <code>prior_fail_or_priority_events</code>,
+            <code>days_since_last_inspection</code>,
+            <code>days_since_last_fail</code>,
+            <code>temporal_month</code>, <code>temporal_quarter</code>,
+            <code>license_age_days</code>,
+            <code>license_n_history_rows</code>.
+          </p>
+        </div>
+        <div class="card" style="margin-top: 0.8rem;">
+          <div class="label">Categorical · 3 · one-hot, min_frequency=30</div>
+          <p style="margin: 0.4rem 0 0 0; font-size: 0.92rem; line-height: 1.5;">
+            <code>static_facility_type</code>,
+            <code>static_risk_tier</code>,
+            <code>static_zip</code>. Rare ZIPs collapse to "infrequent"
+            instead of overfitting to a handful of rows.
+          </p>
+        </div>
+        <div class="card" style="margin-top: 0.8rem;">
+          <div class="label">Boolean keyword flags · 12 · NLP layer B</div>
+          <p style="margin: 0.4rem 0 0 0; font-size: 0.92rem; line-height: 1.5;">
+            Hand-picked regex on prior violation text. Detail below.
+          </p>
+        </div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1rem;">
+      Dropped along the way: <code>static_zip3</code> (subset of zip),
+      <code>temporal_year</code> (time-anchored, breaks chronological split),
+      <code>temporal_dow</code>, <code>temporal_season</code>,
+      <code>prior_fail_rate*</code> ratios, and the 311 spatial counts.
+    </p>
+  </section>
+
+  <!-- 06 - Keyword regex detail -->
+  <section class="slide">
+    <p class="eyebrow">Feature engineering · NLP layer B</p>
+    <h2 class="title">
+      Twelve regex flags on the
+      <span class="accent">free-text violations</span>
+    </h2>
+    <p class="subtitle" style="margin-bottom: 0.8rem;">
+      The violations field is pipe-separated free text with a code prefix
+      and an inspector-written comment. Structured code counts catch the
+      "what" (priority vs core). These keyword flags catch the "specifically
+      what" inside the comment, with regex tuned to the actual Chicago
+      phrasing.
+    </p>
+    <div class="card" style="padding: 0;">
+      <table class="regex-table">
+        <thead>
+          <tr><th style="padding-left: 1.2rem;">Flag</th><th>Pattern (case-insensitive)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_temperature</td><td>\btemp(?:erature)?\b | holding[- ]?temp | cold[- ]?holding | hot[- ]?holding</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_cooling</td><td>\bcooling\b | cool(ed|ing)? properly | cool[- ]?down | within 4 ?hr</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_raw_food</td><td>\braw\s+(chicken|beef|pork|meat|poultry|seafood|fish|egg)</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_cross_contamination</td><td>cross[- ]?contam(ination)? | separat(e|ion)\s+raw | ready[- ]?to[- ]?eat</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_expired</td><td>\bexpire[ds]?\b | past\s+(expir|use)\s+date | date[- ]?mark(ed|ing)?</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_rodent</td><td>\brodent\b | \brat[s]?\b | \bmice\b | \bmouse\b | droppings | gnaw</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_pest</td><td>\bpest\b | \bcockroach(es)?\b | \broaches?\b | insect activity</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_handwash_sink</td><td>hand[- ]?wash(ing)?\s+sink | handwash\s+sign</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_no_soap</td><td>\bno\s+(hand[- ]?)?soap\b | missing\s+(hand[- ]?)?soap</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_no_paper_towels</td><td>\bno\s+(paper\s+)?towels?\b | missing\s+(paper\s+)?towels?</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_sewage</td><td>\bsewage\b | backed[- ]?up | sewer\s+line</td></tr>
+          <tr><td style="padding-left: 1.2rem;">flag_kw_certified_manager</td><td>certified\s+food\s+(protection\s+)?manager | cfpm | food\s+manager\s+certif</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="subtitle" style="margin-top: 1rem;">
+      Source of truth: <code>src/foodsafety/features/keyword_flags.py</code>.
+      These names show up directly on the detail page as SHAP-friendly
+      drivers. Adding or trimming the list is a versioned change.
+    </p>
+  </section>
+
+  <!-- 07 - Model -->
+  <section class="slide">
+    <p class="eyebrow">Modeling</p>
+    <h2 class="title">
+      Calibrated logistic regression
+    </h2>
+    <div class="grid grid-2" style="margin-top: 1rem;">
+      <div class="card">
+        <div class="label">Estimator</div>
+        <pre style="margin-top: 0.6rem;">LogisticRegression(
+  class_weight="balanced",
+  solver="liblinear",
+  max_iter=3000,
+)
++ CalibratedClassifierCV(
+    method="sigmoid",  # was isotonic
+    cv="prefit",       # calibrate on val
+)</pre>
+      </div>
+      <div class="card">
+        <div class="label">Why sigmoid instead of isotonic</div>
+        <p style="margin-top: 0.5rem; line-height: 1.55;">
+          Isotonic is a piecewise-constant monotonic step function. On our
+          calibration set it collapsed to only
+          <span class="num accent">60</span> distinct output values. All
+          23,513 restaurants landed on one of those 60. The home page
+          showed many restaurants tied at the same <span class="num">0.48</span>.
+        </p>
+        <p style="margin-top: 0.6rem; line-height: 1.55;">
+          Sigmoid (Platt) fits a smooth 2-parameter logistic and produces
+          <span class="num accent">107,125</span> continuous values on the
+          same data. Same tier counts. No ties.
+        </p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1.25rem;">
+      Discipline rules from CLAUDE.md.
+      <code>train_test_split(shuffle=True)</code> is banned because it
+      leaks the future into the past on a time series. We use
+      <code>temporal_split</code> instead. SMOTE is banned because
+      synthetic positives break chronological eval and invalidate the
+      calibrated probabilities. We use <code>class_weight="balanced"</code>
+      instead.
+    </p>
+  </section>
+
+  <!-- 08 - Honest metrics -->
+  <section class="slide">
+    <p class="eyebrow">Held-out performance</p>
+    <h2 class="title">
+      Honest test-set metrics
+    </h2>
+    <p class="subtitle">
+      After dropping right-truncated rows from train and eval. Truncated
+      rows have under-counted labels because we have not observed their
+      full 180-day window yet. Half the original test split was truncated.
+    </p>
+    <div class="stat-grid" style="margin-top: 1rem;">
+      <div class="card">
+        <div class="label">Test n</div>
+        <div class="number">6,222</div>
+        <p class="caption">from 13,070 raw rows. The 52% drop is the right-truncation filter.</p>
+      </div>
+      <div class="card">
+        <div class="label">PR-AUC</div>
+        <div class="number">0.293</div>
+        <p class="caption">vs. positive rate 0.105. Roughly <span class="num">2.8×</span> over baseline.</p>
+      </div>
+      <div class="card">
+        <div class="label">ROC-AUC</div>
+        <div class="number">0.761</div>
+        <p class="caption">Ranking quality on the chronological hold-out.</p>
+      </div>
+      <div class="card">
+        <div class="label">Top-decile lift</div>
+        <div class="number">3.4×</div>
+        <p class="caption">P@10% = 33.6%. The highest-risk decile concentrates real Fails.</p>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1.25rem;">
+      Tier distribution across the full 23,513 scored restaurants:
+    </p>
+    <div style="margin-top: 0.4rem;">
+      <div class="tier-bar">
+        <span class="l"></span><span class="m"></span><span class="e"></span><span class="h"></span>
+      </div>
+      <div class="tier-legend">
+        <span><span class="dot" style="background:#7a8f6a"></span>Low · 20%</span>
+        <span><span class="dot" style="background:#d4a571"></span>Moderate · 68%</span>
+        <span><span class="dot" style="background:#da8a6c"></span>Elevated · 11%</span>
+        <span><span class="dot" style="background:#b8634a"></span>High · 1.4% (318)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 09 - Explainability with embedded drivers screenshot -->
+  <section class="slide">
+    <p class="eyebrow">Explainability</p>
+    <h2 class="title">
+      Every score has an
+      <span class="accent">auditable why</span>
+    </h2>
+    <div class="two-col-img" style="margin-top: 1rem;">
+      <div>
+        <p class="subtitle" style="margin: 0 0 1rem;">
+          Linear contributions per feature (signed SHAP-style), summed back
+          to recover the model's logit. No <code>shap</code> dependency. The
+          detail page surfaces the top 4 drivers, sign-coloured by their
+          direction.
+        </p>
+        <ul class="checklist">
+          <li><span><span style="color:var(--terra)">Terra</span> bars push the score up.</span></li>
+          <li><span><span style="color:var(--sage)">Sage</span> bars push it down.</span></li>
+          <li><span>Topic icon per feature family. Bug, Hand, Thermometer, MapPin, Calendar.</span></li>
+        </ul>
+      </div>
+      <div class="screenshot">
+        <img src="img/detail-drivers.png" alt="Driver list screenshot - Pest activity noted, Handwashing-sink issue, ZIP 60606, Temperature-related violation" />
+      </div>
+    </div>
+  </section>
+
+  <!-- 10 - Home with embedded map screenshot -->
+  <section class="slide">
+    <p class="eyebrow">Web app · home</p>
+    <h2 class="title">
+      Map-first home
+    </h2>
+    <div class="two-col-img" style="margin-top: 1rem;">
+      <div class="screenshot">
+        <img src="img/home-map.png" alt="Map-first home screenshot - Chicago map with tier-colored pins and side list" />
+      </div>
+      <div>
+        <ul class="checklist">
+          <li><span>Full-bleed Chicago map. CartoDB Voyager tiles. No API key.</span></li>
+          <li><span>SVG teardrop pins coloured by tier.</span></li>
+          <li><span>Zoom-aware density. Caps from <span class="num">80</span> to <span class="num">1,500</span> by zoom, viewport-clipped above z=13.</span></li>
+          <li><span>Search filters across all <span class="num">23,513</span> restaurants, not just the top-200 side list.</span></li>
+          <li><span>Tier-chip filters apply to both map and list.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11 - Detail page (score + history) -->
+  <section class="slide">
+    <p class="eyebrow">Web app · detail</p>
+    <h2 class="title">
+      Restaurant detail
+    </h2>
+    <div class="two-col-img" style="margin-top: 1rem;">
+      <div class="screenshot">
+        <img src="img/detail-score.png" alt="Score card screenshot - MEZZA GRILLED WRAPS AND PITA, score 41, ranks higher than 99.6%" />
+      </div>
+      <div class="screenshot">
+        <img src="img/detail-history.png" alt="Inspection history screenshot - 16 inspections, 3 failures, timeline of dated events with results and headlines" />
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1.25rem;">
+      Arc gauge as the centerpiece. Computed percentile rank below the
+      score (replaced the old hardcoded "top 1.7%"). 90-day trend chart
+      with population median as a reference line. Real Chicago Department
+      of Public Health inspection timeline, up to 30 most-recent events
+      per restaurant.
+    </p>
+  </section>
+
+  <!-- 12 - Repo structure -->
+  <section class="slide">
+    <p class="eyebrow">Codebase</p>
+    <h2 class="title">
+      Two languages joined at a
+      <span class="accent">JSON seam</span>
+    </h2>
+<pre style="margin-top: 1rem;">food-safety-intelligence/
+├── src/foodsafety/        # importable python package
+│   ├── data/labels.py             # label construction
+│   ├── features/{...}.py          # leak-free feature builders
+│   ├── models/{baseline,xgb,evaluate}.py
+│   ├── serve/predict_batch.py     # build_scores_table + write_scores_json
+│   └── explain/shap_drivers.py    # linear SHAP, no shap dep
+├── scripts/               # make retrain · make history · make normalize
+├── notebooks/             # 00, 02-06 (numbered, owner in first cell)
+├── tests/                 # 68 pytest tests, all green
+├── app/                   # next.js · src/{app,components,lib}
+└── docs/
+    ├── interface_contracts.md     # cross-team schema source of truth
+    └── weekly/YYYY-MM-DD.md       # async check-ins (this is the live one)</pre>
+    <p class="subtitle" style="margin-top: 1rem;">
+      The web app reads <code>app/public/data/scores.json</code> only. It
+      never calls the Python side and never runs the model at request time.
+      Batch-write-JSON is the contract.
+    </p>
+  </section>
+
+  <!-- 13 - Next phases -->
+  <section class="slide">
+    <p class="eyebrow">Direction</p>
+    <h2 class="title">
+      What we want to focus on next
+    </h2>
+    <p class="subtitle">
+      The MVP scaffolding is in a defensible place. From here, what we
+      want to focus on next is the harder layers that actually
+      differentiate the writeup.
+    </p>
+    <div class="roadmap">
+      <div class="step done">
+        <div class="stage">Done</div>
+        <div class="name">Baseline model and web app MVP</div>
+        <div class="when">2026-05 → 06</div>
+      </div>
+      <div class="step">
+        <div class="stage">Next</div>
+        <div class="name">NLP layer C · TF-IDF/SVD or LLM</div>
+        <div class="when">2 weeks</div>
+      </div>
+      <div class="step">
+        <div class="stage">Next</div>
+        <div class="name">Fine-tune XGBoost and ensemble</div>
+        <div class="when">2 weeks</div>
+      </div>
+      <div class="step">
+        <div class="stage">Next</div>
+        <div class="name">AWS deployment and serving</div>
+        <div class="when">3-4 weeks</div>
+      </div>
+      <div class="step">
+        <div class="stage">Next</div>
+        <div class="name">Fairness audit and ethics writeup</div>
+        <div class="when">3-4 weeks</div>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1.25rem;">
+      Open to pushback. If anyone has a different read on ordering or
+      scope, this is the time to call it.
+    </p>
+  </section>
+
+  <!-- (Optional 14) - Where to dig in. Keeping count at 13 by folding wrap into 13 above? -->
+
+  <script>
+    const slides = document.querySelectorAll(".slide");
+    const counter = document.getElementById("counter");
+    const progress = document.getElementById("progress-fill");
+    counter.textContent = "01 / " + String(slides.length).padStart(2, "0");
+
+    function currentIndex() {
+      const y = window.scrollY;
+      let best = 0;
+      let bestDist = Infinity;
+      slides.forEach((s, i) => {
+        const d = Math.abs(s.offsetTop - y);
+        if (d < bestDist) { bestDist = d; best = i; }
+      });
+      return best;
+    }
+    function go(i) {
+      i = Math.max(0, Math.min(slides.length - 1, i));
+      slides[i].scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function updateChrome() {
+      const i = currentIndex();
+      const n = slides.length;
+      counter.textContent = String(i + 1).padStart(2, "0") + " / " + String(n).padStart(2, "0");
+      progress.style.width = ((i + 1) / n * 100) + "%";
+    }
+    window.addEventListener("scroll", updateChrome, { passive: true });
+    updateChrome();
+
+    document.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      const i = currentIndex();
+      switch (e.key) {
+        case "ArrowDown":
+        case "ArrowRight":
+        case " ":
+        case "PageDown":
+          e.preventDefault(); go(i + 1); break;
+        case "ArrowUp":
+        case "ArrowLeft":
+        case "PageUp":
+          e.preventDefault(); go(i - 1); break;
+        case "Home": e.preventDefault(); go(0); break;
+        case "End": e.preventDefault(); go(slides.length - 1); break;
+        case "f":
+        case "F":
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+          break;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Food Safety · class standup · 2026-06-08</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Mono:wght@400;500&display=swap"
+  />
+  <style>
+    :root {
+      --cream: #f6f1e9;
+      --card: #ffffff;
+      --ink: #2b3239;
+      --muted: #6b7280;
+      --line: #e6dfd3;
+      --tint: #ede6d8;
+      --sage: #7a8f6a;
+      --terra: #b8634a;
+      --teal: #486073;
+      --font-sans: "Manrope", system-ui, sans-serif;
+      --font-serif: "Instrument Serif", Georgia, serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+    }
+    body {
+      scroll-snap-type: y mandatory;
+      overflow-y: scroll;
+      scroll-behavior: smooth;
+    }
+    .slide {
+      scroll-snap-align: start;
+      min-height: 100vh;
+      width: 100%;
+      padding: 6vh 6vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1.2rem;
+      position: relative;
+    }
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--sage);
+      font-weight: 600;
+    }
+    .title {
+      font-size: clamp(2.2rem, 4.5vw, 3.8rem);
+      font-weight: 300;
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+    .accent {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-weight: 400;
+      color: var(--terra);
+    }
+    .subtitle {
+      font-size: clamp(1rem, 1.4vw, 1.18rem);
+      color: var(--muted);
+      max-width: 64ch;
+      line-height: 1.55;
+      margin: 0;
+    }
+    .num { font-family: var(--font-mono); font-feature-settings: "tnum"; }
+    code, .mono { font-family: var(--font-mono); }
+    .grid { display: grid; gap: 1.1rem; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 1.1rem;
+      padding: 1.2rem 1.3rem;
+      box-shadow: 0 1px 2px rgba(43, 50, 57, 0.04),
+        0 6px 18px rgba(43, 50, 57, 0.04);
+    }
+    .card .label {
+      font-size: 10.5px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .card p { margin: 0.45rem 0 0 0; font-size: 0.95rem; line-height: 1.5; }
+    ul.checklist {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.55rem;
+    }
+    ul.checklist li {
+      display: grid;
+      grid-template-columns: 16px 1fr;
+      gap: 0.55rem;
+      align-items: start;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    ul.checklist li::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: var(--sage);
+      margin-top: 0.55rem;
+      grid-column: 1;
+    }
+    ul.checklist li.warn::before { background: var(--terra); }
+    ul.checklist li.next::before { background: var(--teal); }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.22rem 0.7rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      background: var(--tint);
+      color: var(--muted);
+    }
+    .pill.terra { background: #e7c9be; color: #7b3c26; }
+
+    .progress {
+      position: fixed; top: 0; left: 0; right: 0; height: 2px;
+      background: transparent; z-index: 100;
+    }
+    .progress > span {
+      display: block; height: 100%; background: var(--terra);
+      width: 0%; transition: width 0.2s ease;
+    }
+    .counter {
+      position: fixed; bottom: 1.5vh; right: 2vw;
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--muted);
+      padding: 0.3rem 0.7rem;
+      background: rgba(255, 255, 255, 0.75);
+      border-radius: 999px;
+      backdrop-filter: blur(6px);
+      z-index: 100;
+    }
+    .hint {
+      position: fixed; bottom: 1.5vh; left: 2vw;
+      font-size: 11px; color: var(--muted);
+      letter-spacing: 0.04em; z-index: 100; opacity: 0.8;
+    }
+
+    .two-col-img {
+      display: grid;
+      grid-template-columns: 0.85fr 1.15fr;
+      gap: 2rem;
+      align-items: center;
+    }
+    @media (max-width: 880px) {
+      .two-col-img, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+    .chart {
+      border-radius: 1rem;
+      border: 1px solid var(--line);
+      background: var(--card);
+      overflow: hidden;
+      box-shadow: 0 1px 2px rgba(43, 50, 57, 0.04),
+        0 10px 28px rgba(43, 50, 57, 0.07);
+    }
+    .chart img { display: block; width: 100%; height: auto; }
+    .takeaway {
+      font-family: var(--font-serif);
+      font-style: italic;
+      font-size: 1.05rem;
+      color: var(--terra);
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="progress"><span id="progress-fill"></span></div>
+  <div class="counter" id="counter">01 / 07</div>
+  <div class="hint">↓ scroll · ← → arrow keys · F fullscreen</div>
+
+  <!-- 01 - Where we are -->
+  <section class="slide">
+    <p class="eyebrow">Standup · 2026-06-08</p>
+    <h1 class="title">
+      Where we are
+    </h1>
+    <p class="subtitle">
+      Quick update on the model and the web app. Focus tonight is
+      data, EDA, feature selection, why these features, and SME feedback.
+    </p>
+    <div style="margin-top: 0.4rem;">
+      <span class="pill">Local dev shipped</span>
+      &nbsp;
+      <span class="pill terra">Notebooks now running on AWS SageMaker (EFS)</span>
+    </div>
+    <div class="grid grid-3" style="margin-top: 1.4rem;">
+      <div class="card">
+        <div class="label">Two models, one feature set</div>
+        <p>
+          <strong>Production:</strong> calibrated logistic regression (Platt).
+          PR-AUC <span class="num">0.293</span>, ROC-AUC <span class="num">0.761</span>,
+          top-decile lift <span class="num">3.4x</span> on the chronological
+          hold-out (test n = <span class="num">6,222</span>).
+        </p>
+        <p style="margin-top: 0.5rem;">
+          <strong>Diagnostic:</strong> XGBoost on the same 26 features. Used
+          on the next two slides to surface non-linear feature importance
+          the linear model cannot see.
+        </p>
+      </div>
+      <div class="card">
+        <div class="label">Web app</div>
+        <p>
+          Map-first home for <span class="num">23,513</span> restaurants.
+          Restaurant detail page with arc gauge, 90-day trend, real
+          inspection timeline, per-restaurant SHAP drivers.
+        </p>
+      </div>
+      <div class="card">
+        <div class="label">AWS</div>
+        <p>
+          All notebooks running in SageMaker via EFS as described in
+          Workshop 2. Modified <code>05_xgboost_model.ipynb</code> to
+          produce the two charts on the next slides.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 - Data + EDA -->
+  <section class="slide">
+    <p class="eyebrow">Data and EDA</p>
+    <h2 class="title">
+      Four public Chicago datasets feed the model
+    </h2>
+    <div class="grid grid-2" style="margin-top: 0.8rem;">
+      <div class="card">
+        <div class="label">Sources</div>
+        <ul class="checklist" style="margin-top: 0.6rem;">
+          <li><span><strong>Food Inspections</strong> · <span class="num">310,882</span> rows · labels + most prior-history features.</span></li>
+          <li><span><strong>311 Service Requests</strong> · ~3.2 M · 8 food-relevant types, BallTree-prepped.</span></li>
+          <li><span><strong>Business Licenses (current)</strong> · <span class="num">48,535</span> active food licenses.</span></li>
+          <li><span><strong>Business Licenses (historical)</strong> · ~640 K rows · license age + activity.</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="label">Target and key EDA numbers</div>
+        <ul class="checklist" style="margin-top: 0.6rem;">
+          <li><span>Label: <code>y_fail_or_critical_next_180d</code>. Forward 180-day window, right-exclusive of the anchor.</span></li>
+          <li><span>Positive rate on hold-out <span class="num">10.5%</span>. Imbalanced but not extreme.</span></li>
+          <li><span>2019-01-01 burn-in cutoff. July 2018 procedure change makes pre/post labels non-comparable.</span></li>
+          <li><span>26 features after Phase 5 ablation. 11 numeric, 3 categorical, 12 keyword flags.</span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="takeaway" style="margin-top: 1rem;">
+      The label is a measurable proxy. It does not capture food-safety risk
+      itself, only the patterns that historically precede a failed inspection.
+    </p>
+  </section>
+
+  <!-- 03 - Feature Correlation Matrix -->
+  <section class="slide">
+    <p class="eyebrow">Feature selection · evidence 1</p>
+    <h2 class="title">
+      Feature correlation matrix
+    </h2>
+    <div class="two-col-img" style="margin-top: 0.6rem;">
+      <div>
+        <ul class="checklist">
+          <li class="warn"><span>
+            <strong>Historical block.</strong>
+            <code>prior_inspections</code>, <code>prior_fails</code>,
+            <code>prior_priority_violations</code>, and
+            <code>license_n_history_rows</code> move together. Dark red
+            cluster top-left.
+          </span></li>
+          <li class="warn"><span>
+            <strong>Operational pairings.</strong>
+            <code>flag_kw_no_soap</code> + <code>flag_kw_no_paper_towels</code>
+            (handwashing failures come in pairs).
+            <code>flag_kw_rodent</code> + <code>flag_kw_pest</code>.
+            <code>flag_kw_temperature</code> + <code>flag_kw_cooling</code>.
+          </span></li>
+          <li><span>
+            <strong>Justifies tree models.</strong>
+            Linear models would be destabilized by these collinear blocks.
+            XGBoost and Random Forests handle them without inflating variance.
+          </span></li>
+        </ul>
+        <p class="takeaway" style="margin-top: 1rem;">
+          Where features cluster, we keep the count features and drop the
+          ratio features. Tree models reconstruct ratios from numerator
+          and denominator anyway.
+        </p>
+      </div>
+      <div class="chart">
+        <img src="img/capstone_feature_correlation%20matrix.png"
+             alt="Feature correlation matrix heatmap showing historical-features cluster top-left and operational keyword pairings along the diagonal" />
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 - XGBoost gain vs Pearson correlation -->
+  <section class="slide">
+    <p class="eyebrow">Feature selection · evidence 2</p>
+    <h2 class="title">
+      XGBoost gain vs Pearson correlation
+    </h2>
+    <p class="subtitle">
+      XGBoost is the diagnostic here, not the production model. We fit it on
+      the same 26 features to surface importance that linear correlation
+      misses. The chart compares each feature's normalized XGBoost gain
+      against its absolute Pearson correlation with the label.
+    </p>
+    <div class="two-col-img" style="margin-top: 0.6rem;">
+      <div class="chart">
+        <img src="img/XGBoost%20gain%20vs%20Correlation%20chart.png"
+             alt="Horizontal bar chart comparing normalized XGBoost gain (black) and absolute Pearson correlation with the label (orange) for each feature. flag_kw_pest leads at gain 1.0." />
+      </div>
+      <div>
+        <ul class="checklist">
+          <li class="warn"><span>
+            <strong>Keyword flags dominate gain.</strong>
+            <code>flag_kw_pest</code> tops at normalized gain <span class="num">1.0</span>.
+            <code>flag_kw_handwash_sink</code> follows at <span class="num">~0.7</span>.
+          </span></li>
+          <li class="warn"><span>
+            <strong>Gain &gt;&gt; linear correlation.</strong>
+            <code>flag_kw_pest</code> has only ~0.2 Pearson correlation with
+            the label but the highest gain of any feature. The relationship
+            is non-linear or interactive (e.g. pest flag combined with another
+            signal).
+          </span></li>
+          <li><span>
+            <strong>Tenure features are weak.</strong>
+            <code>license_age_days</code> and <code>temporal_quarter</code>
+            sit near zero on both axes. Operational signal beats
+            "how long the place has been open."
+          </span></li>
+        </ul>
+        <p class="takeaway" style="margin-top: 1rem;">
+          These insights guide which features the production logistic
+          regression keeps, and they shape what XGBoost would gain from once
+          we tune it as a candidate production model after NLP layer C.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 05 - Map-first home (web app) -->
+  <section class="slide">
+    <p class="eyebrow">Web app · home</p>
+    <h2 class="title">
+      Map-first home
+    </h2>
+    <div class="two-col-img" style="margin-top: 0.6rem;">
+      <div class="chart">
+        <img src="img/home-map.png" alt="Map-first home screenshot. Chicago map with tier-colored teardrop pins and a side list of highest-risk restaurants." />
+      </div>
+      <div>
+        <ul class="checklist">
+          <li><span>Full-bleed Chicago map. CartoDB Voyager tiles. No API key.</span></li>
+          <li><span>SVG teardrop pins coloured by risk tier.</span></li>
+          <li><span>Zoom-aware density. Caps from <span class="num">80</span> to <span class="num">1,500</span> by zoom, viewport-clipped above z=13.</span></li>
+          <li><span>Search filters across all <span class="num">23,513</span> restaurants, not just the top-200 side list.</span></li>
+          <li><span>Tier-chip filters apply to both map and list.</span></li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 06 - Restaurant detail (web app) -->
+  <section class="slide">
+    <p class="eyebrow">Web app · detail</p>
+    <h2 class="title">
+      Restaurant detail
+    </h2>
+    <div class="two-col-img" style="margin-top: 0.6rem;">
+      <div class="chart">
+        <img src="img/detail-score.png" alt="Score card screenshot. MEZZA GRILLED WRAPS AND PITA, score 41, ranks higher than 99.6% of currently active food licenses." />
+      </div>
+      <div class="chart">
+        <img src="img/detail-history.png" alt="Inspection history screenshot. 16 inspections, 3 failures, timeline of dated events with results and headlines." />
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top: 1rem;">
+      Arc gauge as the centerpiece. Computed percentile rank below the score.
+      90-day trend chart with the population median as a reference line.
+      Real Chicago Department of Public Health inspection timeline, up to 30
+      most-recent events per restaurant.
+    </p>
+  </section>
+
+  <!-- 07 - What we focus on next -->
+  <section class="slide">
+    <p class="eyebrow">Direction</p>
+    <h2 class="title">
+      What we focus on next
+    </h2>
+    <div class="grid grid-2" style="margin-top: 0.8rem;">
+      <div class="card">
+        <div class="label">Done this week</div>
+        <ul class="checklist" style="margin-top: 0.6rem;">
+          <li><span><strong>Aurelia</strong> · data and EDA write-up.</span></li>
+          <li><span><strong>Deepak</strong> · feature selection documented with correlation, tree importance, ANOVA, bias-variance.</span></li>
+          <li><span><strong>Jun and team</strong> · user and SME feedback. Domain experts identified, short interviews underway.</span></li>
+          <li><span><strong>Everyone</strong> · cloned the repo, ran it locally.</span></li>
+        </ul>
+      </div>
+      <div class="card">
+        <div class="label">Focus this week</div>
+        <ul class="checklist" style="margin-top: 0.6rem;">
+          <li class="next"><span>
+            <strong>AWS SageMaker.</strong> Notebooks already ported via EFS
+            (Workshop 2). Next is the batch scoring job that writes
+            <code>scores.parquet</code>.
+          </span></li>
+          <li class="next"><span>
+            <strong>S3 for scores JSON.</strong> Move the web-app data
+            artifact off local disk. CloudFront fronting comes later.
+          </span></li>
+          <li class="next"><span>
+            <strong>Scheduled batch runs.</strong> Port the recurring pipeline
+            (data refresh, retrain, re-export) into AWS so the laptop is no
+            longer the source of truth.
+          </span></li>
+        </ul>
+      </div>
+    </div>
+    <p class="takeaway" style="margin-top: 1rem;">
+      The MVP is shipped locally and the per-person prep work is done. Focus
+      now is moving compute and data into AWS so the team works against one
+      shared environment.
+    </p>
+  </section>
+
+  <script>
+    const slides = document.querySelectorAll(".slide");
+    const counter = document.getElementById("counter");
+    const progress = document.getElementById("progress-fill");
+    counter.textContent = "01 / " + String(slides.length).padStart(2, "0");
+
+    function currentIndex() {
+      const y = window.scrollY;
+      let best = 0;
+      let bestDist = Infinity;
+      slides.forEach((s, i) => {
+        const d = Math.abs(s.offsetTop - y);
+        if (d < bestDist) { bestDist = d; best = i; }
+      });
+      return best;
+    }
+    function go(i) {
+      i = Math.max(0, Math.min(slides.length - 1, i));
+      slides[i].scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    function updateChrome() {
+      const i = currentIndex();
+      const n = slides.length;
+      counter.textContent = String(i + 1).padStart(2, "0") + " / " + String(n).padStart(2, "0");
+      progress.style.width = ((i + 1) / n * 100) + "%";
+    }
+    window.addEventListener("scroll", updateChrome, { passive: true });
+    updateChrome();
+
+    document.addEventListener("keydown", (e) => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      const i = currentIndex();
+      switch (e.key) {
+        case "ArrowDown":
+        case "ArrowRight":
+        case " ":
+        case "PageDown":
+          e.preventDefault(); go(i + 1); break;
+        case "ArrowUp":
+        case "ArrowLeft":
+        case "PageUp":
+          e.preventDefault(); go(i - 1); break;
+        case "Home": e.preventDefault(); go(0); break;
+        case "End": e.preventDefault(); go(slides.length - 1); break;
+        case "f":
+        case "F":
+          if (document.fullscreenElement) document.exitFullscreen();
+          else document.documentElement.requestFullscreen();
+          break;
+      }
+    });
+  </script>
+</body>
+</html>
