@@ -102,17 +102,18 @@ class Driver:
 
 
 def _underlying_pipeline(model) -> Pipeline:
-    """Pull the inner Pipeline out of a fitted calibration wrapper.
+    """Pull the inner Pipeline out of a calibrated wrapper.
 
-    Our training code wraps the trained pipeline with a fitted
-    :class:`~sklearn.frozen.FrozenEstimator` inside
-    :class:`~sklearn.calibration.CalibratedClassifierCV`. We also support the
-    legacy case where the raw pipeline is passed directly.
+    Training wraps the fitted pipeline in ``FrozenEstimator`` before
+    calibration, so for a ``CalibratedClassifierCV`` the pipeline lives at
+    ``model.calibrated_classifiers_[0].estimator.estimator``. We unwrap the
+    FrozenEstimator layer if present. Other shapes are returned unchanged.
     """
     if isinstance(model, CalibratedClassifierCV):
-        model = model.calibrated_classifiers_[0].estimator
-    if isinstance(model, FrozenEstimator):
-        return model.estimator
+        inner = model.calibrated_classifiers_[0].estimator
+        if isinstance(inner, FrozenEstimator):
+            inner = inner.estimator
+        return inner
     return model
 
 

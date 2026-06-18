@@ -144,10 +144,11 @@ violation text. Only added if Phase 6 has slack.
 trend chart.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `src/foodsafety/serve/predict_batch.py` (Bella).
-**Consumer**: `app/Home.py` and pages.
+**Consumer**: the Next.js web app, via the exported `app/public/data/scores.json`.
 
-This is the file the Streamlit app reads. **No live model inference happens
-in the app** — predictions are precomputed and written here.
+This is the Python pipeline artifact; it is exported to
+`app/public/data/scores.json`, which the Next.js web app reads. **No live
+model inference happens in the app** — predictions are precomputed and written here.
 
 | Column | dtype | Nullable | Description |
 |---|---|---|---|
