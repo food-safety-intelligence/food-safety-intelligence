@@ -69,6 +69,11 @@ MODEL_VERSION = "baseline_logreg_sigmoid"
 
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
+    if not FEATURES_PATH.exists():
+        raise SystemExit(
+            "Missing data artifact: data/processed/features.parquet was not found. "
+            "Run notebooks/03_feature_engineering.ipynb to generate the feature parquet before `make retrain`."
+        )
     features = pd.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}, dtypes verified for {len(ALL_FEATURES)} feature cols")
 
