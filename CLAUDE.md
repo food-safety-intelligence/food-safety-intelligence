@@ -8,6 +8,21 @@ with the workspace file, this file wins.
 
 ## Project goal (this iteration only)
 
+> **Phase 2 status — scope update (the team moved into Phase 2 ~2026-06-15).**
+> The scope text below describes the **MVP-demo iteration** and is kept for the
+> record. Several items it lists as OUT are now **IN scope**: AWS (SageMaker /
+> Bedrock / S3), agentic AI, transformer/LLM NLP **for batch feature extraction**,
+> hosted **batch** inference, and **deployment** — the web app is live on AWS
+> Amplify and Vercel, both auto-deploying on push to `main`, so **merging to
+> `main` publishes to production** (verify app changes before merging). What does
+> **not** change: the permanent **batch-score-to-JSON** pattern (the app never
+> calls the model at request time), the temporal-split / leakage discipline, and
+> the both-metrics promotion gate. See
+> [`docs/project_plan.md`](docs/project_plan.md) for the project intent and
+> [0009](docs/decisions/0009-production-estimator-revisit-logreg-vs-xgb.md) for
+> the production-estimator state; the Phase-2 deep-learning bets are scoped in a
+> separate deep-learning decision record.
+
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
 
@@ -78,6 +93,11 @@ Three layers, in this order — A and B are required, C is a stretch:
 ---
 
 ## What is OUT of scope — do not add, do not stub, do not leave seams
+
+> **See the Phase-2 status note at the top.** Several items below (AWS,
+> deployment, hosted batch inference, transformer/LLM NLP for batch features) are
+> now **IN scope**. The list is kept for the MVP-iteration record; the discipline
+> it encodes — no request-time inference, no premature seams — still applies.
 
 - **AWS this iteration** — no `boto3`, no S3 paths in code, no SageMaker /
   Lambda / Bedrock references. The Phase-2 plan IS hosted training and
