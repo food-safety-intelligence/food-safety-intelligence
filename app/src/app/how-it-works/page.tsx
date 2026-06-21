@@ -5,7 +5,6 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
-import { loadScores } from "@/lib/scores-server";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -97,20 +96,12 @@ export default async function HowItWorksPage() {
         ? `under ${pct(t.max)}`
         : `${pct(t.min)}–${pct(t.max)}`;
 
-  // Share of *scored establishments* in each band — the served distribution
-  // (scores.json totals), the population a reader actually sees on the map/list.
-  // (Not the test split: tier shares differ between recent-inspection rows and
-  // the latest-per-license served scoring.)
-  const tierCounts = await loadScores()
-    .then((s) => s.totals?.tier_counts ?? null)
-    .catch(() => null);
-  const tierTotal = tierCounts
-    ? Object.values(tierCounts).reduce((a, b) => a + b, 0)
-    : 0;
-  const tierShare = (label: string) =>
-    tierCounts && tierTotal
-      ? `${Math.round(((tierCounts[label as RiskTier] ?? 0) / tierTotal) * 100)}%`
-      : null;
+  // Share of scored establishments per band comes straight from methodology.json
+  // (the build script reads the served scores.json totals), so this page loads
+  // only its own JSON — no coupling to the 18 MB scores file.
+  const tierShare = (t: { share?: number }) =>
+    t.share != null ? `${Math.round(t.share * 100)}%` : null;
+  const hasShares = tiers.some((t) => t.share != null);
 
   const importance = methodology.global_importance ?? [];
   const maxImpact = Math.max(...importance.map((d) => d.mean_abs_logodds), 0);
@@ -181,8 +172,8 @@ export default async function HowItWorksPage() {
           <a href="#how-well-it-works" className="text-muted hover:text-ink transition-colors">
             How well it works
           </a>
-          <a href="#caveats" className="text-muted hover:text-ink transition-colors">
-            Caveats
+          <a href="#limits" className="text-muted hover:text-ink transition-colors">
+            Limits
           </a>
           <a href="#reference" className="text-muted hover:text-ink transition-colors">
             Reference
@@ -215,7 +206,7 @@ export default async function HowItWorksPage() {
               don&apos;t confuse them with Chicago&apos;s own Risk 1/2/3
               classification, which is an{" "}
               <span className="font-medium text-ink/80">input</span>{" "}feature
-              (see &ldquo;The features&rdquo;).
+              (see &ldquo;What the model looks at&rdquo;).
             </p>
             {tiers.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
@@ -223,7 +214,7 @@ export default async function HowItWorksPage() {
                   <span>Tier</span>
                   <span className="flex items-center gap-4">
                     <span className="w-24 text-right">Score</span>
-                    {tierShare("Low") && <span className="w-14 text-right">Share</span>}
+                    {hasShares && <span className="w-14 text-right">Share</span>}
                   </span>
                 </div>
                 {tiers.map((t) => (
@@ -236,9 +227,9 @@ export default async function HowItWorksPage() {
                       <span className="w-24 text-right text-[14px] text-ink/85">
                         {tierRange(t)}
                       </span>
-                      {tierShare(t.label) && (
+                      {tierShare(t) && (
                         <span className="w-14 text-right text-[13px] text-muted">
-                          {tierShare(t.label)}
+                          {tierShare(t)}
                         </span>
                       )}
                     </span>
@@ -287,7 +278,7 @@ export default async function HowItWorksPage() {
           <SectionLabel id="how-its-built">How it&apos;s built</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
-              The label
+              What the score predicts
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               For each inspection, we ask: in the 180 days that follow, does
@@ -303,7 +294,7 @@ export default async function HowItWorksPage() {
 
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
-              The features
+              What the model looks at
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               Thirty-six features, all built leak-free from the public record:
@@ -365,7 +356,7 @@ export default async function HowItWorksPage() {
 
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
-              The split is by time, never random
+              Tested on the future, not the past
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               Train, validation, and test are carved by date, not shuffled. We{" "}
@@ -477,7 +468,7 @@ export default async function HowItWorksPage() {
 
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
-              What&apos;s explained
+              Why a score is what it is
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               Per-establishment SHAP attribution — log-odds contributions from
@@ -592,10 +583,10 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel id="caveats">Caveats</SectionLabel>
+          <SectionLabel id="limits">Limits</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
-              Known limitations
+              What it doesn&apos;t do
             </h2>
             <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>

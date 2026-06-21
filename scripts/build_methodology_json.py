@@ -133,18 +133,39 @@ def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
     }
 
 
-def risk_tier_bands() -> list[dict]:
+def served_tier_shares() -> dict[str, float] | None:
+    """Share of *scored establishments* in each tier, from the served
+    ``scores.json`` totals — the population the app actually displays. Lets the
+    methodology page show shares without itself loading the 18 MB scores file.
+
+    Returns ``None`` if ``scores.json`` isn't built yet (fresh clone before the
+    serving script runs); the page then just omits the Share column.
+    """
+    scores_path = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+    try:
+        counts = json.loads(scores_path.read_text())["totals"]["tier_counts"]
+    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        return None
+    total = sum(counts.values())
+    return {label: count / total for label, count in counts.items()} if total else None
+
+
+def risk_tier_bands(shares: dict[str, float] | None = None) -> list[dict]:
     """Score→tier bands for the "How this works" page, derived from the served
     ``RISK_TIER_THRESHOLDS`` so the page can't drift from ``score_to_tier``.
 
-    Each band is ``{label, min, max}`` on the predicted probability; the top
-    band's ``max`` is ``None`` (open-ended).
+    Each band is ``{label, min, max}`` on the predicted probability (top band's
+    ``max`` is ``None``), plus ``share`` (fraction of establishments) when the
+    served distribution is available.
     """
     bands: list[dict] = []
     lo = 0.0
     for threshold, tier in RISK_TIER_THRESHOLDS:
         hi = None if threshold > 1.0 else round(threshold, 4)
-        bands.append({"label": tier, "min": round(lo, 4), "max": hi})
+        band: dict = {"label": tier, "min": round(lo, 4), "max": hi}
+        if shares is not None and tier in shares:
+            band["share"] = round(shares[tier], 4)
+        bands.append(band)
         lo = threshold
     return bands
 
@@ -205,8 +226,9 @@ def main() -> None:
             "top_decile_lift": round(float(report.top_decile_lift), 2),
         },
         # Score→tier bands (Low/Moderate/Elevated/High) shown as the badge legend
-        # on the page — sourced from the served thresholds, not hardcoded in TS.
-        "risk_tiers": risk_tier_bands(),
+        # on the page — thresholds from the served constants, share from the
+        # served scores.json, so the page reads only this one JSON.
+        "risk_tiers": risk_tier_bands(served_tier_shares()),
         "operating_points": [
             {
                 "frac": float(row.inspect_top_frac),
