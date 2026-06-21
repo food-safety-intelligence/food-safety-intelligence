@@ -10,10 +10,16 @@ on:
   push:
     branches: [main]
 
-# A newer push to the same branch/PR cancels the in-flight run.
+# This workflow only reads the checkout and runs tests — no writes needed.
+# Set least privilege explicitly rather than inheriting the repo default.
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels the in-flight run. Don't cancel runs on
+# main (push) — each merge's run is a health signal worth keeping.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   python:
