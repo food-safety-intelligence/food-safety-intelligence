@@ -273,10 +273,7 @@ export function MapExplorer({
                     signal, not a safety guarantee
                   </>
                 ) : (
-                  <>
-                    Top {listRows.length.toLocaleString()} by risk — search or
-                    sort for the rest
-                  </>
+                  <>Top {listRows.length.toLocaleString()} by risk</>
                 )}
               </p>
             </div>
