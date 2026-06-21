@@ -1,128 +1,107 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
-import type { PinDriver, PinSummary, RestaurantScore, RiskTier } from "@/lib/scores";
-import { TIER_HEX, TIER_TEXT_CLASS, toPinDriver } from "@/lib/scores";
+import type { HomeSort, HomeView, RiskTier } from "@/lib/scores";
+import { ALL_TIERS, isAllTiers, TIER_HEX, TIER_TEXT_CLASS } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
 import { cn } from "@/lib/utils";
 
-const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
-
-/** Common shape for side-list rows. PinSummary rows set trend to null. */
-type ListRow = {
-  license_id: string;
-  dba_name: string;
-  address: string;
-  risk_score: number;
-  risk_tier: RiskTier;
-  trend_slope_90d: number | null;
-  top_driver?: PinDriver;
-};
+// How long to wait after the last keystroke before pushing `?q=` to the URL.
+// Keeps typing responsive (local state updates instantly) while avoiding a
+// server round-trip per character.
+const SEARCH_DEBOUNCE_MS = 300;
 
 /**
- * Map-first home shell — the design's "Chicago Safety Map" screen, scaled
- * for desktop. Layout:
+ * Map-first home shell — the design's "Chicago Safety Map" screen.
  *
- *   ┌─────────────────────────────────────────┐
- *   │ floating search + filter chips          │
- *   │                                         │  side list
- *   │             M A P                       │  (scrollable)
- *   │                                         │
- *   │             [zoom controls]             │
- *   └─────────────────────────────────────────┘
- *
- * On a tablet/mobile the side list stacks below the map.
+ * URL-driven: search (`?q=`), tier filter (`?tier=`), and sort (`?sort=`) all
+ * live in the URL. The server (`getHomeView`) does ALL filtering/sorting over
+ * the full population and hands back the capped list + filtered pins; this
+ * component only renders them and edits the URL. That's what makes search
+ * reach every establishment and every tier — not just the top-N shipped down.
  */
 export function MapExplorer({
-  scores,
-  pins,
-  tierCounts,
-  totalEstablishments,
+  view,
+  query,
+  sort,
+  activeTiers,
 }: {
-  scores: RestaurantScore[];
-  pins: PinSummary[];
-  tierCounts: Record<RiskTier, number>;
-  totalEstablishments?: number;
+  view: HomeView;
+  query: string;
+  sort: HomeSort;
+  activeTiers: RiskTier[];
 }) {
-  const [query, setQuery] = useState("");
-  const [activeTiers, setActiveTiers] = useState<Set<RiskTier>>(
-    new Set(ALL_TIERS),
-  );
+  const router = useRouter();
+  const pathname = usePathname();
 
-  const trimmedQuery = query.trim().toLowerCase();
-  const hasQuery = trimmedQuery.length > 0;
+  // Local mirror of the query so the input stays responsive while the URL
+  // catches up on a debounce. Seeded from the URL-derived prop.
+  const [input, setInput] = useState(query);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Map: filter by tier always; filter by query across the FULL pin set when
-  // present. Without a query the map still shows zoom-aware density from all
-  // ~23k pins; with a query the result narrows to typed-name matches.
-  const visiblePins = useMemo(() => {
-    return pins
-      .filter((p) => activeTiers.has(p.risk_tier))
-      .filter((p) =>
-        hasQuery
-          ? `${p.dba_name} ${p.address}`.toLowerCase().includes(trimmedQuery)
-          : true,
-      );
-  }, [pins, activeTiers, hasQuery, trimmedQuery]);
+  // Keep the input in sync when the URL query changes from outside the box
+  // (back/forward, a cleared search) — but never clobber what the user is
+  // actively typing.
+  useEffect(() => {
+    if (document.activeElement !== inputRef.current) setInput(query);
+  }, [query]);
 
-  // Side list: with no query we render the rich top-200 from `scores` (has
-  // trend slopes); with a query we search the FULL pin set so a name like
-  // "Starbucks" at rank 5,000 is findable. Capped at 200 results.
-  const listRows = useMemo<ListRow[]>(() => {
-    if (!hasQuery) {
-      return scores
-        .filter((r) => activeTiers.has(r.risk_tier))
-        .slice()
-        .sort((a, b) => b.risk_score - a.risk_score)
-        .slice(0, 200)
-        .map<ListRow>((r) => {
-          const d = r.top_drivers[0];
-          return {
-            license_id: r.license_id,
-            dba_name: r.dba_name,
-            address: r.address,
-            risk_score: r.risk_score,
-            risk_tier: r.risk_tier,
-            trend_slope_90d: r.trend_slope_90d,
-            top_driver: d ? toPinDriver(d) : undefined,
-          };
-        });
-    }
-    return pins
-      .filter((p) => activeTiers.has(p.risk_tier))
-      .filter((p) =>
-        `${p.dba_name} ${p.address}`.toLowerCase().includes(trimmedQuery),
-      )
-      .slice(0, 200)
-      .map<ListRow>((p) => ({
-        license_id: p.license_id,
-        dba_name: p.dba_name,
-        address: p.address,
-        risk_score: p.risk_score,
-        risk_tier: p.risk_tier,
-        trend_slope_90d: null,
-        top_driver: p.top_driver,
-      }));
-  }, [scores, pins, activeTiers, hasQuery, trimmedQuery]);
+  const hasQuery = query.trim().length > 0;
+  const tierActive = !isAllTiers(activeTiers);
+  const activeSet = new Set(activeTiers);
+
+  const hrefFor = (next: {
+    q?: string;
+    sort?: HomeSort;
+    tiers?: RiskTier[];
+  }): string => {
+    const q = (next.q ?? query).trim();
+    const s = next.sort ?? sort;
+    const t = next.tiers ?? activeTiers;
+    const params = new URLSearchParams();
+    if (q) params.set("q", q);
+    if (s !== "risk") params.set("sort", s);
+    if (!isAllTiers(t)) params.set("tier", t.join(","));
+    const qs = params.toString();
+    return qs ? `${pathname}?${qs}` : pathname;
+  };
+
+  const onSearchChange = (value: string) => {
+    setInput(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      router.replace(hrefFor({ q: value }), { scroll: false });
+    }, SEARCH_DEBOUNCE_MS);
+  };
 
   const toggleTier = (tier: RiskTier) => {
-    setActiveTiers((prev) => {
-      const next = new Set(prev);
-      if (next.has(tier)) next.delete(tier);
-      else next.add(tier);
-      return next.size === 0 ? new Set(ALL_TIERS) : next;
-    });
+    const next = new Set(activeSet);
+    if (next.has(tier)) next.delete(tier);
+    else next.add(tier);
+    // Empty selection is meaningless → treat as "all".
+    const tiers =
+      next.size === 0 ? [...ALL_TIERS] : ALL_TIERS.filter((t) => next.has(t));
+    router.replace(hrefFor({ tiers }), { scroll: false });
   };
+
+  const setSort = (s: HomeSort) => {
+    router.replace(hrefFor({ sort: s }), { scroll: false });
+  };
+
+  const { listRows, pins, matchCount, total, tierCounts } = view;
+  const capped = matchCount > listRows.length;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-0 lg:gap-6 px-4 lg:px-8 h-full">
       {/* MAP COLUMN */}
       <div className="relative h-[calc(100vh-200px)] lg:h-[calc(100vh-140px)] min-h-[520px] rounded-3xl overflow-hidden border border-line bg-card soft-shadow">
-        <MapView pins={visiblePins} className="absolute inset-0" />
+        <MapView pins={pins} className="absolute inset-0" />
 
         {/* Floating search + filter overlay */}
         <div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
@@ -130,17 +109,19 @@ export function MapExplorer({
             <div className="flex items-center gap-3 px-3 py-2">
               <Search className="w-5 h-5 text-ink" strokeWidth={2} />
               <input
+                ref={inputRef}
                 type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                value={input}
+                onChange={(e) => onSearchChange(e.target.value)}
                 placeholder="Search food establishments or addresses"
                 className="bg-transparent flex-1 text-[16px] placeholder:text-muted/70 focus:outline-none"
+                aria-label="Search food establishments or addresses"
               />
               <span
                 className="text-[10px] text-muted/80 px-2 py-1 rounded-md bg-tint"
-                title={`Map shows up to a zoom-dependent cap from ${pins.length.toLocaleString()} food establishments. Side list shows the top ${scores.length} by risk score.`}
+                title={`Searches all ${total.toLocaleString()} indexed food establishments server-side, across every risk tier.`}
               >
-                {pins.length.toLocaleString()} pins · zoom for more
+                {total.toLocaleString()} indexed
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5 px-2 pt-2 pb-1">
@@ -150,16 +131,18 @@ export function MapExplorer({
                   onClick={() => toggleTier(tier)}
                   className={cn(
                     "transition-opacity",
-                    activeTiers.has(tier) ? "opacity-100" : "opacity-35",
+                    !tierActive || activeSet.has(tier)
+                      ? "opacity-100"
+                      : "opacity-35",
                   )}
-                  aria-pressed={activeTiers.has(tier)}
+                  aria-pressed={!tierActive || activeSet.has(tier)}
                 >
                   <TierPill tier={tier} withCount={tierCounts[tier]} size="sm" />
                 </button>
               ))}
               <span className="grow" />
               <span className="text-[11px] text-muted mr-2">
-                {visiblePins.length.toLocaleString()} on map
+                {pins.length.toLocaleString()} on map
               </span>
             </div>
           </div>
@@ -175,19 +158,64 @@ export function MapExplorer({
       <aside className="mt-6 lg:mt-0 lg:h-[calc(100vh-140px)] lg:min-h-[520px] flex flex-col">
         <div className="rounded-3xl bg-card border border-line soft-shadow flex flex-col h-full overflow-hidden">
           <div className="px-5 py-4 border-b border-line bg-cream/40">
-            <h2 className="font-semibold tracking-tight text-[15px]">
-              {hasQuery ? `Matching "${query}"` : "Highest-risk · live"}
-            </h2>
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="font-semibold tracking-tight text-[15px]">
+                {hasQuery
+                  ? `Matching "${query}"`
+                  : sort === "name"
+                    ? "All establishments · A–Z"
+                    : "Highest risk"}
+              </h2>
+              {/* Sort toggle — A–Z surfaces every tier alphabetically, so the
+                  list is no longer just the highest-risk (all-High) slice. */}
+              <div
+                className="flex items-center rounded-lg border border-line overflow-hidden text-[11px]"
+                role="group"
+                aria-label="Sort order"
+              >
+                <button
+                  onClick={() => setSort("risk")}
+                  aria-pressed={sort === "risk"}
+                  className={cn(
+                    "px-2 py-1 transition-colors",
+                    sort === "risk"
+                      ? "bg-ink text-cream"
+                      : "text-muted hover:bg-cream/60",
+                  )}
+                >
+                  Risk
+                </button>
+                <button
+                  onClick={() => setSort("name")}
+                  aria-pressed={sort === "name"}
+                  className={cn(
+                    "px-2 py-1 transition-colors border-l border-line",
+                    sort === "name"
+                      ? "bg-ink text-cream"
+                      : "text-muted hover:bg-cream/60",
+                  )}
+                >
+                  A–Z
+                </button>
+              </div>
+            </div>
             <p className="text-[11px] text-muted mt-0.5">
               {hasQuery ? (
                 <>
-                  {listRows.length.toLocaleString()} of{" "}
-                  {pins.length.toLocaleString()} match
+                  {capped
+                    ? `First ${listRows.length.toLocaleString()} of ${matchCount.toLocaleString()} matches`
+                    : `${matchCount.toLocaleString()} ${matchCount === 1 ? "match" : "matches"}`}
+                </>
+              ) : sort === "name" ? (
+                <>
+                  Showing {listRows.length.toLocaleString()} of{" "}
+                  {total.toLocaleString()} — type to find any establishment
                 </>
               ) : (
                 <>
-                  Top {listRows.length} ·{" "}
-                  {(totalEstablishments ?? scores.length).toLocaleString()} indexed
+                  Top {listRows.length.toLocaleString()} by risk ·{" "}
+                  {total.toLocaleString()} indexed (search or sort A–Z for the
+                  rest)
                 </>
               )}
             </p>

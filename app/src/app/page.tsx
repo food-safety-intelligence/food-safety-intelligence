@@ -1,16 +1,16 @@
 import { ArrowRight, Heart } from "lucide-react";
 import Link from "next/link";
-import type { PinDriver } from "@/lib/scores";
-import { getMapPins, loadScores } from "@/lib/scores-server";
+import { getHomeView, loadScores } from "@/lib/scores-server";
+import { parseTiers, type HomeSort, type PinDriver } from "@/lib/scores";
 import { DemoBanner } from "@/components/DemoBanner";
 import { MapExplorer } from "@/components/MapExplorer";
 import { PinDriverLine } from "@/components/MapView";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
-// Iteration-speed knob — see comment history in scores-server.ts. The
-// floating search is still in-memory client-side; the cap controls how big
-// the RSC payload is. Bump to 1000+ once we add `?q=` server-side search.
+// The home list is capped for payload size; search/sort/filters narrow the
+// full population server-side (see getHomeView), so the cap never hides a
+// match — it only bounds the no-query "highest-risk" preview.
 const HOME_LIMIT = 200;
 
 // A static, generic example of the kind of drivers the model surfaces, so the
@@ -28,13 +28,21 @@ const EXAMPLE_DRIVERS: PinDriver[] = [
   { feature: "flag_kw_handwash_sink", label: "Handwashing lapses", up: true },
 ];
 
-export default async function HomePage() {
-  const [payload, pins] = await Promise.all([loadScores(), getMapPins()]);
+export default async function HomePage({
+  searchParams,
+}: {
+  // Next 16: searchParams is async.
+  searchParams: Promise<{ q?: string; tier?: string; sort?: string }>;
+}) {
+  const sp = await searchParams;
+  const query = (sp.q ?? "").trim();
+  const sort: HomeSort = sp.sort === "name" ? "name" : "risk";
+  const tiers = parseTiers(sp.tier);
 
-  const visibleScores = payload.scores
-    .slice()
-    .sort((a, b) => b.risk_score - a.risk_score)
-    .slice(0, HOME_LIMIT);
+  const [payload, view] = await Promise.all([
+    loadScores(),
+    getHomeView({ q: query, tiers, sort, listLimit: HOME_LIMIT }),
+  ]);
 
   return (
     <>
@@ -44,10 +52,10 @@ export default async function HomePage() {
       {/* MAP-FIRST viewport — the design's "Chicago Safety Map" screen. */}
       <main className="flex-1 flex flex-col pt-4">
         <MapExplorer
-          scores={visibleScores}
-          pins={pins}
-          tierCounts={payload.totals.tier_counts}
-          totalEstablishments={payload.totals.establishments}
+          view={view}
+          query={query}
+          sort={sort}
+          activeTiers={tiers}
         />
 
         {/* Below-the-fold supplementary content. Map-first means scroll for the rest. */}
