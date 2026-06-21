@@ -419,3 +419,103 @@ def test_complaint_features_respects_radius():
     )
     out = add_complaint_features(inspections, complaints)
     assert out.loc[0, "n_311_rodent_300m_90d"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Address-exact 311 features (venue-level: complaints at the EXACT address,
+# not a radius). The same leak guard as the radius counts — strictly before
+# the anchor day — applies here too.
+# ---------------------------------------------------------------------------
+
+
+def test_address_exact_counts_match_normalized_address_only():
+    """Counts key on the normalised street address, not a radius. Case and
+    whitespace differences still match; a different address, a same-day filing,
+    and an out-of-window filing must all be excluded."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_complaint_features,
+    )
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1",
+                inspection_date="2020-06-01",
+                address="100 W RANDOLPH ST ",  # upper + trailing space, as in the data
+            )
+        ]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": [
+                "100 W Randolph St",  # same address, mixed case -> counts
+                "100 W Randolph St",  # same address, ON anchor day -> excluded (leak)
+                "100 W Randolph St",  # same address, >365d prior -> outside window
+                "200 N State St",  # different address -> excluded
+            ],
+            "sr_type": ["Restaurant Complaint"] * 4,
+            "created_date": pd.to_datetime(
+                ["2020-03-01", "2020-06-01", "2019-01-01", "2020-03-01"]
+            ),
+        }
+    )
+    out = add_address_exact_complaint_features(inspections, complaints)
+    assert out.loc[0, "n_311_addr_restaurant_365d"] == 1
+    # Other complaint types stay at zero — type is not conflated.
+    assert out.loc[0, "n_311_addr_rodent_365d"] == 0
+    assert out.loc[0, "n_311_addr_sanitation_365d"] == 0
+
+
+def test_address_exact_recency_and_trend():
+    """Recency = days to the most recent prior complaint; trend is positive
+    when recent complaints outpace the venue's own yearly baseline. A venue
+    with no matched complaints gets NaN recency and 0 trend (not 0 days)."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_recency_features,
+    )
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2020-06-01", address="100 W RANDOLPH ST "
+            ),
+            _minimal_row(license_id="L2", inspection_date="2020-06-01", address="999 NOWHERE AVE "),
+        ]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": ["100 W Randolph St", "100 W Randolph St"],
+            "sr_type": ["Restaurant Complaint", "Sanitation Code Violation"],
+            # 17 d prior (recent window) and 152 d prior (older part of the year).
+            "created_date": pd.to_datetime(["2020-05-15", "2020-01-01"]),
+        }
+    )
+    out = add_address_exact_recency_features(inspections, complaints)
+    assert out.loc[0, "days_since_last_311_addr_complaint"] == 17
+    # 1 recent (<=90d) minus 1 older * (90/275) ~= +0.67 -> a rising spike.
+    assert out.loc[0, "trend_311_addr_complaint"] > 0
+    # No matched complaints: "never", not "yesterday".
+    assert pd.isna(out.loc[1, "days_since_last_311_addr_complaint"])
+    assert out.loc[1, "trend_311_addr_complaint"] == 0
+
+
+def test_address_exact_recency_excludes_anchor_day():
+    """A complaint filed ON the inspection day must not count — it would leak
+    the anchor (inspectors often file a 311 during the visit)."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_recency_features,
+    )
+
+    inspections = _df(
+        [_minimal_row(license_id="L1", inspection_date="2020-06-01", address="100 W RANDOLPH ST ")]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": ["100 W Randolph St"],
+            "sr_type": ["Restaurant Complaint"],
+            "created_date": pd.to_datetime(["2020-06-01"]),  # same day as anchor
+        }
+    )
+    out = add_address_exact_recency_features(inspections, complaints)
+    assert pd.isna(out.loc[0, "days_since_last_311_addr_complaint"])
+    assert out.loc[0, "trend_311_addr_complaint"] == 0

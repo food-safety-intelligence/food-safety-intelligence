@@ -85,9 +85,20 @@ NUMERIC_FEATURES: list[str] = [
     # License-history features (joined from licenses_historical.parquet)
     "license_age_days",
     "license_n_history_rows",
-    # 311 spatial counts re-tested in this stack and left OUT: served PR-AUC
-    # 0.3147 -> 0.3152 (~flat) for a slow BallTree build dependency, so the
-    # Phase-5 drop holds. Code remains in complaint_features.py if revisited.
+    # 311 spatial RADIUS counts re-tested in an earlier stack and left OUT:
+    # served PR-AUC 0.3147 -> 0.3152 (~flat) for a slow BallTree dependency
+    # (density confound — busy blocks dominate). Code stays in
+    # complaint_features.py if revisited.
+    #
+    # Run 2 — venue-level 311 (complaints at the EXACT address, not a radius):
+    # the open-data analog of reviews about THIS establishment. Each shows
+    # clean monotonic univariate label separation; on the group-test gate vs
+    # whether they survive alongside prior_* history.
+    "n_311_addr_restaurant_365d",
+    "n_311_addr_sanitation_365d",
+    "n_311_addr_rodent_365d",
+    "days_since_last_311_addr_complaint",
+    "trend_311_addr_complaint",
 ]
 
 CATEGORICAL_FEATURES: list[str] = [

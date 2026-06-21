@@ -25,7 +25,11 @@ from __future__ import annotations
 
 import pandas as pd
 
-from foodsafety.features.complaint_features import add_complaint_features
+from foodsafety.features.complaint_features import (
+    add_address_exact_complaint_features,
+    add_address_exact_recency_features,
+    add_complaint_features,
+)
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.features.license_features import add_license_features
@@ -86,9 +90,15 @@ def build_features(
     # Calendar / seasonality features (no external join needed).
     df = add_temporal_features(df)
 
-    # Spatial 311 counts (BallTree 300m). Skipped if no complaints provided.
+    # 311 complaint features. Skipped if no complaints provided.
     if complaints is not None:
+        # Spatial 311 counts (BallTree 300m) — kept for reference / ablation.
         df = add_complaint_features(df, complaints)
+        # Venue-level 311: complaints at the EXACT address (count + recency +
+        # trend). The radius counts were flat (density confound); the exact
+        # address isolates the venue, like reviews about THIS establishment.
+        df = add_address_exact_complaint_features(df, complaints)
+        df = add_address_exact_recency_features(df, complaints)
 
     # License history (age + activity). Skipped if no historical-licenses df provided.
     if licenses_historical is not None:
