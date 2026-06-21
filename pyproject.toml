@@ -42,6 +42,12 @@ packages = ["src/foodsafety"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Notebooks are exploratory and follow the nbstripout convention, not
+# library-code lint rules. Imports-after-markdown (E402), one-liners (E701/E702),
+# etc. are normal in cells — linting them as if they were package modules just
+# generates churn on every notebook edit. The package, scripts, tests, and
+# agents are linted; notebooks are not.
+extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]

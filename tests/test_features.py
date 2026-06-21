@@ -15,7 +15,6 @@ Other tests pin down:
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from foodsafety.features.build import build_features
 from foodsafety.features.inspection_features import add_inspection_features
@@ -66,8 +65,7 @@ def test_prior_features_do_not_leak_anchor():
     df = _df(
         [
             _minimal_row(inspection_date="2019-04-01", results="Pass"),
-            _minimal_row(inspection_date="2019-08-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-08-01", results="Fail", is_fail_or_priority=True),
         ]
     )
     out = add_inspection_features(df)
@@ -85,8 +83,7 @@ def test_prior_features_count_earlier_events_correctly():
     """
     df = _df(
         [
-            _minimal_row(inspection_date="2019-04-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-04-01", results="Fail", is_fail_or_priority=True),
             _minimal_row(inspection_date="2019-08-01", results="Pass"),
             _minimal_row(inspection_date="2019-12-01", results="Pass"),
         ]
@@ -100,10 +97,13 @@ def test_prior_features_do_not_leak_across_licenses():
     """A Fail at License A should NOT count towards License B's prior_fails."""
     df = _df(
         [
-            _minimal_row(license_id="A", inspection_date="2019-04-01",
-                         results="Fail", is_fail_or_priority=True),
-            _minimal_row(license_id="B", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(
+                license_id="A",
+                inspection_date="2019-04-01",
+                results="Fail",
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(license_id="B", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = add_inspection_features(df)
@@ -132,8 +132,7 @@ def test_days_since_last_fail_is_strictly_before():
     df = _df(
         [
             _minimal_row(inspection_date="2019-01-01", results="Pass"),
-            _minimal_row(inspection_date="2019-04-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-04-01", results="Fail", is_fail_or_priority=True),
             _minimal_row(inspection_date="2019-07-01", results="Pass"),  # 91 days after the Fail
         ]
     )
@@ -220,8 +219,7 @@ def test_current_inspection_outcome_describes_the_anchor_itself():
 def test_static_features_present_and_typed():
     df = _df(
         [
-            _minimal_row(facility_type="Bakery", risk="Risk 2 (Medium)",
-                         zip="60614"),
+            _minimal_row(facility_type="Bakery", risk="Risk 2 (Medium)", zip="60614"),
         ]
     )
     out = add_license_features(df)
@@ -237,7 +235,7 @@ def test_static_zip_cleans_decimals_and_short_codes():
     df = _df(
         [
             _minimal_row(zip="60614.0"),
-            _minimal_row(zip="606"),       # too short
+            _minimal_row(zip="606"),  # too short
             _minimal_row(zip=None),
         ]
     )
@@ -289,11 +287,9 @@ def test_build_features_drops_burnin_invalid_and_non_modelable():
     df = _df(
         [
             _minimal_row(license_id="L1", inspection_date="2018-06-01", is_burnin=True),
-            _minimal_row(license_id="0",  inspection_date="2019-06-01"),
-            _minimal_row(license_id="L1", inspection_date="2019-07-01",
-                         results="Out of Business"),
-            _minimal_row(license_id="L1", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(license_id="0", inspection_date="2019-06-01"),
+            _minimal_row(license_id="L1", inspection_date="2019-07-01", results="Out of Business"),
+            _minimal_row(license_id="L1", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = build_features(df, complaints=None)
@@ -309,11 +305,14 @@ def test_build_features_uses_burnin_for_priors_before_dropping():
     """
     df = _df(
         [
-            _minimal_row(license_id="L1", inspection_date="2018-06-01",
-                         results="Fail", is_burnin=True,
-                         is_fail_or_priority=True),
-            _minimal_row(license_id="L1", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(
+                license_id="L1",
+                inspection_date="2018-06-01",
+                results="Fail",
+                is_burnin=True,
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(license_id="L1", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = build_features(df, complaints=None)
@@ -347,13 +346,13 @@ def test_complaint_features_count_recent_events_within_radius():
     )
     complaints = pd.DataFrame(
         {
-            "latitude":   [41.9000, 41.9000, 41.9000, 41.9000],
-            "longitude":  [-87.6500, -87.6500, -87.6500, -87.6500],
+            "latitude": [41.9000, 41.9000, 41.9000, 41.9000],
+            "longitude": [-87.6500, -87.6500, -87.6500, -87.6500],
             "sr_type": [
                 "Rodent Baiting/Rat Complaint",  # 30 d prior — should count
                 "Rodent Baiting/Rat Complaint",  # 95 d prior — outside 90d window
                 "Rodent Baiting/Rat Complaint",  # 30 d prior, but at a FAR coord
-                "Sanitation Code Violation",     # 30 d prior — counts for sanitation
+                "Sanitation Code Violation",  # 30 d prior — counts for sanitation
             ],
             "created_date": pd.to_datetime(
                 ["2020-05-02", "2020-02-26", "2020-05-02", "2020-05-02"]

@@ -94,9 +94,7 @@ def main() -> None:
     #     and we don't want to drop ~3% of restaurants whose most-recent
     #     inspection happens to fall in the trailing 180 days.
     if "right_truncated" in features.columns:
-        features_modelable = features.loc[~features["right_truncated"]].reset_index(
-            drop=True
-        )
+        features_modelable = features.loc[~features["right_truncated"]].reset_index(drop=True)
         n_dropped = len(features) - len(features_modelable)
         if n_dropped:
             print(
@@ -110,9 +108,7 @@ def main() -> None:
 
     print(f"Temporal split (train_end={TRAIN_END}, val_end={VAL_END})")
     split = temporal_split(features_modelable, train_end=TRAIN_END, val_end=VAL_END)
-    print(
-        f"  train n={len(split.train):,}  val n={len(split.val):,}  test n={len(split.test):,}"
-    )
+    print(f"  train n={len(split.train):,}  val n={len(split.val):,}  test n={len(split.test):,}")
 
     X_train = split.train[ALL_FEATURES]
     y_train = split.train[LABEL_COL].astype(int).to_numpy()
@@ -219,9 +215,7 @@ def main() -> None:
 
     # Sanity: confirm we got continuous probabilities this time.
     full_p = calibrated.predict_proba(features[ALL_FEATURES])[:, 1]
-    print(
-        f"Unique probability values across {len(full_p):,} rows: {len(np.unique(full_p)):,}"
-    )
+    print(f"Unique probability values across {len(full_p):,} rows: {len(np.unique(full_p)):,}")
 
     # Score every restaurant + export JSON for the web app.
     print("Building scores table (per-license_id, anchored on latest inspection)")
@@ -240,7 +234,8 @@ def main() -> None:
     for col in extras:
         if col not in scores.columns and col in features.columns:
             scores[col] = (
-                features.drop_duplicates("license_id").set_index("license_id")[col]
+                features.drop_duplicates("license_id")
+                .set_index("license_id")[col]
                 .reindex(scores["license_id"].astype(str))
                 .to_numpy()
             )

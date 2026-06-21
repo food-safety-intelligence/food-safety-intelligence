@@ -89,9 +89,7 @@ def add_violation_features(df: pd.DataFrame) -> pd.DataFrame:
     codes = out["violations"].apply(extract_violation_codes)
     out["violation_codes"] = codes
     out["n_violations"] = codes.str.len().astype("Int32")
-    out["has_priority_violation"] = codes.apply(
-        lambda cs: any(c <= _PRIORITY_CODE_MAX for c in cs)
-    )
+    out["has_priority_violation"] = codes.apply(lambda cs: any(c <= _PRIORITY_CODE_MAX for c in cs))
     out["n_priority_violations"] = codes.apply(
         lambda cs: sum(1 for c in cs if c <= _PRIORITY_CODE_MAX)
     ).astype("Int32")

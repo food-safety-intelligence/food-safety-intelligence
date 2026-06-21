@@ -102,7 +102,9 @@ def add_inspection_features(
         if "inspection_type" in out.columns
         else pd.Series("", index=out.index)
     )
-    out["_reinsp_int"] = _itype.str.contains("re-inspection|reinspection", regex=True).astype("int8")
+    out["_reinsp_int"] = _itype.str.contains("re-inspection|reinspection", regex=True).astype(
+        "int8"
+    )
     out["_complaint_int"] = _itype.str.contains("complaint", regex=True).astype("int8")
 
     group = out.groupby(license_col, sort=False)
@@ -117,15 +119,11 @@ def add_inspection_features(
         group.cumcount().astype("int32")
         # cumcount() is 0-indexed and naturally excludes the current row already
     )
-    out["prior_fails"] = (
-        group["_is_fail_int"].cumsum() - out["_is_fail_int"]
-    ).astype("int32")
+    out["prior_fails"] = (group["_is_fail_int"].cumsum() - out["_is_fail_int"]).astype("int32")
     out["prior_priority_violations"] = (
         group["_priority_int"].cumsum() - out["_priority_int"]
     ).astype("int32")
-    out["prior_core_violations"] = (
-        group["_core_int"].cumsum() - out["_core_int"]
-    ).astype("int32")
+    out["prior_core_violations"] = (group["_core_int"].cumsum() - out["_core_int"]).astype("int32")
     out["prior_fail_or_priority_events"] = (
         group["_event_int"].cumsum() - out["_event_int"]
     ).astype("int32")
@@ -134,9 +132,9 @@ def add_inspection_features(
     out["prior_pass_w_conditions"] = (
         group["_pass_cond_int"].cumsum() - out["_pass_cond_int"]
     ).astype("int32")
-    out["prior_reinspections"] = (
-        group["_reinsp_int"].cumsum() - out["_reinsp_int"]
-    ).astype("int32")
+    out["prior_reinspections"] = (group["_reinsp_int"].cumsum() - out["_reinsp_int"]).astype(
+        "int32"
+    )
     out["prior_complaint_inspections"] = (
         group["_complaint_int"].cumsum() - out["_complaint_int"]
     ).astype("int32")
@@ -145,17 +143,13 @@ def add_inspection_features(
     # tree models handle NaN natively; logreg pipelines should impute.
     safe_denom = out["prior_inspections"].replace(0, np.nan)
     out["prior_fail_rate"] = (out["prior_fails"] / safe_denom).astype("float64")
-    out["prior_event_rate"] = (
-        out["prior_fail_or_priority_events"] / safe_denom
-    ).astype("float64")
+    out["prior_event_rate"] = (out["prior_fail_or_priority_events"] / safe_denom).astype("float64")
 
     # --- Pattern 2: "last event strictly before" --------------------------
     # days_since_last_inspection: shift the date within the license group.
     # ``group_keys=False`` keeps the result aligned with the original index.
     last_insp = group[date_col].shift(1)
-    out["days_since_last_inspection"] = (
-        (out[date_col] - last_insp).dt.days.astype("float64")
-    )
+    out["days_since_last_inspection"] = (out[date_col] - last_insp).dt.days.astype("float64")
 
     # days_since_last_fail: more involved. We want the date of the most
     # recent Fail at this license BEFORE the current row.
@@ -172,11 +166,11 @@ def add_inspection_features(
     # group boundaries, so there's no cross-license leak.
     fail_date_or_nat = out[date_col].where(out["_is_fail_int"] == 1, pd.NaT)
     last_fail_at_or_before = fail_date_or_nat.groupby(out[license_col], sort=False).ffill()
-    last_fail_strictly_before = last_fail_at_or_before.groupby(
-        out[license_col], sort=False
-    ).shift(1)
-    out["days_since_last_fail"] = (
-        (out[date_col] - last_fail_strictly_before).dt.days.astype("float64")
+    last_fail_strictly_before = last_fail_at_or_before.groupby(out[license_col], sort=False).shift(
+        1
+    )
+    out["days_since_last_fail"] = (out[date_col] - last_fail_strictly_before).dt.days.astype(
+        "float64"
     )
 
     # --- Recency / last-outcome / trend (own-history only; leak-free) ------
@@ -224,8 +218,13 @@ def add_inspection_features(
     # Drop intermediate columns; they were named with `_` prefix on purpose.
     return out.drop(
         columns=[
-            "_is_fail_int", "_priority_int", "_core_int", "_event_int",
-            "_pass_cond_int", "_reinsp_int", "_complaint_int",
+            "_is_fail_int",
+            "_priority_int",
+            "_core_int",
+            "_event_int",
+            "_pass_cond_int",
+            "_reinsp_int",
+            "_complaint_int",
         ]
     )
 
@@ -236,7 +235,7 @@ def add_inspection_features(
 # duplication is two lines and trivially correct.
 # ---------------------------------------------------------------------------
 
-import re as _re
+import re as _re  # noqa: E402  (deliberate: keep this helper self-contained at file end)
 
 _VIOLATION_CODE_RE = _re.compile(r"(?:^|\|)\s*(\d{1,2})\.\s")
 

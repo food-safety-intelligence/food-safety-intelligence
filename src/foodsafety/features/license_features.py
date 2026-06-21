@@ -52,12 +52,7 @@ def add_license_features(df: pd.DataFrame) -> pd.DataFrame:
     # match. Short codes ("606") and missing values both become "" — we do NOT
     # zero-pad short codes, because "00606" isn't a real Chicago ZIP and the
     # padding would silently invent a value that doesn't exist.
-    zip_clean = (
-        out["zip"]
-        .astype("string")
-        .fillna("")
-        .str.replace(r"\.0$", "", regex=True)
-    )
+    zip_clean = out["zip"].astype("string").fillna("").str.replace(r"\.0$", "", regex=True)
     zip_clean = zip_clean.where(zip_clean.str.match(r"^\d{5}$"), "")
     out["static_zip"] = zip_clean.astype("category")
     out["static_zip3"] = zip_clean.str.slice(0, 3).astype("category")

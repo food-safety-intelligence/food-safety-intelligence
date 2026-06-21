@@ -21,8 +21,8 @@ Two product surfaces depend on this module:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import numpy as np
 import pandas as pd
@@ -31,7 +31,6 @@ from sklearn.compose import ColumnTransformer
 from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-
 
 # ---------------------------------------------------------------------------
 # Plain-English labels for the UI driver bars.
@@ -156,9 +155,7 @@ def linear_contributions(
     expanded_to_original = _map_expanded_to_original(output_names, original_features)
 
     # Sum into a DataFrame with original-feature columns.
-    contrib_df = pd.DataFrame(
-        0.0, index=X.index, columns=original_features, dtype="float64"
-    )
+    contrib_df = pd.DataFrame(0.0, index=X.index, columns=original_features, dtype="float64")
     for j, expanded_name in enumerate(output_names):
         orig = expanded_to_original.get(expanded_name)
         if orig is None:

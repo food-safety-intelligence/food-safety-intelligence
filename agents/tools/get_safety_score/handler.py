@@ -29,12 +29,12 @@ import re
 from datetime import date
 from typing import Any
 
-from sagemaker_stub import FEATURE_ORDER, score_restaurants
-
+from sagemaker_stub import score_restaurants
 
 # ---------------------------------------------------------------------------
 # Scores.json fallback loader
 # ---------------------------------------------------------------------------
+
 
 @functools.lru_cache(maxsize=1)
 def _load_scores_index() -> dict[str, dict]:
@@ -55,10 +55,17 @@ def _normalise_address(addr: str) -> str:
     """Uppercase, expand common abbreviations, collapse whitespace."""
     addr = addr.upper()
     replacements = {
-        "STREET": "ST",  "AVENUE": "AVE",  "BOULEVARD": "BLVD",
-        "DRIVE":  "DR",  "COURT":  "CT",   "PLACE":     "PL",
-        "ROAD":   "RD",  "NORTH":  "N",    "SOUTH":     "S",
-        "EAST":   "E",   "WEST":   "W",
+        "STREET": "ST",
+        "AVENUE": "AVE",
+        "BOULEVARD": "BLVD",
+        "DRIVE": "DR",
+        "COURT": "CT",
+        "PLACE": "PL",
+        "ROAD": "RD",
+        "NORTH": "N",
+        "SOUTH": "S",
+        "EAST": "E",
+        "WEST": "W",
     }
     for long, short in replacements.items():
         addr = re.sub(rf"\b{long}\b", short, addr)
@@ -78,6 +85,7 @@ def _fuzzy_lookup(address: str, index: dict[str, dict]) -> dict | None:
 # Feature builder (used when calling SageMaker directly)
 # ---------------------------------------------------------------------------
 
+
 def _build_feature_row(restaurant: dict[str, Any]) -> dict[str, Any]:
     """
     Build a feature row for the SageMaker endpoint.
@@ -94,7 +102,6 @@ def _build_feature_row(restaurant: dict[str, Any]) -> dict[str, Any]:
     fallback = restaurant.get("_scores_record", {}) or {}
 
     today = date.today()
-    as_of_date = fallback.get("as_of_date", str(today))
     last_inspection_date = restaurant.get("last_inspection_date")
 
     # Days-since features.
@@ -108,53 +115,48 @@ def _build_feature_row(restaurant: dict[str, Any]) -> dict[str, Any]:
 
     return {
         # Passthrough identifiers (not sent to model, used for bookkeeping).
-        "osm_id":  restaurant.get("osm_id", ""),
-        "name":    restaurant.get("name", ""),
+        "osm_id": restaurant.get("osm_id", ""),
+        "name": restaurant.get("name", ""),
         "address": restaurant.get("address", ""),
-
         # Prior-history features — from scores.json fallback or 0.
-        "prior_inspections":           fallback.get("prior_inspections", 0),
-        "prior_fails":                 fallback.get("prior_fails", 0),
-        "prior_priority_violations":   fallback.get("prior_priority_violations", 0),
-        "prior_core_violations":       fallback.get("prior_core_violations", 0),
+        "prior_inspections": fallback.get("prior_inspections", 0),
+        "prior_fails": fallback.get("prior_fails", 0),
+        "prior_priority_violations": fallback.get("prior_priority_violations", 0),
+        "prior_core_violations": fallback.get("prior_core_violations", 0),
         "prior_fail_or_priority_events": fallback.get("prior_fail_or_priority_events", 0),
-
         # Recency features.
-        "days_since_last_inspection":  days_since_inspection,
-        "days_since_last_fail":        fallback.get("days_since_last_fail", 730),
-
+        "days_since_last_inspection": days_since_inspection,
+        "days_since_last_fail": fallback.get("days_since_last_fail", 730),
         # Calendar features.
-        "temporal_month":   today.month,
+        "temporal_month": today.month,
         "temporal_quarter": (today.month - 1) // 3 + 1,
-
         # License features.
-        "license_age_days":         fallback.get("license_age_days", 0),
-        "license_n_history_rows":   fallback.get("license_n_history_rows", 0),
-
+        "license_age_days": fallback.get("license_age_days", 0),
+        "license_n_history_rows": fallback.get("license_n_history_rows", 0),
         # Static/categorical (label-encoded integers; 0 = unknown).
         "static_facility_type": fallback.get("static_facility_type", 0),
-        "static_risk_tier":     fallback.get("static_risk_tier", 0),
-        "static_zip":           fallback.get("static_zip", 0),
-
+        "static_risk_tier": fallback.get("static_risk_tier", 0),
+        "static_zip": fallback.get("static_zip", 0),
         # Keyword flags — binary (0/1).
-        "flag_kw_temperature":        fallback.get("flag_kw_temperature", 0),
-        "flag_kw_cooling":            fallback.get("flag_kw_cooling", 0),
-        "flag_kw_raw_food":           fallback.get("flag_kw_raw_food", 0),
-        "flag_kw_cross_contamination":fallback.get("flag_kw_cross_contamination", 0),
-        "flag_kw_expired":            fallback.get("flag_kw_expired", 0),
-        "flag_kw_rodent":             fallback.get("flag_kw_rodent", 0),
-        "flag_kw_pest":               fallback.get("flag_kw_pest", 0),
-        "flag_kw_no_soap":            fallback.get("flag_kw_no_soap", 0),
-        "flag_kw_no_paper_towels":    fallback.get("flag_kw_no_paper_towels", 0),
-        "flag_kw_handwash_sink":      fallback.get("flag_kw_handwash_sink", 0),
-        "flag_kw_sewage":             fallback.get("flag_kw_sewage", 0),
-        "flag_kw_certified_manager":  fallback.get("flag_kw_certified_manager", 0),
+        "flag_kw_temperature": fallback.get("flag_kw_temperature", 0),
+        "flag_kw_cooling": fallback.get("flag_kw_cooling", 0),
+        "flag_kw_raw_food": fallback.get("flag_kw_raw_food", 0),
+        "flag_kw_cross_contamination": fallback.get("flag_kw_cross_contamination", 0),
+        "flag_kw_expired": fallback.get("flag_kw_expired", 0),
+        "flag_kw_rodent": fallback.get("flag_kw_rodent", 0),
+        "flag_kw_pest": fallback.get("flag_kw_pest", 0),
+        "flag_kw_no_soap": fallback.get("flag_kw_no_soap", 0),
+        "flag_kw_no_paper_towels": fallback.get("flag_kw_no_paper_towels", 0),
+        "flag_kw_handwash_sink": fallback.get("flag_kw_handwash_sink", 0),
+        "flag_kw_sewage": fallback.get("flag_kw_sewage", 0),
+        "flag_kw_certified_manager": fallback.get("flag_kw_certified_manager", 0),
     }
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     """
@@ -215,41 +217,44 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
 
     # Merge SageMaker output with scores.json metadata.
     output: list[dict[str, Any]] = []
-    for r, sm in zip(restaurants, sm_results):
+    for r, sm in zip(restaurants, sm_results, strict=True):
         scores_match = scores_json_matches.get(r["osm_id"])
 
-        output.append({
-            # Identity
-            "osm_id":    r["osm_id"],
-            "name":      r["name"],
-            "address":   r.get("address", ""),
-            "lat":       r.get("lat"),
-            "lon":       r.get("lon"),
-            "cuisine":   r.get("cuisine", ""),
-
-            # Score (from SageMaker — stub or real)
-            "risk_score":   sm["risk_score"],
-            "risk_tier":    sm["risk_tier"],
-            "shap_drivers": sm["shap_drivers"],
-            "stub":         sm.get("stub", False),
-            "stub_note":    sm.get("stub_note"),
-
-            # Metadata from scores.json match (if any)
-            "license_id":          scores_match["license_id"]      if scores_match else None,
-            "matched_scores_json": scores_match is not None,
-            "percentile_rank":     scores_match.get("percentile_rank") if scores_match else None,
-            "trend":               _trend_label(
-                                       scores_match.get("trend_slope_90d") if scores_match else None
-                                   ),
-            "neighborhood":        scores_match.get("neighborhood")  if scores_match else None,
-        })
+        output.append(
+            {
+                # Identity
+                "osm_id": r["osm_id"],
+                "name": r["name"],
+                "address": r.get("address", ""),
+                "lat": r.get("lat"),
+                "lon": r.get("lon"),
+                "cuisine": r.get("cuisine", ""),
+                # Score (from SageMaker — stub or real)
+                "risk_score": sm["risk_score"],
+                "risk_tier": sm["risk_tier"],
+                "shap_drivers": sm["shap_drivers"],
+                "stub": sm.get("stub", False),
+                "stub_note": sm.get("stub_note"),
+                # Metadata from scores.json match (if any)
+                "license_id": scores_match["license_id"] if scores_match else None,
+                "matched_scores_json": scores_match is not None,
+                "percentile_rank": scores_match.get("percentile_rank") if scores_match else None,
+                "trend": _trend_label(
+                    scores_match.get("trend_slope_90d") if scores_match else None
+                ),
+                "neighborhood": scores_match.get("neighborhood") if scores_match else None,
+            }
+        )
 
     # Return safest first.
     return sorted(output, key=lambda r: r["risk_score"])
 
 
 def _trend_label(slope: float | None) -> str:
-    if slope is None:    return "stable"
-    if slope >  0.001:   return "worsening"
-    if slope < -0.001:   return "improving"
+    if slope is None:
+        return "stable"
+    if slope > 0.001:
+        return "worsening"
+    if slope < -0.001:
+        return "improving"
     return "stable"

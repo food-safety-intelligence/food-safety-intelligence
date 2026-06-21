@@ -30,9 +30,7 @@ def _df(dates: list[str], **extra) -> pd.DataFrame:
 
 
 def test_split_partitions_all_rows_exactly_once():
-    df = _df(
-        ["2019-01-01", "2020-06-15", "2022-03-01", "2024-12-31", "2025-09-30"]
-    )
+    df = _df(["2019-01-01", "2020-06-15", "2022-03-01", "2024-12-31", "2025-09-30"])
     s = temporal_split(df, train_end="2023-01-01", val_end="2025-01-01")
     assert len(s.train) + len(s.val) + len(s.test) == len(df)
     # No row is in two splits — check via the row indices being disjoint.
@@ -154,9 +152,7 @@ def test_expanding_year_folds_embargo_excludes_tail_of_train():
 
 
 def test_expanding_year_folds_train_expands_and_never_overlaps_val():
-    df = _df(
-        ["2019-01-01", "2020-01-01", "2021-01-01", "2022-01-01", "2023-01-01"]
-    )
+    df = _df(["2019-01-01", "2020-01-01", "2021-01-01", "2022-01-01", "2023-01-01"])
     folds = expanding_year_folds(df)
     prev_train = -1
     for train_idx, val_idx in folds:

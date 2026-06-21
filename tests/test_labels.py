@@ -24,7 +24,6 @@ from foodsafety.data.labels import (
     has_priority_violation,
 )
 
-
 # ---------------------------------------------------------------------------
 # Violation-code extraction
 # ---------------------------------------------------------------------------
@@ -52,10 +51,7 @@ def test_has_priority_violation_recognises_priority_codes():
     # Code 55 is core (30+ family)
     assert has_priority_violation("55. PHYSICAL FACILITIES - Comments: ...") is False
     # Mixed — priority presence wins
-    assert (
-        has_priority_violation("10. HANDWASHING - Comments: ... | 55. FACILITIES")
-        is True
-    )
+    assert has_priority_violation("10. HANDWASHING - Comments: ... | 55. FACILITIES") is True
 
 
 def test_boundary_codes_29_and_30():
@@ -227,14 +223,10 @@ def test_invalid_license_tokens_get_na_label():
     )
     out = build_labels(df, train_start_date="2019-01-01")
     # Placeholder license rows: label NA
-    placeholder_labels = out.loc[
-        out["license_id"] == "0", "y_fail_or_critical_next_180d"
-    ]
+    placeholder_labels = out.loc[out["license_id"] == "0", "y_fail_or_critical_next_180d"]
     assert placeholder_labels.isna().all()
     # Valid license rows: label computed normally
-    valid_labels = out.loc[
-        out["license_id"] == "L42", "y_fail_or_critical_next_180d"
-    ]
+    valid_labels = out.loc[out["license_id"] == "L42", "y_fail_or_critical_next_180d"]
     assert not valid_labels.isna().any()
 
 
@@ -273,9 +265,7 @@ def test_labels_do_not_leak_across_licenses():
 
 
 def test_add_violation_features_columns_present():
-    df = pd.DataFrame(
-        {"violations": ["10. HANDWASHING | 30. FOO | 55. BAR", None, "29. PRIORITY"]}
-    )
+    df = pd.DataFrame({"violations": ["10. HANDWASHING | 30. FOO | 55. BAR", None, "29. PRIORITY"]})
     out = add_violation_features(df)
     assert list(out["n_violations"]) == [3, 0, 1]
     assert list(out["has_priority_violation"]) == [True, False, True]

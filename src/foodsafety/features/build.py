@@ -33,7 +33,6 @@ from foodsafety.features.license_history_features import add_license_history_fea
 from foodsafety.features.temporal_features import add_temporal_features
 from foodsafety.utils.geo import warn_and_null_out_of_bbox
 
-
 MODELABLE_RESULTS = frozenset({"Pass", "Pass w/ Conditions", "Fail"})
 
 

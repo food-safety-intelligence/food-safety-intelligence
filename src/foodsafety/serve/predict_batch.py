@@ -106,45 +106,38 @@ def build_scores_table(
 
     # Per-restaurant aggregation.
     latest_per_license = (
-        df.sort_values("inspection_date")
-        .drop_duplicates("license_id", keep="last")
-        .copy()
+        df.sort_values("inspection_date").drop_duplicates("license_id", keep="last").copy()
     )
 
     # SHAP attribution for the latest-anchor rows. Done in one batched call
     # against the latest set rather than the full feature frame.
     latest_X = latest_per_license[list(feature_columns)]
-    contributions = linear_contributions(
-        model, latest_X, original_features=list(feature_columns)
-    )
+    contributions = linear_contributions(model, latest_X, original_features=list(feature_columns))
 
     # Build top_drivers list per row.
     drivers_per_row: list[list[dict]] = []
     for idx, row in latest_per_license.iterrows():
         row_values = row[feature_columns]
         row_contribs = contributions.loc[idx]
-        drivers = top_drivers_for_row(
-            row_values, row_contribs, k=n_drivers
-        )
+        drivers = top_drivers_for_row(row_values, row_contribs, k=n_drivers)
         drivers_per_row.append([d.to_dict() for d in drivers])
     latest_per_license["top_drivers"] = drivers_per_row
 
     # 90-day trend slope per license.
-    latest_per_license["trend_slope_90d"] = _compute_trend_slopes(
-        df, latest_per_license
-    )
+    latest_per_license["trend_slope_90d"] = _compute_trend_slopes(df, latest_per_license)
 
     # Tier + as_of_date.
-    latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(
-        score_to_tier
-    )
+    latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(score_to_tier)
     latest_per_license["as_of_date"] = latest_per_license["inspection_date"]
 
     # Output schema per contract.
-    output_cols = (
-        list(keep_columns)
-        + ["as_of_date", "risk_score", "risk_tier", "top_drivers", "trend_slope_90d"]
-    )
+    output_cols = list(keep_columns) + [
+        "as_of_date",
+        "risk_score",
+        "risk_tier",
+        "top_drivers",
+        "trend_slope_90d",
+    ]
     return latest_per_license[output_cols].reset_index(drop=True)
 
 
@@ -162,9 +155,9 @@ def _compute_trend_slopes(
     """
     slopes: list[float] = []
     full_indexed = full_scored.set_index("license_id")
-    for license_id, latest_row in latest_per_license[
-        ["license_id", "inspection_date"]
-    ].itertuples(index=False):
+    for license_id, latest_row in latest_per_license[["license_id", "inspection_date"]].itertuples(
+        index=False
+    ):
         # All inspections at this license — pandas .loc lookup is fast.
         try:
             subset = full_indexed.loc[[license_id]]
@@ -176,8 +169,7 @@ def _compute_trend_slopes(
         upper = latest_row
         lower = upper - pd.Timedelta(days=window_days)
         in_window = subset[
-            (subset["inspection_date"] > lower)
-            & (subset["inspection_date"] <= upper)
+            (subset["inspection_date"] > lower) & (subset["inspection_date"] <= upper)
         ]
         if len(in_window) < 2:
             slopes.append(np.nan)
@@ -240,9 +232,7 @@ def write_scores_json(
         "model_version": model_version,
         "label_window_days": label_window_days,
         "totals": totals,
-        "scores": [
-            _row_to_json(r) for r in df.itertuples(index=False)
-        ],
+        "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 
     with open(out_path, "w") as f:
@@ -262,9 +252,7 @@ def _row_to_json(row) -> dict:
         "as_of_date": str(row.as_of_date),
         "risk_score": float(row.risk_score),
         "risk_tier": str(row.risk_tier),
-        "trend_slope_90d": (
-            None if pd.isna(row.trend_slope_90d) else float(row.trend_slope_90d)
-        ),
+        "trend_slope_90d": (None if pd.isna(row.trend_slope_90d) else float(row.trend_slope_90d)),
         "trend_ci_low": None,
         "trend_ci_high": None,
         "top_drivers": list(row.top_drivers) if row.top_drivers is not None else [],

@@ -15,7 +15,7 @@ Run: ``PYTHONPATH=src uv run python scripts/build_methodology_json.py``
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -64,7 +64,7 @@ def main() -> None:
     table = operating_point_table(y, scores, k_fracs=K_FRACS)
 
     payload = {
-        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         # Uncalibrated baseline: operating points + PR/ROC-AUC are rank-based, so
         # they're identical to the sigmoid-calibrated served form (see docstring).
         # The string names the estimator family, not a calibration step we ran.
