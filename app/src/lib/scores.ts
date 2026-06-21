@@ -243,7 +243,7 @@ export function trendDirection(slope: number | null): TrendDirection {
 
 export const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
 
-export type HomeSort = "risk" | "name";
+export type HomeSort = "risk" | "low" | "name";
 
 /** Lean row for the home side-list. Carries trend (the pin set does not). */
 export interface HomeListRow {

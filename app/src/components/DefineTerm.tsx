@@ -55,7 +55,7 @@ export function DefineTerm({
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        aria-label={`What is a ${entry.term.toLowerCase()}?`}
+        aria-label={`What does "${entry.term}" mean?`}
         className="text-muted hover:text-ink transition-colors"
       >
         <Info className="w-3.5 h-3.5" strokeWidth={2} />

@@ -8,11 +8,9 @@ import { PinDriverLine } from "@/components/MapView";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
-// The no-query default is a "highest-risk" preview, so a small cap is fine.
-// When the user searches or browses A–Z they want to reach matches, so the
-// list is capped much higher there (revealed incrementally via "show more").
-const PREVIEW_LIMIT = 200;
-const SEARCH_LIMIT = 1000;
+// One list cap for every mode (highest/lowest risk, A–Z, search) — kept
+// consistent and bounded; the list reveals 100 rows at a time via "show more".
+const LIST_LIMIT = 500;
 
 // A static, generic example of the kind of drivers the model surfaces, so the
 // caregivers promise ("we show the top three drivers") is concrete on the home
@@ -37,15 +35,13 @@ export default async function HomePage({
 }) {
   const sp = await searchParams;
   const query = (sp.q ?? "").trim();
-  const sort: HomeSort = sp.sort === "name" ? "name" : "risk";
+  const sort: HomeSort =
+    sp.sort === "name" ? "name" : sp.sort === "low" ? "low" : "risk";
   const tiers = parseTiers(sp.tier);
-
-  // Searching or browsing A–Z wants reach; the plain risk view wants a preview.
-  const listLimit = query || sort === "name" ? SEARCH_LIMIT : PREVIEW_LIMIT;
 
   const [payload, view] = await Promise.all([
     loadScores(),
-    getHomeView({ q: query, tiers, sort, listLimit }),
+    getHomeView({ q: query, tiers, sort, listLimit: LIST_LIMIT }),
   ]);
 
   return (

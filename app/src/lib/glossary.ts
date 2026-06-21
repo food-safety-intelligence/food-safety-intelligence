@@ -45,6 +45,12 @@ export const GLOSSARY = {
     short:
       "Our Low / Moderate / Elevated / High bands, assigned from the model's predicted probability. Distinct from Chicago's own Risk 1–3 category.",
   },
+  "current-inspection": {
+    id: "current-inspection",
+    term: "Current inspection result",
+    short:
+      "Whether the establishment passed or failed the inspection on record as of this score — the model's strongest near-term signal. It describes that latest visit, not a prediction; the score is about the next 180 days.",
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryKey = keyof typeof GLOSSARY;
@@ -54,6 +60,7 @@ export const GLOSSARY_ORDER: GlossaryKey[] = [
   "priority-violations",
   "core-violations",
   "inspection-types",
+  "current-inspection",
   "chicago-risk",
   "risk-tiers",
 ];
@@ -78,5 +85,6 @@ export function glossaryKeyForFeature(feature: string): GlossaryKey | null {
   }
   if (feature === "static_inspection_type") return "inspection-types";
   if (feature === "static_risk_tier") return "chicago-risk";
+  if (feature === "was_fail") return "current-inspection";
   return null;
 }

@@ -204,10 +204,11 @@ export async function getHomeView(opts: {
       (!tierActive || tierSet.has(r.risk_tier)) && matchesQuery(r, query),
   );
 
-  // List: sort by the chosen key, then cap. Name sort surfaces all tiers
-  // (alphabetical), which is how a user browses past the highest-risk slice.
+  // List: sort by the chosen key, then cap. Name surfaces all tiers
+  // alphabetically; "low" surfaces the lowest-risk end; default is highest-risk.
   const sorted = matched.slice().sort((a, b) => {
     if (sort === "name") return a.dba_name.localeCompare(b.dba_name);
+    if (sort === "low") return a.risk_score - b.risk_score;
     return b.risk_score - a.risk_score;
   });
   const listRows: HomeListRow[] = sorted.slice(0, listLimit).map((r) => {
@@ -224,11 +225,15 @@ export async function getHomeView(opts: {
     };
   });
 
-  // Map pins: the matches that have coordinates, always risk-sorted so the
-  // map's zoom-aware density keeps surfacing the most prominent first.
+  // Map pins: the matches that have coordinates. MapView surfaces the first N
+  // by array order at low zoom, so order them to match the list — lowest-risk
+  // first in "low" mode (the map goes green), highest-risk first otherwise —
+  // so the map and the side list never contradict each other.
   const pins: PinSummary[] = matched
     .filter(hasCoords)
-    .sort((a, b) => b.risk_score - a.risk_score)
+    .sort((a, b) =>
+      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
+    )
     .map(pinFromScore);
 
   return {

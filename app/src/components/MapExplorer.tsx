@@ -16,10 +16,9 @@ import { cn } from "@/lib/utils";
 // server round-trip per character.
 const SEARCH_DEBOUNCE_MS = 300;
 
-// Side-list reveals incrementally (a "show more" step) so a fresh load — and
-// especially mobile, where the list isn't a fixed-height scroll panel — isn't
-// hundreds of rows tall.
-const LIST_PAGE = 25;
+// Side-list reveals incrementally (a "show more" step) so a fresh load isn't
+// the whole capped set at once. Same on web and mobile.
+const LIST_PAGE = 100;
 
 /**
  * Map-first home shell — the design's "Chicago Safety Map" screen.
@@ -221,39 +220,39 @@ export function MapExplorer({
                     ? `Matching "${query}"`
                     : sort === "name"
                       ? "All establishments · A–Z"
-                      : "Highest risk"}
+                      : sort === "low"
+                        ? "Lowest risk"
+                        : "Highest risk"}
                 </h2>
-                {/* Sort toggle — A–Z surfaces every tier alphabetically, so the
-                    list is no longer just the highest-risk (all-High) slice. */}
+                {/* Sort toggle — High/Low risk or A–Z (alphabetical surfaces
+                    every tier, so the list isn't just the highest-risk slice). */}
                 <div
                   className="flex items-center rounded-lg border border-line overflow-hidden text-[11px]"
                   role="group"
                   aria-label="Sort order"
                 >
-                  <button
-                    onClick={() => setSort("risk")}
-                    aria-pressed={sort === "risk"}
-                    className={cn(
-                      "px-2 py-1 transition-colors",
-                      sort === "risk"
-                        ? "bg-ink text-cream"
-                        : "text-muted hover:bg-cream/60",
-                    )}
-                  >
-                    Risk
-                  </button>
-                  <button
-                    onClick={() => setSort("name")}
-                    aria-pressed={sort === "name"}
-                    className={cn(
-                      "px-2 py-1 transition-colors border-l border-line",
-                      sort === "name"
-                        ? "bg-ink text-cream"
-                        : "text-muted hover:bg-cream/60",
-                    )}
-                  >
-                    A–Z
-                  </button>
+                  {(
+                    [
+                      ["risk", "High"],
+                      ["low", "Low"],
+                      ["name", "A–Z"],
+                    ] as const
+                  ).map(([key, label], i) => (
+                    <button
+                      key={key}
+                      onClick={() => setSort(key)}
+                      aria-pressed={sort === key}
+                      className={cn(
+                        "px-2 py-1 transition-colors",
+                        i > 0 && "border-l border-line",
+                        sort === key
+                          ? "bg-ink text-cream"
+                          : "text-muted hover:bg-cream/60",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
               </div>
               <p className="text-[11px] text-muted mt-0.5">
@@ -268,10 +267,15 @@ export function MapExplorer({
                     Showing {listRows.length.toLocaleString()} of{" "}
                     {total.toLocaleString()} — type to find any establishment
                   </>
+                ) : sort === "low" ? (
+                  <>
+                    Lowest {listRows.length.toLocaleString()} by risk — a weaker
+                    signal, not a safety guarantee
+                  </>
                 ) : (
                   <>
                     Top {listRows.length.toLocaleString()} by risk — search or
-                    sort A–Z for the rest
+                    sort for the rest
                   </>
                 )}
               </p>
