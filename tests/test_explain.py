@@ -34,22 +34,18 @@ def test_every_model_feature_has_a_label():
 
 def test_was_fail_label_is_sign_aware():
     """The same binary feature reads oppositely for the fail vs pass case."""
-    fail = top_drivers_for_row(
-        pd.Series({"was_fail": 1}), pd.Series({"was_fail": 2.0}), k=1
-    )[0]
+    fail = top_drivers_for_row(pd.Series({"was_fail": 1}), pd.Series({"was_fail": 2.0}), k=1)[0]
     assert fail.label == "Failed the current inspection"
 
-    passed = top_drivers_for_row(
-        pd.Series({"was_fail": 0}), pd.Series({"was_fail": -0.4}), k=1
-    )[0]
+    passed = top_drivers_for_row(pd.Series({"was_fail": 0}), pd.Series({"was_fail": -0.4}), k=1)[0]
     assert passed.label == "Passed the current inspection"
 
 
 def test_sign_aware_label_handles_numpy_value():
     """Row values arrive as numpy scalars from the parquet, not python ints."""
-    d = top_drivers_for_row(
-        pd.Series({"was_fail": np.int8(1)}), pd.Series({"was_fail": 2.0}), k=1
-    )[0]
+    d = top_drivers_for_row(pd.Series({"was_fail": np.int8(1)}), pd.Series({"was_fail": 2.0}), k=1)[
+        0
+    ]
     assert d.label == "Failed the current inspection"
 
 
