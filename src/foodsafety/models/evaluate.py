@@ -97,6 +97,49 @@ def top_decile_lift(y_true: ArrayLike, y_score: ArrayLike) -> float:
     return precision_at_k(y_true, y_score, 0.10) / base
 
 
+def operating_point_table(
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    k_fracs: Sequence[float] = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50),
+) -> pd.DataFrame:
+    """Precision / recall / lift at each capacity-limited operating point.
+
+    The decision-facing view of a triage model: "if an inspector works the
+    top K% by risk this cycle, how many real events do they catch, and how
+    much better than inspecting a random K%?" One row per K in ``k_fracs``.
+    This is what the methodology / how-it-works page reports — a single PR-AUC
+    hides the operating point the city would actually run at.
+
+    Columns: ``inspect_top_frac``, ``n_flagged``, ``precision``, ``recall``
+    (fraction of ALL events captured), ``lift`` (precision / base rate;
+    1.0 = no better than random), ``events_caught``.
+    """
+    y_t = _as_array(y_true)
+    y_s = _as_array(y_score)
+    n = len(y_t)
+    total_pos = float(y_t.sum())
+    base = float(np.mean(y_t))
+    order = np.argsort(-y_s, kind="stable")
+    rows = []
+    for k_frac in k_fracs:
+        if not 0 < k_frac <= 1:
+            raise ValueError(f"k_frac must be in (0, 1]; got {k_frac}")
+        k = max(1, int(np.ceil(n * k_frac)))
+        caught = int(y_t[order[:k]].sum())
+        precision = caught / k
+        rows.append(
+            {
+                "inspect_top_frac": round(k_frac, 4),
+                "n_flagged": k,
+                "precision": round(precision, 4),
+                "recall": round(caught / total_pos, 4) if total_pos else float("nan"),
+                "lift": round(precision / base, 4) if base > 0 else float("nan"),
+                "events_caught": caught,
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def decile_lift_table(y_true: ArrayLike, y_score: ArrayLike) -> pd.DataFrame:
     """Per-decile lift table — the rank-quality eyeball-test.
 
