@@ -85,9 +85,18 @@ NUMERIC_FEATURES: list[str] = [
     # License-history features (joined from licenses_historical.parquet)
     "license_age_days",
     "license_n_history_rows",
-    # 311 spatial counts re-tested in this stack and left OUT: served PR-AUC
-    # 0.3147 -> 0.3152 (~flat) for a slow BallTree build dependency, so the
-    # Phase-5 drop holds. Code remains in complaint_features.py if revisited.
+    # 311 features tested across several angles and ALL left OUT — the 311
+    # signal is redundant with prior_* inspection history at every spatial scale:
+    #   - Spatial RADIUS counts (BallTree 300m): served PR-AUC 0.3147->0.3152
+    #     (~flat); density confound (busy blocks dominate).
+    #   - Run 2 venue-level (complaints at the EXACT address — counts + recency
+    #     + trend): clean monotonic UNIVARIATE separation, but on the honest
+    #     test the group failed the both-metrics gate (LogReg +0.005 PR-AUC /
+    #     +0.001 P@10; XGB -0.002 PR-AUC). Flat on the cold-start cut too.
+    #   - Run 2 neighborhood-normalized excess (ring 100m-vs-500m): flat,
+    #     orthogonal to prior_* but uninformative.
+    # Feature code stays in complaint_features.py (tested) if revisited. See
+    # docs/experiments.md for the full numbers.
 ]
 
 CATEGORICAL_FEATURES: list[str] = [
