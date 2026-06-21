@@ -3,7 +3,7 @@ Tests for the SageMaker stub — verifies that:
   1. The stub returns plausible, deterministic scores.
   2. Score distribution roughly matches the real model's ~10% positive rate.
   3. The real-endpoint path raises clearly when env vars are missing.
-  4. Feature row builder includes all 26 features in FEATURE_ORDER.
+  4. FEATURE_ORDER stays identical to the model feature contract (ALL_FEATURES).
   5. Swap flag (SAGEMAKER_USE_STUB) is respected.
 """
 
@@ -210,42 +210,17 @@ class TestShapDrivers:
 
 
 class TestFeatureOrder:
-    """FEATURE_ORDER must match the training pipeline exactly."""
+    """FEATURE_ORDER must stay identical to the model's ALL_FEATURES contract."""
 
-    EXPECTED_FEATURES = [
-        "prior_inspections",
-        "prior_fails",
-        "prior_priority_violations",
-        "prior_core_violations",
-        "prior_fail_or_priority_events",
-        "days_since_last_inspection",
-        "days_since_last_fail",
-        "temporal_month",
-        "temporal_quarter",
-        "license_age_days",
-        "license_n_history_rows",
-        "static_facility_type",
-        "static_risk_tier",
-        "static_zip",
-        "flag_kw_temperature",
-        "flag_kw_cooling",
-        "flag_kw_raw_food",
-        "flag_kw_cross_contamination",
-        "flag_kw_expired",
-        "flag_kw_rodent",
-        "flag_kw_pest",
-        "flag_kw_no_soap",
-        "flag_kw_no_paper_towels",
-        "flag_kw_handwash_sink",
-        "flag_kw_sewage",
-        "flag_kw_certified_manager",
-    ]
+    def test_matches_all_features(self):
+        # Import here, not at module top, so the lightweight stub tests still run
+        # without the foodsafety/sklearn stack; only this drift guard needs it.
+        from foodsafety.models.baseline import ALL_FEATURES
 
-    def test_count(self):
-        assert len(FEATURE_ORDER) == 26
-
-    def test_exact_order(self):
-        assert FEATURE_ORDER == self.EXPECTED_FEATURES
+        assert FEATURE_ORDER == ALL_FEATURES, (
+            "FEATURE_ORDER has drifted from foodsafety.models.baseline.ALL_FEATURES; "
+            "update the literal in sagemaker_stub.py to match the model contract."
+        )
 
 
 class TestSwapFlag:
