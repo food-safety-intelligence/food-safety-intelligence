@@ -41,14 +41,20 @@ repo "before changing an area" rule).
   `CATEGORICAL_FEATURES` / `BOOLEAN_FEATURES` in `src/foodsafety/models/baseline.py`
   (→ `ALL_FEATURES`, the single source of truth consumed by **both** LogReg and
   XGBoost). Add a short WHY comment.
-- **Add a plain-English driver label** in `FEATURE_LABELS`
-  (`src/foodsafety/explain/shap_drivers.py`) for any feature that can surface as a
+- **Add an entry to the `FEATURES` registry** in
+  `src/foodsafety/explain/feature_labels.py` for any feature that can surface as a
   top driver — without it the served `scores.json` (and the UI driver list) shows
-  the raw column name. Use a `{value}` format string (`{value:.0f}` for counts);
-  for a **binary outcome that surfaces in both directions** (e.g. `was_fail` — a
-  fail pushes risk up, a pass pulls it down) use a `{True/False}` dict so it reads
-  correctly for both cases, not a static string. `ALL_FEATURES` and
-  `FEATURE_LABELS` must stay in sync.
+  the raw column name. Each entry is a `FeaturePresentation(name, label)`:
+  - `name` — a generic, value-free label for the **global feature-impact chart**
+    on the methodology page (no `{value}`);
+  - `label` — the **per-row driver label**: a `{value}` format string
+    (`{value:.0f}` for counts), or — for a **binary outcome that surfaces in both
+    directions** (e.g. `was_fail`: a fail pushes risk up, a pass pulls it down) —
+    a `{True/False}` dict so it reads correctly both ways, not a static string.
+  `FEATURE_LABELS` and `display_name()` are **derived** from this registry, and
+  `shap_drivers` re-exports `FEATURE_LABELS` (so existing imports are unchanged).
+  `ALL_FEATURES` and `FEATURES` must stay in sync — every model feature needs an
+  entry (the global chart and the per-row label both read it).
 - Add a leak-free test in `tests/test_features.py` on tiny synthetic data with a
   known answer (mirror `test_prior_features_do_not_leak_anchor`).
 - `.venv/bin/python -m pytest tests/test_features.py -q` should pass. The
@@ -101,11 +107,20 @@ a residual-risk bullet + revision date) rather than spawning a new record.
 - **Re-ship the served model + app JSON** (else the demo runs the old model):
   `PYTHONPATH=src .venv/bin/python scripts/retrain_baseline_sigmoid.py` →
   served model + `data/predictions/scores.parquet` → `app/public/data/scores.json`
-  + `reports/metrics/baseline_sigmoid_<run>.json`; then
+  (schema `0.4.0`: **5** `top_drivers` per row + a top-level `calibration
+  {a, b, intercept}` Platt triple — both written automatically) +
+  `reports/metrics/baseline_sigmoid_<run>.json`; then
   `PYTHONPATH=src .venv/bin/python scripts/build_methodology_json.py` →
-  `app/public/data/methodology.json`. Sanity-check `scores.json` (row count, score
-  range, `top_drivers` schema, **driver labels human-readable — no raw
-  `snake_case` column names**, tier distribution).
+  `app/public/data/methodology.json` (also carries the **global feature-impact**
+  ranking + the worked **calibrated-waterfall** example). A new feature flows into
+  all of these automatically — the global-importance bar, the methodology worked
+  example, and the per-establishment detail-page waterfall (which reconstructs
+  client-side from the `calibration` triple + the row's `top_drivers`) — *provided
+  it has a `FEATURES` entry* (Step 1). Sanity-check `scores.json`: row count, score
+  range, `top_drivers` schema (5), **driver labels human-readable — no raw
+  `snake_case`**, tier distribution, and that `calibration` is present (a
+  per-profile waterfall reconciles when `sigmoid(base + Σdrivers + other) ==
+  risk_score`).
 - Commit the metrics JSONs (they're git-tracked; **never** commit `data/`).
 
 ## Step 7 — If FLAT (missed the gate)
@@ -116,7 +131,7 @@ Feature *code* may stay if cheap and self-contained (note it's unwired).
 ## Before committing / PR
 - `make test` (or `.venv/bin/python -m pytest -q`) green; `make lint` clean for the
   files you touched (don't expand scope to repo-wide lint debt).
-- Notebook outputs stripped on commit (nbstripout / [[clear-outputs]]).
+- Notebook outputs stripped on commit by the repo's nbstripout filter.
 - One PR per experiment; squash-merge. If a feature **resets the baseline** that
   later experiments are measured against, land it **first**.
 - Run `/update-docs` to propagate to the changelog + handoff memory.

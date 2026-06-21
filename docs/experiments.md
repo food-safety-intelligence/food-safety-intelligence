@@ -31,6 +31,8 @@
 | 2026-06-21 | **Missingness indicator (baseline LogReg)** — `SimpleImputer(add_indicator=True)` so LogReg learns the structural "no prior event" NaNs (`days_since_last_inspection`, `days_since_last_fail`, `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `license_age_days` — 6 cols) instead of conflating them with the median. *Does flagging missingness beat plain median-impute?* | **Flat.** Honest test n=13,812, A/B (median-only vs +indicator; ranking metrics are calibration-invariant): PR-AUC 0.3442→0.3449 (+0.0007, noise), P@10 0.3690 unchanged, P@5 0.434→0.428 (slightly down). The 6 indicators are redundant — `prior_inspections` / `prior_fails` / `prior_fail_or_priority_events` already encode the no-prior-history case. (XGBoost unaffected — NaN-native.) | **Reverted** — no change to `baseline.py`. | this PR |
 | 2026-06-21 | **Fail-only label — expanding-window CV** (validation of the prototype row above). Build the leak-free Fail-only forward-180 d label (event flag = `results == "Fail"` only, same forward-window logic) and re-run the baseline across **6 expanding-year folds** (RT-filtered, 180 d embargo). *Does the prototype's "more learnable" finding hold up across folds, or was it a single-split artifact?* | **Holds up.** Mean lift over base rate across 6 folds: fail-only **PR-lift 3.61** vs current 3.22; **P@10-lift 3.86** vs 3.70. Fail-only wins **6/6** folds on PR-lift, **4/6** on P@10-lift. (Compared on lift, not raw PR-AUC — fail-only prevalence 6.1% vs current 13.6%.) Unlike Run 3's morsel, CV *confirms* rather than erases it. | **Rejected on product grounds — kept fail-or-priority (DR 0007).** More learnable, but this is a consumer food-safety *risk* product: codes 1–29 are the city's serious tier already used across ~8 features + the UI, and fail-only narrows the target + leans harder on the re-inspection artifact. CV evidence retained as the record that the broad label is a *deliberate* choice, not a default. | this PR, DR 0007 |
 | 2026-06-21 | **Violation free-text embeddings (Layer-C dense NLP)** — embed each inspection's own violation comment with Amazon Titan Text Embeddings V2 (Bedrock, 256-dim, offline batch → parquet cache, leak-free per-text join), reduce to 32 PCA comps (fit on TRAIN only) + a `has_violation_text` flag, A/B into both models. *Do dense contextual embeddings beat the 12 keyword flags + structured codes — i.e. is the comment text under-encoded, or just redundant?* | **Flat / fails the gate.** Honest test n=13,812, A/B isolating the 33 cols (32 PCA + flag): production **LogReg fails the both-metrics gate** — PR-AUC 0.3442→0.3446 (flat) / P@10 0.369→**0.367 (down)**. XGB PR-AUC 0.3526→0.3530 (flat) / P@10 0.373→0.387 — a single-split P@10 bump on top of flat PR-AUC, on the non-production model (the same shape Run 3's false positive took before CV killed it). PCA(32) keeps 76% of embedding variance, so the flatness isn't a reduction artifact. Fairness (LogReg): Children's-facility recall@10% 0.435→**0.391 (down)**, School 0.646→0.633; no vulnerable-group win. | **Reverted** — the comment text is **redundant with the structured codes 1–29 + keyword flags**, not under-encoded; the dense embeddings add no signal the flags don't already carry. Feature module (`text_features.py`) + offline builder (`build_text_embeddings.py`) + leak test retained, **unwired** (not in `ALL_FEATURES`). | this PR |
+| 2026-06-21 | **Core-code break-out ablation** — split specific CORE codes (30+) out of the undifferentiated `n_core_this_inspection` count: structured boolean flags for codes 33 (hot holding), 48 (warewashing), 50 (hot/cold water), 54 (garbage), 58 (allergen training), built from the current inspection's violation text (leak-free, same basis as the other current-inspection features). Motivated by a univariate scan showing core-code lift spans 1.2×–2.4× over the 15.1% base — i.e. core is *not* uniform. *Does any specific core code carry orthogonal signal the generic core count misses?* | **Flat / fails the gate.** Honest test n=7,008, base 10.8%, A/B vs the v36 baseline (uncalibrated; ranking metrics). **+all-5:** PR-AUC 0.3716→0.3731 (+0.0015) but P@10 0.415→**0.399 (−0.016, down)**. **+allergen-58-only:** PR-AUC +0.0006 / P@10 −0.0014 (flat). No single code passes (33/48/50 ≈0; 54 +0.0010 PR-AUC but −0.013 P@10). The raw data has ~22.8k allergen mentions (~19.9k are code 58, "allergen training") — real but already absorbed by `n_core_this_inspection`. | **Reverted** — same outcome as the 2026-06-15 per-code experiment; the generic core count already captures it. **Allergen has no modeling lift** — its only case is a distinct *product* angle (allergen-awareness for a different vulnerable-diner population), not accuracy. Throwaway script only; nothing wired. | this PR |
+| 2026-06-21 | **LLM structured violation-label extraction (Layer-C dense NLP, Spike #2)** — Amazon Nova Lite (Bedrock, forced tool-use) reads each violation comment → 4 observed-conduct labels (hazard type / severity 1–3 / imminent-hazard / corrected-on-site) over the 90,174 distinct comments (offline batch → parquet cache, leak-free per-text-hash join), A/B the 5 label cols into both models. *Does turning prose into clean structured severity/hazard signal beat the codes + 12 keyword flags — the companion bet to the dense embeddings (Spike #1, row above)?* | **Null — fails the gate.** Honest test n=13,812: production **LogReg** PR-AUC 0.3442→0.3442 (flat) / P@10 0.369→**0.367 (down)**. XGB PR-AUC 0.3526→0.3545 (flat) / P@10 0.373→0.386 — single-split wobble on the non-production model (corrected-on-site / severity ride the re-inspection circularity). Fairness recall@10%: Children's 0.435→0.391, School 0.646→0.620 (no win); hazard-mix skew = genuine facility-type differences, not a proxy. | **Reverted** — redundant with codes 1–29 + keyword flags (severity/imminent ≈ `was_fail` + `n_priority_this_inspection`); even the interpretability path is a no (no accuracy, dents vulnerable-group recall). `violation_labels.py` + builder kept in-tree, **unwired**. | this PR |
 
 ## Model comparison: LogReg vs XGBoost
 
@@ -75,6 +77,36 @@ that expanding-window CV erased. The two changes that actually moved metrics wer
 **methodology fix** (XGB validation) and a **fairness-driven simplification** (proxy
 removal) — not added features. The **label** lever is now settled: fail-only was
 more learnable under CV but rejected on product grounds (kept fail-or-priority —
-DR 0007). That leaves the **operating point / product** and the one genuinely
-under-exploited surface — the **violation free-text** via dense embeddings / LLM extraction
-(Phase 2) — not more hand-crafted structured features.
+DR 0007). The last under-exploited surface — the **violation free-text** — has now
+been spiked at **both ends** and came back **null** (see below). That leaves the
+**operating point / product**, not more features.
+
+## Deep-learning scoping (Phase 2)
+
+The one genuinely under-exploited surface was the **violation free-text**, so the
+Phase-2 DL bets targeted it — and **both spikes came back null** on the
+both-metrics gate (honest test n=13,812; v36 baseline LogReg 0.332/0.370, XGB
+0.338/0.376):
+
+- **Spike #1 — dense embeddings** (Titan Text V2 → PCA(32) → GBM): flat; LogReg
+  P@10 down. (Row above.)
+- **Spike #2 — LLM structured severity/hazard labels** (Nova Lite → 5 cols → GBM):
+  flat; LogReg P@10 down. (Row above.)
+
+The text is **redundant with codes 1–29 + the 12 keyword flags**, not
+under-encoded — so the *information-not-capacity* ceiling holds for text too. The
+remaining DL families are **NO-GO at this scale** (documented, not spiked):
+
+- **Sequence model** (RNN / temporal-Transformer over each license's ordered
+  inspections) — `prior_*` already encodes recency / trend / 365-day / last-outcome;
+  ~80k short sequences would relearn those aggregates with more variance. Default NO-GO.
+- **Tabular DL** (FT-Transformer / TabNet) — wrong tool at ~80k rows with heavy
+  structural NaNs; GBMs win this regime and XGBoost already pulled even with LogReg
+  on v36. Expected lift ≈ 0.
+- **Graph** (operator / inspector / address networks) — the cross-license
+  **operator-prior already came up flat** (2026-06-14), and an inspector-linked
+  graph would re-create the geographic/demographic proxy we dropped `static_zip`
+  for (fairness red flag). NO-GO.
+
+**Net:** no untried DL lever has positive expected value at this scale; the next
+gains are product/operating-point, not model capacity.
