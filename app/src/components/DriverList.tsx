@@ -122,9 +122,9 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
       </ol>
       <p className="px-5 sm:px-6 py-4 text-[12px] text-muted leading-relaxed border-t border-line">
         Bar length shows each factor&apos;s relative influence; the number is its
-        log-odds contribution to this restaurant&apos;s risk (larger magnitude =
-        more influence). These show what moves the score up or down, not a sum
-        equal to it.
+        log-odds contribution to this food establishment&apos;s risk (larger
+        magnitude = more influence). These show what moves the score up or down,
+        not a sum equal to it.
       </p>
     </div>
   );

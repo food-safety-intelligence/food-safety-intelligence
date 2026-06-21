@@ -38,9 +38,9 @@ export default async function HowItWorksPage() {
           </h1>
           <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
             A logistic-regression model fit on six years of Chicago inspection
-            history. The score is a calibrated probability that a restaurant
-            will fail an inspection or be cited for a priority violation in
-            the next 180 days.
+            history. The score is a calibrated probability that a food
+            establishment will fail an inspection or be cited for a priority
+            violation in the next 180 days.
           </p>
         </header>
 
@@ -54,7 +54,7 @@ export default async function HowItWorksPage() {
               className="text-[15.5px] text-muted leading-relaxed mt-2"
             >
               For each inspection, we ask: in the 180 days that follow, does
-              the same restaurant have either a Fail result OR a priority
+              the same food establishment have either a Fail result OR a priority
               violation (Chicago codes 1–29)? Priority violations are the
               serious tier — temperature abuse, handwashing failures,
               cross-contamination, sewage/plumbing issues. Pre-2019
@@ -75,7 +75,7 @@ export default async function HowItWorksPage() {
               <li>
                 <span className="font-medium">Prior history</span> — counts of
                 inspections, failures, priority and core violations across the
-                restaurant&apos;s full prior record, plus near-miss and
+                food establishment&apos;s full prior record, plus near-miss and
                 visit-trigger history (Pass w/ Conditions, re-inspections,
                 complaint visits)
               </li>
@@ -83,7 +83,8 @@ export default async function HowItWorksPage() {
                 <span className="font-medium">Recency &amp; trend</span> — days
                 since the last inspection/failure, the previous inspection&apos;s
                 outcome, and 365-day rolling failure and violation counts — so
-                the model can see a restaurant improving, not just its lifetime
+                the model can see a food establishment improving, not just its
+              lifetime
                 totals
               </li>
               <li>
@@ -134,7 +135,8 @@ export default async function HowItWorksPage() {
               2024-07 → 2025-07, and <span className="font-medium">test</span>{" "}
               on 2025-07 onward — and every feature at a given inspection is
               computed only from data strictly before it. A random shuffle would
-              let the model peek at a restaurant&apos;s future to predict its
+              let the model peek at a food establishment&apos;s future to predict
+              its
               past, inflating the score into a number that would never hold up
               in production. The chronological split mirrors how the model is
               actually used: trained on history, scored on what comes next.
@@ -156,7 +158,7 @@ export default async function HowItWorksPage() {
                 <thead>
                   <tr className="text-left text-sage text-[12px] tracking-[0.08em] uppercase border-b border-ink/15">
                     <th className="py-2 pr-4 font-medium">Inspect top</th>
-                    <th className="py-2 pr-4 font-medium">Restaurants</th>
+                    <th className="py-2 pr-4 font-medium">Establishments</th>
                     <th className="py-2 pr-4 font-medium">Precision</th>
                     <th className="py-2 pr-4 font-medium">Events caught</th>
                     <th className="py-2 font-medium">Lift</th>
@@ -203,7 +205,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 5%</span>
                   {top5
-                    ? ` (~${top5.n_flagged.toLocaleString()} restaurants): about ${Math.round(
+                    ? ` (~${top5.n_flagged.toLocaleString()} food establishments): about ${Math.round(
                         top5.precision * 100,
                       )}% of those visits find a real problem — ${top5.lift.toFixed(
                         1,
@@ -215,7 +217,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 10%</span>
                   {top10
-                    ? ` (~${top10.n_flagged.toLocaleString()} restaurants): roughly ${Math.round(
+                    ? ` (~${top10.n_flagged.toLocaleString()} food establishments): roughly ${Math.round(
                         top10.precision * 100,
                       )}% of visits find a problem (${top10.lift.toFixed(
                         1,
@@ -238,7 +240,7 @@ export default async function HowItWorksPage() {
               What&apos;s explained
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
-              Per-restaurant SHAP attribution — log-odds contributions from
+              Per-establishment SHAP attribution — log-odds contributions from
               each feature, summed to recover the model&apos;s logit. The
               detail page surfaces the top four drivers, signed so positive
               contributions push risk up and negative contributions push it
@@ -261,7 +263,7 @@ export default async function HowItWorksPage() {
                 diners experience.
               </li>
               <li>
-                No restaurant-level traffic or revenue data — the score
+                No establishment-level traffic or revenue data — the score
                 doesn&apos;t adjust for kitchen volume.
               </li>
               <li>

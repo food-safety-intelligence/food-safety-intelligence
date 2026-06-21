@@ -127,12 +127,12 @@ export function MapExplorer({
                 type="text"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search restaurants or addresses"
+                placeholder="Search food establishments or addresses"
                 className="bg-transparent flex-1 text-[16px] placeholder:text-muted/70 focus:outline-none"
               />
               <span
                 className="text-[10px] text-muted/80 px-2 py-1 rounded-md bg-tint"
-                title={`Map shows up to a zoom-dependent cap from ${pins.length.toLocaleString()} restaurants. Side list shows the top ${scores.length} by risk score.`}
+                title={`Map shows up to a zoom-dependent cap from ${pins.length.toLocaleString()} food establishments. Side list shows the top ${scores.length} by risk score.`}
               >
                 {pins.length.toLocaleString()} pins · zoom for more
               </span>
@@ -190,7 +190,7 @@ export function MapExplorer({
           <ul className="flex-1 overflow-y-auto divide-y divide-line">
             {listRows.length === 0 && (
               <li className="px-5 py-8 text-[13px] text-muted text-center">
-                No restaurants match these filters.
+                No food establishments match these filters.
               </li>
             )}
             {listRows.map((r) => (

@@ -6,7 +6,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 export const metadata = {
   title: "For caregivers · Food Safety",
   description:
-    "How to read a restaurant risk signal when you're choosing for someone with compromised immunity.",
+    "How to read a food establishment risk signal when you're choosing for someone with compromised immunity.",
 };
 
 export default function CaregiversPage() {
@@ -32,7 +32,8 @@ export default function CaregiversPage() {
             The drivers matter more than the score.
           </h1>
           <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
-            Two restaurants can share the same predicted risk score for very
+            Two food establishments can share the same predicted risk score for
+            very
             different reasons. If you&apos;re ordering for someone with
             compromised immunity — an older parent, a chemo patient, a
             transplant recipient — the kind of pattern matters far more than
@@ -91,8 +92,8 @@ export default function CaregiversPage() {
             What this is not
           </p>
           <p className="text-[16px] leading-relaxed text-ink/90">
-            A &quot;High&quot; prediction does not mean a restaurant is unsafe
-            to eat at today. It means the patterns in the public record
+            A &quot;High&quot; prediction does not mean a food establishment is
+            unsafe to eat at today. It means the patterns in the public record
             resemble those that historically precede a failed inspection. Use
             it as one input alongside the precautions your care team
             recommends — not as a verdict.
