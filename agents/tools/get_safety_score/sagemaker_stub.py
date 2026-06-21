@@ -23,12 +23,12 @@ Real endpoint contract
   Output: JSON  {"predictions": [{"score": float, "shap": {...}}]}
 
   The XGBoost model output pipeline (SageMaker script mode):
-    - Input:  feature vector (26 floats/ints, see FEATURE_ORDER)
+    - Input:  feature vector (one float/int per column in FEATURE_ORDER)
     - Output: calibrated probability (sigmoid-scaled) 0.0–1.0
     - SHAP:   TreeExplainer values returned alongside score when
               RETURN_SHAP=1 environment variable is set on the endpoint
 
-Feature ordering mirrors data/models/baseline_sigmoid_20260605_metadata.json.
+Feature ordering mirrors foodsafety.models.baseline.ALL_FEATURES exactly.
 """
 
 from __future__ import annotations
@@ -40,24 +40,41 @@ import random
 from typing import Any
 
 # ---------------------------------------------------------------------------
-# Feature contract (must match the training pipeline column order exactly)
+# Feature contract — must match foodsafety.models.baseline.ALL_FEATURES exactly
+# (same names, same order). Kept as a literal so the lightweight stub pulls in
+# no heavy ML deps (sklearn/pandas) just to read a list of names. A drift-guard
+# test (test_sagemaker_stub.py) imports ALL_FEATURES and fails if this list
+# falls out of sync — the durable fix for a contract that has moved repeatedly.
 # ---------------------------------------------------------------------------
 
 FEATURE_ORDER: list[str] = [
+    # Numeric
     "prior_inspections",
     "prior_fails",
     "prior_priority_violations",
     "prior_core_violations",
     "prior_fail_or_priority_events",
+    "prior_pass_w_conditions",
+    "prior_reinspections",
+    "prior_complaint_inspections",
     "days_since_last_inspection",
     "days_since_last_fail",
+    "last_was_fail",
+    "prev_priority_violations",
+    "priority_violation_trend",
+    "prior_fails_365d",
+    "prior_priority_violations_365d",
+    "was_fail",
+    "n_priority_this_inspection",
+    "n_core_this_inspection",
     "temporal_month",
     "temporal_quarter",
     "license_age_days",
     "license_n_history_rows",
-    "static_facility_type",
+    # Categorical
     "static_risk_tier",
-    "static_zip",
+    "static_inspection_type",
+    # Boolean keyword flags
     "flag_kw_temperature",
     "flag_kw_cooling",
     "flag_kw_raw_food",
