@@ -25,6 +25,7 @@
 | 2026-06-15 | **311 geotemporal complaint counts** — `n_311_*` within 300 m × 90/180 d prior window (BallTree). *Does neighbourhood complaint density add signal?* | served PR-AUC 0.3147→0.3152 (**flat**); bottom-of-gain in XGBoost | **Excluded** from the model; code retained in `complaint_features.py`. Redundant with the rodent/pest/sewage keyword flags | — |
 | 2026-06-15 | **Fairness audit + proxy removal** — drop `static_zip` and `static_facility_type`, ship alongside recency/trend (30→33). *Can we cut geographic/business-type proxies without losing accuracy?* | served PR-AUC 0.3147→**0.3246**, P@10 0.352→**0.364**; XGB 0.2681→**0.2882**. Both metrics up, both models, **+ fairness win**. (Within this: dropping `static_facility_type` ≈free 0.3147→0.3139; dropping `static_zip` *improved* 0.3147→0.3188 — its sparse dummies overfit the chronological split) | **Kept** | DR 0004, contract v33 |
 | 2026-06-21 | **Sharper label prototype** — Fail-only (and priority-only) vs current fail-or-priority, 180 d, same pipeline + chronological split, full 33 features. *Is a crisper target more learnable?* | **Yes.** Top-decile lift over base rate: fail-only **4.1×** vs current 3.4× vs priority-only 3.2×; PR-AUC/prevalence 4.12 vs 3.01. Raw PR-AUC is lower (0.236 vs 0.324) only because prevalence is lower (5.7% vs 10.8%); priority-only is the noisy half diluting the current label. | **Promising** — add CV + label-owner (Aurelia/Arun) sign-off before any contract change | this PR |
+| 2026-06-21 | **Current-inspection own outcome (33→36)** — keep the anchor inspection's own `was_fail` + `n_priority_this_inspection` + `n_core_this_inspection` (already computed as intermediates, then dropped). Leak-free: observed at as_of_date, label window strictly after. *Does the current visit's own result/counts add signal beyond the PRIOR outcomes + keyword flags?* | **Yes — both models, both metrics** (honest test n=13,812; controlled A/B isolating just the 3 cols). LogReg PR-AUC 0.291→**0.344**, P@10 0.326→**0.369**; XGB 0.280→**0.344**, P@10 0.306→**0.367**; top-decile lift ~4.2. (Calibrated artifacts: LogReg 0.332 / XGB 0.338.) **Caveat:** top decile ~91% recent-failers (mandated re-inspection lands in the window) — but the gain persists on never-failed rows (PR-AUC 0.128→0.146) and helps cold-start (0.36→0.40). Ethics review cleared: vulnerable-pop recall@10% 0.50→0.60; the lone Children's PR-AUC dip is small-group noise. | **Kept** — clears the both-metrics gate (0002); resets the baseline for Runs 2–3 | contract v36, DR 0005 (principle 6) |
 
 ## Model comparison: LogReg vs XGBoost
 
@@ -42,6 +43,15 @@ XGBoost at the operating points that matter:
 PR-AUC: LogReg **0.325** vs XGB 0.312. (XGB's ROC-AUC is a hair higher — 0.772 vs
 0.770 — but ROC-AUC is the wrong metric under this imbalance.) They converge past
 the top 20%.
+
+> **v36 update (2026-06-21, current-inspection features).** The table above is the
+> **v33 served-basis** comparison. Under v36 the gap closes: on the honest test
+> (n=13,812) XGBoost slightly *leads* — PR-AUC LogReg 0.332 vs XGB **0.338**, P@10
+> 0.370 vs **0.376**. The **served LogReg stays the production estimator** (it feeds
+> `scores.json`; v36 served test PR-AUC **0.372**, P@10 **0.415**, n=7,008), but XGB
+> pulling even is worth a production-model revisit — a separate decision, not this
+> PR. A full v36 **served-basis** refresh of the operating-point table is pending an
+> XGB served-filter run.
 
 **Convention going forward:** report each experiment's impact on **both** models
 where measured (LogReg served + XGB) — a feature can help one and not the other.

@@ -176,6 +176,43 @@ def test_priority_violation_counts_picked_up():
 
 
 # ---------------------------------------------------------------------------
+# Current-inspection own outcome (the mirror image of the prior_* leak tests:
+# these features DO describe the anchor's own visit — that's correct, because
+# the 180-day label window is strictly AFTER the anchor, so they don't leak).
+# ---------------------------------------------------------------------------
+
+
+def test_current_inspection_outcome_describes_the_anchor_itself():
+    """was_fail / n_priority_this_inspection / n_core_this_inspection summarise
+    THIS inspection — the opposite of the prior_* columns, which exclude it."""
+    df = _df(
+        [
+            _minimal_row(
+                inspection_date="2019-04-01",
+                results="Fail",
+                # one priority code (10) and one core code (45)
+                violations="10. HANDWASHING - Comments: ... | 45. FLOORS - Comments: ...",
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(inspection_date="2019-09-01", results="Pass"),
+        ]
+    )
+    out = add_inspection_features(df).sort_values("inspection_date").reset_index(drop=True)
+    # Anchor row (the Fail) reflects ITS OWN outcome.
+    assert out.loc[0, "was_fail"] == 1
+    assert out.loc[0, "n_priority_this_inspection"] == 1
+    assert out.loc[0, "n_core_this_inspection"] == 1
+    # The later Pass reflects its own (clean) outcome — NOT the earlier Fail.
+    assert out.loc[1, "was_fail"] == 0
+    assert out.loc[1, "n_priority_this_inspection"] == 0
+    assert out.loc[1, "n_core_this_inspection"] == 0
+    # And the prior_* columns still EXCLUDE the anchor (leak guard intact):
+    # the anchor's own Fail is not in its own prior_fails.
+    assert out.loc[0, "prior_fails"] == 0
+    assert out.loc[1, "prior_fails"] == 1
+
+
+# ---------------------------------------------------------------------------
 # Static features
 # ---------------------------------------------------------------------------
 

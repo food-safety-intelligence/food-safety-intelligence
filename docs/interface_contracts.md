@@ -124,12 +124,13 @@ not a contract change.
 | `prior_*` features | various | varies | **MUST use `.shift()` or `event_date < as_of_date` guards.** Examples below. |
 | `static_*` features | various | varies | Facility-level constants that don't change over time (facility_type, risk tier, zip). |
 
-**Required `prior_*` features** (canonical **33-feature** contract — single
-source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`. The
+**Required `prior_*` features** (part of the canonical **36-feature** contract —
+single source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`. The
 feature-refresh added the recency/trend rows below and **dropped
 `static_facility_type` + `static_zip` from the model feature set** on fairness +
 accuracy grounds — see decision record 0004. Those two columns remain in the
-parquet but are no longer consumed by the model):
+parquet but are no longer consumed by the model. The current-inspection outcome
+block below took the contract 33→36):
 
 | Column | dtype | Description |
 |---|---|---|
@@ -152,6 +153,23 @@ parquet but are no longer consumed by the model):
 Note: `prior_fail_rate` / `prior_fail_rate_2y` ratio features were dropped
 in Phase 5 — tree models can reconstruct ratios from numerator + denominator
 and the ratios added noise without orthogonal signal.
+
+**Required current-inspection outcome features** (the anchor inspection's OWN
+result + violation-code counts — *not* `prior_*`. Leak-free because the 180-day
+label window is strictly **after** `as_of_date`, so the anchor's own outcome
+cannot leak its own forward label):
+
+| Column | dtype | Description |
+|---|---|---|
+| `was_fail` | `int` | Was THIS inspection a `Fail` (1/0). |
+| `n_priority_this_inspection` | `int` | Priority (code 1–29) violation count on THIS inspection. |
+| `n_core_this_inspection` | `int` | Core (code 30+) violation count on THIS inspection. |
+
+Note: with these added, the model's flagged top decile becomes ~91%
+recently-failed restaurants (a Fail triggers a mandated re-inspection that often
+lands in the window). That is legitimate forward risk but must be surfaced as
+"recently failed" in the UI — see decision record 0005 (principle 6) for the
+ethics review and the re-inspection feedback-loop disclosure.
 
 **Required `static_*` features**:
 
@@ -225,6 +243,7 @@ in `reports/metrics/`.
 | 26 | #7 | baseline contract | — | reference | — |
 | 30 | #8 | `prior_pass_w_conditions`, `prior_reinspections`, `prior_complaint_inspections`, `static_inspection_type` (visit-trigger + near-miss priors) | — | incremental over 26 (served settled at PR-AUC ≈0.3147; exact 26→30 delta blurred by a concurrent data refresh) | — |
 | 33 | #10 | `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d` (recency/trend) | `static_zip`, `static_facility_type` (fairness proxies) | served PR-AUC 0.3147→0.3246, precision@10% 0.352→0.364; XGB 0.2681→0.2882; + fairness win | 0004 |
+| 36 | #15 | `was_fail`, `n_priority_this_inspection`, `n_core_this_inspection` (current-inspection own outcome) | — | honest test (n=13,812), controlled A/B: LogReg PR-AUC 0.291→0.344, P@10 0.326→0.369; XGB 0.280→0.344, P@10 0.306→0.367. Both metrics, both models. Ethics-reviewed (re-inspection feedback-loop disclosure) | 0002 gate; 0005 (principle 6) |
 
 Tried and kept **out** (came up flat — risk is largely already captured by
 `prior_*` inspection history): operator / license-status priors, per-code 1–29

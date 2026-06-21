@@ -66,6 +66,13 @@ def add_inspection_features(
         priority_violation_trend     float — prev minus prev-prev priority count (worsening if >0)
         prior_fails_365d             float — Fails in the trailing 365 days (leak-free, exclusive)
         prior_priority_violations_365d float — priority violations in trailing 365 days (leak-free)
+
+    Plus the anchor inspection's OWN outcome (current-inspection, not prior_*;
+    leak-free because the label window is strictly AFTER the anchor):
+
+        was_fail                     int   — was THIS inspection a Fail (1/0)
+        n_priority_this_inspection   int   — priority (code 1-29) count on THIS inspection
+        n_core_this_inspection       int   — core (code 30+) count on THIS inspection
     """
     # We need stable sort order for the cumsum/shift patterns to produce
     # the right semantics. The group-key sort is also required for the
@@ -195,6 +202,24 @@ def add_inspection_features(
     out["prior_priority_violations_365d"] = _trailing_window_count(
         out, license_col, date_col, "_priority_int", 365
     )
+
+    # --- Current-inspection own outcome (NOT a prior_* feature) -------------
+    # The anchor inspection's OWN result and code counts. Leak-free WITHOUT a
+    # shift: these are observed AT as_of_date (== inspection_date), and the
+    # 180-day label window is strictly AFTER the anchor — so the anchor's own
+    # outcome can't leak its own forward label. The model otherwise sees only
+    # PRIOR outcomes (the shift/cumsum prior_* columns) and the current
+    # comment's keyword flags — never the current visit's own Fail result or
+    # violation-code counts. These are promoted, not shifted, on purpose.
+    #
+    # Re-inspection dynamic to keep in mind (validated at eval, not here): a
+    # Fail triggers a mandated ~30-day re-inspection that often lands inside
+    # the 180-day window. That's legitimate forward signal, but it means
+    # was_fail correlates with the label partly via that mechanism — see
+    # docs/experiments.md for the circularity check.
+    out["was_fail"] = out["_is_fail_int"].astype("int8")
+    out["n_priority_this_inspection"] = out["_priority_int"].astype("int32")
+    out["n_core_this_inspection"] = out["_core_int"].astype("int32")
 
     # Drop intermediate columns; they were named with `_` prefix on purpose.
     return out.drop(

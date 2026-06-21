@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-06-21T03:59:02+00:00",
+  "generated_at": "2026-06-21T04:49:56+00:00",
   "model_version": "baseline_logreg",
   "provenance": {
-    "run_id": "20260621_3ebce0f61",
-    "git_commit": "3ebce0f611758c8602050e48931986c05bc5e315",
+    "run_id": "20260621_e728d09fe",
+    "git_commit": "e728d09fe48f07d7f46edefe3f3e24b5ae850eaf",
     "git_dirty": true,
-    "feature_set_version": "dbb6d73f553a",
-    "features_sha256": "752497f0ac7055381e0b1c599c3e936d2e14474a43035089a1bf2c37a9cb4351"
+    "feature_set_version": "68fe2ae76184",
+    "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3"
   },
   "test": {
     "n": 7008,
@@ -15,50 +15,50 @@
     "split_from": "2025-07-01"
   },
   "headline": {
-    "pr_auc": 0.3246,
-    "roc_auc": 0.7699,
-    "top_decile_lift": 3.37
+    "pr_auc": 0.3716,
+    "roc_auc": 0.7996,
+    "top_decile_lift": 3.85
   },
   "operating_points": [
     {
       "frac": 0.05,
       "n_flagged": 351,
-      "precision": 0.4501,
-      "recall": 0.209,
-      "lift": 4.1727,
-      "events_caught": 158
+      "precision": 0.5043,
+      "recall": 0.2341,
+      "lift": 4.6745,
+      "events_caught": 177
     },
     {
       "frac": 0.1,
       "n_flagged": 701,
-      "precision": 0.3638,
-      "recall": 0.3373,
-      "lift": 3.3721,
-      "events_caught": 255
+      "precision": 0.4151,
+      "recall": 0.3849,
+      "lift": 3.8481,
+      "events_caught": 291
     },
     {
       "frac": 0.2,
       "n_flagged": 1402,
-      "precision": 0.2889,
-      "recall": 0.5357,
-      "lift": 2.6778,
-      "events_caught": 405
+      "precision": 0.3081,
+      "recall": 0.5714,
+      "lift": 2.8563,
+      "events_caught": 432
     },
     {
       "frac": 0.3,
       "n_flagged": 2103,
-      "precision": 0.2392,
-      "recall": 0.6653,
-      "lift": 2.2172,
-      "events_caught": 503
+      "precision": 0.2592,
+      "recall": 0.7209,
+      "lift": 2.4023,
+      "events_caught": 545
     },
     {
       "frac": 0.5,
       "n_flagged": 3504,
-      "precision": 0.1798,
-      "recall": 0.8333,
-      "lift": 1.6667,
-      "events_caught": 630
+      "precision": 0.1855,
+      "recall": 0.8598,
+      "lift": 1.7196,
+      "events_caught": 650
     }
   ]
 }
