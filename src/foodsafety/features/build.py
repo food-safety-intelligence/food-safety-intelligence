@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from foodsafety.features.building_features import add_building_features
 from foodsafety.features.complaint_features import add_complaint_features
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
@@ -40,6 +41,8 @@ def build_features(
     inspections_labeled: pd.DataFrame,
     complaints: pd.DataFrame | None = None,
     licenses_historical: pd.DataFrame | None = None,
+    building_permits: pd.DataFrame | None = None,
+    building_violations: pd.DataFrame | None = None,
     *,
     drop_burnin: bool = True,
     drop_invalid_license: bool = True,
@@ -97,6 +100,13 @@ def build_features(
     # License history (age + activity). Skipped if no historical-licenses df provided.
     if licenses_historical is not None:
         df = add_license_history_features(df, licenses_historical)
+
+    # Block-face building permits / violations (BallTree ~30m). Skipped if
+    # neither building df is provided. Physical-plant condition, orthogonal to
+    # inspection history; the leak guard (events strictly before the anchor)
+    # lives in add_building_features.
+    if building_permits is not None or building_violations is not None:
+        df = add_building_features(df, building_permits, building_violations)
 
     # Add as_of_date as a synonym of inspection_date — per contract the row
     # key is (license_id, as_of_date). We set them equal here so the contract

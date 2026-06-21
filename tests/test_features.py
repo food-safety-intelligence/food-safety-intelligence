@@ -557,3 +557,104 @@ def test_normalize_facility_type_collapses_vulnerable_families():
     assert normalize_facility_type("   ") is None
     assert normalize_facility_type(float("nan")) is None
     assert normalize_facility_type(pd.NA) is None
+
+
+# ---------------------------------------------------------------------------
+# Block-face building permits / violations (add_building_features). Unwired
+# (failed the both-metrics gate under CV — see docs/experiments.md), but the
+# leak guard and block-face radius still need coverage like every feature.
+# ---------------------------------------------------------------------------
+
+
+def test_building_features_count_block_face_within_window():
+    """Violations at the anchor's coordinate, strictly before it, count for the
+    right window; a too-old one falls out of the 365d window but stays in 730d."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9000, longitude=-87.6500
+            )
+        ]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9000, 41.9000],
+            "longitude": [-87.6500, -87.6500],
+            # 90 d prior → in both windows; 500 d prior → only in 730d.
+            "violation_date": pd.to_datetime(["2022-03-03", "2021-01-17"]),
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert out.loc[0, "prior_bldg_violations_365d"] == 1
+    assert out.loc[0, "prior_bldg_violations_730d"] == 2
+    assert out.loc[0, "days_since_last_bldg_violation"] == 90
+
+
+def test_building_features_exclude_anchor_date():
+    """A building record dated ON the anchor day must NOT count (leak guard:
+    physical-plant records from the inspection day itself can't inform a label
+    window that starts after the anchor)."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9, longitude=-87.65
+            )
+        ]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9],
+            "longitude": [-87.65],
+            "violation_date": pd.to_datetime(["2022-06-01"]),  # same day as anchor
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert out.loc[0, "prior_bldg_violations_365d"] == 0
+    assert pd.isna(out.loc[0, "days_since_last_bldg_violation"])
+
+
+def test_building_features_respect_block_face_radius():
+    """A record ~1.5 km away (well past the ~30m block-face radius) must NOT
+    count — the whole point of the tight radius is to stay at the building."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9000, longitude=-87.6500
+            )
+        ]
+    )
+    permits = pd.DataFrame(
+        {
+            "latitude": [41.913],  # ~1.4 km north
+            "longitude": [-87.6500],
+            "issue_date": pd.to_datetime(["2022-03-03"]),
+        }
+    )
+    out = add_building_features(inspections, permits=permits, violations=None)
+    assert out.loc[0, "prior_bldg_permits_365d"] == 0
+
+
+def test_building_features_no_geo_anchor_is_na_not_zero():
+    """An anchor with missing lat/lon gets NA (signal not computable), never a
+    fabricated 0 — same contract as the 311 spatial features."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [_minimal_row(license_id="L1", inspection_date="2022-06-01", latitude=None, longitude=None)]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9],
+            "longitude": [-87.65],
+            "violation_date": pd.to_datetime(["2022-03-03"]),
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert pd.isna(out.loc[0, "prior_bldg_violations_365d"])
+    assert pd.isna(out.loc[0, "days_since_last_bldg_violation"])
