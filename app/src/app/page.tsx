@@ -126,27 +126,29 @@ export default async function HomePage() {
                 match the data to the precautions your care team recommends.
               </p>
             </div>
-            <div className="col-span-12 md:col-span-5 flex flex-col gap-4 md:items-end">
-              {/* Example driver preview — makes the "top three drivers" promise
-                  above concrete with real model factors. Reuses the same driver
-                  row as the map list/popup for visual consistency. */}
-              <div className="w-full md:max-w-[320px] rounded-2xl border border-line bg-card/80 p-4">
-                <div className="text-[11px] tracking-widest uppercase text-muted mb-2.5">
-                  Example drivers
+            <div className="col-span-12 md:col-span-5">
+              {/* Example driver preview + its CTA as one unit: a 320px group,
+                  right-aligned in the column on desktop, with the button centered
+                  under the card. */}
+              <div className="md:ml-auto md:max-w-[320px] flex flex-col items-center gap-4">
+                <div className="w-full rounded-2xl border border-line bg-card/80 p-4">
+                  <div className="text-[11px] tracking-widest uppercase text-muted mb-2.5">
+                    Example drivers
+                  </div>
+                  <div className="space-y-2">
+                    {EXAMPLE_DRIVERS.map((d) => (
+                      <PinDriverLine key={d.feature} driver={d} />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  {EXAMPLE_DRIVERS.map((d) => (
-                    <PinDriverLine key={d.feature} driver={d} />
-                  ))}
-                </div>
+                <Link
+                  href="/caregivers"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
+                >
+                  Open the caregiver guide
+                  <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                </Link>
               </div>
-              <Link
-                href="/caregivers"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
-              >
-                Open the caregiver guide
-                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
-              </Link>
             </div>
           </div>
         </section>
