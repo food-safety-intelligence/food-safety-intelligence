@@ -49,9 +49,12 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
           const barStyle = isPositive
             ? { left: "50%", width: `${halfPct}%` }
             : { right: "50%", width: `${halfPct}%` };
+          const direction = isPositive ? "raises" : "lowers";
+          const rowTitle = `${d.label} — ${direction} risk by ${Math.abs(d.shap).toFixed(2)} (log-odds contribution)`;
           return (
             <li
               key={d.feature + i}
+              title={rowTitle}
               className={cn(
                 "grid grid-cols-12 gap-4 items-center px-6 py-5",
                 i < drivers.length - 1 && "border-b border-line",
@@ -104,6 +107,12 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
           );
         })}
       </ol>
+      <p className="px-6 py-4 text-[12px] text-muted leading-relaxed border-t border-line">
+        Bar length shows each factor&apos;s relative influence; the number is its
+        log-odds contribution to this restaurant&apos;s risk (larger magnitude =
+        more influence). These show what moves the score up or down, not a sum
+        equal to it.
+      </p>
     </div>
   );
 }
