@@ -20,8 +20,8 @@ XGBoost, and any future model.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -40,9 +40,7 @@ def _as_array(x: ArrayLike) -> np.ndarray:
     return np.asarray(x, dtype=float)
 
 
-def precision_at_k(
-    y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10
-) -> float:
+def precision_at_k(y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10) -> float:
     """Precision in the top ``k_frac`` fraction of predicted scores.
 
     The operational interpretation: if we surface the top K% of restaurants
@@ -61,9 +59,7 @@ def precision_at_k(
     return float(np.mean(y_true_arr[top_k]))
 
 
-def recall_at_k(
-    y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10
-) -> float:
+def recall_at_k(y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10) -> float:
     """Recall (coverage) in the top ``k_frac`` fraction of predicted scores.
 
     Of ALL restaurants that actually fail / incur a priority violation in the
@@ -165,9 +161,7 @@ def decile_lift_table(y_true: ArrayLike, y_score: ArrayLike) -> pd.DataFrame:
     return grouped.round(4)
 
 
-def calibration_table(
-    y_true: ArrayLike, y_score: ArrayLike, n_bins: int = 10
-) -> pd.DataFrame:
+def calibration_table(y_true: ArrayLike, y_score: ArrayLike, n_bins: int = 10) -> pd.DataFrame:
     """Predicted vs observed positive rate per probability bin.
 
     A perfectly calibrated model has ``predicted == observed`` in every bin.

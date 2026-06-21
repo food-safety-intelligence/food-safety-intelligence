@@ -29,25 +29,27 @@ sys.modules.setdefault("boto3", _boto3_stub)
 from sagemaker_stub import (  # noqa: E402
     FEATURE_ORDER,
     _invoke_stub,
-    _stub_shap_drivers,
     _tier,
     score_restaurants,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 SAMPLE_RESTAURANTS = [
-    {"osm_id": "111", "name": "La Pasadita",        "address": "1132 N Ashland Ave, Chicago, IL"},
-    {"osm_id": "222", "name": "Great Falafel",       "address": "500 W Diversey Pkwy, Chicago, IL"},
-    {"osm_id": "333", "name": "Arami",               "address": "1829 W Chicago Ave, Chicago, IL"},
-    {"osm_id": "444", "name": "Golden Wok",          "address": "4500 N Broadway, Chicago, IL"},
-    {"osm_id": "555", "name": "Starbucks Lincoln Park","address": "2545 N Lincoln Ave, Chicago, IL"},
-    {"osm_id": "666", "name": "Enchanting Cafe",     "address": "300 E 75th St, Chicago, IL"},
-    {"osm_id": "777", "name": "Subway Mount Greenwood","address":"3800 W 103rd St, Chicago, IL"},
-    {"osm_id": "888", "name": "Homan Square Cafe",   "address": "3517 W Arthington St, Chicago, IL"},
+    {"osm_id": "111", "name": "La Pasadita", "address": "1132 N Ashland Ave, Chicago, IL"},
+    {"osm_id": "222", "name": "Great Falafel", "address": "500 W Diversey Pkwy, Chicago, IL"},
+    {"osm_id": "333", "name": "Arami", "address": "1829 W Chicago Ave, Chicago, IL"},
+    {"osm_id": "444", "name": "Golden Wok", "address": "4500 N Broadway, Chicago, IL"},
+    {
+        "osm_id": "555",
+        "name": "Starbucks Lincoln Park",
+        "address": "2545 N Lincoln Ave, Chicago, IL",
+    },
+    {"osm_id": "666", "name": "Enchanting Cafe", "address": "300 E 75th St, Chicago, IL"},
+    {"osm_id": "777", "name": "Subway Mount Greenwood", "address": "3800 W 103rd St, Chicago, IL"},
+    {"osm_id": "888", "name": "Homan Square Cafe", "address": "3517 W Arthington St, Chicago, IL"},
 ]
 
 
@@ -55,14 +57,28 @@ SAMPLE_RESTAURANTS = [
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestTierThresholds:
-    def test_low(self):      assert _tier(0.05)  == "Low"
-    def test_moderate(self): assert _tier(0.30)  == "Moderate"
-    def test_elevated(self): assert _tier(0.50)  == "Elevated"
-    def test_high(self):     assert _tier(0.80)  == "High"
-    def test_boundary_low_moderate(self):  assert _tier(0.2)  == "Moderate"
-    def test_boundary_mod_elevated(self):  assert _tier(0.4)  == "Elevated"
-    def test_boundary_elevated_high(self): assert _tier(0.65) == "High"
+    def test_low(self):
+        assert _tier(0.05) == "Low"
+
+    def test_moderate(self):
+        assert _tier(0.30) == "Moderate"
+
+    def test_elevated(self):
+        assert _tier(0.50) == "Elevated"
+
+    def test_high(self):
+        assert _tier(0.80) == "High"
+
+    def test_boundary_low_moderate(self):
+        assert _tier(0.2) == "Moderate"
+
+    def test_boundary_mod_elevated(self):
+        assert _tier(0.4) == "Elevated"
+
+    def test_boundary_elevated_high(self):
+        assert _tier(0.65) == "High"
 
 
 class TestStubDeterminism:
@@ -118,7 +134,7 @@ class TestStubOutputShape:
 
     def test_osm_id_passed_through(self):
         result_ids = {r["osm_id"] for r in self.results}
-        input_ids  = {r["osm_id"] for r in SAMPLE_RESTAURANTS}
+        input_ids = {r["osm_id"] for r in SAMPLE_RESTAURANTS}
         assert result_ids == input_ids
 
 
@@ -131,7 +147,7 @@ class TestStubDistribution:
 
     def test_distribution_not_all_one_tier(self):
         restaurants = [
-            {"osm_id": str(i), "name": f"Restaurant {i}", "address": f"{i*10} N State St"}
+            {"osm_id": str(i), "name": f"Restaurant {i}", "address": f"{i * 10} N State St"}
             for i in range(200)
         ]
         results = _invoke_stub(restaurants)
@@ -143,19 +159,18 @@ class TestStubDistribution:
     def test_majority_are_low_or_moderate(self):
         """Beta(1.5, 8) peaks ~0.16; most scores should be Low/Moderate."""
         restaurants = [
-            {"osm_id": str(i), "name": f"Restaurant {i}", "address": f"{i*10} W Madison"}
+            {"osm_id": str(i), "name": f"Restaurant {i}", "address": f"{i * 10} W Madison"}
             for i in range(300)
         ]
         results = _invoke_stub(restaurants)
         safe = sum(1 for r in results if r["risk_tier"] in {"Low", "Moderate"})
-        assert safe / len(results) >= 0.55, f"Only {safe/len(results):.0%} are Low/Moderate"
+        assert safe / len(results) >= 0.55, f"Only {safe / len(results):.0%} are Low/Moderate"
 
 
 class TestShapDrivers:
     """SHAP drivers should be coherent with the score direction."""
 
     def test_high_score_has_positive_drivers(self):
-        import random, hashlib
         # Find a restaurant that hashes to a high score.
         high_r = None
         for i in range(500):
@@ -171,7 +186,7 @@ class TestShapDrivers:
     def test_low_score_has_negative_drivers(self):
         low_r = None
         for i in range(500):
-            r = {"osm_id": str(i+1000), "name": f"S{i}", "address": f"{i} E Wacker"}
+            r = {"osm_id": str(i + 1000), "name": f"S{i}", "address": f"{i} E Wacker"}
             result = _invoke_stub([r])[0]
             if result["risk_score"] < 0.2:
                 low_r = result
@@ -198,17 +213,32 @@ class TestFeatureOrder:
     """FEATURE_ORDER must match the training pipeline exactly."""
 
     EXPECTED_FEATURES = [
-        "prior_inspections", "prior_fails", "prior_priority_violations",
-        "prior_core_violations", "prior_fail_or_priority_events",
-        "days_since_last_inspection", "days_since_last_fail",
-        "temporal_month", "temporal_quarter",
-        "license_age_days", "license_n_history_rows",
-        "static_facility_type", "static_risk_tier", "static_zip",
-        "flag_kw_temperature", "flag_kw_cooling", "flag_kw_raw_food",
-        "flag_kw_cross_contamination", "flag_kw_expired",
-        "flag_kw_rodent", "flag_kw_pest", "flag_kw_no_soap",
-        "flag_kw_no_paper_towels", "flag_kw_handwash_sink",
-        "flag_kw_sewage", "flag_kw_certified_manager",
+        "prior_inspections",
+        "prior_fails",
+        "prior_priority_violations",
+        "prior_core_violations",
+        "prior_fail_or_priority_events",
+        "days_since_last_inspection",
+        "days_since_last_fail",
+        "temporal_month",
+        "temporal_quarter",
+        "license_age_days",
+        "license_n_history_rows",
+        "static_facility_type",
+        "static_risk_tier",
+        "static_zip",
+        "flag_kw_temperature",
+        "flag_kw_cooling",
+        "flag_kw_raw_food",
+        "flag_kw_cross_contamination",
+        "flag_kw_expired",
+        "flag_kw_rodent",
+        "flag_kw_pest",
+        "flag_kw_no_soap",
+        "flag_kw_no_paper_towels",
+        "flag_kw_handwash_sink",
+        "flag_kw_sewage",
+        "flag_kw_certified_manager",
     ]
 
     def test_count(self):
@@ -236,7 +266,7 @@ class TestSwapFlag:
         monkeypatch.delenv("SAGEMAKER_ENDPOINT", raising=False)
         try:
             score_restaurants([SAMPLE_RESTAURANTS[0]])
-            assert False, "Expected KeyError for missing SAGEMAKER_ENDPOINT"
+            raise AssertionError("Expected KeyError for missing SAGEMAKER_ENDPOINT")
         except KeyError:
             pass  # Expected: SAGEMAKER_ENDPOINT not set
 

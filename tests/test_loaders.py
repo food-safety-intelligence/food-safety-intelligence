@@ -8,7 +8,6 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pandas as pd
-import pytest
 
 from foodsafety.io.cache import load_or_fetch
 from foodsafety.io.soda import _safe_dedupe, fetch_soda

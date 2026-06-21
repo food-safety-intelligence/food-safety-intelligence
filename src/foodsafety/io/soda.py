@@ -24,7 +24,6 @@ import requests
 
 from foodsafety.config import SODA_BASE
 
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -152,7 +151,9 @@ def fetch_soda_keyset(
             cursor = str(last[cursor_col].max())
             if verbose:
                 cum = sum(len(pd.read_parquet(s)) for s in shards)
-                print(f"  resuming from {len(shards)} shard(s): {cum:,} rows, cursor -> {cursor[:19]}")
+                print(
+                    f"  resuming from {len(shards)} shard(s): {cum:,} rows, cursor -> {cursor[:19]}"
+                )
 
     start_page = len(shards)
     for page in range(start_page, max_pages):
@@ -180,7 +181,9 @@ def fetch_soda_keyset(
             shards.append(shard_path)
 
         if verbose:
-            print(f"  page {page + 1}: +{len(chunk):,} rows (cursor={str(cursor)[:10]}, {elapsed:.1f}s)")
+            print(
+                f"  page {page + 1}: +{len(chunk):,} rows (cursor={str(cursor)[:10]}, {elapsed:.1f}s)"
+            )
         if len(chunk) < page_size:
             break
         cursor = chunk[cursor_col].iloc[-1]

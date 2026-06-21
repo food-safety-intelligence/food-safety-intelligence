@@ -32,9 +32,9 @@ SODA_BASE: str = "https://data.cityofchicago.org/resource"
 
 # Dataset IDs map to the Socrata "4x4" identifiers in each dataset's URL.
 DATASETS: dict[str, str] = {
-    "inspections":         "4ijn-s7e5",  # Chicago Food Inspections (2010-present)
-    "complaints_311":      "v6vf-nfxy",  # Chicago 311 Service Requests
-    "licenses_current":    "uupf-x98q",  # Business Licenses — current active
+    "inspections": "4ijn-s7e5",  # Chicago Food Inspections (2010-present)
+    "complaints_311": "v6vf-nfxy",  # Chicago 311 Service Requests
+    "licenses_current": "uupf-x98q",  # Business Licenses — current active
     "licenses_historical": "vgg9-bn8p",  # Business Licenses — historical
 }
 

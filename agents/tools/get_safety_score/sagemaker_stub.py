@@ -35,7 +35,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 import os
 import random
 from typing import Any
@@ -73,17 +72,22 @@ FEATURE_ORDER: list[str] = [
     "flag_kw_certified_manager",
 ]
 
+
 # Risk tier thresholds — mirror scores.ts in the web app.
 def _tier(score: float) -> str:
-    if score < 0.2:  return "Low"
-    if score < 0.4:  return "Moderate"
-    if score < 0.65: return "Elevated"
+    if score < 0.2:
+        return "Low"
+    if score < 0.4:
+        return "Moderate"
+    if score < 0.65:
+        return "Elevated"
     return "High"
 
 
 # ---------------------------------------------------------------------------
 # Public interface
 # ---------------------------------------------------------------------------
+
 
 def score_restaurants(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
@@ -115,6 +119,7 @@ def score_restaurants(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]
 # Stub implementation
 # ---------------------------------------------------------------------------
 
+
 def _invoke_stub(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Returns realistic dummy scores without hitting AWS.
@@ -141,19 +146,21 @@ def _invoke_stub(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
         # Build plausible SHAP drivers based on score range.
         shap_drivers = _stub_shap_drivers(score, rng)
 
-        results.append({
-            "osm_id":      row.get("osm_id", ""),
-            "name":        row.get("name", ""),
-            "risk_score":  score,
-            "risk_tier":   tier,
-            "shap_drivers": shap_drivers,
-            # Signals to downstream code and the UI that this is stub data.
-            "stub":        True,
-            "stub_note":   (
-                "Score from stub — SageMaker endpoint not yet configured. "
-                "Set SAGEMAKER_USE_STUB=false and SAGEMAKER_ENDPOINT to use real model."
-            ),
-        })
+        results.append(
+            {
+                "osm_id": row.get("osm_id", ""),
+                "name": row.get("name", ""),
+                "risk_score": score,
+                "risk_tier": tier,
+                "shap_drivers": shap_drivers,
+                # Signals to downstream code and the UI that this is stub data.
+                "stub": True,
+                "stub_note": (
+                    "Score from stub — SageMaker endpoint not yet configured. "
+                    "Set SAGEMAKER_USE_STUB=false and SAGEMAKER_ENDPOINT to use real model."
+                ),
+            }
+        )
 
     return results
 
@@ -166,33 +173,61 @@ def _stub_shap_drivers(score: float, rng: random.Random) -> list[dict[str, Any]]
     Low-score restaurants get negative (risk-decreasing) drivers.
     """
     POSITIVE_DRIVERS = [
-        ("prior_priority_violations", "Prior priority violations",
-         "Recurring priority-class violations in the past 2 years"),
-        ("flag_kw_temperature",       "Temperature violation on record",
-         "Cold- or hot-holding temperature cited in a prior inspection"),
-        ("flag_kw_rodent",            "Pest / vermin violation on record",
-         "Rodent or pest citation in inspection history"),
-        ("days_since_last_inspection","Long gap since last inspection",
-         "Inspection cadence is above the 220–300 day typical range"),
-        ("prior_fails",               "Prior failed inspections",
-         "One or more Fail results in the past 2 years"),
-        ("flag_kw_cross_contamination","Cross-contamination violation",
-         "Raw/ready-to-eat food separation issue cited previously"),
-        ("flag_kw_cooling",           "Improper cooling on record",
-         "Food not cooled from 135 °F to 70 °F within required window"),
+        (
+            "prior_priority_violations",
+            "Prior priority violations",
+            "Recurring priority-class violations in the past 2 years",
+        ),
+        (
+            "flag_kw_temperature",
+            "Temperature violation on record",
+            "Cold- or hot-holding temperature cited in a prior inspection",
+        ),
+        (
+            "flag_kw_rodent",
+            "Pest / vermin violation on record",
+            "Rodent or pest citation in inspection history",
+        ),
+        (
+            "days_since_last_inspection",
+            "Long gap since last inspection",
+            "Inspection cadence is above the 220–300 day typical range",
+        ),
+        ("prior_fails", "Prior failed inspections", "One or more Fail results in the past 2 years"),
+        (
+            "flag_kw_cross_contamination",
+            "Cross-contamination violation",
+            "Raw/ready-to-eat food separation issue cited previously",
+        ),
+        (
+            "flag_kw_cooling",
+            "Improper cooling on record",
+            "Food not cooled from 135 °F to 70 °F within required window",
+        ),
     ]
 
     NEGATIVE_DRIVERS = [
-        ("prior_fails",               "No failed inspections",
-         "All recent inspections resulted in Pass or Pass w/ Conditions"),
-        ("prior_priority_violations", "No priority violations",
-         "No priority-class violations (codes 1–29) in the past 2 years"),
-        ("license_age_days",          "Established license history",
-         "Business has operated under this license for 5+ years"),
-        ("flag_kw_rodent",            "No pest complaints nearby",
-         "No 311 rodent or pest complaints within 300 m in the past 90 days"),
-        ("days_since_last_inspection","Recently inspected",
-         "Inspected within the last 180 days"),
+        (
+            "prior_fails",
+            "No failed inspections",
+            "All recent inspections resulted in Pass or Pass w/ Conditions",
+        ),
+        (
+            "prior_priority_violations",
+            "No priority violations",
+            "No priority-class violations (codes 1–29) in the past 2 years",
+        ),
+        (
+            "license_age_days",
+            "Established license history",
+            "Business has operated under this license for 5+ years",
+        ),
+        (
+            "flag_kw_rodent",
+            "No pest complaints nearby",
+            "No 311 rodent or pest complaints within 300 m in the past 90 days",
+        ),
+        ("days_since_last_inspection", "Recently inspected", "Inspected within the last 180 days"),
     ]
 
     drivers: list[dict[str, Any]] = []
@@ -203,26 +238,30 @@ def _stub_shap_drivers(score: float, rng: random.Random) -> list[dict[str, Any]]
         chosen = rng.sample(POSITIVE_DRIVERS, min(n, len(POSITIVE_DRIVERS)))
         for i, (feature, label, detail) in enumerate(chosen):
             shap_val = round(score * (0.35 - i * 0.05) * rng.uniform(0.8, 1.2), 3)
-            drivers.append({
-                "feature": feature,
-                "label":   label,
-                "detail":  detail,
-                "shap":    shap_val,
-                "direction": "positive",
-            })
+            drivers.append(
+                {
+                    "feature": feature,
+                    "label": label,
+                    "detail": detail,
+                    "shap": shap_val,
+                    "direction": "positive",
+                }
+            )
     else:
         # Pick 1–3 negative drivers for safer restaurants.
         n = 1 + int((0.4 - score) / 0.4 * 2)
         chosen = rng.sample(NEGATIVE_DRIVERS, min(n, len(NEGATIVE_DRIVERS)))
         for i, (feature, label, detail) in enumerate(chosen):
             shap_val = round(-1 * (0.3 - score) * (0.4 - i * 0.06) * rng.uniform(0.8, 1.2), 3)
-            drivers.append({
-                "feature": feature,
-                "label":   label,
-                "detail":  detail,
-                "shap":    shap_val,
-                "direction": "negative",
-            })
+            drivers.append(
+                {
+                    "feature": feature,
+                    "label": label,
+                    "detail": detail,
+                    "shap": shap_val,
+                    "direction": "negative",
+                }
+            )
 
     return sorted(drivers, key=lambda d: abs(d["shap"]), reverse=True)
 
@@ -230,6 +269,7 @@ def _stub_shap_drivers(score: float, rng: random.Random) -> list[dict[str, Any]]
 # ---------------------------------------------------------------------------
 # Real SageMaker implementation (inactive until endpoint is provisioned)
 # ---------------------------------------------------------------------------
+
 
 def _invoke_real(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
@@ -246,7 +286,7 @@ def _invoke_real(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     import boto3  # noqa: PLC0415 — only imported when real endpoint is active
 
     endpoint_name = os.environ["SAGEMAKER_ENDPOINT"]
-    region        = os.environ.get("AWS_REGION", "us-east-1")
+    region = os.environ.get("AWS_REGION", "us-east-1")
 
     client = boto3.client("sagemaker-runtime", region_name=region)
 
@@ -268,29 +308,31 @@ def _invoke_real(feature_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     predictions: list[dict] = body["predictions"]
 
     results: list[dict[str, Any]] = []
-    for row, pred in zip(feature_rows, predictions):
+    for row, pred in zip(feature_rows, predictions, strict=True):
         score = float(pred["score"])
         shap_raw: dict[str, float] = pred.get("shap", {})
 
         # Convert raw SHAP dict → sorted driver list matching the UI contract.
         shap_drivers = [
             {
-                "feature":   feat,
-                "label":     feat.replace("_", " ").replace("flag kw ", "").title(),
-                "shap":      round(val, 4),
+                "feature": feat,
+                "label": feat.replace("_", " ").replace("flag kw ", "").title(),
+                "shap": round(val, 4),
                 "direction": "positive" if val > 0 else "negative",
             }
             for feat, val in sorted(shap_raw.items(), key=lambda kv: abs(kv[1]), reverse=True)
             if abs(val) > 0.005  # suppress near-zero contributors
         ][:5]  # top-5 drivers
 
-        results.append({
-            "osm_id":      row.get("osm_id", ""),
-            "name":        row.get("name", ""),
-            "risk_score":  round(score, 4),
-            "risk_tier":   _tier(score),
-            "shap_drivers": shap_drivers,
-            "stub":        False,
-        })
+        results.append(
+            {
+                "osm_id": row.get("osm_id", ""),
+                "name": row.get("name", ""),
+                "risk_score": round(score, 4),
+                "risk_tier": _tier(score),
+                "shap_drivers": shap_drivers,
+                "stub": False,
+            }
+        )
 
     return results

@@ -73,7 +73,5 @@ def warn_and_null_out_of_bbox(
             stacklevel=2,
         )
         rows = np.flatnonzero(mask)
-        out.iloc[
-            rows, [out.columns.get_loc(lat_col), out.columns.get_loc(lon_col)]
-        ] = np.nan
+        out.iloc[rows, [out.columns.get_loc(lat_col), out.columns.get_loc(lon_col)]] = np.nan
     return out

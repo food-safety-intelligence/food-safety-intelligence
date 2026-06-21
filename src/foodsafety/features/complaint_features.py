@@ -60,10 +60,10 @@ EARTH_RADIUS_M: float = 6_371_000.0
 # longer window because they're rarer (~22k since 2019, ~8% the volume of
 # rodent / garbage). Extending here is one line.
 COMPLAINT_FEATURE_SPEC: dict[str, tuple[str, int]] = {
-    "Rodent Baiting/Rat Complaint":   ("rodent",     90),
-    "Sanitation Code Violation":      ("sanitation", 90),
-    "Garbage Cart Maintenance":       ("garbage",    90),
-    "Restaurant Complaint":           ("restaurant", 180),
+    "Rodent Baiting/Rat Complaint": ("rodent", 90),
+    "Sanitation Code Violation": ("sanitation", 90),
+    "Garbage Cart Maintenance": ("garbage", 90),
+    "Restaurant Complaint": ("restaurant", 180),
 }
 
 
@@ -182,9 +182,7 @@ def _count_spatial_temporal(
         anchor_d = anchor_dates[i]
         # Right-exclusive of anchor. Lower bound exclusive too (older events
         # don't count). Equivalently: nearby_dates in (anchor - window, anchor).
-        in_window = (nearby_event_dates > (anchor_d - window_td)) & (
-            nearby_event_dates < anchor_d
-        )
+        in_window = (nearby_event_dates > (anchor_d - window_td)) & (nearby_event_dates < anchor_d)
         counts[i] = int(in_window.sum())
 
     return counts

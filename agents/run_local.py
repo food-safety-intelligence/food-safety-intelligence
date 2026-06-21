@@ -60,24 +60,26 @@ os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 # ---------------------------------------------------------------------------
 # Strands imports (after path setup)
 # ---------------------------------------------------------------------------
+# Tool handlers — each wraps its Lambda handler as a Strands @tool.
+# We import handler.py from each tool directory directly (they're on sys.path).
+import importlib.util as _ilu  # noqa: E402
+import types as _types  # noqa: E402
+
 from strands import Agent, tool  # noqa: E402
 from strands.models.bedrock import BedrockModel  # noqa: E402
 
-# Tool handlers — each wraps its Lambda handler as a Strands @tool.
-# We import handler.py from each tool directory directly (they're on sys.path).
-import importlib.util as _ilu
-import types as _types
 
 def _load_handler(tool_name: str) -> _types.ModuleType:
     """Load a tool's handler.py by absolute path, avoiding package-name collisions."""
     path = os.path.join(_AGENTS_DIR, "tools", tool_name, "handler.py")
     spec = _ilu.spec_from_file_location(f"_{tool_name}_handler", path)
-    mod  = _ilu.module_from_spec(spec)
+    mod = _ilu.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-_find_handler    = _load_handler("find_restaurants")
-_score_handler   = _load_handler("get_safety_score")
+
+_find_handler = _load_handler("find_restaurants")
+_score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
 
 
@@ -85,6 +87,7 @@ _explain_handler = _load_handler("explain_restaurant")
 # Tool wrappers — Strands @tool converts Python functions into agent tools.
 # The docstring becomes the tool description the model reads.
 # ---------------------------------------------------------------------------
+
 
 @tool
 def find_restaurants(
@@ -193,6 +196,7 @@ RESPONSE FORMAT:
 # Agent factory
 # ---------------------------------------------------------------------------
 
+
 def build_agent() -> Agent:
     region = os.environ.get("AWS_REGION", "us-east-1")
     # Nova 2 Lite — cost-effective AWS-native model with tool-use support.
@@ -214,17 +218,20 @@ def build_agent() -> Agent:
 # CLI entrypoint
 # ---------------------------------------------------------------------------
 
+
 def _banner():
     stub_mode = os.environ.get("SAGEMAKER_USE_STUB", "true").lower() != "false"
-    endpoint   = os.environ.get("SAGEMAKER_ENDPOINT", "not set")
+    endpoint = os.environ.get("SAGEMAKER_ENDPOINT", "not set")
     scores_path = os.environ.get("SCORES_JSON_PATH", "")
     scores_exists = os.path.exists(scores_path)
 
     print("\n╔══════════════════════════════════════════════════════════╗")
     print("║   Food Safety Intelligence — Local Agent (Strands)       ║")
     print("╠══════════════════════════════════════════════════════════╣")
-    print(f"║  Model        : Nova 2 Lite (us.amazon.nova-2-lite-v1:0)        ║")
-    print(f"║  SageMaker    : {'STUB (deterministic hash)' if stub_mode else f'REAL → {endpoint}':<34}║")
+    print("║  Model        : Nova 2 Lite (us.amazon.nova-2-lite-v1:0)        ║")
+    print(
+        f"║  SageMaker    : {'STUB (deterministic hash)' if stub_mode else f'REAL → {endpoint}':<34}║"
+    )
     print(f"║  scores.json  : {'FOUND ✓' if scores_exists else 'NOT FOUND — using mock':<34}║")
     print("╠══════════════════════════════════════════════════════════╣")
     print("║  Try: 'safe sushi near Wicker Park'                      ║")
