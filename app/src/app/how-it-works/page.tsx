@@ -67,7 +67,23 @@ export default async function HowItWorksPage() {
 
   const importance = methodology.global_importance ?? [];
   const maxImpact = Math.max(...importance.map((d) => d.mean_abs_logodds), 0);
-  const waterfall = methodology.waterfall;
+
+  // Round the waterfall to the precision the rows display (2 dp) and make the
+  // "everything else" bucket the residual, so the visible column sums EXACTLY to
+  // the total. The stored JSON stays full-precision; this is presentation only.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const wf = methodology.waterfall;
+  const waterfall = wf
+    ? (() => {
+        const base = round2(wf.base);
+        const drivers = wf.drivers.map((d) => ({ ...d, contribution: round2(d.contribution) }));
+        const total = round2(wf.total_logit);
+        const other = round2(
+          total - base - drivers.reduce((sum, d) => sum + d.contribution, 0),
+        );
+        return { base, drivers, other, total, probability: wf.probability };
+      })()
+    : null;
 
   return (
     <>
@@ -122,7 +138,7 @@ export default async function HowItWorksPage() {
               The features
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
-              Thirty-three features, all built leak-free from the public record:
+              Thirty-six features, all built leak-free from the public record:
             </p>
             <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>
@@ -369,7 +385,7 @@ export default async function HowItWorksPage() {
                 />
                 <WaterfallRow
                   label="Total (calibrated log-odds)"
-                  value={waterfall.total_logit}
+                  value={waterfall.total}
                   strong
                 />
                 <div className="flex items-center justify-between px-4 py-3 bg-cream/50">
