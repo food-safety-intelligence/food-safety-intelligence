@@ -44,6 +44,15 @@ PR-AUC: LogReg **0.325** vs XGB 0.312. (XGB's ROC-AUC is a hair higher — 0.772
 0.770 — but ROC-AUC is the wrong metric under this imbalance.) They converge past
 the top 20%.
 
+> **v36 update (2026-06-21, current-inspection features).** The table above is the
+> **v33 served-basis** comparison. Under v36 the gap closes: on the honest test
+> (n=13,812) XGBoost slightly *leads* — PR-AUC LogReg 0.332 vs XGB **0.338**, P@10
+> 0.370 vs **0.376**. The **served LogReg stays the production estimator** (it feeds
+> `scores.json`; v36 served test PR-AUC **0.372**, P@10 **0.415**, n=7,008), but XGB
+> pulling even is worth a production-model revisit — a separate decision, not this
+> PR. A full v36 **served-basis** refresh of the operating-point table is pending an
+> XGB served-filter run.
+
 **Convention going forward:** report each experiment's impact on **both** models
 where measured (LogReg served + XGB) — a feature can help one and not the other.
 Regenerate this table after any contract change with `operating_point_table` on
