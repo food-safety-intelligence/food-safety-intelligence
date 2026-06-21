@@ -264,8 +264,14 @@ source of truth.
 - **Put ALL the verification screenshots in the PR description** for any visible
   UI change — every state and viewport you captured while verifying (above), not
   a hand-picked one. A diff can't show layout, and reviewers shouldn't have to
-  run the branch to see what changed. Capture them via `/verify` (or, by hand,
-  the `verifier-app` recipe or a browser on your laptop).
+  run the branch to see what changed. **This repo is private, so embed them by
+  dragging the image files into the PR description in the GitHub web UI** — that
+  uploads them to GitHub's attachment store and renders inline for everyone. A
+  committed PNG referenced via `raw.githubusercontent.com` will **not** render
+  (GitHub's image proxy fetches it unauthenticated → 404); committing under
+  `design/` and linking the file view is a non-inline fallback. An agent that
+  can't drag-drop should save the screenshots to a known path and ask a human to
+  drop them in.
 
 ---
 

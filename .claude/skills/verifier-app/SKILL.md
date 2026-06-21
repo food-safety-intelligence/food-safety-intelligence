@@ -88,3 +88,18 @@ Surfaces to confirm:
 - No layout breaks at mobile width (390px).
 
 Other routes worth a glance: `/` (map + list), `/how-it-works` (methodology).
+
+## Put the screenshots in the PR (this repo is private)
+
+GitHub **cannot inline-render committed images in a private repo** — its image
+proxy fetches `raw.githubusercontent.com` unauthenticated and gets a 404, so
+`![](raw…)` embeds show as broken. To embed screenshots in a PR description:
+
+- **Human / web UI (the only inline path):** open the PR, edit the description,
+  and **drag the PNG files in**. GitHub uploads them to its attachment store
+  (`user-attachments`) and they render inline for everyone with repo access.
+- **Headless / agent (can't drag-drop):** save the PNGs to a known path and ask
+  a human to drop them in. As a non-inline fallback, commit them under `design/`
+  and link to the GitHub **file view** (`…/blob/<sha>/design/…png`) — that works
+  for logged-in reviewers, but is a click, not an inline image. Do **not** rely
+  on `raw.githubusercontent.com` links; they 404 for the renderer.
