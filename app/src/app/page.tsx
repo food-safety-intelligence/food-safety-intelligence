@@ -1,8 +1,10 @@
 import { ArrowRight, Heart } from "lucide-react";
 import Link from "next/link";
+import type { PinDriver } from "@/lib/scores";
 import { getMapPins, loadScores } from "@/lib/scores-server";
 import { DemoBanner } from "@/components/DemoBanner";
 import { MapExplorer } from "@/components/MapExplorer";
+import { PinDriverLine } from "@/components/MapView";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -10,6 +12,21 @@ import { SiteHeader } from "@/components/SiteHeader";
 // floating search is still in-memory client-side; the cap controls how big
 // the RSC payload is. Bump to 1000+ once we add `?q=` server-side search.
 const HOME_LIMIT = 200;
+
+// A static, generic example of the kind of drivers the model surfaces, so the
+// caregivers promise ("we show the top three drivers") is concrete on the home
+// page. These are REAL model features (keyword flags the model actually uses),
+// shown as an example rather than pulled from one establishment — each place's
+// actual, signed drivers live on its detail page.
+//
+// Chosen to be the hazards that matter most for an immunocompromised diner —
+// the classic foodborne-pathogen routes (temperature abuse, cross-contamination,
+// handwashing) rather than generic operational signals.
+const EXAMPLE_DRIVERS: PinDriver[] = [
+  { feature: "flag_kw_temperature", label: "Temperature abuse (bacterial growth)", up: true },
+  { feature: "flag_kw_cross_contamination", label: "Cross-contamination risk", up: true },
+  { feature: "flag_kw_handwash_sink", label: "Handwashing lapses", up: true },
+];
 
 export default async function HomePage() {
   const [payload, pins] = await Promise.all([loadScores(), getMapPins()]);
@@ -103,21 +120,35 @@ export default async function HomePage() {
               </h3>
               <p className="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
                 Two food establishments can share the same score for different
-                reasons.
-                We show the top three drivers — recurring temperature
-                violations, nearby pest complaints, long gaps since last
-                inspection — so you can match the data to the precautions your
-                care team recommends.
+                reasons — and for someone with a weakened immune system, the
+                reason matters. We surface the top drivers, like temperature
+                abuse, cross-contamination, and handwashing lapses, so you can
+                match the data to the precautions your care team recommends.
               </p>
             </div>
-            <div className="col-span-12 md:col-span-5 flex md:justify-end">
-              <Link
-                href="/caregivers"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
-              >
-                Open the caregiver guide
-                <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
-              </Link>
+            <div className="col-span-12 md:col-span-5">
+              {/* Example driver preview + its CTA as one unit: a 320px group,
+                  right-aligned in the column on desktop, with the button centered
+                  under the card. */}
+              <div className="md:ml-auto md:max-w-[320px] flex flex-col items-center gap-4">
+                <div className="w-full rounded-2xl border border-line bg-card/80 p-4">
+                  <div className="text-[11px] tracking-widest uppercase text-muted mb-2.5">
+                    Example drivers
+                  </div>
+                  <div className="space-y-2">
+                    {EXAMPLE_DRIVERS.map((d) => (
+                      <PinDriverLine key={d.feature} driver={d} />
+                    ))}
+                  </div>
+                </div>
+                <Link
+                  href="/caregivers"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
+                >
+                  Open the caregiver guide
+                  <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />
+                </Link>
+              </div>
             </div>
           </div>
         </section>

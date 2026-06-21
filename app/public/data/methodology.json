@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-21T04:49:56+00:00",
+  "generated_at": "2026-06-21T13:36:24+00:00",
   "model_version": "baseline_logreg",
   "provenance": {
-    "run_id": "20260621_e728d09fe",
-    "git_commit": "e728d09fe48f07d7f46edefe3f3e24b5ae850eaf",
+    "run_id": "20260621_64fbfd451",
+    "git_commit": "64fbfd451df488357a475ba164ebcdd73a4f8af6",
     "git_dirty": true,
     "feature_set_version": "68fe2ae76184",
     "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3"
@@ -60,5 +60,95 @@
       "lift": 1.7196,
       "events_caught": 650
     }
-  ]
+  ],
+  "global_importance": [
+    {
+      "feature": "was_fail",
+      "label": "Outcome of the current inspection",
+      "mean_abs_logodds": 0.5951
+    },
+    {
+      "feature": "license_age_days",
+      "label": "License age",
+      "mean_abs_logodds": 0.4056
+    },
+    {
+      "feature": "static_inspection_type",
+      "label": "Inspection type",
+      "mean_abs_logodds": 0.3675
+    },
+    {
+      "feature": "n_priority_this_inspection",
+      "label": "Priority violations at this inspection",
+      "mean_abs_logodds": 0.318
+    },
+    {
+      "feature": "prior_complaint_inspections",
+      "label": "Prior complaint-driven inspections",
+      "mean_abs_logodds": 0.1936
+    },
+    {
+      "feature": "license_n_history_rows",
+      "label": "License history entries",
+      "mean_abs_logodds": 0.1432
+    },
+    {
+      "feature": "prior_fail_or_priority_events",
+      "label": "Prior fail-or-priority events",
+      "mean_abs_logodds": 0.1361
+    },
+    {
+      "feature": "n_core_this_inspection",
+      "label": "Core violations at this inspection",
+      "mean_abs_logodds": 0.1294
+    },
+    {
+      "feature": "temporal_month",
+      "label": "Month of inspection",
+      "mean_abs_logodds": 0.1095
+    },
+    {
+      "feature": "static_risk_tier",
+      "label": "Chicago risk tier",
+      "mean_abs_logodds": 0.0944
+    },
+    {
+      "feature": "days_since_last_inspection",
+      "label": "Days since last inspection",
+      "mean_abs_logodds": 0.0737
+    },
+    {
+      "feature": "temporal_quarter",
+      "label": "Quarter of inspection",
+      "mean_abs_logodds": 0.0575
+    }
+  ],
+  "waterfall": {
+    "base": -2.1635,
+    "drivers": [
+      {
+        "feature": "prior_complaint_inspections",
+        "label": "51 prior complaint-driven inspections",
+        "contribution": 2.4653
+      },
+      {
+        "feature": "was_fail",
+        "label": "Failed the current inspection",
+        "contribution": 1.0285
+      },
+      {
+        "feature": "license_age_days",
+        "label": "License is 5074 days old",
+        "contribution": -0.6844
+      },
+      {
+        "feature": "prior_fail_or_priority_events",
+        "label": "25 prior fail-or-priority events",
+        "contribution": 0.641
+      }
+    ],
+    "other": 1.3065,
+    "total_logit": 2.5933,
+    "probability": 0.9304
+  }
 }

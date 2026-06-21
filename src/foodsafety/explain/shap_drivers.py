@@ -32,67 +32,10 @@ from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
-# ---------------------------------------------------------------------------
-# Plain-English labels for the UI driver bars.
-# ---------------------------------------------------------------------------
-#
-# Most entries are a format template: ``{value}`` is filled in with the row's
-# value for that feature. Numeric features show the value; boolean keyword flags
-# only render when True (the False case is suppressed at the caller); category
-# features show the actual category that triggered.
-#
-# A few binary OUTCOME features (e.g. ``was_fail``) read oppositely for the
-# pass vs fail case and surface in BOTH directions — a fail pushes risk up, a
-# pass pulls it down. A single template can't say both, so those map to a
-# ``{True: ..., False: ...}`` dict chosen by the row's value at render time.
-#
-# These strings are what end up on the restaurant detail page next to the
-# horizontal driver bars. They were tuned for the Clinical Quiet mockup's
-# tone — neutral, not alarmist.
-FEATURE_LABELS: dict[str, str | dict[bool, str]] = {
-    "prior_inspections": "{value} prior inspections on record",
-    "prior_fails": "{value} failed inspections previously",
-    "prior_priority_violations": "{value} priority violations in prior history",
-    "prior_core_violations": "{value} core violations in prior history",
-    "prior_fail_or_priority_events": "{value} prior fail-or-priority events",
-    "prior_pass_w_conditions": "{value:.0f} prior 'Pass with conditions' results",
-    "prior_reinspections": "{value:.0f} prior re-inspections",
-    "prior_complaint_inspections": "{value:.0f} prior complaint-driven inspections",
-    "prior_fails_365d": "{value:.0f} failed inspections in the last year",
-    "prior_priority_violations_365d": "{value:.0f} priority violations in the last year",
-    "prev_priority_violations": "{value:.0f} priority violations at the previous inspection",
-    "priority_violation_trend": "Recent trend in priority violations",
-    "days_since_last_inspection": "Last inspected {value:.0f} days ago",
-    "days_since_last_fail": "Last fail was {value:.0f} days ago",
-    "license_age_days": "License is {value:.0f} days old",
-    "license_n_history_rows": "{value} entries in license history",
-    "temporal_month": "Anchored in month {value}",
-    "temporal_quarter": "Anchored in Q{value}",
-    "static_facility_type": "Facility type: {value}",
-    "static_risk_tier": "Chicago risk tier: {value}",
-    "static_inspection_type": "Inspection type: {value}",
-    "static_zip": "ZIP {value}",
-    # Current-inspection own outcome + code counts (observed at as_of_date; the
-    # 180-day label window is strictly after). These are the model's strongest
-    # drivers, so they must read clearly for both the fail and the pass case.
-    "n_priority_this_inspection": "{value:.0f} priority violations at this inspection",
-    "n_core_this_inspection": "{value:.0f} core violations at this inspection",
-    "was_fail": {True: "Failed the current inspection", False: "Passed the current inspection"},
-    "last_was_fail": {True: "Previous inspection was a fail", False: "Previous inspection passed"},
-    # Boolean flag labels (only rendered when value is True)
-    "flag_kw_temperature": "Temperature-related violation in recent history",
-    "flag_kw_cooling": "Improper cooling cited",
-    "flag_kw_raw_food": "Raw-food handling issue cited",
-    "flag_kw_cross_contamination": "Cross-contamination concerns",
-    "flag_kw_expired": "Expired food / date-marking issue",
-    "flag_kw_rodent": "Vermin / rodent violation noted",
-    "flag_kw_pest": "Pest activity noted",
-    "flag_kw_no_soap": "Missing soap at handwash sink",
-    "flag_kw_no_paper_towels": "Missing paper towels at handwash sink",
-    "flag_kw_handwash_sink": "Handwashing-sink issue",
-    "flag_kw_sewage": "Sewage / plumbing issue",
-    "flag_kw_certified_manager": "Certified-manager certification issue",
-}
+# The feature presentation registry (labels) lives in its own dependency-light
+# module; re-imported here so `from ...shap_drivers import FEATURE_LABELS` (used
+# by the modeling notebook and as the default in top_drivers_for_row) still works.
+from foodsafety.explain.feature_labels import FEATURE_LABELS
 
 
 @dataclass(frozen=True)

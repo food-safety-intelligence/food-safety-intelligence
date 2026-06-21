@@ -3,6 +3,55 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { loadMethodology } from "@/lib/methodology-server";
+import { cn } from "@/lib/utils";
+
+/**
+ * One row of the worked-example waterfall: a label on the left and its signed
+ * calibrated log-odds on the right. Positive (raises risk) reads terra,
+ * negative (lowers) reads sage; structural rows (base / other / total) are
+ * neutral. `strong` styles the running-total row.
+ */
+function WaterfallRow({
+  label,
+  value,
+  muted = false,
+  strong = false,
+}: {
+  label: string;
+  value: number;
+  muted?: boolean;
+  strong?: boolean;
+}) {
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const valueColor = muted
+    ? "text-muted"
+    : value > 0
+      ? "text-terra-strong"
+      : value < 0
+        ? "text-sage-strong"
+        : "text-muted";
+  return (
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 px-4 py-2.5 border-b border-line",
+        strong && "bg-tint/50",
+      )}
+    >
+      <span className={cn("text-[14px]", strong ? "text-ink font-medium" : "text-ink/85")}>
+        {label}
+      </span>
+      <span
+        className={cn(
+          "num tabular-nums shrink-0",
+          strong ? "text-ink font-semibold" : valueColor,
+        )}
+      >
+        {sign}
+        {Math.abs(value).toFixed(2)}
+      </span>
+    </div>
+  );
+}
 
 export const metadata = {
   title: "How this works · Food Safety",
@@ -15,6 +64,26 @@ export default async function HowItWorksPage() {
   const top5 = methodology.operating_points.find((p) => p.frac === 0.05);
   const top10 = methodology.operating_points.find((p) => p.frac === 0.1);
   const top20 = methodology.operating_points.find((p) => p.frac === 0.2);
+
+  const importance = methodology.global_importance ?? [];
+  const maxImpact = Math.max(...importance.map((d) => d.mean_abs_logodds), 0);
+
+  // Round the waterfall to the precision the rows display (2 dp) and make the
+  // "everything else" bucket the residual, so the visible column sums EXACTLY to
+  // the total. The stored JSON stays full-precision; this is presentation only.
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const wf = methodology.waterfall;
+  const waterfall = wf
+    ? (() => {
+        const base = round2(wf.base);
+        const drivers = wf.drivers.map((d) => ({ ...d, contribution: round2(d.contribution) }));
+        const total = round2(wf.total_logit);
+        const other = round2(
+          total - base - drivers.reduce((sum, d) => sum + d.contribution, 0),
+        );
+        return { base, drivers, other, total, probability: wf.probability };
+      })()
+    : null;
 
   return (
     <>
@@ -69,7 +138,7 @@ export default async function HowItWorksPage() {
               The features
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
-              Thirty-three features, all built leak-free from the public record:
+              Thirty-six features, all built leak-free from the public record:
             </p>
             <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>
@@ -241,10 +310,111 @@ export default async function HowItWorksPage() {
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               Per-establishment SHAP attribution — log-odds contributions from
-              each feature, summed to recover the model&apos;s logit. The
-              detail page surfaces the top four drivers, signed so positive
-              contributions push risk up and negative contributions push it
-              down.
+              each feature, summed to recover the model&apos;s logit. The detail
+              page surfaces the top drivers, signed so positive contributions
+              push risk up and negative contributions push it down.
+            </p>
+
+            {/* Global feature impact — which features move the score most,
+                averaged over the whole test set. Magnitude only (mean |log-odds|),
+                so all bars read the same direction. */}
+            <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
+              Which features matter most, overall
+            </h3>
+            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+              Averaged across every establishment in the test set, this is how
+              much each feature moves the prediction — the mean size of its
+              log-odds contribution. It says nothing about direction; that&apos;s
+              per-establishment.
+            </p>
+            {importance.length > 0 ? (
+              <ul className="mt-4 space-y-3">
+                {importance.map((d) => (
+                  <li key={d.feature}>
+                    {/* Label above its bar so the full feature name always shows
+                        — these run long and a fixed column would truncate them. */}
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13.5px] text-ink/85">{d.label}</span>
+                      <span className="num text-[12px] text-muted tabular-nums shrink-0">
+                        {d.mean_abs_logodds.toFixed(2)}
+                      </span>
+                    </div>
+                    <span className="mt-1 block h-2.5 rounded-full bg-tint overflow-hidden">
+                      <span
+                        className="block h-full rounded-full bg-teal/70"
+                        style={{
+                          width: `${maxImpact > 0 ? (d.mean_abs_logodds / maxImpact) * 100 : 0}%`,
+                        }}
+                      />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[13.5px] text-muted mt-3">
+                Run the metrics pipeline to populate the feature-impact chart.
+              </p>
+            )}
+            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+              Each number is the <span className="font-medium">mean |log-odds|</span>{" "}
+              — the feature&apos;s average influence on the model&apos;s internal
+              score, counted in either direction. It&apos;s a relative scale
+              (bigger = more sway), not a probability or a percentage.
+            </p>
+
+            {/* Worked example: how one establishment's calibrated log-odds add
+                up to its published probability. Additive in calibrated space, so
+                the parts sum exactly to the score on the gauge. */}
+            <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
+              A worked example
+            </h3>
+            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+              For one (anonymised) establishment, here is how the score is built.
+              The rows are in{" "}
+              <span className="font-medium text-ink/80">calibrated log-odds</span>{" "}
+              — the model&apos;s internal additive scale (a running sum, not a
+              percentage), adjusted so the total lands on the real-world
+              probability. So the base, the drivers, and everything else add up to
+              one number, which a sigmoid then turns into the % on the gauge.
+            </p>
+            {waterfall ? (
+              <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-[14px]">
+                <WaterfallRow
+                  label="Base (model intercept)"
+                  value={waterfall.base}
+                  muted
+                />
+                {waterfall.drivers.map((d, i) => (
+                  <WaterfallRow key={d.feature + i} label={d.label} value={d.contribution} />
+                ))}
+                <WaterfallRow
+                  label="Everything else (remaining features)"
+                  value={waterfall.other}
+                  muted
+                />
+                <WaterfallRow
+                  label="Total (calibrated log-odds)"
+                  value={waterfall.total}
+                  strong
+                />
+                <div className="flex items-center justify-between px-4 py-3 bg-cream/50">
+                  <span className="font-medium">
+                    Squashed to a probability (the gauge)
+                  </span>
+                  <span className="num font-semibold text-terra-strong text-[16px]">
+                    {(waterfall.probability * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-[13.5px] text-muted mt-3">
+                Run the metrics pipeline to populate the worked example.
+              </p>
+            )}
+            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+              A positive number pushes risk up; a negative number pulls it down.
+              The detail page shows the same drivers as bars — this page shows
+              the arithmetic behind a single score.
             </p>
           </article>
 
