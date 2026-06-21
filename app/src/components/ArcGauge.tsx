@@ -120,7 +120,10 @@ function arcPath(
   const y1 = cy - r * Math.sin(startRad);
   const x2 = cx + r * Math.cos(endRad);
   const y2 = cy - r * Math.sin(endRad);
-  // SVG sweep-flag=0 means CCW (visually CW because y is flipped).
+  // The points above use flipped y (screen y-down vs math angles), which
+  // inverts handedness — so the sweep-flag must MATCH the large-arc-flag. A
+  // major (>180°) arc drawn with sweep-flag 0 renders the wrong 270° and the
+  // gauge track shows as a broken minor segment.
   const largeArc = sweepDeg > 180 ? 1 : 0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 0 ${x2} ${y2}`;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} ${largeArc} ${x2} ${y2}`;
 }
