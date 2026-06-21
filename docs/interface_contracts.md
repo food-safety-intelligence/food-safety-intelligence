@@ -44,8 +44,11 @@ decision 0002.
   are not zero-padded — `00606` isn't a real ZIP). `static_zip` is dropped from
   the model but still cleaned for the fairness audit.
 - **Geo** — lat/lon coerced to numeric; 311 rows without geo are dropped before
-  the spatial join. lat/lon are **not** model features (they drive only the map
-  and the 311 join); the current snapshot is entirely within the Chicago bbox.
+  the spatial join. Inspection coords outside the Chicago bbox are flagged and
+  **nulled** (the row is kept, not dropped — it's routed into the existing
+  missing-geo path: the map skips the pin, the 311 join counts 0). lat/lon are
+  **not** model features (they drive only the map and the 311 join); the current
+  snapshot is 100% in-bbox, so this is defensive for future ingestion.
 
 ### Nulls
 `prior_*` / recency / `license_*` NaNs are **structural** ("no prior history
