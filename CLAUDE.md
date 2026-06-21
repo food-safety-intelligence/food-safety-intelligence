@@ -244,6 +244,27 @@ source of truth.
 - No emoji in committed code or UI unless explicitly asked.
 - Accessibility is default: keyboard nav, ARIA labels on icon-only buttons,
   ≥44px tap targets, sufficient contrast.
+- **Validate UI changes rigorously — by observing the running app, not
+  `tsc`/tests** (which pass while layout, overflow, colour, and visual
+  regressions ship). For any visible change under `app/`, use the `verify-app`
+  skill (`.claude/skills/verify-app/`) to capture **real screenshots**, and
+  check each of these *per item* — not one glance and a "looks good":
+  - **every state the change affects**, plus realistic **edge cases** — empty /
+    missing / extreme data (e.g. a record with zero drivers, the longest label
+    that could appear);
+  - **both viewports** — desktop and mobile (~390px) — for wrapping and overflow;
+  - **interactions** — hover / focus / keyboard, not just the static render;
+  - **accessibility** — text contrast ≥ WCAG AA (4.5:1 normal, 3:1 large text)
+    and a **non-colour cue** for anything conveyed by colour alone.
+  Report honestly which items you actually observed and which you could not
+  exercise — **never a blanket pass**. A static "it loads" or an HTML-only check
+  is not verification of a visual change. The built-in `verify` skill picks up
+  `verify-app` automatically.
+- **Put ALL the verification screenshots in the PR description** for any visible
+  UI change — every state and viewport you captured while verifying (above), not
+  a hand-picked one. A diff can't show layout, and reviewers shouldn't have to
+  run the branch to see what changed. Capture them with the `verify-app`
+  recipe or a browser on your laptop.
 
 ---
 
