@@ -52,9 +52,22 @@ NUMERIC_FEATURES: list[str] = [
     "prior_priority_violations",
     "prior_core_violations",
     "prior_fail_or_priority_events",
+    # Prior near-misses + visit-trigger history (leak-free cumsum rollups):
+    # repeated "Pass w/ Conditions", prior Re-Inspections, prior Complaint visits.
+    "prior_pass_w_conditions",
+    "prior_reinspections",
+    "prior_complaint_inspections",
     # Recency
     "days_since_last_inspection",
     "days_since_last_fail",
+    # Recency / last-outcome / trend (own-history only — individually fair, no
+    # neighborhood/demographic proxy). Tests whether recent history beats the
+    # lifetime prior_* totals on a non-stationary risk process.
+    "last_was_fail",
+    "prev_priority_violations",
+    "priority_violation_trend",
+    "prior_fails_365d",
+    "prior_priority_violations_365d",
     # Calendar. Deliberate omissions:
     #   - `temporal_year`: time-anchored, doesn't generalise across the
     #     chronological split (every test row has year > all train years).
@@ -64,17 +77,27 @@ NUMERIC_FEATURES: list[str] = [
     # License-history features (joined from licenses_historical.parquet)
     "license_age_days",
     "license_n_history_rows",
-    # 311 spatial counts are deliberately omitted. They sat at the bottom of
-    # XGBoost gain in the Phase-5 ablation, and the violation-text flags
-    # (`flag_kw_rodent`, `flag_kw_pest`, `flag_kw_sewage`) already capture
-    # the same signal directly. Carnegie Mellon's 2019 hindsight critique of
-    # Chicago's heat-map features reached the same conclusion.
+    # 311 spatial counts re-tested in this stack and left OUT: served PR-AUC
+    # 0.3147 -> 0.3152 (~flat) for a slow BallTree build dependency, so the
+    # Phase-5 drop holds. Code remains in complaint_features.py if revisited.
 ]
 
 CATEGORICAL_FEATURES: list[str] = [
-    "static_facility_type",
     "static_risk_tier",
-    "static_zip",
+    # Scheduled visit trigger (Canvass / Complaint / Re-Inspection / License) —
+    # known before the outcome, so leak-safe.
+    "static_inspection_type",
+    # DROPPED for fairness + accuracy (ablation on the served model):
+    #   - `static_facility_type`: only PARTLY correlates with immigrant/ethnic
+    #     business types, and its real risk signal is largely redundant with the
+    #     kept `static_risk_tier` (the city's Risk 1/2/3) — so removing it is
+    #     ~free (PR-AUC 0.3147→0.3139, precision@10% 0.352→0.355).
+    #   - `static_zip`: geographic proxy for race/income in highly segregated
+    #     Chicago; its sparse high-cardinality dummies also OVERFIT the
+    #     chronological split, so dropping it IMPROVES the model
+    #     (PR-AUC 0.3147→0.3188, precision@10% 0.352→0.367). Win-win — better
+    #     accuracy AND less geographic bias. (Geographic miscalibration is only
+    #     partly removed; the full disparate-impact audit needs a census join.)
     # `static_zip3` dropped — strict subset of `static_zip`, no orthogonal info.
     # `temporal_season` dropped — categorical bucket of `temporal_month`.
 ]
