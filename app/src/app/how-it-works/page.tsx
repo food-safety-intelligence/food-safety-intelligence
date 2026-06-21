@@ -5,6 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
+import { loadScores } from "@/lib/scores-server";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -62,9 +63,12 @@ function WaterfallRow({
  * into "read it / how it's built / how well it works / caveats". Matches the
  * "Methodology" eyebrow in the header.
  */
-function SectionLabel({ children }: { children: string }) {
+function SectionLabel({ children, id }: { children: string; id?: string }) {
   return (
-    <p className="text-sage text-[12px] tracking-[0.18em] uppercase pt-8 border-t border-line">
+    <p
+      id={id}
+      className="scroll-mt-20 text-sage text-[12px] tracking-[0.18em] uppercase pt-8 border-t border-line"
+    >
       {children}
     </p>
   );
@@ -92,6 +96,21 @@ export default async function HowItWorksPage() {
       : t.min <= 0
         ? `under ${pct(t.max)}`
         : `${pct(t.min)}–${pct(t.max)}`;
+
+  // Share of *scored establishments* in each band — the served distribution
+  // (scores.json totals), the population a reader actually sees on the map/list.
+  // (Not the test split: tier shares differ between recent-inspection rows and
+  // the latest-per-license served scoring.)
+  const tierCounts = await loadScores()
+    .then((s) => s.totals?.tier_counts ?? null)
+    .catch(() => null);
+  const tierTotal = tierCounts
+    ? Object.values(tierCounts).reduce((a, b) => a + b, 0)
+    : 0;
+  const tierShare = (label: string) =>
+    tierCounts && tierTotal
+      ? `${Math.round(((tierCounts[label as RiskTier] ?? 0) / tierTotal) * 100)}%`
+      : null;
 
   const importance = methodology.global_importance ?? [];
   const maxImpact = Math.max(...importance.map((d) => d.mean_abs_logodds), 0);
@@ -145,8 +164,33 @@ export default async function HowItWorksPage() {
           </p>
         </header>
 
+        {/* Sticky jump-nav — lets a reader skip to any part without scrolling
+            the whole methodology. Plain anchors (server component); deep-links
+            like #definitions still work. bg matches the page so content scrolls
+            cleanly underneath. */}
+        <nav
+          aria-label="Sections"
+          className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-3 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px]"
+        >
+          <a href="#reading-the-score" className="text-muted hover:text-ink transition-colors">
+            Reading the score
+          </a>
+          <a href="#how-its-built" className="text-muted hover:text-ink transition-colors">
+            How it&apos;s built
+          </a>
+          <a href="#how-well-it-works" className="text-muted hover:text-ink transition-colors">
+            How well it works
+          </a>
+          <a href="#caveats" className="text-muted hover:text-ink transition-colors">
+            Caveats
+          </a>
+          <a href="#reference" className="text-muted hover:text-ink transition-colors">
+            Reference
+          </a>
+        </nav>
+
         <section className="mt-10 space-y-8">
-          <SectionLabel>Reading the score</SectionLabel>
+          <SectionLabel id="reading-the-score">Reading the score</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               How to read a score
@@ -154,8 +198,11 @@ export default async function HowItWorksPage() {
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               Every establishment gets one number — a calibrated probability,
               shown as a percentage, that it fails an inspection or draws a
-              priority violation in the next 180 days. The map and list summarise
-              that number two ways: a risk band and a 90-day trend.
+              priority violation in the next 180 days. &ldquo;Calibrated&rdquo;
+              means the number is honest about its own odds: across the
+              establishments the model scores around 20%, about 1 in 5 actually
+              has an event. The map and list summarise that number two ways: a
+              risk band and a 90-day trend.
             </p>
 
             <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
@@ -164,22 +211,36 @@ export default async function HowItWorksPage() {
             <p className="text-[14px] text-muted leading-relaxed mt-1.5">
               The percentage is bucketed into four bands — the coloured badges on
               the map, list, and detail pages. These are the model&apos;s{" "}
-              <span className="font-medium text-ink/80">output</span> bands;
+              <span className="font-medium text-ink/80">output</span>{" "}bands;
               don&apos;t confuse them with Chicago&apos;s own Risk 1/2/3
               classification, which is an{" "}
-              <span className="font-medium text-ink/80">input</span> feature
+              <span className="font-medium text-ink/80">input</span>{" "}feature
               (see &ldquo;The features&rdquo;).
             </p>
             {tiers.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
+                <div className="flex items-center justify-between gap-4 px-4 py-2 border-b border-line text-[11px] uppercase tracking-[0.08em] text-sage">
+                  <span>Tier</span>
+                  <span className="flex items-center gap-6">
+                    <span className="w-28 text-right">Score</span>
+                    {tierShare("Low") && <span className="w-16 text-right">Share</span>}
+                  </span>
+                </div>
                 {tiers.map((t) => (
                   <div
                     key={t.label}
                     className="flex items-center justify-between gap-4 px-4 py-3 border-b border-line last:border-b-0"
                   >
                     <TierPill tier={t.label as RiskTier} />
-                    <span className="num text-[14px] text-ink/85 tabular-nums">
-                      {tierRange(t)}
+                    <span className="flex items-center gap-6 num tabular-nums">
+                      <span className="w-28 text-right text-[14px] text-ink/85">
+                        {tierRange(t)}
+                      </span>
+                      {tierShare(t.label) && (
+                        <span className="w-16 text-right text-[13px] text-muted">
+                          {tierShare(t.label)}
+                        </span>
+                      )}
                     </span>
                   </div>
                 ))}
@@ -192,6 +253,10 @@ export default async function HowItWorksPage() {
             <p className="text-[12.5px] text-muted leading-relaxed mt-3">
               Bands are fixed cutoffs on the predicted probability, set once
               (decision record 0008) — they don&apos;t shift per establishment.
+              &ldquo;Share&rdquo; is the portion of all scored establishments in
+              each band: real scores cluster low, so most sit in Low or Moderate
+              and only the small Elevated / High slice is the signal worth acting
+              on.
             </p>
 
             <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
@@ -219,7 +284,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel>How it&apos;s built</SectionLabel>
+          <SectionLabel id="how-its-built">How it&apos;s built</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               The label
@@ -317,7 +382,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel>How well it works</SectionLabel>
+          <SectionLabel id="how-well-it-works">How well it works</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               What it catches
@@ -471,7 +536,10 @@ export default async function HowItWorksPage() {
             {/* Worked example: how one establishment's calibrated log-odds add
                 up to its published probability. Additive in calibrated space, so
                 the parts sum exactly to the score on the gauge. */}
-            <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
+            <h3
+              id="calibrated-log-odds"
+              className="scroll-mt-24 text-[1.05rem] font-medium tracking-tight mt-8"
+            >
               A worked example
             </h3>
             <p className="text-[14px] text-muted leading-relaxed mt-1.5">
@@ -524,7 +592,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel>Caveats</SectionLabel>
+          <SectionLabel id="caveats">Caveats</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               Known limitations
@@ -555,7 +623,7 @@ export default async function HowItWorksPage() {
             </ul>
           </article>
 
-          <SectionLabel>Reference</SectionLabel>
+          <SectionLabel id="reference">Reference</SectionLabel>
           <article id="definitions">
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               Definitions
