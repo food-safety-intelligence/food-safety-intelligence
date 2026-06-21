@@ -5,7 +5,22 @@
 **Runtime**: Amazon Bedrock AgentCore Harness (Strands Agents)  
 **Restaurant data**: OpenStreetMap via Overpass API (free, no key)  
 **Safety scores**: Chicago Food Inspections batch pipeline (existing)  
-**Status**: Design proposal — Phase 2 / post-demo
+**Status**: Design proposal — Phase 2 (now underway)  
+**Deployment**: web app live on AWS Amplify + Vercel (both auto-deploy `main`); features/scores moving to S3
+
+> **Update (2026-06-21, Bella) — for Deepak's review.** Reconciling this spec with
+> what's now on `main`:
+> - **Feature contract is 36, not 26**, and `baseline_sigmoid_20260605_metadata.json`
+>   does not exist — the source of truth is `foodsafety.models.baseline.ALL_FEATURES`.
+>   The agent's `FEATURE_ORDER` was synced to it (with a drift-guard test) in PR #18.
+> - **Live-inference wording was contradictory** (§4 "calls SageMaker at query time" vs
+>   §13 "no live inference at query time"). Settled: the **map/detail pages** read the
+>   batch `scores.json` (no model call); the **chatbot** is the *one* live-inference
+>   surface (the SageMaker endpoint). Text updated below.
+> - **The app is deployed** (Amplify + Vercel, auto-deploy `main`), and the agent tool
+>   code already exists in `agents/` — so the "no AWS until Phase 2" framing is stale.
+> - A standalone chatbot stub (`ChatWidget` + a `/api/agent` route) was prototyped then
+>   retired in favor of this spec's map-integrated UI.
 
 ---
 
@@ -97,8 +112,8 @@ complex multi-constraint searches — keeping costs predictable.
 
 The `get_safety_score` Lambda calls the SageMaker real-time endpoint that hosts
 the XGBoost model trained by the Python pipeline. The endpoint accepts a CSV
-payload (one row per restaurant, 26 features in the exact order defined in
-`baseline_sigmoid_20260605_metadata.json`) and returns calibrated probability
+payload (one row per restaurant, 36 features in the exact order defined by
+`foodsafety.models.baseline.ALL_FEATURES`) and returns calibrated probability
 scores + SHAP values.
 
 ```
@@ -129,8 +144,9 @@ find_restaurants        get_safety_score Lambda
 - Same restaurant always gets the same score across calls (deterministic).
 - Every result includes `"stub": true` and a `stub_note` string so the agent
   can surface this to the user.
-- 31 automated tests in `agents/tools/get_safety_score/test_sagemaker_stub.py`
-  cover distribution, determinism, output shape, and the swap flag.
+- 30 automated tests in `agents/tools/get_safety_score/test_sagemaker_stub.py`
+  cover distribution, determinism, output shape, the swap flag, and a
+  feature-contract drift guard (`FEATURE_ORDER` must equal `ALL_FEATURES`).
 
 ### 4.3 Switching to the real endpoint (one line)
 
@@ -153,7 +169,7 @@ from the response body.
 
 ### 4.4 Feature row construction
 
-`_build_feature_row()` in `get_safety_score/handler.py` assembles the 26-feature
+`_build_feature_row()` in `get_safety_score/handler.py` assembles the 36-feature
 vector from whatever data is available:
 - Calendar features (`temporal_month`, `temporal_quarter`) from `date.today()`
 - Pre-computed features from a `scores.json` address-fuzzy match when available
@@ -688,9 +704,11 @@ normalisation + Levenshtein matching (cutoff 0.72) handles common variations
 (St vs Street, abbreviations). Unmatched restaurants surface as `tier: "Unknown"`
 rather than silently dropping them.
 
-**Batch scores stay unchanged**  
-The Python pipeline → `scores.json` seam is permanent. The agent reads the same
-pre-computed file the web app already uses. No live model inference at query time.
+**Batch scores feed the pages; the chatbot is the one live-inference surface**  
+The Python pipeline → `scores.json` seam is permanent, and the **map/detail pages**
+read that pre-computed file with **no model call**. The **chatbot/agent** is the
+only surface that invokes the model live at query time — `get_safety_score` hits
+the SageMaker endpoint for restaurants it needs to score on demand.
 
 **AgentCore Harness over custom orchestration**  
 Harness is a config file, not framework code. Memory, session isolation (microVM),
@@ -699,5 +717,7 @@ Agents runtime that powers it is open-source and runnable locally for developmen
 
 ---
 
-*No AWS code, stubs, or seams should be added to the current codebase until
-Phase 2 work begins. This document is the design target only.*
+*This document is the design target for the agent. Note (2026-06-21): Phase 2 is
+underway — the web app is deployed on AWS (Amplify + Vercel) and the agent tool
+code already lives in `agents/`, so the original "no AWS code until Phase 2"
+caveat no longer applies.*
