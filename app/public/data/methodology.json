@@ -1,6 +1,13 @@
 {
-  "generated_at": "2026-06-21T02:29:50+00:00",
-  "model_version": "baseline_logreg_sigmoid",
+  "generated_at": "2026-06-21T03:59:02+00:00",
+  "model_version": "baseline_logreg",
+  "provenance": {
+    "run_id": "20260621_3ebce0f61",
+    "git_commit": "3ebce0f611758c8602050e48931986c05bc5e315",
+    "git_dirty": true,
+    "feature_set_version": "dbb6d73f553a",
+    "features_sha256": "752497f0ac7055381e0b1c599c3e936d2e14474a43035089a1bf2c37a9cb4351"
+  },
   "test": {
     "n": 7008,
     "prevalence": 0.1079,
