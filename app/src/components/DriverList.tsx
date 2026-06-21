@@ -3,6 +3,24 @@ import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
 
 /**
+ * Pure geometry for one diverging driver bar. The bar spans up to half the
+ * track on its side, sized by this factor's |shap| relative to the largest
+ * |shap| in the list. `maxMagnitude <= 0` (every contribution zero, or an empty
+ * list) falls back to a denominator of 1 so the width is 0, not `NaN%`.
+ */
+export function driverBarGeometry(
+  shap: number,
+  maxMagnitude: number,
+): { isPositive: boolean; sign: "+" | "−" | ""; halfPct: number } {
+  const denom = maxMagnitude > 0 ? maxMagnitude : 1;
+  return {
+    isPositive: shap > 0,
+    sign: shap > 0 ? "+" : shap < 0 ? "−" : "",
+    halfPct: (Math.abs(shap) / denom) * 50,
+  };
+}
+
+/**
  * Ranked drivers as a diverging bar chart. Each row leads with a topic icon
  * (so a reader scanning the column can parse pest / temperature / time-since-
  * inspection at a glance) and a plain-English label. The bar diverges from a
@@ -50,9 +68,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
 
       <ol>
         {drivers.map((d, i) => {
-          const halfPct = (Math.abs(d.shap) / maxMagnitude) * 50;
-          const isPositive = d.shap > 0;
-          const sign = d.shap > 0 ? "+" : d.shap < 0 ? "−" : "";
+          const { isPositive, sign, halfPct } = driverBarGeometry(d.shap, maxMagnitude);
           const Icon = iconForFeature(d.feature);
           const barStyle = isPositive
             ? { left: "50%", width: `${halfPct}%` }

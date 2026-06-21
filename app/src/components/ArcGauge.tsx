@@ -29,16 +29,21 @@ export function ArcGauge({
   const startAngle = 225;
   const sweep = 270;
 
+  // Clamp to [0, 1] once, and fall back to 0 for a non-finite score (NaN/±∞).
+  // Both the arc geometry and the centre number derive from this, so a bad
+  // input can't produce a broken SVG path or a "NaN" / "150" label.
+  const frac = Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
+
   const trackPath = arcPath(cx, cy, r, startAngle, sweep);
-  const valuePath = arcPath(cx, cy, r, startAngle, sweep * Math.min(1, Math.max(0, score)));
+  const valuePath = arcPath(cx, cy, r, startAngle, sweep * frac);
 
   // Marker position at the score's angle.
-  const markerAngle = startAngle - sweep * Math.min(1, Math.max(0, score));
+  const markerAngle = startAngle - sweep * frac;
   const markerRad = (Math.PI / 180) * markerAngle;
   const markerX = cx + r * Math.cos(markerRad);
   const markerY = cy - r * Math.sin(markerRad);
 
-  const display = Math.round(score * 100);
+  const display = Math.round(frac * 100);
   const color = TIER_HEX[tier];
 
   return (
@@ -109,14 +114,16 @@ export function ArcGauge({
  * starting at `startAngleDeg` (measured from +x axis, CCW) and sweeping
  * `sweepDeg` degrees clockwise (decreasing angle).
  */
-function arcPath(
+export function arcPath(
   cx: number,
   cy: number,
   r: number,
   startAngleDeg: number,
   sweepDeg: number,
 ): string {
-  if (sweepDeg <= 0) return "";
+  // `!(x > 0)` (not `x <= 0`) so a NaN sweep also yields an empty path rather
+  // than "M NaN NaN A …" — a zero/empty value arc just renders nothing.
+  if (!(sweepDeg > 0)) return "";
 
   const startRad = (Math.PI / 180) * startAngleDeg;
   const endRad = (Math.PI / 180) * (startAngleDeg - sweepDeg);
