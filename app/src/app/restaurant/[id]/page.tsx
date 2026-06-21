@@ -10,6 +10,7 @@ import {
 import { ScoreCard } from "@/components/ScoreCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Waterfall } from "@/components/Waterfall";
 import {
   getInspectionHistory,
   getPopulationStats,
@@ -117,6 +118,34 @@ export default async function RestaurantDetailPage({
           </div>
 
           <DriverList drivers={restaurant.top_drivers} />
+
+          {/* How the score adds up — the same drivers as an additive,
+              reconciling waterfall (calibrated log-odds). Only when the payload
+              ships the calibration triple. */}
+          {payload.calibration && (
+            <div className="mt-8">
+              <div className="flex items-baseline justify-between gap-4 flex-wrap mb-3">
+                <h3 className="text-[1.2rem] font-medium tracking-tight">
+                  How the score adds up
+                </h3>
+                <Link
+                  href="/how-it-works"
+                  className="text-[13px] text-teal hover:underline"
+                >
+                  What is calibrated log-odds?
+                </Link>
+              </div>
+              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[68ch]">
+                The same drivers as the bars above, rescaled to the model&apos;s
+                calibrated scale so they add up — so the numbers here are smaller
+                than the bars (which show raw influence and don&apos;t sum). The
+                base, each driver, and everything else total one number, which a
+                sigmoid turns into the probability on the gauge — so this column
+                reconciles exactly with the score.
+              </p>
+              <Waterfall restaurant={restaurant} calibration={payload.calibration} />
+            </div>
+          )}
         </section>
 
         {/* Caregiver note */}

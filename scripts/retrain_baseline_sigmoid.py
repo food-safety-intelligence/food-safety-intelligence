@@ -219,7 +219,7 @@ def main() -> None:
 
     # Score every restaurant + export JSON for the web app.
     print("Building scores table (per-license_id, anchored on latest inspection)")
-    scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=4)
+    scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=5)
 
     PRED_DIR.mkdir(parents=True, exist_ok=True)
     scores_parquet_path = PRED_DIR / "scores.parquet"
@@ -247,11 +247,24 @@ def main() -> None:
     tier_counts = scores["risk_tier"].value_counts().to_dict()
     print("  ", tier_counts)
 
+    # Platt calibration triple, shipped once so the web app can reconstruct each
+    # establishment's calibrated-log-odds waterfall (calibrated_logit = -(a*L+b),
+    # L = intercept + Σ contributions). a/b come from the fitted sigmoid
+    # calibrator; intercept from the base logistic regression.
+    sigmoid_cal = calibrated.calibrated_classifiers_[0].calibrators[0]
+    calibration = {
+        "a": float(sigmoid_cal.a_),
+        "b": float(sigmoid_cal.b_),
+        "intercept": float(base.named_steps["model"].intercept_[0]),
+    }
+    print(f"Calibration triple: {calibration}")
+
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.3.0",
+        schema_version="0.4.0",
         model_version=MODEL_VERSION,
+        calibration=calibration,
     )
     print(f"Wrote {SCORES_JSON_PATH}")
     size_mb = SCORES_JSON_PATH.stat().st_size / 1024 / 1024

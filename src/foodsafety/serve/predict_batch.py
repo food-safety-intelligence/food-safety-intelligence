@@ -196,12 +196,19 @@ def write_scores_json(
     model_version: str = "baseline_logreg_sigmoid",
     label_window_days: int = 180,
     totals: dict | None = None,
+    calibration: dict | None = None,
 ) -> None:
     """Convert ``scores.parquet`` to the JSON the Next.js app reads.
 
     Schema matches ``app/public/data/scores_mock.json`` minus the
     ``_is_mock`` field — that omission is what makes the web app drop the
     demo banner automatically when this file replaces the mock.
+
+    ``calibration`` is the Platt triple ``{a, b, intercept}`` shipped ONCE at
+    the top level (not per row). The detail page reconstructs each
+    establishment's calibrated-log-odds waterfall from it plus the per-row
+    ``risk_score`` and ``top_drivers`` shap values — so the full waterfall costs
+    three floats total, not a payload field per restaurant.
     """
     import json
 
@@ -232,6 +239,7 @@ def write_scores_json(
         "model_version": model_version,
         "label_window_days": label_window_days,
         "totals": totals,
+        "calibration": calibration,
         "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 
