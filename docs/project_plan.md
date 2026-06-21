@@ -38,7 +38,9 @@ never a random shuffle.
 Four model components in the plan: (1) risk classification / ranking,
 (2) violation-text classification (NLP), (3) Yelp review-signal extraction
 (Phase 2), and (4) SHAP explainability. Plus a fairness audit across geography,
-demographics, and cuisine.
+demographics, and cuisine (the plan's aspiration; the implemented audit covers
+facility type and ZIP, with a demographic disparate-impact audit deferred to
+Phase 2 — see decisions 0004 and 0005).
 
 Evaluation metrics: precision, recall, ROC-AUC, PR-AUC, and top-decile lift. The
 primary metrics are PR-AUC plus precision@k / recall@k.
@@ -50,7 +52,7 @@ primary metrics are PR-AUC plus precision@k / recall@k.
 - **B:** ~12 hand-picked keyword flags on the residual violation text.
 - **C:** TF-IDF → TruncatedSVD(50) (kept as a deliverable; came up flat).
 
-LLM / transformer NLP is a Phase-2 bet, scoped separately in the deep-learning
+LLM / transformer NLP is a Phase-2 bet, scoped separately in a deep-learning
 decision record.
 
 ## Anticipated challenges (check these in review)

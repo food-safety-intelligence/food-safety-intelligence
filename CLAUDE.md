@@ -20,8 +20,8 @@ with the workspace file, this file wins.
 > the both-metrics promotion gate. See
 > [`docs/project_plan.md`](docs/project_plan.md) for the project intent and
 > [0009](docs/decisions/0009-production-estimator-revisit-logreg-vs-xgb.md) for
-> the production-estimator state; the Phase-2 deep-learning bets are scoped in
-> their own decision record.
+> the production-estimator state; the Phase-2 deep-learning bets are scoped in a
+> separate deep-learning decision record.
 
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
