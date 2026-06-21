@@ -136,10 +136,12 @@ export default async function RestaurantDetailPage({
                 </Link>
               </div>
               <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[68ch]">
-                The same drivers, on the model&apos;s additive scale. The base,
-                each driver, and everything else sum to one number, which the
-                model squashes into the probability on the gauge — so the parts
-                reconcile exactly with the score.
+                The same drivers as the bars above, rescaled to the model&apos;s
+                calibrated scale so they add up — so the numbers here are smaller
+                than the bars (which show raw influence and don&apos;t sum). The
+                base, each driver, and everything else total one number, which a
+                sigmoid turns into the probability on the gauge — so this column
+                reconciles exactly with the score.
               </p>
               <Waterfall restaurant={restaurant} calibration={payload.calibration} />
             </div>
