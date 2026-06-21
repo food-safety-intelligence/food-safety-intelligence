@@ -19,6 +19,28 @@
     "roc_auc": 0.7996,
     "top_decile_lift": 3.85
   },
+  "risk_tiers": [
+    {
+      "label": "Low",
+      "min": 0.0,
+      "max": 0.04
+    },
+    {
+      "label": "Moderate",
+      "min": 0.04,
+      "max": 0.13
+    },
+    {
+      "label": "Elevated",
+      "min": 0.13,
+      "max": 0.3
+    },
+    {
+      "label": "High",
+      "min": 0.3,
+      "max": null
+    }
+  ],
   "operating_points": [
     {
       "frac": 0.05,

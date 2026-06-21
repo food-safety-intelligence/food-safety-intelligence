@@ -71,6 +71,10 @@ export interface Methodology {
   provenance?: Provenance;
   test: { n: number; prevalence: number; events: number; split_from: string };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
+  /** Score→tier bands (Low/Moderate/Elevated/High) for the badge legend.
+   *  Probability cutoffs; the top band's `max` is null (open-ended). Absent in
+   *  older JSON written before tiers were surfaced. */
+  risk_tiers?: { label: string; min: number; max: number | null }[];
   operating_points: OperatingPoint[];
   /** Absent in older JSON written before the SHAP section was added. */
   global_importance?: GlobalImportance[];

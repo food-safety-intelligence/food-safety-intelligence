@@ -2,7 +2,10 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { TierPill } from "@/components/TierPill";
+import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
+import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
 
 /**
@@ -53,6 +56,19 @@ function WaterfallRow({
   );
 }
 
+/**
+ * A part divider — an uppercase eyebrow over a hairline that groups the page
+ * into "read it / how it's built / how well it works / caveats". Matches the
+ * "Methodology" eyebrow in the header.
+ */
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <p className="text-sage text-[12px] tracking-[0.18em] uppercase pt-8 border-t border-line">
+      {children}
+    </p>
+  );
+}
+
 export const metadata = {
   title: "How this works · Food Safety",
   description:
@@ -64,6 +80,17 @@ export default async function HowItWorksPage() {
   const top5 = methodology.operating_points.find((p) => p.frac === 0.05);
   const top10 = methodology.operating_points.find((p) => p.frac === 0.1);
   const top20 = methodology.operating_points.find((p) => p.frac === 0.2);
+
+  // Score→tier bands for the badge legend (sourced from the served thresholds
+  // via methodology.json, so they can't drift from Python's score_to_tier).
+  const tiers = methodology.risk_tiers ?? [];
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
+  const tierRange = (t: { min: number; max: number | null }) =>
+    t.max === null
+      ? `${pct(t.min)} and up`
+      : t.min <= 0
+        ? `under ${pct(t.max)}`
+        : `${pct(t.min)}–${pct(t.max)}`;
 
   const importance = methodology.global_importance ?? [];
   const maxImpact = Math.max(...importance.map((d) => d.mean_abs_logodds), 0);
@@ -114,6 +141,80 @@ export default async function HowItWorksPage() {
         </header>
 
         <section className="mt-10 space-y-8">
+          <SectionLabel>Reading the score</SectionLabel>
+          <article>
+            <h2 className="text-[1.5rem] font-medium tracking-tight">
+              How to read a score
+            </h2>
+            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+              Every establishment gets one number — a calibrated probability,
+              shown as a percentage, that it fails an inspection or draws a
+              priority violation in the next 180 days. The map and list summarise
+              that number two ways: a risk band and a 90-day trend.
+            </p>
+
+            <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
+              Risk bands
+            </h3>
+            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+              The percentage is bucketed into four bands — the coloured badges on
+              the map, list, and detail pages. These are the model&apos;s{" "}
+              <span className="font-medium text-ink/80">output</span> bands;
+              don&apos;t confuse them with Chicago&apos;s own Risk 1/2/3
+              classification, which is an{" "}
+              <span className="font-medium text-ink/80">input</span> feature
+              (see &ldquo;The features&rdquo;).
+            </p>
+            {tiers.length > 0 ? (
+              <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
+                {tiers.map((t) => (
+                  <div
+                    key={t.label}
+                    className="flex items-center justify-between gap-4 px-4 py-3 border-b border-line last:border-b-0"
+                  >
+                    <TierPill tier={t.label as RiskTier} />
+                    <span className="num text-[14px] text-ink/85 tabular-nums">
+                      {tierRange(t)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-[13.5px] text-muted mt-3">
+                Run the metrics pipeline to populate the tier bands.
+              </p>
+            )}
+            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+              Bands are fixed cutoffs on the predicted probability, set once
+              (decision record 0008) — they don&apos;t shift per establishment.
+            </p>
+
+            <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
+              The 90-day trend
+            </h3>
+            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+              Next to each score, an arrow shows where risk has been heading over
+              the last 90 days:
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-[14px] text-ink/85">
+              <span className="inline-flex items-center gap-2">
+                <TrendIndicator slope={-0.01} /> — risk falling
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <TrendIndicator slope={0.01} /> — risk rising
+              </span>
+              <span className="inline-flex items-center gap-2">
+                <TrendIndicator slope={0} /> — little change
+              </span>
+            </div>
+            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+              We don&apos;t store a full score history, so the trendline is
+              reconstructed from a single slope — a quick read of direction and
+              size, not a day-by-day reproduction.
+            </p>
+          </article>
+
+          <SectionLabel>How it&apos;s built</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               The label
@@ -158,7 +259,9 @@ export default async function HowItWorksPage() {
               </li>
               <li>
                 <span className="font-medium">Static facility</span> —
-                Chicago&apos;s risk tier, license age/history, and the scheduled
+                Chicago&apos;s own Risk 1/2/3 classification (a model{" "}
+                <span className="font-medium text-ink/80">input</span>, not the
+                output risk bands above), license age/history, and the scheduled
                 visit trigger. ZIP and facility type were dropped as
                 geographic/business-type proxies (see limitations)
               </li>
@@ -212,6 +315,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
+          <SectionLabel>How well it works</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               What it catches
@@ -418,6 +522,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
+          <SectionLabel>Caveats</SectionLabel>
           <article>
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               Known limitations
