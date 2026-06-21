@@ -9,6 +9,60 @@ the full schema.
 
 ---
 
+## Data cleaning & the train/val/test split
+
+The cleaning and split are implemented across the loader, `labels.py`,
+`build.py`, and `utils/time.py`; this is the single place that describes them.
+
+### Split — chronological, never shuffled
+`src/foodsafety/utils/time.py::temporal_split` (cutoffs are recorded in each
+model's `metadata.json`):
+- **train**: `inspection_date < 2024-07-01`
+- **val** (calibration / early stopping): `2024-07-01 ≤ date < 2025-07-01`
+- **test** (time-held-out): `date ≥ 2025-07-01`
+
+Boundaries are right-exclusive. **Never** `train_test_split(shuffle=True)` — a
+shuffle would leak the future into the past. Cross-validation uses
+`expanding_year_folds` (full-year expanding windows + a 180-day embargo); see
+decision 0002.
+
+### Cleaning (where each step lives)
+- **Dedup** — at fetch (`io/soda.py`, on `inspection_id`); the raw snapshot has
+  0 duplicate ids.
+- **`license_id`** — `license_` → `license_id`, `fillna("")`→str; placeholder
+  tokens `""` / `"0"` get a NULL label and are dropped in `build.py`.
+- **Results filter** — only `{Pass, Pass w/ Conditions, Fail}` are modelable; the
+  4 operational non-outcomes (Out of Business, No Entry, Not Ready, Business Not
+  Located) are dropped during feature build.
+- **Burn-in** — inspections before 2019-01-01 are kept to seed `prior_*` history
+  but get a NULL label and are excluded from train/test.
+- **Right-truncation** — anchors whose 180-day forward window runs past the
+  snapshot's max date are flagged (`right_truncated`) and dropped from honest
+  train/test (their labels are under-counted).
+- **Dates** — coerced to datetime (`errors="coerce"` where the source is dirty).
+- **ZIP** — strip trailing `.0`, require exactly 5 digits else `""` (short codes
+  are not zero-padded — `00606` isn't a real ZIP). `static_zip` is dropped from
+  the model but still cleaned for the fairness audit.
+- **Geo** — lat/lon coerced to numeric; 311 rows without geo are dropped before
+  the spatial join. lat/lon are **not** model features (they drive only the map
+  and the 311 join); the current snapshot is entirely within the Chicago bbox.
+
+### Nulls
+`prior_*` / recency / `license_*` NaNs are **structural** ("no prior history
+yet" — e.g. `days_since_last_fail` is NaN for ~29% that never failed,
+`license_age_days` ~20% not in the license-history table), not dirty data:
+XGBoost reads NaN natively; the LogReg pipeline median-imputes numerics. The
+**label has 0 nulls** in the modeling set (burn-in/invalid already dropped). Raw
+`violations` is ~28% null — those are clean Pass inspections with nothing cited.
+
+### Known cleanup TODO
+`facility_type` has ~250 distinct raw values (a casing/typo/variant tail). It is
+**not** a model feature (`static_facility_type` was dropped for fairness), but
+normalizing it to canonical buckets would sharpen the group-performance fairness
+audit and the UI display.
+
+---
+
 ## 1. `data/processed/inspections_labeled.parquet`
 
 **Grain**: one row per inspection.
