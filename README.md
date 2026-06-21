@@ -3,7 +3,7 @@
 Predicting forward-window food-safety risk for Chicago restaurants from public
 inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
 
-**Team**: Jun Xu (PM), Arun Agarwal, Bella Davis, Deepak Srivastava, Aurelia Yang
+**Team**: Jun Xu (PM), Arun Agarwal, Bella Davies, Deepak Srivastava, Aurelia Yang
 
 > **Latest status**: see [`docs/weekly/`](docs/weekly/) — newest dated file is
 > the current snapshot of what's built, what's open, and how to verify locally.
