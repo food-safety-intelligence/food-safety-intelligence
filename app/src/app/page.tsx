@@ -13,15 +13,16 @@ import { SiteHeader } from "@/components/SiteHeader";
 // the RSC payload is. Bump to 1000+ once we add `?q=` server-side search.
 const HOME_LIMIT = 200;
 
-// Illustrative only — a static preview of what "the top drivers" look like, so
-// the caregivers promise ("we show the top three drivers") is concrete on the
-// home page. Not tied to any real establishment; each place's actual, signed
-// drivers live on its detail page. Uses real feature keys so the icons match.
+// A static, generic example of the kind of drivers the model surfaces, so the
+// caregivers promise ("we show the top three drivers") is concrete on the home
+// page. These are REAL model features (keyword flags the model actually uses),
+// shown as an example rather than pulled from one establishment — each place's
+// actual, signed drivers live on its detail page.
 //
 // Chosen to be the hazards that matter most for an immunocompromised diner —
 // the classic foodborne-pathogen routes (temperature abuse, cross-contamination,
 // handwashing) rather than generic operational signals.
-const ILLUSTRATIVE_DRIVERS: PinDriver[] = [
+const EXAMPLE_DRIVERS: PinDriver[] = [
   { feature: "flag_kw_temperature", label: "Temperature abuse (bacterial growth)", up: true },
   { feature: "flag_kw_cross_contamination", label: "Cross-contamination risk", up: true },
   { feature: "flag_kw_handwash_sink", label: "Handwashing lapses", up: true },
@@ -126,15 +127,15 @@ export default async function HomePage() {
               </p>
             </div>
             <div className="col-span-12 md:col-span-5 flex flex-col gap-4 md:items-end">
-              {/* Illustrative driver preview — makes the "top three drivers"
-                  promise above concrete. Reuses the same driver row as the map
-                  list/popup for visual consistency. */}
+              {/* Example driver preview — makes the "top three drivers" promise
+                  above concrete with real model factors. Reuses the same driver
+                  row as the map list/popup for visual consistency. */}
               <div className="w-full md:max-w-[320px] rounded-2xl border border-line bg-card/80 p-4">
                 <div className="text-[11px] tracking-widest uppercase text-muted mb-2.5">
-                  Illustrative drivers
+                  Example drivers
                 </div>
                 <div className="space-y-2">
-                  {ILLUSTRATIVE_DRIVERS.map((d) => (
+                  {EXAMPLE_DRIVERS.map((d) => (
                     <PinDriverLine key={d.feature} driver={d} />
                   ))}
                 </div>
