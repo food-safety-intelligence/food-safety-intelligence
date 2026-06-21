@@ -41,7 +41,7 @@ export default async function RestaurantDetailPage({
     <>
       <SiteHeader activeNav="search" />
 
-      <div className="max-w-[1240px] mx-auto px-8 mt-5">
+      <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
@@ -131,13 +131,13 @@ export default async function RestaurantDetailPage({
                   How the score adds up
                 </h3>
                 <Link
-                  href="/how-it-works"
+                  href="/how-it-works#calibrated-log-odds"
                   className="text-[13px] text-teal hover:underline"
                 >
                   What is calibrated log-odds?
                 </Link>
               </div>
-              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[68ch]">
+              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[60ch]">
                 The same drivers as the bars above, rescaled to the model&apos;s
                 calibrated scale so they add up — so the numbers here are smaller
                 than the bars (which show raw influence and don&apos;t sum). The

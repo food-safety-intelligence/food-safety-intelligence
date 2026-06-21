@@ -313,6 +313,7 @@ Workstreams + owners:
 | Modeling (baseline + XGBoost) | **Bella + Deepak** | Jun |
 | Eval + SHAP + `scores.parquet` | **Bella** | Deepak |
 | Web app (Next.js) | **Aurelia + Jun** | Arun |
+| Agentic AI / AWS (Bedrock, SageMaker) | **Deepak** | — |
 | PM / scope guard | **Jun** | Arun (tiebreaker) |
 
 Process:

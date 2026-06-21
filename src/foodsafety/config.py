@@ -27,7 +27,7 @@ PROCESSED_DIR: Path = DATA_DIR / "processed"
 MODELS_DIR: Path = DATA_DIR / "models"
 PREDICTIONS_DIR: Path = DATA_DIR / "predictions"
 
-# Chicago SODA (Socrata) API base. All four datasets are served from here.
+# Chicago SODA (Socrata) API base. All datasets are served from here.
 SODA_BASE: str = "https://data.cityofchicago.org/resource"
 
 # Dataset IDs map to the Socrata "4x4" identifiers in each dataset's URL.
@@ -36,6 +36,11 @@ DATASETS: dict[str, str] = {
     "complaints_311": "v6vf-nfxy",  # Chicago 311 Service Requests
     "licenses_current": "uupf-x98q",  # Business Licenses — current active
     "licenses_historical": "vgg9-bn8p",  # Business Licenses — historical
+    # Physical-plant condition, joined to food establishments by block-face
+    # (lat/lon proximity). Genuinely orthogonal to inspection history — see
+    # docs/experiments.md / the building-features run.
+    "building_permits": "ydr8-5enu",  # Building Permits (2006-present)
+    "building_violations": "22u3-xenr",  # Building Violations (2006-present)
 }
 
 # 311 SR types we treat as food-safety-relevant. Derived empirically by querying
