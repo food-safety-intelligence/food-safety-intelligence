@@ -81,6 +81,9 @@ parquet but are no longer consumed by the model):
 | `prior_priority_violations` | `int` | Number of priority (code 1–29) violations strictly before `as_of_date`. |
 | `prior_core_violations` | `int` | Number of core (code 30+) violations strictly before `as_of_date`. |
 | `prior_fail_or_priority_events` | `int` | Combined count of failed inspections OR inspections with any priority violation, strictly before `as_of_date`. |
+| `prior_pass_w_conditions` | `int` | Count of prior "Pass w/ Conditions" results (near-miss signal), strictly before `as_of_date`. |
+| `prior_reinspections` | `int` | Count of prior Re-Inspection visits, strictly before `as_of_date`. |
+| `prior_complaint_inspections` | `int` | Count of prior Complaint-triggered visits, strictly before `as_of_date`. |
 | `days_since_last_inspection` | `float` | Days from most recent prior inspection to `as_of_date`. NaN if none. |
 | `days_since_last_fail` | `float` | Days from most recent prior `Fail` to `as_of_date`. NaN if none. |
 | `last_was_fail` | `float` | 1/0 — was the immediately previous inspection a `Fail`. NaN if first. |
@@ -131,10 +134,12 @@ generalise across the chronological train/test split. `temporal_dow` and
 **Required keyword-flag features (Phase 4, hybrid NLP layer B)**:
 
 `flag_kw_*` boolean columns from regex matching the residual `violations` text,
-after stripping the numbered codes. The exact keyword list lives in
-`src/foodsafety/features/keyword_flags.py`. Expected ~20 flags, e.g.:
-`flag_kw_temperature`, `flag_kw_rodent`, `flag_kw_raw_chicken`,
-`flag_kw_no_soap`, `flag_kw_expired`, `flag_kw_cross_contamination`.
+after stripping the numbered codes. Source of truth for the list is
+`src/foodsafety/features/keyword_flags.py`. There are **12** flags:
+`flag_kw_temperature`, `flag_kw_cooling`, `flag_kw_raw_food`,
+`flag_kw_cross_contamination`, `flag_kw_expired`, `flag_kw_rodent`,
+`flag_kw_pest`, `flag_kw_no_soap`, `flag_kw_no_paper_towels`,
+`flag_kw_handwash_sink`, `flag_kw_sewage`, `flag_kw_certified_manager`.
 
 **311 spatial complaint features**: dropped from the production contract.
 The Phase-5 ablation showed `n_311_*` features sat at the bottom of XGBoost
@@ -149,6 +154,25 @@ build by default.
 
 `tfidf_svd_*` — 50 columns of TruncatedSVD-reduced TF-IDF features on residual
 violation text. Only added if Phase 6 has slack.
+
+### Feature contract changelog
+
+This tracks **contract version bumps** only. The full experiment history — including
+the experiments that came up flat and were reverted — is in
+[`docs/experiments.md`](experiments.md). Impact below is on the **served** basis
+(baseline LogReg + sigmoid, review-time-filtered) unless noted; exact run metrics live
+in `reports/metrics/`.
+
+| Version | PR | Added | Removed | Impact | Decision |
+|---|---|---|---|---|---|
+| 26 | #7 | baseline contract | — | reference | — |
+| 30 | #8 | `prior_pass_w_conditions`, `prior_reinspections`, `prior_complaint_inspections`, `static_inspection_type` (visit-trigger + near-miss priors) | — | incremental over 26 (served settled at PR-AUC ≈0.3147; exact 26→30 delta blurred by a concurrent data refresh) | — |
+| 33 | #10 | `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d` (recency/trend) | `static_zip`, `static_facility_type` (fairness proxies) | served PR-AUC 0.3147→0.3246, precision@10% 0.352→0.364; XGB 0.2681→0.2882; + fairness win | 0004 |
+
+Tried and kept **out** (came up flat — risk is largely already captured by
+`prior_*` inspection history): operator / license-status priors, per-code 1–29
+prior counts, comment-severity text, the 311 geotemporal counts above, and the
+Layer-C TF-IDF→SVD(50) violation-text embedding.
 
 ---
 

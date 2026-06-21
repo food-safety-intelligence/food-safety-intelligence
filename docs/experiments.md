@@ -1,0 +1,36 @@
+# Experiments Log
+
+- **Owner**: Bella · **Last updated**: 2026-06-21
+- One row per modeling experiment: the change + hypothesis, the measured result, and the
+  verdict (kept / reverted). **Negative results are logged too** — knowing what *didn't*
+  move the needle is the point.
+- Conventions: commit code before a tracked run (provenance), machine metrics land in
+  `reports/metrics/<run>.json`, decisions in `docs/decisions/`, and feature-contract
+  version bumps in [`interface_contracts.md`](interface_contracts.md#feature-contract-changelog).
+- **Metric basis matters.** "served" = baseline LogReg + sigmoid, review-time-filtered
+  test (n≈7,008); "honest test" = unfiltered test (n≈13,812). The two bases are not
+  directly comparable; each row says which it used.
+
+## Log
+
+| Date | Experiment (change + hypothesis) | Result | Verdict | Refs |
+|---|---|---|---|---|
+| 2026-06-14 | **XGBoost validation double-dip fix** — early-stop on an embargoed train tail (val reserved for calibration only); add expanding-window CV. *Does fixing the leak change the honest estimate?* | honest test PR-AUC 0.254→**0.268**, log_loss 0.282→0.261; CV PR-AUC 0.326±0.029 | **Kept** (methodology). Baseline still the production estimator on the both-metrics gate (XGB misses precision@10%) | DR 0002 |
+| 2026-06-14 | **Operator + license-status priors** — `operator_prior_fail_rate` (cross-license, by `account_number`), license renewals-to-date, days-to-expiration. *Does cross-license operator history add signal?* | served PR-AUC 0.3147→0.3151 (**flat**); P@10 / R@10 unchanged | **Reverted**. (Also found `license_status` is uniformly "AAI" → the planned REV/AAC counts are impossible) | — |
+| 2026-06-14 | **Visit-trigger + near-miss priors** — add `prior_pass_w_conditions`, `prior_reinspections`, `prior_complaint_inspections`, `static_inspection_type` (26→30) | incremental over 26 (served settled ≈0.3147) | **Kept** | contract v30 |
+| 2026-06-15 | **Per-code 1–29 prior violation-count features** — one prior-count column per priority code. *Does code-level detail beat the rollups?* | flat | **Reverted** (branch deleted) | — |
+| 2026-06-15 | **Comment-severity text features** — severity signal mined from violation comments | flat / slightly negative (collinear with `prior_*`) | **Reverted** | — |
+| 2026-06-15 | **Recency / trend features** — `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d`. *Does recent history beat lifetime totals on a non-stationary process?* | served PR-AUC +≈0.005 | **Kept** — the only own-history lever that moved | contract v33 |
+| 2026-06-15 | **Layer-C TF-IDF → TruncatedSVD(50)** on residual violation text (leak-free prior-mean) | flat, both models | **Kept local** (`mle/layer-c-tfidf-svd`, not merged) as the "we did NLP" deliverable | — |
+| 2026-06-15 | **311 geotemporal complaint counts** — `n_311_*` within 300 m × 90/180 d prior window (BallTree). *Does neighbourhood complaint density add signal?* | served PR-AUC 0.3147→0.3152 (**flat**); bottom-of-gain in XGBoost | **Excluded** from the model; code retained in `complaint_features.py`. Redundant with the rodent/pest/sewage keyword flags | — |
+| 2026-06-15 | **Fairness audit + proxy removal** — drop `static_zip` and `static_facility_type`, ship alongside recency/trend (30→33). *Can we cut geographic/business-type proxies without losing accuracy?* | served PR-AUC 0.3147→**0.3246**, P@10 0.352→**0.364**; XGB 0.2681→**0.2882**. Both metrics up, both models, **+ fairness win**. (Within this: dropping `static_facility_type` ≈free 0.3147→0.3139; dropping `static_zip` *improved* 0.3147→0.3188 — its sparse dummies overfit the chronological split) | **Kept** | DR 0004, contract v33 |
+| 2026-06-21 | **Sharper label prototype** — Fail-only (and priority-only) vs current fail-or-priority, 180 d, same pipeline + chronological split, full 33 features. *Is a crisper target more learnable?* | **Yes.** Top-decile lift over base rate: fail-only **4.1×** vs current 3.4× vs priority-only 3.2×; PR-AUC/prevalence 4.12 vs 3.01. Raw PR-AUC is lower (0.236 vs 0.324) only because prevalence is lower (5.7% vs 10.8%); priority-only is the noisy half diluting the current label. | **Promising** — add CV + label-owner (Aurelia/Arun) sign-off before any contract change | this PR |
+
+## Reading the pattern
+
+Five-plus feature/text/spatial angles came up **flat** because the risk is largely already
+captured by `prior_*` inspection history, and much inspection-outcome variance is
+irreducible (inspector + timing noise). The two changes that actually moved metrics were a
+**methodology fix** (XGB validation) and a **fairness-driven simplification** (proxy
+removal) — not added features. That's why the next bets are the **label** (this log's last
+row) and the **operating point / product**, not more features.
