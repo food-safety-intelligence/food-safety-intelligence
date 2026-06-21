@@ -137,7 +137,7 @@ export default async function RestaurantDetailPage({
                   What is calibrated log-odds?
                 </Link>
               </div>
-              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[68ch]">
+              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[60ch]">
                 The same drivers as the bars above, rescaled to the model&apos;s
                 calibrated scale so they add up — so the numbers here are smaller
                 than the bars (which show raw influence and don&apos;t sum). The

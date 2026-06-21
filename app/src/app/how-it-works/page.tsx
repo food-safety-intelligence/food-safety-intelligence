@@ -221,9 +221,9 @@ export default async function HowItWorksPage() {
               <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
                 <div className="flex items-center justify-between gap-4 px-4 py-2 border-b border-line text-[11px] uppercase tracking-[0.08em] text-sage">
                   <span>Tier</span>
-                  <span className="flex items-center gap-6">
-                    <span className="w-28 text-right">Score</span>
-                    {tierShare("Low") && <span className="w-16 text-right">Share</span>}
+                  <span className="flex items-center gap-4">
+                    <span className="w-24 text-right">Score</span>
+                    {tierShare("Low") && <span className="w-14 text-right">Share</span>}
                   </span>
                 </div>
                 {tiers.map((t) => (
@@ -232,12 +232,12 @@ export default async function HowItWorksPage() {
                     className="flex items-center justify-between gap-4 px-4 py-3 border-b border-line last:border-b-0"
                   >
                     <TierPill tier={t.label as RiskTier} />
-                    <span className="flex items-center gap-6 num tabular-nums">
-                      <span className="w-28 text-right text-[14px] text-ink/85">
+                    <span className="flex items-center gap-4 num tabular-nums">
+                      <span className="w-24 text-right text-[14px] text-ink/85">
                         {tierRange(t)}
                       </span>
                       {tierShare(t.label) && (
-                        <span className="w-16 text-right text-[13px] text-muted">
+                        <span className="w-14 text-right text-[13px] text-muted">
                           {tierShare(t.label)}
                         </span>
                       )}
