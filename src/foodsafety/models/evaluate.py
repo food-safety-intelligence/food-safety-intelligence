@@ -238,3 +238,78 @@ def evaluate(y_true: ArrayLike, y_score: ArrayLike) -> EvalReport:
         brier_score=float(brier_score_loss(y_t, y_s)),
         log_loss=float(log_loss(y_t, np.clip(y_s, 1e-15, 1 - 1e-15))),
     )
+
+
+def group_performance_audit(
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    groups: ArrayLike,
+    *,
+    min_n: int = 50,
+    floor_frac: float = 0.5,
+    k_frac: float = 0.10,
+) -> pd.DataFrame:
+    """Per-group fairness audit: does the model rank comparably across groups?
+
+    For every value in ``groups`` with at least ``min_n`` rows AND >= 1 positive,
+    compute PR-AUC, precision@k, and recall@k. A group is flagged ``below_floor``
+    when its PR-AUC falls under ``floor_frac`` x the overall PR-AUC — CLAUDE.md's
+    in-scope rule ("no group < 50% of overall PR-AUC"). This is the reusable form
+    of the notebook-06 audit so every new experiment can run the same check.
+
+    Returns one row per audited group, sorted by ``n`` descending, with columns:
+    ``group, n, positive_rate, pr_auc, precision_at_k, recall_at_k, below_floor``.
+    The overall PR-AUC and the floor are attached as ``df.attrs["overall_pr_auc"]``
+    / ``df.attrs["pr_auc_floor"]``.
+
+    CAVEAT (read before concluding "unfair"): PR-AUC is mechanically low at low
+    prevalence (its floor is roughly the base rate), so ``below_floor`` for a
+    rare-event group is usually a base-rate artifact, not bias. Read it alongside
+    ``recall_at_k`` (coverage), and treat sub-~50-positive groups as noise — see
+    decision 0005.
+    """
+    y = _as_array(y_true)
+    s = _as_array(y_score)
+    g = np.asarray(groups)
+    if not (len(y) == len(s) == len(g)):
+        raise ValueError("y_true, y_score, and groups must be the same length")
+
+    overall = float(average_precision_score(y, s)) if y.sum() else float("nan")
+    floor = floor_frac * overall
+
+    df = pd.DataFrame({"y": y, "s": s, "group": g})
+    rows = []
+    for name, grp in df.groupby("group", observed=True):
+        if len(grp) < min_n or grp["y"].sum() == 0:
+            continue
+        pr = float(average_precision_score(grp["y"], grp["s"]))
+        rows.append(
+            {
+                "group": name,
+                "n": int(len(grp)),
+                "positive_rate": round(float(grp["y"].mean()), 4),
+                "pr_auc": round(pr, 4),
+                "precision_at_k": round(precision_at_k(grp["y"], grp["s"], k_frac), 4),
+                "recall_at_k": round(recall_at_k(grp["y"], grp["s"], k_frac), 4),
+                "below_floor": bool(pr < floor),
+            }
+        )
+
+    out = pd.DataFrame(
+        rows,
+        columns=[
+            "group",
+            "n",
+            "positive_rate",
+            "pr_auc",
+            "precision_at_k",
+            "recall_at_k",
+            "below_floor",
+        ],
+    )
+    if not out.empty:
+        out = out.sort_values("n", ascending=False, ignore_index=True)
+    out.attrs["overall_pr_auc"] = round(overall, 4)
+    out.attrs["pr_auc_floor"] = round(floor, 4)
+    out.attrs["floor_frac"] = floor_frac
+    return out

@@ -9,6 +9,23 @@ the full schema.
 
 ---
 
+## Scope — what establishments are covered
+
+The source is Chicago's **Food Inspections** dataset, which covers **all licensed
+establishments that handle or serve food — not just restaurants.** In the modelable
+data ~**69% are restaurants**; the other ~31% are grocery stores, school / daycare
+kitchens, hospital / nursing-home kitchens, bakeries, caterers, taverns, mobile
+vendors, etc. The pipeline does **not** filter to restaurants — the model trains on
+and scores all of them, and the fairness audit groups by `facility_type` precisely
+because vulnerable-population facilities (daycare, school, hospital, long-term care)
+are in scope.
+
+> **Copy caveat:** product / UI wording that says "restaurants" is imprecise — it
+> should read "food establishments" / "places that serve food." Tracked as a
+> Phase-2 copy fix (app workstream).
+
+---
+
 ## Data cleaning & the train/val/test split
 
 The cleaning and split are implemented across the loader, `labels.py`,
@@ -58,11 +75,13 @@ XGBoost reads NaN natively; the LogReg pipeline median-imputes numerics. The
 **label has 0 nulls** in the modeling set (burn-in/invalid already dropped). Raw
 `violations` is ~28% null — those are clean Pass inspections with nothing cited.
 
-### Known cleanup TODO
-`facility_type` has ~250 distinct raw values (a casing/typo/variant tail). It is
-**not** a model feature (`static_facility_type` was dropped for fairness), but
-normalizing it to canonical buckets would sharpen the group-performance fairness
-audit and the UI display.
+### facility_type normalization (done)
+`facility_type` has ~500 distinct raw values (a casing/typo/variant tail). It is
+**not** a model feature (`static_facility_type` was dropped for fairness), but it
+is normalized to canonical buckets for the group-performance fairness audit via
+`license_features.normalize_facility_type` (collapses the daycare family; keeps
+senior/adult daycare out of child daycare and culinary out of child schools). See
+the audit in `notebooks/06` and `fairness_audit.md`.
 
 ---
 
