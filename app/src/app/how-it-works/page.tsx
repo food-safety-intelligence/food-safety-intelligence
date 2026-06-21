@@ -312,22 +312,24 @@ export default async function HowItWorksPage() {
               per-establishment.
             </p>
             {importance.length > 0 ? (
-              <ul className="mt-4 space-y-2">
+              <ul className="mt-4 space-y-3">
                 {importance.map((d) => (
-                  <li key={d.feature} className="grid grid-cols-[180px_1fr_auto] items-center gap-3">
-                    <span className="text-[13px] text-ink/85 truncate" title={d.label}>
-                      {d.label}
-                    </span>
-                    <span className="h-2.5 rounded-full bg-tint overflow-hidden">
+                  <li key={d.feature}>
+                    {/* Label above its bar so the full feature name always shows
+                        — these run long and a fixed column would truncate them. */}
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13.5px] text-ink/85">{d.label}</span>
+                      <span className="num text-[12px] text-muted tabular-nums shrink-0">
+                        {d.mean_abs_logodds.toFixed(2)}
+                      </span>
+                    </div>
+                    <span className="mt-1 block h-2.5 rounded-full bg-tint overflow-hidden">
                       <span
                         className="block h-full rounded-full bg-teal/70"
                         style={{
                           width: `${maxImpact > 0 ? (d.mean_abs_logodds / maxImpact) * 100 : 0}%`,
                         }}
                       />
-                    </span>
-                    <span className="num text-[12px] text-muted tabular-nums w-12 text-right">
-                      {d.mean_abs_logodds.toFixed(2)}
                     </span>
                   </li>
                 ))}
