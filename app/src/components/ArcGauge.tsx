@@ -17,11 +17,16 @@ export function ArcGauge({
   tier: RiskTier;
   size?: number;
 }) {
-  // Geometry — 270° arc centred on bottom-left-to-bottom-right, opening down.
+  // Geometry — 270° arc opening at the bottom: the two endpoints sit at
+  // lower-left (225°) and lower-right (-45°), mirror images across the vertical
+  // centre line, leaving a symmetric 90° gap centred at the bottom.
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 22;
-  const startAngle = 135; // degrees from 3 o'clock, going CCW
+  // 225° = lower-left endpoint (measured from 3 o'clock, CCW). Sweeping 270°
+  // clockwise from here runs up over the top and down to the lower-right, so
+  // the score fills left-to-right and the gap lands at the bottom.
+  const startAngle = 225;
   const sweep = 270;
 
   const trackPath = arcPath(cx, cy, r, startAngle, sweep);
@@ -91,7 +96,6 @@ export function ArcGauge({
         fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         fontSize={11}
         fontWeight={600}
-        letterSpacing={1.6}
         fill="#6B7280"
       >
         / 100
@@ -120,10 +124,14 @@ function arcPath(
   const y1 = cy - r * Math.sin(startRad);
   const x2 = cx + r * Math.cos(endRad);
   const y2 = cy - r * Math.sin(endRad);
-  // The points above use flipped y (screen y-down vs math angles), which
-  // inverts handedness — so the sweep-flag must MATCH the large-arc-flag. A
-  // major (>180°) arc drawn with sweep-flag 0 renders the wrong 270° and the
-  // gauge track shows as a broken minor segment.
+  // Two independent flags:
+  //  - large-arc-flag depends on the sweep SIZE (minor <180°, major >180°).
+  //  - sweep-flag is the rotational DIRECTION and is constant: we always draw
+  //    from startAngle toward decreasing angle, which under flipped y (screen
+  //    y-down) is the clockwise sense, i.e. sweep-flag = 1.
+  // Tying the sweep-flag to large-arc (the old bug) only worked for the full
+  // 270° track; partial value arcs ≤180° then reversed and bulged through the
+  // centre.
   const largeArc = sweepDeg > 180 ? 1 : 0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} ${largeArc} ${x2} ${y2}`;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
 }

@@ -93,12 +93,9 @@ export interface ScoresPayload {
 // Pure helpers — safe to call from server or client.
 // ---------------------------------------------------------------------------
 
-export function tierFromScore(score: number): RiskTier {
-  if (score < 0.2) return "Low";
-  if (score < 0.4) return "Moderate";
-  if (score < 0.65) return "Elevated";
-  return "High";
-}
+// Tiers are assigned in Python (score_to_tier / RISK_TIER_THRESHOLDS) and shipped
+// in scores.json's risk_tier field — the app reads that directly and never buckets
+// scores itself. See decision record 0008 (risk-tier thresholds).
 
 /**
  * Map a tier to its colour-token name. Useful for inline styles and lookup
