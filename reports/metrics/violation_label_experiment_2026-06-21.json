@@ -1,0 +1,196 @@
+{
+  "experiment": "violation_label_layer_c_structured",
+  "date": "2026-06-21",
+  "config": {
+    "model_id": "amazon.nova-lite-v1:0",
+    "label_cols": [
+      "llm_hazard",
+      "llm_severity",
+      "llm_imminent_health_hazard",
+      "llm_corrected_on_site"
+    ],
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test": 13812,
+    "test_text_coverage": 0.7972
+  },
+  "v36_published_baseline": {
+    "logreg": [
+      0.332,
+      0.37
+    ],
+    "xgb": [
+      0.338,
+      0.376
+    ]
+  },
+  "results": {
+    "logreg": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344211,
+        "roc_auc": 0.826518,
+        "precision_at_5pct": 0.434153,
+        "precision_at_10pct": 0.36903,
+        "precision_at_20pct": 0.284111,
+        "recall_at_5pct": 0.245298,
+        "recall_at_10pct": 0.417007,
+        "recall_at_20pct": 0.641864,
+        "top_decile_lift": 4.16766,
+        "brier_score": 0.154269,
+        "log_loss": 0.490802
+      },
+      "treatment": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344189,
+        "roc_auc": 0.826086,
+        "precision_at_5pct": 0.438495,
+        "precision_at_10pct": 0.36686,
+        "precision_at_20pct": 0.28375,
+        "recall_at_5pct": 0.247751,
+        "recall_at_10pct": 0.414554,
+        "recall_at_20pct": 0.641047,
+        "top_decile_lift": 4.143144,
+        "brier_score": 0.154026,
+        "log_loss": 0.48944
+      },
+      "delta_pr_auc": -2.2e-05,
+      "delta_precision_at_10pct": -0.00217,
+      "clears_gate_vs_control": false,
+      "clears_gate_vs_v36_published": false
+    },
+    "xgb": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.352609,
+        "roc_auc": 0.828969,
+        "precision_at_5pct": 0.458755,
+        "precision_at_10pct": 0.372648,
+        "precision_at_20pct": 0.283026,
+        "recall_at_5pct": 0.259199,
+        "recall_at_10pct": 0.421096,
+        "recall_at_20pct": 0.639411,
+        "top_decile_lift": 4.208519,
+        "brier_score": 0.138878,
+        "log_loss": 0.435668
+      },
+      "treatment": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.354506,
+        "roc_auc": 0.83356,
+        "precision_at_5pct": 0.460203,
+        "precision_at_10pct": 0.386397,
+        "precision_at_20pct": 0.287007,
+        "recall_at_5pct": 0.260016,
+        "recall_at_10pct": 0.436631,
+        "recall_at_20pct": 0.648406,
+        "top_decile_lift": 4.363785,
+        "brier_score": 0.142442,
+        "log_loss": 0.446048
+      },
+      "delta_pr_auc": 0.001897,
+      "delta_precision_at_10pct": 0.013749,
+      "clears_gate_vs_control": true,
+      "clears_gate_vs_v36_published": true
+    }
+  },
+  "fairness_vulnerable_groups": {
+    "Children's Services Facility": {
+      "n": 543,
+      "recall_ctrl": 0.4348,
+      "recall_treat": 0.3913
+    },
+    "Daycare": {
+      "n": 344,
+      "recall_ctrl": 0.6,
+      "recall_treat": 0.6
+    },
+    "Long Term Care": {
+      "n": 101,
+      "recall_ctrl": 0.3333,
+      "recall_treat": 0.5
+    },
+    "School": {
+      "n": 1013,
+      "recall_ctrl": 0.6456,
+      "recall_treat": 0.6203
+    }
+  },
+  "label_fairness_hazard_skew": {
+    "overall_mix": {
+      "sanitation_cleaning": 0.3438,
+      "handwashing_hygiene": 0.1648,
+      "documentation_certification": 0.1169,
+      "contamination": 0.0996,
+      "pest_vermin": 0.0984,
+      "facility_maintenance": 0.085,
+      "temperature": 0.0802,
+      "other": 0.0112
+    },
+    "by_group": {
+      "Children's Services Facility": {
+        "n": 360,
+        "mix": {
+          "sanitation_cleaning": 0.3056,
+          "facility_maintenance": 0.1778,
+          "handwashing_hygiene": 0.15,
+          "pest_vermin": 0.1389,
+          "temperature": 0.0972,
+          "documentation_certification": 0.0889,
+          "contamination": 0.0306,
+          "other": 0.0111
+        },
+        "largest_gap_hazard": "facility_maintenance",
+        "largest_gap_pp": 9.3
+      },
+      "Daycare": {
+        "n": 238,
+        "mix": {
+          "sanitation_cleaning": 0.2563,
+          "facility_maintenance": 0.2059,
+          "pest_vermin": 0.1933,
+          "handwashing_hygiene": 0.1218,
+          "documentation_certification": 0.0966,
+          "temperature": 0.0756,
+          "contamination": 0.0462,
+          "other": 0.0042
+        },
+        "largest_gap_hazard": "facility_maintenance",
+        "largest_gap_pp": 12.1
+      },
+      "Long Term Care": {
+        "n": 78,
+        "mix": {
+          "sanitation_cleaning": 0.3462,
+          "pest_vermin": 0.1667,
+          "handwashing_hygiene": 0.1538,
+          "contamination": 0.1282,
+          "facility_maintenance": 0.0769,
+          "documentation_certification": 0.0769,
+          "temperature": 0.0513
+        },
+        "largest_gap_hazard": "pest_vermin",
+        "largest_gap_pp": 6.8
+      },
+      "School": {
+        "n": 754,
+        "mix": {
+          "handwashing_hygiene": 0.2984,
+          "sanitation_cleaning": 0.2732,
+          "facility_maintenance": 0.1538,
+          "pest_vermin": 0.134,
+          "temperature": 0.0531,
+          "contamination": 0.0491,
+          "documentation_certification": 0.0371,
+          "other": 0.0013
+        },
+        "largest_gap_hazard": "handwashing_hygiene",
+        "largest_gap_pp": 13.4
+      }
+    }
+  }
+}
