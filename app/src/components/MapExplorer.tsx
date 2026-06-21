@@ -191,10 +191,6 @@ export function MapExplorer({
                     <TierPill tier={tier} withCount={tierCounts[tier]} size="sm" />
                   </button>
                 ))}
-                <span className="grow" />
-                <span className="text-[11px] text-muted mr-2">
-                  {pins.length.toLocaleString()} on map
-                </span>
               </div>
             </div>
           </div>
@@ -265,7 +261,7 @@ export function MapExplorer({
                 ) : sort === "name" ? (
                   <>
                     Showing {listRows.length.toLocaleString()} of{" "}
-                    {total.toLocaleString()} — type to find any establishment
+                    {total.toLocaleString()}
                   </>
                 ) : sort === "low" ? (
                   <>
