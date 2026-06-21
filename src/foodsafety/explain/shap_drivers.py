@@ -36,20 +36,32 @@ from sklearn.pipeline import Pipeline
 # Plain-English labels for the UI driver bars.
 # ---------------------------------------------------------------------------
 #
-# Each entry is a format template. ``{value}`` is filled in with the row's
-# value for that feature. Numeric features show the value; boolean features
+# Most entries are a format template: ``{value}`` is filled in with the row's
+# value for that feature. Numeric features show the value; boolean keyword flags
 # only render when True (the False case is suppressed at the caller); category
 # features show the actual category that triggered.
+#
+# A few binary OUTCOME features (e.g. ``was_fail``) read oppositely for the
+# pass vs fail case and surface in BOTH directions — a fail pushes risk up, a
+# pass pulls it down. A single template can't say both, so those map to a
+# ``{True: ..., False: ...}`` dict chosen by the row's value at render time.
 #
 # These strings are what end up on the restaurant detail page next to the
 # horizontal driver bars. They were tuned for the Clinical Quiet mockup's
 # tone — neutral, not alarmist.
-FEATURE_LABELS: dict[str, str] = {
+FEATURE_LABELS: dict[str, str | dict[bool, str]] = {
     "prior_inspections": "{value} prior inspections on record",
     "prior_fails": "{value} failed inspections previously",
     "prior_priority_violations": "{value} priority violations in prior history",
     "prior_core_violations": "{value} core violations in prior history",
     "prior_fail_or_priority_events": "{value} prior fail-or-priority events",
+    "prior_pass_w_conditions": "{value:.0f} prior 'Pass with conditions' results",
+    "prior_reinspections": "{value:.0f} prior re-inspections",
+    "prior_complaint_inspections": "{value:.0f} prior complaint-driven inspections",
+    "prior_fails_365d": "{value:.0f} failed inspections in the last year",
+    "prior_priority_violations_365d": "{value:.0f} priority violations in the last year",
+    "prev_priority_violations": "{value:.0f} priority violations at the previous inspection",
+    "priority_violation_trend": "Recent trend in priority violations",
     "days_since_last_inspection": "Last inspected {value:.0f} days ago",
     "days_since_last_fail": "Last fail was {value:.0f} days ago",
     "license_age_days": "License is {value:.0f} days old",
@@ -58,7 +70,15 @@ FEATURE_LABELS: dict[str, str] = {
     "temporal_quarter": "Anchored in Q{value}",
     "static_facility_type": "Facility type: {value}",
     "static_risk_tier": "Chicago risk tier: {value}",
+    "static_inspection_type": "Inspection type: {value}",
     "static_zip": "ZIP {value}",
+    # Current-inspection own outcome + code counts (observed at as_of_date; the
+    # 180-day label window is strictly after). These are the model's strongest
+    # drivers, so they must read clearly for both the fail and the pass case.
+    "n_priority_this_inspection": "{value:.0f} priority violations at this inspection",
+    "n_core_this_inspection": "{value:.0f} core violations at this inspection",
+    "was_fail": {True: "Failed the current inspection", False: "Passed the current inspection"},
+    "last_was_fail": {True: "Previous inspection was a fail", False: "Previous inspection passed"},
     # Boolean flag labels (only rendered when value is True)
     "flag_kw_temperature": "Temperature-related violation in recent history",
     "flag_kw_cooling": "Improper cooling cited",
@@ -208,7 +228,7 @@ def top_drivers_for_row(
     row_contributions: pd.Series,
     *,
     k: int = 4,
-    labels: Mapping[str, str] | None = None,
+    labels: Mapping[str, str | Mapping[bool, str]] | None = None,
 ) -> list[Driver]:
     """Pick the top-K drivers for one restaurant.
 
@@ -245,10 +265,15 @@ def top_drivers_for_row(
             continue  # don't show purely-zero contributors
         raw_value = row_values.get(feat)
         label_template = labels.get(feat, feat)
-        try:
-            label = label_template.format(value=raw_value)
-        except (TypeError, ValueError):
-            label = label_template
+        if isinstance(label_template, Mapping):
+            # Sign-aware label for a binary outcome feature: the same feature
+            # reads oppositely for the fail vs pass case (and surfaces in both).
+            label = label_template.get(bool(raw_value), feat)
+        else:
+            try:
+                label = label_template.format(value=raw_value)
+            except (TypeError, ValueError):
+                label = label_template
         drivers.append(
             Driver(
                 feature=feat,
