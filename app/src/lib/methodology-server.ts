@@ -24,9 +24,20 @@ export interface OperatingPoint {
   events_caught: number;
 }
 
+/** Ties the rendered numbers to the exact code + dataset that produced them. */
+export interface Provenance {
+  run_id: string;
+  git_commit: string | null;
+  git_dirty: boolean | null;
+  feature_set_version: string;
+  features_sha256: string;
+}
+
 export interface Methodology {
   generated_at: string;
   model_version: string;
+  /** Absent in older JSON written before provenance was added. */
+  provenance?: Provenance;
   test: { n: number; prevalence: number; events: number; split_from: string };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   operating_points: OperatingPoint[];

@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from foodsafety.utils.geo import flag_and_null_out_of_bbox, out_of_chicago_bbox
+from foodsafety.utils.geo import out_of_chicago_bbox, warn_and_null_out_of_bbox
 
 
 def test_chicago_point_is_in_bbox():
@@ -23,7 +23,7 @@ def test_missing_coords_not_flagged():
     assert not out_of_chicago_bbox([np.nan], [np.nan])[0]
 
 
-def test_flag_and_null_keeps_rows_and_nulls_bad_coords():
+def test_warn_and_null_keeps_rows_and_nulls_bad_coords():
     df = pd.DataFrame(
         {
             "license_id": ["a", "b", "c"],
@@ -31,7 +31,7 @@ def test_flag_and_null_keeps_rows_and_nulls_bad_coords():
             "longitude": [-87.63, 0.0, np.nan],
         }
     )
-    out = flag_and_null_out_of_bbox(df)
+    out = warn_and_null_out_of_bbox(df)
     assert len(out) == 3  # no rows dropped
     assert out.loc[0, "latitude"] == 41.88  # in-bbox preserved
     assert pd.isna(out.loc[1, "latitude"]) and pd.isna(out.loc[1, "longitude"])  # nulled
@@ -42,4 +42,4 @@ def test_flag_and_null_keeps_rows_and_nulls_bad_coords():
 
 def test_missing_columns_is_noop():
     df = pd.DataFrame({"a": [1]})
-    assert flag_and_null_out_of_bbox(df).equals(df)
+    assert warn_and_null_out_of_bbox(df).equals(df)
