@@ -355,6 +355,12 @@ export default async function HowItWorksPage() {
                 Run the metrics pipeline to populate the feature-impact chart.
               </p>
             )}
+            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+              Each number is the <span className="font-medium">mean |log-odds|</span>{" "}
+              — the feature&apos;s average influence on the model&apos;s internal
+              score, counted in either direction. It&apos;s a relative scale
+              (bigger = more sway), not a probability or a percentage.
+            </p>
 
             {/* Worked example: how one establishment's calibrated log-odds add
                 up to its published probability. Additive in calibrated space, so
@@ -364,9 +370,12 @@ export default async function HowItWorksPage() {
             </h3>
             <p className="text-[14px] text-muted leading-relaxed mt-1.5">
               For one (anonymised) establishment, here is how the score is built.
-              Everything is in calibrated log-odds, so the base, the drivers, and
-              everything else add up to a single number that the model squashes
-              into the probability you see on the gauge.
+              The rows are in{" "}
+              <span className="font-medium text-ink/80">calibrated log-odds</span>{" "}
+              — the model&apos;s internal additive scale (a running sum, not a
+              percentage), adjusted so the total lands on the real-world
+              probability. So the base, the drivers, and everything else add up to
+              one number, which a sigmoid then turns into the % on the gauge.
             </p>
             {waterfall ? (
               <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-[14px]">
