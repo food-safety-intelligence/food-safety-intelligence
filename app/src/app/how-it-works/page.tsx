@@ -76,7 +76,7 @@ function SectionLabel({ children, id }: { children: string; id?: string }) {
 export const metadata = {
   title: "How this works · Food Safety",
   description:
-    "Methodology: data, label, features, model, calibration, and known limitations.",
+    "How the risk score works: what it predicts, what the model looks at, how it's tested, why a score is what it is, and its limits.",
 };
 
 export default async function HowItWorksPage() {
