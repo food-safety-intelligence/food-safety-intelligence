@@ -19,7 +19,7 @@ import pandas as pd
 from foodsafety.features.build import build_features
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
-from foodsafety.features.license_features import add_license_features
+from foodsafety.features.license_features import add_license_features, normalize_facility_type
 
 
 def _minimal_row(**overrides) -> dict:
@@ -519,3 +519,41 @@ def test_address_exact_recency_excludes_anchor_day():
     out = add_address_exact_recency_features(inspections, complaints)
     assert pd.isna(out.loc[0, "days_since_last_311_addr_complaint"])
     assert out.loc[0, "trend_311_addr_complaint"] == 0
+
+
+def test_normalize_facility_type_collapses_vulnerable_families():
+    # Daycare family (many spellings) collapses to one bucket.
+    for raw in [
+        "Daycare Above and Under 2 Years",
+        "Daycare (2 - 6 Years)",
+        "DAYCARE",
+        "Day Care 1023",
+    ]:
+        assert normalize_facility_type(raw) == "Daycare"
+    # Adult / senior "daycare" is long-term care, NOT child Daycare (order matters).
+    for raw in ["ADULT DAYCARE", "SENIOR DAY CARE", "NURSING HOME", "Assisted Living Senior Care"]:
+        assert normalize_facility_type(raw) == "Long Term Care"
+    # Children's-services typos / "1023" prefixes collapse.
+    for raw in [
+        "Children's Services Facility",
+        "1023 CHILDERN'S SERVICES FACILITY",
+        "CHILDRENS SERVICES FACILITY",
+    ]:
+        assert normalize_facility_type(raw) == "Children's Services Facility"
+    # Child schools collapse; adult culinary schools do NOT become child "School".
+    assert normalize_facility_type("CHARTER SCHOOL") == "School"
+    assert normalize_facility_type("PRIVATE SCHOOL") == "School"
+    assert normalize_facility_type("COOKING SCHOOL") == "Culinary School"
+    assert normalize_facility_type("Culinary Arts School") == "Culinary School"
+    # An animal-shelter cafe is not a (human) Shelter.
+    assert normalize_facility_type("Animal Shelter Cafe Permit") != "Shelter"
+    assert normalize_facility_type("Shelter") == "Shelter"
+    # Casing-only duplicates merge via title-case for the long tail.
+    assert normalize_facility_type("TAVERN") == "Tavern"
+    assert normalize_facility_type("GAS STATION") == "Gas Station"
+    # Missing / blank → None. pd.NA is how missing arrives when the audit maps over
+    # a StringDtype column, so it must be caught too (not title-cased to "<Na>").
+    assert normalize_facility_type(None) is None
+    assert normalize_facility_type("   ") is None
+    assert normalize_facility_type(float("nan")) is None
+    assert normalize_facility_type(pd.NA) is None

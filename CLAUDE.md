@@ -11,6 +11,13 @@ with the workspace file, this file wins.
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
 
+> **Scope note:** the Food Inspections data covers **all licensed food
+> establishments, not just restaurants** (~69% restaurants; the rest are grocery
+> stores, school/daycare/hospital kitchens, bakeries, caterers, etc.). The pipeline
+> does not filter to restaurants — it scores all of them. "Restaurants" is used
+> loosely here; user-facing copy should say "food establishments" (Phase-2 copy
+> fix). Full detail in `docs/interface_contracts.md` § Scope.
+
 1. A measured, calibrated model (logistic regression baseline + XGBoost) with
    SHAP explainability.
 2. A demoable **Next.js web app** that runs on Jun's laptop.
