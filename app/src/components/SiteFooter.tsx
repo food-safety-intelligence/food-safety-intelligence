@@ -27,7 +27,7 @@ export function SiteFooter() {
             Team
           </div>
           <p>
-            Jun Xu · Arun Agarwal · Bella Davis · Deepak Srivastava · Aurelia
+            Jun Xu · Arun Agarwal · Bella Davies · Deepak Srivastava · Aurelia
             Yang
           </p>
         </div>

@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-06-21T02:29:50+00:00",
+  "model_version": "baseline_logreg_sigmoid",
+  "test": {
+    "n": 7008,
+    "prevalence": 0.1079,
+    "events": 756,
+    "split_from": "2025-07-01"
+  },
+  "headline": {
+    "pr_auc": 0.3246,
+    "roc_auc": 0.7699,
+    "top_decile_lift": 3.37
+  },
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "n_flagged": 351,
+      "precision": 0.4501,
+      "recall": 0.209,
+      "lift": 4.1727,
+      "events_caught": 158
+    },
+    {
+      "frac": 0.1,
+      "n_flagged": 701,
+      "precision": 0.3638,
+      "recall": 0.3373,
+      "lift": 3.3721,
+      "events_caught": 255
+    },
+    {
+      "frac": 0.2,
+      "n_flagged": 1402,
+      "precision": 0.2889,
+      "recall": 0.5357,
+      "lift": 2.6778,
+      "events_caught": 405
+    },
+    {
+      "frac": 0.3,
+      "n_flagged": 2103,
+      "precision": 0.2392,
+      "recall": 0.6653,
+      "lift": 2.2172,
+      "events_caught": 503
+    },
+    {
+      "frac": 0.5,
+      "n_flagged": 3504,
+      "precision": 0.1798,
+      "recall": 0.8333,
+      "lift": 1.6667,
+      "events_caught": 630
+    }
+  ]
+}

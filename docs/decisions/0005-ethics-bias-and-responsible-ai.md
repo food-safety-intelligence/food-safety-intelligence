@@ -48,6 +48,27 @@ isn't a post-hoc checkbox here; it shapes what we build.
    and full `static_zip` is run in nb06 (06_eval_and_shap) on the served eval
    basis. We report per-group calibration / over-prediction, not just averages.
 
+5. **Prior-inspection history (`prior_*`) — predictive, not deterministic.** This
+   family is the model's strongest signal and its sharpest ethical question ("past
+   fails don't mean future fails"). Our stance:
+   - It produces a *calibrated probability*, never a verdict. Recurrence is real, so
+     prior history is legitimately predictive; the objection conflates prediction
+     with determinism, and calibration is what keeps the output honest.
+   - The genuine risk is a **detection feedback loop**, not "past≠future":
+     `prior_fails` correlates ~0.79 with inspection *frequency* but only ~0.05 with
+     true risk (see residual risks below), so the counts partly encode *scrutiny*,
+     not safety. We keep auditing this and will test rate-normalized variants (Phase 2).
+   - The **recency / trend features** added in the 33-feature set (`last_was_fail`,
+     `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d`)
+     directly answer the "past≠future" worry: they let the model see *recovery* — an
+     old failure followed by clean inspections lowers the score, so one bad day does
+     not permanently condemn a restaurant. Dropping prior history would make the
+     model blunter and *less* fair, not more.
+   - Unlike `static_zip`, `prior_*` reflects the establishment's **own conduct**, not
+     a demographic group — the least proxy-like signal we have.
+   - It is used for **prioritisation, not sentencing** (principle 1): a high score
+     routes a human inspector; it is not a judgment about the restaurant.
+
 ## Known residual risks (carry into the model card + Phase 2)
 
 - **Geographic miscalibration only partly removed.** Dropping `static_zip`

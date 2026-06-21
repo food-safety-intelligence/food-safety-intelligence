@@ -60,7 +60,7 @@ Three layers, in this order — A and B are required, C is a stretch:
 
 1. **Structured violation codes (A)** — count of each code 1–29 plus
    `n_priority` and `n_core` rollups. Already extractable from EDA.
-2. **Keyword flags (B)** — ~20 hand-picked regex flags on the residual
+2. **Keyword flags (B)** — 12 hand-picked regex flags on the residual
    text (e.g. `temperature`, `vermin`/`rodent`, `raw chicken`,
    `cross-contamination`, `expired`, `no soap`, `no paper towels`). Each
    flag becomes one SHAP-friendly column.

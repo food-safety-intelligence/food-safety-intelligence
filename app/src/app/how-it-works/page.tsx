@@ -2,6 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { loadMethodology } from "@/lib/methodology-server";
 
 export const metadata = {
   title: "How this works · Food Safety",
@@ -9,7 +10,12 @@ export const metadata = {
     "Methodology: data, label, features, model, calibration, and known limitations.",
 };
 
-export default function HowItWorksPage() {
+export default async function HowItWorksPage() {
+  const methodology = await loadMethodology();
+  const top5 = methodology.operating_points.find((p) => p.frac === 0.05);
+  const top10 = methodology.operating_points.find((p) => p.frac === 0.1);
+  const top20 = methodology.operating_points.find((p) => p.frac === 0.2);
+
   return (
     <>
       <SiteHeader activeNav="how" />
@@ -63,21 +69,28 @@ export default function HowItWorksPage() {
               The features
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
-              Twenty-six features, all built leak-free from the public record:
+              Thirty-three features, all built leak-free from the public record:
             </p>
             <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>
                 <span className="font-medium">Prior history</span> — counts of
-                inspections, failures, priority violations, and core violations
-                in the trailing 2 years
+                inspections, failures, priority and core violations across the
+                restaurant&apos;s full prior record, plus near-miss and
+                visit-trigger history (Pass w/ Conditions, re-inspections,
+                complaint visits)
               </li>
               <li>
-                <span className="font-medium">Recency</span> — days since the
-                last inspection, days since the last failure
+                <span className="font-medium">Recency &amp; trend</span> — days
+                since the last inspection/failure, the previous inspection&apos;s
+                outcome, and 365-day rolling failure and violation counts — so
+                the model can see a restaurant improving, not just its lifetime
+                totals
               </li>
               <li>
-                <span className="font-medium">Static facility</span> — facility
-                type, risk tier, ZIP code, license age
+                <span className="font-medium">Static facility</span> —
+                Chicago&apos;s risk tier, license age/history, and the scheduled
+                visit trigger. ZIP and facility type were dropped as
+                geographic/business-type proxies (see limitations)
               </li>
               <li>
                 <span className="font-medium">Violation keywords</span> —
@@ -102,12 +115,122 @@ export default function HowItWorksPage() {
               <code className="num text-[13.5px] bg-tint px-1.5 py-0.5 rounded">
                 class_weight=&quot;balanced&quot;
               </code>{" "}
-              to handle the ~10% positive rate, fit on training data through
-              2024-07. Calibrated on a held-out validation set
-              (2024-07 → 2025-07) with Platt scaling. Final metrics on the
-              2025-07-onward test split: PR-AUC 0.27, ROC-AUC 0.77, top-decile
-              lift 3.4×.
+              to handle the ~11% positive rate, calibrated with Platt (sigmoid)
+              scaling. On the time-held-out test split: PR-AUC{" "}
+              {methodology.headline.pr_auc.toFixed(2)}, ROC-AUC{" "}
+              {methodology.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
+              {methodology.headline.top_decile_lift.toFixed(1)}×.
             </p>
+          </article>
+
+          <article>
+            <h2 className="text-[1.5rem] font-medium tracking-tight">
+              The split is by time, never random
+            </h2>
+            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+              Train, validation, and test are carved by date, not shuffled. We{" "}
+              <span className="font-medium">train</span> on inspections before
+              2024-07, <span className="font-medium">calibrate</span> on
+              2024-07 → 2025-07, and <span className="font-medium">test</span>{" "}
+              on 2025-07 onward — and every feature at a given inspection is
+              computed only from data strictly before it. A random shuffle would
+              let the model peek at a restaurant&apos;s future to predict its
+              past, inflating the score into a number that would never hold up
+              in production. The chronological split mirrors how the model is
+              actually used: trained on history, scored on what comes next.
+            </p>
+          </article>
+
+          <article>
+            <h2 className="text-[1.5rem] font-medium tracking-tight">
+              What it catches
+            </h2>
+            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+              Inspectors are capacity-limited, so the score is really a ranked
+              work-list. The honest read isn&apos;t a single number — it&apos;s
+              how much of the real risk you catch at the slice you can actually
+              staff:
+            </p>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-[14px] border-collapse">
+                <thead>
+                  <tr className="text-left text-sage text-[12px] tracking-[0.08em] uppercase border-b border-ink/15">
+                    <th className="py-2 pr-4 font-medium">Inspect top</th>
+                    <th className="py-2 pr-4 font-medium">Restaurants</th>
+                    <th className="py-2 pr-4 font-medium">Precision</th>
+                    <th className="py-2 pr-4 font-medium">Events caught</th>
+                    <th className="py-2 font-medium">Lift</th>
+                  </tr>
+                </thead>
+                <tbody className="num text-ink/85">
+                  {methodology.operating_points.map((p) => (
+                    <tr key={p.frac} className="border-b border-ink/10">
+                      <td className="py-2 pr-4">{Math.round(p.frac * 100)}%</td>
+                      <td className="py-2 pr-4">
+                        {p.n_flagged.toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {Math.round(p.precision * 100)}%
+                      </td>
+                      <td className="py-2 pr-4">
+                        {Math.round(p.recall * 100)}%
+                      </td>
+                      <td className="py-2">{p.lift.toFixed(1)}×</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[13.5px] text-muted leading-relaxed mt-3">
+              Working the top 20% by risk surfaces{" "}
+              {top20 ? Math.round(top20.recall * 100) : 54}% of the next-180-day
+              events — {top20 ? top20.lift.toFixed(1) : "2.7"}× better than
+              inspecting a random 20%. Baseline model, time-held-out test from{" "}
+              {methodology.test.split_from || "2025-07-01"} onward (n ≈{" "}
+              {methodology.test.n
+                ? methodology.test.n.toLocaleString()
+                : "7,000"}{" "}
+              inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
+              with an event). &ldquo;Lift&rdquo; is precision divided by that
+              base rate.
+            </p>
+
+            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-[14px] leading-relaxed text-ink/85">
+              <p className="font-medium mb-1.5">
+                Reading the two tightest slices
+              </p>
+              <ul className="space-y-1.5 list-disc pl-5">
+                <li>
+                  <span className="font-medium">Top 5%</span>
+                  {top5
+                    ? ` (~${top5.n_flagged.toLocaleString()} restaurants): about ${Math.round(
+                        top5.precision * 100,
+                      )}% of those visits find a real problem — ${top5.lift.toFixed(
+                        1,
+                      )}× better than picking at random — and that sliver alone covers ${Math.round(
+                        top5.recall * 100,
+                      )}% of every problem city-wide.`
+                    : " — run the metrics pipeline to populate."}
+                </li>
+                <li>
+                  <span className="font-medium">Top 10%</span>
+                  {top10
+                    ? ` (~${top10.n_flagged.toLocaleString()} restaurants): roughly ${Math.round(
+                        top10.precision * 100,
+                      )}% of visits find a problem (${top10.lift.toFixed(
+                        1,
+                      )}× random), catching about ${Math.round(
+                        top10.recall * 100,
+                      )}% of all problems.`
+                    : ""}
+                </li>
+              </ul>
+              <p className="mt-2 text-[13px] text-muted">
+                The tighter the slice, the higher the hit-rate but the fewer
+                problems you cover — that&apos;s the precision/recall trade an
+                inspection team tunes to its capacity.
+              </p>
+            </div>
           </article>
 
           <article>

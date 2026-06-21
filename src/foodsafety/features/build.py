@@ -31,6 +31,7 @@ from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.features.license_features import add_license_features
 from foodsafety.features.license_history_features import add_license_history_features
 from foodsafety.features.temporal_features import add_temporal_features
+from foodsafety.utils.geo import flag_and_null_out_of_bbox
 
 
 MODELABLE_RESULTS = frozenset({"Pass", "Pass w/ Conditions", "Fail"})
@@ -115,5 +116,12 @@ def build_features(
         # the most affected since it's the most recent slice; on the current
         # snapshot about half of the test rows are right-truncated).
         df = df[~df["right_truncated"]]
+
+    # Geo sanity: flag + null (don't drop) any coords outside the Chicago bbox.
+    # A bad geocode is a broken display field, not a reason to drop a valid
+    # inspection — nulling routes it into the same missing-geo path the map and
+    # 311 join already handle (skip the pin / count 0), instead of misplacing a
+    # pin or computing a wrong spatial count. lat/lon aren't model features.
+    df = flag_and_null_out_of_bbox(df)
 
     return df.reset_index(drop=True)

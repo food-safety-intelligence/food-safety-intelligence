@@ -9,6 +9,63 @@ the full schema.
 
 ---
 
+## Data cleaning & the train/val/test split
+
+The cleaning and split are implemented across the loader, `labels.py`,
+`build.py`, and `utils/time.py`; this is the single place that describes them.
+
+### Split — chronological, never shuffled
+`src/foodsafety/utils/time.py::temporal_split` (cutoffs are recorded in each
+model's `metadata.json`):
+- **train**: `inspection_date < 2024-07-01`
+- **val** (calibration / early stopping): `2024-07-01 ≤ date < 2025-07-01`
+- **test** (time-held-out): `date ≥ 2025-07-01`
+
+Boundaries are right-exclusive. **Never** `train_test_split(shuffle=True)` — a
+shuffle would leak the future into the past. Cross-validation uses
+`expanding_year_folds` (full-year expanding windows + a 180-day embargo); see
+decision 0002.
+
+### Cleaning (where each step lives)
+- **Dedup** — at fetch (`io/soda.py`, on `inspection_id`); the raw snapshot has
+  0 duplicate ids.
+- **`license_id`** — `license_` → `license_id`, `fillna("")`→str; placeholder
+  tokens `""` / `"0"` get a NULL label and are dropped in `build.py`.
+- **Results filter** — only `{Pass, Pass w/ Conditions, Fail}` are modelable; the
+  4 operational non-outcomes (Out of Business, No Entry, Not Ready, Business Not
+  Located) are dropped during feature build.
+- **Burn-in** — inspections before 2019-01-01 are kept to seed `prior_*` history
+  but get a NULL label and are excluded from train/test.
+- **Right-truncation** — anchors whose 180-day forward window runs past the
+  snapshot's max date are flagged (`right_truncated`) and dropped from honest
+  train/test (their labels are under-counted).
+- **Dates** — coerced to datetime (`errors="coerce"` where the source is dirty).
+- **ZIP** — strip trailing `.0`, require exactly 5 digits else `""` (short codes
+  are not zero-padded — `00606` isn't a real ZIP). `static_zip` is dropped from
+  the model but still cleaned for the fairness audit.
+- **Geo** — lat/lon coerced to numeric; 311 rows without geo are dropped before
+  the spatial join. Inspection coords outside the Chicago bbox are flagged and
+  **nulled** (the row is kept, not dropped — it's routed into the existing
+  missing-geo path: the map skips the pin, the 311 join counts 0). lat/lon are
+  **not** model features (they drive only the map and the 311 join); the current
+  snapshot is 100% in-bbox, so this is defensive for future ingestion.
+
+### Nulls
+`prior_*` / recency / `license_*` NaNs are **structural** ("no prior history
+yet" — e.g. `days_since_last_fail` is NaN for ~29% that never failed,
+`license_age_days` ~20% not in the license-history table), not dirty data:
+XGBoost reads NaN natively; the LogReg pipeline median-imputes numerics. The
+**label has 0 nulls** in the modeling set (burn-in/invalid already dropped). Raw
+`violations` is ~28% null — those are clean Pass inspections with nothing cited.
+
+### Known cleanup TODO
+`facility_type` has ~250 distinct raw values (a casing/typo/variant tail). It is
+**not** a model feature (`static_facility_type` was dropped for fairness), but
+normalizing it to canonical buckets would sharpen the group-performance fairness
+audit and the UI display.
+
+---
+
 ## 1. `data/processed/inspections_labeled.parquet`
 
 **Grain**: one row per inspection.
@@ -81,6 +138,9 @@ parquet but are no longer consumed by the model):
 | `prior_priority_violations` | `int` | Number of priority (code 1–29) violations strictly before `as_of_date`. |
 | `prior_core_violations` | `int` | Number of core (code 30+) violations strictly before `as_of_date`. |
 | `prior_fail_or_priority_events` | `int` | Combined count of failed inspections OR inspections with any priority violation, strictly before `as_of_date`. |
+| `prior_pass_w_conditions` | `int` | Count of prior "Pass w/ Conditions" results (near-miss signal), strictly before `as_of_date`. |
+| `prior_reinspections` | `int` | Count of prior Re-Inspection visits, strictly before `as_of_date`. |
+| `prior_complaint_inspections` | `int` | Count of prior Complaint-triggered visits, strictly before `as_of_date`. |
 | `days_since_last_inspection` | `float` | Days from most recent prior inspection to `as_of_date`. NaN if none. |
 | `days_since_last_fail` | `float` | Days from most recent prior `Fail` to `as_of_date`. NaN if none. |
 | `last_was_fail` | `float` | 1/0 — was the immediately previous inspection a `Fail`. NaN if first. |
@@ -131,10 +191,12 @@ generalise across the chronological train/test split. `temporal_dow` and
 **Required keyword-flag features (Phase 4, hybrid NLP layer B)**:
 
 `flag_kw_*` boolean columns from regex matching the residual `violations` text,
-after stripping the numbered codes. The exact keyword list lives in
-`src/foodsafety/features/keyword_flags.py`. Expected ~20 flags, e.g.:
-`flag_kw_temperature`, `flag_kw_rodent`, `flag_kw_raw_chicken`,
-`flag_kw_no_soap`, `flag_kw_expired`, `flag_kw_cross_contamination`.
+after stripping the numbered codes. Source of truth for the list is
+`src/foodsafety/features/keyword_flags.py`. There are **12** flags:
+`flag_kw_temperature`, `flag_kw_cooling`, `flag_kw_raw_food`,
+`flag_kw_cross_contamination`, `flag_kw_expired`, `flag_kw_rodent`,
+`flag_kw_pest`, `flag_kw_no_soap`, `flag_kw_no_paper_towels`,
+`flag_kw_handwash_sink`, `flag_kw_sewage`, `flag_kw_certified_manager`.
 
 **311 spatial complaint features**: dropped from the production contract.
 The Phase-5 ablation showed `n_311_*` features sat at the bottom of XGBoost
@@ -149,6 +211,25 @@ build by default.
 
 `tfidf_svd_*` — 50 columns of TruncatedSVD-reduced TF-IDF features on residual
 violation text. Only added if Phase 6 has slack.
+
+### Feature contract changelog
+
+This tracks **contract version bumps** only. The full experiment history — including
+the experiments that came up flat and were reverted — is in
+[`docs/experiments.md`](experiments.md). Impact below is on the **served** basis
+(baseline LogReg + sigmoid, review-time-filtered) unless noted; exact run metrics live
+in `reports/metrics/`.
+
+| Version | PR | Added | Removed | Impact | Decision |
+|---|---|---|---|---|---|
+| 26 | #7 | baseline contract | — | reference | — |
+| 30 | #8 | `prior_pass_w_conditions`, `prior_reinspections`, `prior_complaint_inspections`, `static_inspection_type` (visit-trigger + near-miss priors) | — | incremental over 26 (served settled at PR-AUC ≈0.3147; exact 26→30 delta blurred by a concurrent data refresh) | — |
+| 33 | #10 | `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d` (recency/trend) | `static_zip`, `static_facility_type` (fairness proxies) | served PR-AUC 0.3147→0.3246, precision@10% 0.352→0.364; XGB 0.2681→0.2882; + fairness win | 0004 |
+
+Tried and kept **out** (came up flat — risk is largely already captured by
+`prior_*` inspection history): operator / license-status priors, per-code 1–29
+prior counts, comment-severity text, the 311 geotemporal counts above, and the
+Layer-C TF-IDF→SVD(50) violation-text embedding.
 
 ---
 
