@@ -92,7 +92,9 @@ export function MapExplorer({
     sort?: HomeSort;
     tiers?: RiskTier[];
   }): string => {
-    const q = (next.q ?? query).trim();
+    // Default the query to the live input, not the committed URL prop, so a
+    // word typed but not yet debounced-to-URL survives a tier/sort click.
+    const q = (next.q ?? input).trim();
     const s = next.sort ?? sort;
     const t = next.tiers ?? activeTiers;
     const params = new URLSearchParams();
@@ -103,15 +105,25 @@ export function MapExplorer({
     return qs ? `${pathname}?${qs}` : pathname;
   };
 
+  const cancelPendingSearch = () => {
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+  };
+
   const onSearchChange = (value: string) => {
     setInput(value);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    cancelPendingSearch();
     debounceRef.current = setTimeout(() => {
       router.replace(hrefFor({ q: value }), { scroll: false });
     }, SEARCH_DEBOUNCE_MS);
   };
 
   const toggleTier = (tier: RiskTier) => {
+    // Navigate now with the live query (via hrefFor); drop any pending
+    // debounced search so it can't fire later and clobber this tier change.
+    cancelPendingSearch();
     const next = new Set(activeSet);
     if (next.has(tier)) next.delete(tier);
     else next.add(tier);
@@ -122,6 +134,7 @@ export function MapExplorer({
   };
 
   const setSort = (s: HomeSort) => {
+    cancelPendingSearch();
     router.replace(hrefFor({ sort: s }), { scroll: false });
   };
 

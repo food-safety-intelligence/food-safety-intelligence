@@ -293,6 +293,7 @@ export function matchesQuery(
   row: { dba_name: string; address: string },
   q: string,
 ): boolean {
-  if (!q) return true;
-  return `${row.dba_name} ${row.address}`.toLowerCase().includes(q);
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
 }
