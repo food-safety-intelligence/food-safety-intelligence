@@ -26,6 +26,28 @@
 | 2026-06-15 | **Fairness audit + proxy removal** — drop `static_zip` and `static_facility_type`, ship alongside recency/trend (30→33). *Can we cut geographic/business-type proxies without losing accuracy?* | served PR-AUC 0.3147→**0.3246**, P@10 0.352→**0.364**; XGB 0.2681→**0.2882**. Both metrics up, both models, **+ fairness win**. (Within this: dropping `static_facility_type` ≈free 0.3147→0.3139; dropping `static_zip` *improved* 0.3147→0.3188 — its sparse dummies overfit the chronological split) | **Kept** | DR 0004, contract v33 |
 | 2026-06-21 | **Sharper label prototype** — Fail-only (and priority-only) vs current fail-or-priority, 180 d, same pipeline + chronological split, full 33 features. *Is a crisper target more learnable?* | **Yes.** Top-decile lift over base rate: fail-only **4.1×** vs current 3.4× vs priority-only 3.2×; PR-AUC/prevalence 4.12 vs 3.01. Raw PR-AUC is lower (0.236 vs 0.324) only because prevalence is lower (5.7% vs 10.8%); priority-only is the noisy half diluting the current label. | **Promising** — add CV + label-owner (Aurelia/Arun) sign-off before any contract change | this PR |
 
+## Model comparison: LogReg vs XGBoost
+
+The **served LogReg baseline is the production estimator** (both-metrics gate,
+decision 0002). On the time-held-out test (n=7,008, 11% prevalence) it edges
+XGBoost at the operating points that matter:
+
+| top-k | LogReg precision / recall / lift | XGBoost precision / recall / lift |
+|---|---|---|
+| 5% | **0.451** / 0.21 / **4.18** | 0.437 / 0.20 / 4.05 |
+| 10% | **0.364** / **0.34** / **3.38** | 0.344 / 0.32 / 3.19 |
+| 20% | 0.289 / 0.54 / 2.68 | 0.288 / 0.53 / 2.67 |
+| 50% | 0.180 / 0.83 | 0.180 / 0.84 |
+
+PR-AUC: LogReg **0.325** vs XGB 0.312. (XGB's ROC-AUC is a hair higher — 0.772 vs
+0.770 — but ROC-AUC is the wrong metric under this imbalance.) They converge past
+the top 20%.
+
+**Convention going forward:** report each experiment's impact on **both** models
+where measured (LogReg served + XGB) — a feature can help one and not the other.
+Regenerate this table after any contract change with `operating_point_table` on
+both estimators.
+
 ## Reading the pattern
 
 Five-plus feature/text/spatial angles came up **flat** because the risk is largely already
