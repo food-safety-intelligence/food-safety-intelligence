@@ -6,14 +6,20 @@ import { Info } from "lucide-react";
 import { GLOSSARY, type GlossaryKey } from "@/lib/glossary";
 import { cn } from "@/lib/utils";
 
+// Popover ideal width; clamped to the viewport on open.
+const POPOVER_W = 288;
+
 /**
  * An in-context definition: a small info button that opens a popover with the
  * term's short definition and a link to the full entry on the how-it-works
  * page. Hand-rolled (no Radix in this project) but accessible — labelled
- * trigger, `aria-expanded`, Esc + outside-click to close.
+ * trigger, `aria-expanded`/`aria-haspopup`, Esc + outside-click to close.
  *
- * Use it next to a controlled term (a driver label, a tier). Definitions come
- * from the shared glossary so the popover and the how-it-works section agree.
+ * The popover is `position: fixed` with viewport-clamped coordinates computed
+ * from the trigger on open. Fixed positioning escapes the driver card's
+ * `overflow-hidden` (so it's never clipped), and clamping the left edge keeps
+ * it from overflowing the viewport on narrow screens. It closes on scroll
+ * (fixed coords would otherwise drift) and resize.
  */
 export function DefineTerm({
   termKey,
@@ -23,49 +29,81 @@ export function DefineTerm({
   className?: string;
 }) {
   const entry = GLOSSARY[termKey];
-  const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLSpanElement>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const popRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(
+    null,
+  );
+  const open = pos !== null;
+
+  const toggle = () => {
+    if (open) {
+      setPos(null);
+      return;
+    }
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    const width = Math.min(POPOVER_W, window.innerWidth - margin * 2);
+    // Clamp so the popover never runs off either edge of the viewport.
+    const left = Math.max(
+      margin,
+      Math.min(r.left, window.innerWidth - width - margin),
+    );
+    setPos({ top: r.bottom + 6, left, width });
+  };
 
   useEffect(() => {
     if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
+    const close = () => setPos(null);
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") setPos(null);
     };
-    document.addEventListener("mousedown", onDown);
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || popRef.current?.contains(t)) return;
+      setPos(null);
+    };
+    // capture scroll on any ancestor (the side panels scroll internally).
+    window.addEventListener("scroll", close, true);
+    window.addEventListener("resize", close);
     document.addEventListener("keydown", onKey);
+    document.addEventListener("mousedown", onDown);
     return () => {
-      document.removeEventListener("mousedown", onDown);
+      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("resize", close);
       document.removeEventListener("keydown", onKey);
+      document.removeEventListener("mousedown", onDown);
     };
   }, [open]);
 
   return (
-    <span ref={rootRef} className={cn("relative inline-flex align-middle", className)}>
+    <span className={cn("inline-flex align-middle", className)}>
       <button
+        ref={btnRef}
         type="button"
         onClick={(e) => {
           // Inside a Link/clickable row? Don't navigate when defining a term.
           e.preventDefault();
           e.stopPropagation();
-          setOpen((v) => !v);
+          toggle();
         }}
         aria-expanded={open}
+        aria-haspopup="dialog"
         aria-label={`What does "${entry.term}" mean?`}
         className="text-muted hover:text-ink transition-colors"
       >
         <Info className="w-3.5 h-3.5" strokeWidth={2} />
       </button>
 
-      {open && (
-        <span
+      {pos && (
+        <div
+          ref={popRef}
           role="dialog"
           aria-label={entry.term}
-          className="absolute left-0 top-full z-30 mt-1 w-72 rounded-xl border border-line bg-card p-3 text-left soft-shadow"
+          style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
+          className="z-50 rounded-xl border border-line bg-card p-3 text-left soft-shadow"
         >
           <span className="block font-semibold text-[13px] text-ink">
             {entry.term}
@@ -79,7 +117,7 @@ export function DefineTerm({
           >
             Full definition →
           </Link>
-        </span>
+        </div>
       )}
     </span>
   );

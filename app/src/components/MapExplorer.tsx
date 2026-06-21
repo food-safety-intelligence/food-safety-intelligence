@@ -74,6 +74,15 @@ export function MapExplorer({
     if (document.activeElement !== inputRef.current) setInput(query);
   }, [query]);
 
+  // Cancel a pending debounced search on unmount, so a half-typed query can't
+  // fire router.replace after the user has clicked through to a detail page
+  // (which would yank them back to the home search).
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
   const hasQuery = query.trim().length > 0;
   const tierActive = !isAllTiers(activeTiers);
   const activeSet = new Set(activeTiers);
@@ -261,7 +270,7 @@ export function MapExplorer({
                 ) : sort === "name" ? (
                   <>
                     Showing {listRows.length.toLocaleString()} of{" "}
-                    {total.toLocaleString()}
+                    {matchCount.toLocaleString()}
                   </>
                 ) : sort === "low" ? (
                   <>
