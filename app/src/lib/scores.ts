@@ -92,6 +92,18 @@ export interface InspectionEvent {
   headline: string;
 }
 
+/**
+ * Platt-calibration triple, shipped ONCE per payload (not per row). With it,
+ * the detail page reconstructs each establishment's calibrated-log-odds
+ * waterfall from data it already has (the row's `risk_score` + `top_drivers`
+ * shap values) — see {@link computeWaterfall}. Absent in older scores.json.
+ */
+export interface Calibration {
+  a: number;
+  b: number;
+  intercept: number;
+}
+
 export interface ScoresPayload {
   schema_version: string;
   generated_at: string;
@@ -105,6 +117,8 @@ export interface ScoresPayload {
     worsening_30d: number;
     improving_30d: number;
   };
+  /** Absent in older JSON written before the per-profile waterfall was added. */
+  calibration?: Calibration;
   scores: RestaurantScore[];
   inspection_history: Record<string, InspectionEvent[]>;
 }
@@ -162,6 +176,56 @@ export const TIER_HEX: Record<RiskTier, string> = {
  */
 export function toPinDriver(d: Driver): PinDriver {
   return { feature: d.feature, label: d.label, up: d.shap > 0 };
+}
+
+/** One step of a per-establishment waterfall, in calibrated log-odds. */
+export interface WaterfallStep {
+  feature: string;
+  label: string;
+  /** Calibrated log-odds contribution (signed). */
+  contribution: number;
+  up: boolean;
+}
+
+/**
+ * The score broken into calibrated log-odds: `base + Σ steps + (everything else)
+ * = total`, and `sigmoid(total) = probability`. The caller renders `steps`,
+ * then derives the "everything else" bucket as `total − base − Σ(shown steps)`
+ * so the displayed column reconciles exactly at whatever precision it shows.
+ */
+export interface WaterfallBreakdown {
+  base: number;
+  steps: WaterfallStep[];
+  total: number;
+  probability: number;
+}
+
+/**
+ * Reconstruct an establishment's calibrated-log-odds waterfall from the shipped
+ * {@link Calibration} triple and the row's own `risk_score` + `top_drivers`.
+ *
+ * Platt calibration is linear in the raw logit L: `calibrated_logit = −(a·L + b)`
+ * and `L = intercept + Σ raw_contributions`. So each driver's calibrated
+ * contribution is `−a · shap`, the base is `−a · intercept − b`, and the total
+ * calibrated logit is simply `logit(risk_score)` — recovered from the published
+ * probability (clamped so the rare p=1.0 doesn't diverge). By construction
+ * `sigmoid(total) = risk_score`, so the waterfall lands exactly on the gauge.
+ */
+export function computeWaterfall(
+  r: RestaurantScore,
+  cal: Calibration,
+): WaterfallBreakdown {
+  const slope = -cal.a;
+  const base = slope * cal.intercept - cal.b;
+  const steps: WaterfallStep[] = r.top_drivers.map((d) => ({
+    feature: d.feature,
+    label: d.label,
+    contribution: slope * d.shap,
+    up: d.shap > 0,
+  }));
+  const p = Math.min(Math.max(r.risk_score, 1e-6), 1 - 1e-6);
+  const total = Math.log(p / (1 - p));
+  return { base, steps, total, probability: r.risk_score };
 }
 
 export type TrendDirection = "improving" | "stable" | "worsening";
