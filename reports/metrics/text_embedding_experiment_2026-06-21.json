@@ -1,0 +1,120 @@
+{
+  "experiment": "text_embedding_layer_c_dense",
+  "date": "2026-06-21",
+  "config": {
+    "model_id": "amazon.titan-embed-text-v2:0",
+    "embed_dim": 256,
+    "n_pca": 32,
+    "pca_explained_variance": 0.7587,
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test": 13812,
+    "test_text_coverage": 0.7973
+  },
+  "v36_published_baseline": {
+    "logreg": [
+      0.332,
+      0.37
+    ],
+    "xgb": [
+      0.338,
+      0.376
+    ]
+  },
+  "results": {
+    "logreg": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344211,
+        "roc_auc": 0.826518,
+        "precision_at_5pct": 0.434153,
+        "precision_at_10pct": 0.36903,
+        "precision_at_20pct": 0.284111,
+        "recall_at_5pct": 0.245298,
+        "recall_at_10pct": 0.417007,
+        "recall_at_20pct": 0.641864,
+        "top_decile_lift": 4.16766,
+        "brier_score": 0.154269,
+        "log_loss": 0.490802
+      },
+      "treatment": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344582,
+        "roc_auc": 0.828699,
+        "precision_at_5pct": 0.434153,
+        "precision_at_10pct": 0.36686,
+        "precision_at_20pct": 0.28194,
+        "recall_at_5pct": 0.245298,
+        "recall_at_10pct": 0.414554,
+        "recall_at_20pct": 0.636958,
+        "top_decile_lift": 4.143144,
+        "brier_score": 0.152494,
+        "log_loss": 0.483925
+      },
+      "delta_pr_auc": 0.000371,
+      "delta_precision_at_10pct": -0.00217,
+      "clears_gate_vs_control": false,
+      "clears_gate_vs_v36_published": false
+    },
+    "xgb": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.352609,
+        "roc_auc": 0.828969,
+        "precision_at_5pct": 0.458755,
+        "precision_at_10pct": 0.372648,
+        "precision_at_20pct": 0.283026,
+        "recall_at_5pct": 0.259199,
+        "recall_at_10pct": 0.421096,
+        "recall_at_20pct": 0.639411,
+        "top_decile_lift": 4.208519,
+        "brier_score": 0.138878,
+        "log_loss": 0.435668
+      },
+      "treatment": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.353042,
+        "roc_auc": 0.829749,
+        "precision_at_5pct": 0.457308,
+        "precision_at_10pct": 0.38712,
+        "precision_at_20pct": 0.284111,
+        "recall_at_5pct": 0.258381,
+        "recall_at_10pct": 0.437449,
+        "recall_at_20pct": 0.641864,
+        "top_decile_lift": 4.371957,
+        "brier_score": 0.131959,
+        "log_loss": 0.417863
+      },
+      "delta_pr_auc": 0.000433,
+      "delta_precision_at_10pct": 0.014472,
+      "clears_gate_vs_control": true,
+      "clears_gate_vs_v36_published": true
+    }
+  },
+  "fairness_vulnerable_groups": {
+    "Children's Services Facility": {
+      "n": 543,
+      "recall_ctrl": 0.4348,
+      "recall_treat": 0.3913
+    },
+    "Daycare": {
+      "n": 344,
+      "recall_ctrl": 0.6,
+      "recall_treat": 0.6
+    },
+    "Long Term Care": {
+      "n": 101,
+      "recall_ctrl": 0.3333,
+      "recall_treat": 0.5
+    },
+    "School": {
+      "n": 1013,
+      "recall_ctrl": 0.6456,
+      "recall_treat": 0.6329
+    }
+  }
+}
