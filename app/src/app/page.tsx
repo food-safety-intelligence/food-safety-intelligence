@@ -44,7 +44,8 @@ export default async function HomePage() {
                 Why this exists
               </h2>
               <p className="text-[16px] text-muted leading-[1.6] mt-4 max-w-[58ch]">
-                Chicago publishes every restaurant inspection it conducts. We
+                Chicago publishes every food establishment inspection it
+                conducts. We
                 pair that record with nearby 311 complaints and license
                 history to estimate the chance a place will see a failed
                 inspection or priority violation in the next six months — and
@@ -101,7 +102,8 @@ export default async function HomePage() {
                 the drivers matter more than the score.
               </h3>
               <p className="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
-                Two restaurants can share the same score for different reasons.
+                Two food establishments can share the same score for different
+                reasons.
                 We show the top three drivers — recurring temperature
                 violations, nearby pest complaints, long gaps since last
                 inspection — so you can match the data to the precautions your

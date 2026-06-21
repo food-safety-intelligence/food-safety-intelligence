@@ -56,10 +56,10 @@ export default async function RestaurantDetailPage({
 
       <main className="max-w-[1240px] mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
-        <section className="grid grid-cols-12 gap-8 mb-10">
-          <div className="col-span-12 lg:col-span-7">
+        <section className="mb-10">
+          <div className="mb-6">
             <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
-              Restaurant profile
+              Food establishment profile
             </p>
             <h1 className="text-[3.4rem] font-light leading-[1.04] tracking-tight">
               {restaurant.dba_name}
@@ -83,12 +83,7 @@ export default async function RestaurantDetailPage({
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-5">
-            <ScoreCard
-              restaurant={restaurant}
-              populationStats={populationStats}
-            />
-          </div>
+          <ScoreCard restaurant={restaurant} populationStats={populationStats} />
         </section>
 
         {/* Drivers */}
@@ -210,7 +205,7 @@ export default async function RestaurantDetailPage({
               <p className="font-medium mb-2">It is not a verdict.</p>
               <p>
                 A &quot;{restaurant.risk_tier}&quot; prediction does not mean
-                this restaurant is unsafe to eat at today. It means the
+                this food establishment is unsafe to eat at today. It means the
                 patterns in the record resemble those that historically precede
                 a failed inspection.
               </p>

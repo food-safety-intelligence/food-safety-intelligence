@@ -119,7 +119,7 @@ export function RestaurantsExplorer({
           <h2 className="text-[1.5rem] font-medium tracking-tight">
             {query
               ? `Matching "${query}"`
-              : "Highest-risk restaurants today"}
+              : "Highest-risk food establishments today"}
           </h2>
           <span className="text-[12px] text-muted">
             Sorted by predicted score · {filtered.length} of{" "}
@@ -146,7 +146,7 @@ export function RestaurantsExplorer({
 
           {filtered.length === 0 && (
             <div className="px-6 py-10 text-center text-[14px] text-muted">
-              No restaurants match this search.
+              No food establishments match this search.
             </div>
           )}
 

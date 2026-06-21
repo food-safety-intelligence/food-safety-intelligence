@@ -224,7 +224,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
         href="/all"
         className="block text-center text-[13px] mt-4 text-teal hover:underline"
       >
-        See all restaurants →
+        See all food establishments →
       </Link>
     </aside>
   );
