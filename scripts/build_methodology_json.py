@@ -18,8 +18,16 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
+from sklearn.calibration import CalibratedClassifierCV
+from sklearn.frozen import FrozenEstimator
 
+from foodsafety.explain.feature_labels import display_name
+from foodsafety.explain.shap_drivers import (
+    linear_contributions,
+    top_drivers_for_row,
+)
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.tracking import provenance
@@ -34,6 +42,94 @@ OUTPUT_PATH = REPO_ROOT / "app" / "public" / "data" / "methodology.json"
 TRAIN_END = pd.Timestamp("2024-07-01")
 TEST_START = pd.Timestamp("2025-07-01")
 K_FRACS = (0.05, 0.10, 0.20, 0.30, 0.50)
+
+# How many features to show in the global-impact bar chart, and how many
+# drivers to itemise in the worked waterfall (rest roll into "other").
+N_GLOBAL_FEATURES = 12
+N_WATERFALL_DRIVERS = 4
+
+
+def _sigmoid(x: float) -> float:
+    return float(1.0 / (1.0 + np.exp(-x)))
+
+
+def global_feature_impact(pipe, test: pd.DataFrame) -> list[dict]:
+    """Mean |log-odds contribution| per feature on the test set — the model's
+    global feature impact (notebook 06 §4). Ranked, top N, with plain names."""
+    contrib = linear_contributions(pipe, test[ALL_FEATURES], original_features=list(ALL_FEATURES))
+    mean_abs = contrib.abs().mean().sort_values(ascending=False)
+    return [
+        {
+            "feature": feat,
+            "label": display_name(feat),
+            "mean_abs_logodds": round(float(mean_abs[feat]), 4),
+        }
+        for feat in mean_abs.head(N_GLOBAL_FEATURES).index
+    ]
+
+
+def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
+    """One worked example: how an establishment's drivers add up — in CALIBRATED
+    log-odds — to the published probability.
+
+    The Platt calibration is a monotone linear map of the raw logit L:
+        calibrated_logit = -(a*L + b),  p = sigmoid(calibrated_logit).
+    Since L = intercept + Σ contributions, scaling every contribution by -a and
+    folding -b into the base term makes the CALIBRATED contributions additive and
+    sum exactly to calibrated_logit — so sigmoid(base + Σdrivers + other) lands
+    exactly on the establishment's probability (no reconciliation gap with the
+    gauge). The example is anonymised — it teaches the math, not a named place.
+    """
+    sig = calibrated.calibrated_classifiers_[0].calibrators[0]
+    a, b = float(sig.a_), float(sig.b_)
+    slope = -a  # calibrated contribution = slope * raw contribution
+
+    intercept = float(pipe.named_steps["model"].intercept_[0])
+    p_test = calibrated.predict_proba(test[ALL_FEATURES])[:, 1]
+    contrib = linear_contributions(pipe, test[ALL_FEATURES], original_features=list(ALL_FEATURES))
+
+    # Pick a pedagogically clear, deterministic example: scanning from the
+    # highest-probability rows, take the first whose top drivers include BOTH a
+    # risk-raising and a risk-lowering factor (so the waterfall shows both
+    # directions). Fall back to the single highest-probability row.
+    order = np.argsort(-p_test)
+    chosen = int(order[0])
+    for idx in order[:300]:
+        row_contrib = contrib.iloc[int(idx)]
+        drivers = top_drivers_for_row(
+            test.iloc[int(idx)][ALL_FEATURES], row_contrib, k=N_WATERFALL_DRIVERS
+        )
+        if any(d.shap > 0 for d in drivers) and any(d.shap < 0 for d in drivers):
+            chosen = int(idx)
+            break
+
+    row_values = test.iloc[chosen][ALL_FEATURES]
+    raw_contrib = contrib.iloc[chosen]
+    drivers = top_drivers_for_row(row_values, raw_contrib, k=N_WATERFALL_DRIVERS)
+    top_feats = {d.feature for d in drivers}
+
+    base_cal = slope * intercept - b
+    driver_out = [
+        {"feature": d.feature, "label": d.label, "contribution": round(slope * d.shap, 4)}
+        for d in drivers
+    ]
+    other_cal = slope * float(
+        raw_contrib[[f for f in raw_contrib.index if f not in top_feats]].sum()
+    )
+    total_cal = base_cal + slope * float(raw_contrib.sum())
+    p = _sigmoid(total_cal)
+
+    # Sanity: the additive calibrated logit must reproduce the model's own
+    # probability for this row (else the page would show a fictitious total).
+    assert abs(p - float(p_test[chosen])) < 1e-6, (p, float(p_test[chosen]))
+
+    return {
+        "base": round(base_cal, 4),
+        "drivers": driver_out,
+        "other": round(other_cal, 4),
+        "total_logit": round(total_cal, 4),
+        "probability": round(p, 4),
+    }
 
 
 def main() -> None:
@@ -53,6 +149,7 @@ def main() -> None:
     df = df[(~df["is_burnin"]) & (~df["right_truncated"])].dropna(subset=[LABEL_COL])
 
     train = df[df["inspection_date"] < TRAIN_END]
+    val = df[(df["inspection_date"] >= TRAIN_END) & (df["inspection_date"] < TEST_START)]
     test = df[df["inspection_date"] >= TEST_START]
 
     pipe = build_baseline_pipeline()
@@ -62,6 +159,13 @@ def main() -> None:
 
     report = evaluate(y, scores)
     table = operating_point_table(y, scores, k_fracs=K_FRACS)
+
+    # Sigmoid (Platt) calibration on the val slice, mirroring the served model
+    # (retrain_baseline_sigmoid.py). Used only for the worked waterfall, so its
+    # additive log-odds land exactly on a calibrated probability. FrozenEstimator
+    # marks `pipe` as pre-fit so calibration doesn't refit the base estimator.
+    calibrated = CalibratedClassifierCV(FrozenEstimator(pipe), method="sigmoid")
+    calibrated.fit(val[ALL_FEATURES], val[LABEL_COL].astype(int))
 
     payload = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
@@ -94,6 +198,10 @@ def main() -> None:
             }
             for row in table.itertuples()
         ],
+        # Global feature impact (mean |log-odds| on test) for the importance bar.
+        "global_importance": global_feature_impact(pipe, test),
+        # One anonymised worked example whose calibrated drivers sum to its score.
+        "waterfall": worked_waterfall(pipe, calibrated, test),
     }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)

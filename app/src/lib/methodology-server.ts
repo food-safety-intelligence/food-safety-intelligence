@@ -33,6 +33,37 @@ export interface Provenance {
   features_sha256: string;
 }
 
+/** One bar in the global feature-impact chart: mean |log-odds| across the
+ *  test set. Higher = the feature moves the score more, on average. */
+export interface GlobalImportance {
+  feature: string;
+  label: string;
+  mean_abs_logodds: number;
+}
+
+/** One line of the worked waterfall — a single driver's CALIBRATED log-odds
+ *  contribution for the example establishment. */
+export interface WaterfallDriver {
+  feature: string;
+  label: string;
+  contribution: number;
+}
+
+/**
+ * One anonymised worked example showing how the model's pieces add up — in
+ * calibrated log-odds — to a published probability:
+ *   base + Σ drivers + other = total_logit,   sigmoid(total_logit) = probability.
+ * The contributions are already in calibrated space, so the sum lands exactly
+ * on `probability` (no reconciliation gap with the gauge).
+ */
+export interface Waterfall {
+  base: number;
+  drivers: WaterfallDriver[];
+  other: number;
+  total_logit: number;
+  probability: number;
+}
+
 export interface Methodology {
   generated_at: string;
   model_version: string;
@@ -41,6 +72,9 @@ export interface Methodology {
   test: { n: number; prevalence: number; events: number; split_from: string };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   operating_points: OperatingPoint[];
+  /** Absent in older JSON written before the SHAP section was added. */
+  global_importance?: GlobalImportance[];
+  waterfall?: Waterfall;
 }
 
 let cached: Methodology | null = null;
