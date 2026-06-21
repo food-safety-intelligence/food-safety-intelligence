@@ -1,6 +1,8 @@
-import { Minus, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { PopulationStats, RestaurantScore } from "@/lib/scores";
 import { trendDirection } from "@/lib/scores";
+import { iconForFeature } from "@/lib/driver-icons";
+import { cn } from "@/lib/utils";
 import { ArcGauge } from "@/components/ArcGauge";
 import { TierPill } from "@/components/TierPill";
 import { TrendChart } from "@/components/TrendChart";
@@ -51,6 +53,12 @@ export function ScoreCard({
   const percentile = restaurant.percentile_rank ?? null;
   const medianScore = populationStats?.median ?? null;
 
+  // Quick-glance summary of the single biggest driver, beside the gauge — so
+  // the dominant reason is visible without scrolling to the full driver panel.
+  const topDriver = restaurant.top_drivers[0] ?? null;
+  const topRaises = topDriver ? topDriver.shap > 0 : false;
+  const TopIcon = topDriver ? iconForFeature(topDriver.feature) : null;
+
   return (
     <div className="rounded-3xl bg-card border border-line soft-shadow-lg p-7">
       <div className="text-[11px] tracking-widest uppercase text-muted">
@@ -69,6 +77,29 @@ export function ScoreCard({
       <div className="flex justify-center mt-1">
         <TierPill tier={restaurant.risk_tier} />
       </div>
+
+      {topDriver && TopIcon && (
+        <div className="flex flex-col items-center gap-1 mt-3">
+          <span className="text-[10.5px] tracking-widest uppercase text-muted">
+            Top factor
+          </span>
+          <span
+            title={topDriver.label}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-w-full text-[12.5px] font-medium",
+              topRaises ? "bg-terra/10 text-terra" : "bg-sage/15 text-sage",
+            )}
+          >
+            <TopIcon className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+            <span className="truncate">{topDriver.label}</span>
+            {topRaises ? (
+              <ArrowUp className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+            ) : (
+              <ArrowDown className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
+            )}
+          </span>
+        </div>
+      )}
 
       <p className="text-[14px] text-muted leading-relaxed mt-4 text-center">
         {medianScore !== null ? (
