@@ -1,5 +1,6 @@
 import type { Driver } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
+import { descriptionForFeature } from "@/lib/driver-descriptions";
 import { cn } from "@/lib/utils";
 
 /**
@@ -70,6 +71,8 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
         {drivers.map((d, i) => {
           const { isPositive, sign, halfPct } = driverBarGeometry(d.shap, maxMagnitude);
           const Icon = iconForFeature(d.feature);
+          // Prefer a server-provided detail; otherwise explain the feature.
+          const description = d.detail || descriptionForFeature(d.feature);
           const barStyle = isPositive
             ? { left: "50%", width: `${halfPct}%` }
             : { right: "50%", width: `${halfPct}%` };
@@ -104,8 +107,10 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
                   </span>
                   <div className="font-semibold">{d.label}</div>
                 </div>
-                {d.detail && (
-                  <div className="text-[12.5px] text-muted mt-0.5">{d.detail}</div>
+                {description && (
+                  <div className="text-[12.5px] text-muted mt-0.5 leading-snug">
+                    {description}
+                  </div>
                 )}
               </div>
 
