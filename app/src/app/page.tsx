@@ -17,10 +17,14 @@ const HOME_LIMIT = 200;
 // the caregivers promise ("we show the top three drivers") is concrete on the
 // home page. Not tied to any real establishment; each place's actual, signed
 // drivers live on its detail page. Uses real feature keys so the icons match.
+//
+// Chosen to be the hazards that matter most for an immunocompromised diner —
+// the classic foodborne-pathogen routes (temperature abuse, cross-contamination,
+// handwashing) rather than generic operational signals.
 const ILLUSTRATIVE_DRIVERS: PinDriver[] = [
-  { feature: "flag_kw_temperature", label: "Recurring temperature violations", up: true },
-  { feature: "flag_kw_pest", label: "Recent pest activity noted", up: true },
-  { feature: "days_since_last_inspection", label: "Long gap since last inspection", up: true },
+  { feature: "flag_kw_temperature", label: "Temperature abuse (bacterial growth)", up: true },
+  { feature: "flag_kw_cross_contamination", label: "Cross-contamination risk", up: true },
+  { feature: "flag_kw_handwash_sink", label: "Handwashing lapses", up: true },
 ];
 
 export default async function HomePage() {
@@ -115,11 +119,10 @@ export default async function HomePage() {
               </h3>
               <p className="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
                 Two food establishments can share the same score for different
-                reasons.
-                We show the top three drivers — recurring temperature
-                violations, nearby pest complaints, long gaps since last
-                inspection — so you can match the data to the precautions your
-                care team recommends.
+                reasons — and for someone with a weakened immune system, the
+                reason matters. We surface the top drivers, like temperature
+                abuse, cross-contamination, and handwashing lapses, so you can
+                match the data to the precautions your care team recommends.
               </p>
             </div>
             <div className="col-span-12 md:col-span-5 flex flex-col gap-4 md:items-end">
