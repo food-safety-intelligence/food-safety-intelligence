@@ -1,0 +1,79 @@
+name: CI
+
+# Gate every PR (and main itself) on the same checks developers run locally:
+# the Python package's ruff lint + pytest, and the web app's eslint + tsc +
+# vitest. Mirrors `make lint` / `make test` and the .githooks/pre-commit hook.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# This workflow only reads the checkout and runs tests — no writes needed.
+# Set least privilege explicitly rather than inheriting the repo default.
+permissions:
+  contents: read
+
+# A newer push to the same PR cancels the in-flight run. Don't cancel runs on
+# main (push) — each merge's run is a health signal worth keeping.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  python:
+    name: Python (ruff + pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          # requires-python is >=3.11,<3.13; pin the upper end of that range.
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies (locked)
+        # ruff + pytest live in the `dev` optional-dependencies extra.
+        run: uv sync --frozen --extra dev
+
+      # Same two commands as `make lint` and .githooks/pre-commit. Notebooks are
+      # excluded in pyproject.toml, so this only gates the package/scripts/tests.
+      - name: Ruff lint
+        run: uv run ruff check .
+
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+      - name: Pytest
+        run: uv run pytest
+
+  app:
+    name: Web app (eslint + tsc + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies (locked)
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Vitest
+        run: npm test
