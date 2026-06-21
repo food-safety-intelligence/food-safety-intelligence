@@ -19,12 +19,10 @@ This encodes the convention from `CLAUDE.md` + `docs/decisions/0001-0005`. Read
 the relevant notebook headers and `docs/interface_contracts.md` first (per the
 repo "before changing an area" rule).
 
-## Environment (see memory [[dev-environment]])
+## Environment
 - Use the repo venv directly: `.venv/bin/python`, `.venv/bin/jupyter` (base conda
   lacks `shap`/`xgboost`). `foodsafety` is editable-installed there.
-- Run compute **inline** in the main session (background subagents can't exec Bash).
-- `gh`/`pnpm` are off PATH — bridge the `gh` token from `~/.config/gh/hosts.yml`
-  for pushes/PRs; use `npm` not `pnpm` in `app/`.
+- Use `npm` (not `pnpm`) in `app/`.
 - Run notebooks in place so outputs are saved for review:
   `.venv/bin/jupyter nbconvert --to notebook --execute --inplace --ExecutePreprocessor.timeout=1800 <nb>`
   (nbstripout strips them again on commit).
@@ -133,7 +131,7 @@ Feature *code* may stay if cheap and self-contained (note it's unwired).
 ## Before committing / PR
 - `make test` (or `.venv/bin/python -m pytest -q`) green; `make lint` clean for the
   files you touched (don't expand scope to repo-wide lint debt).
-- Notebook outputs stripped on commit (nbstripout / [[clear-outputs]]).
+- Notebook outputs stripped on commit (nbstripout / the `clear-outputs` skill).
 - One PR per experiment; squash-merge. If a feature **resets the baseline** that
   later experiments are measured against, land it **first**.
 - Run `/update-docs` to propagate to the changelog + handoff memory.
