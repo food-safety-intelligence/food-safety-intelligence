@@ -36,7 +36,10 @@ def normalize_facility_type(raw: str | float | None) -> str | None:
     child Daycare bucket; adult culinary schools are matched before the child
     School rule for the same reason.
     """
-    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+    # Missing in any form: Python None, float NaN, or pandas pd.NA. The audit calls
+    # this on a StringDtype column, where missing is pd.NA (not float NaN), so a
+    # float-only check would let it through and title-case it into a "<Na>" bucket.
+    if raw is None or raw is pd.NA or (isinstance(raw, float) and pd.isna(raw)):
         return None
     s = re.sub(r"\s+", " ", str(raw).strip())
     if not s:

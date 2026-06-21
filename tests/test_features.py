@@ -551,7 +551,9 @@ def test_normalize_facility_type_collapses_vulnerable_families():
     # Casing-only duplicates merge via title-case for the long tail.
     assert normalize_facility_type("TAVERN") == "Tavern"
     assert normalize_facility_type("GAS STATION") == "Gas Station"
-    # Missing / blank → None.
+    # Missing / blank → None. pd.NA is how missing arrives when the audit maps over
+    # a StringDtype column, so it must be caught too (not title-cased to "<Na>").
     assert normalize_facility_type(None) is None
     assert normalize_facility_type("   ") is None
     assert normalize_facility_type(float("nan")) is None
+    assert normalize_facility_type(pd.NA) is None
