@@ -3,10 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
-import {
-  InspectionTimeline,
-  ResultTally,
-} from "@/components/InspectionTimeline";
+import { InspectionTimeline } from "@/components/InspectionTimeline";
+import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -55,7 +53,11 @@ export default async function RestaurantDetailPage({
 
       {payload.is_mock && <DemoBanner />}
 
-      <main className="max-w-[1240px] mx-auto px-8 pt-8 pb-24 flex-1">
+      {/* max-w-full on mobile (capped to the viewport) so content wraps instead
+          of forcing a horizontal scroll; overflow-x-clip trims any small residual
+          overhang from intrinsic-width content (gauge, waterfall) without
+          clipping text or the fixed term popover. Desktop keeps the 1240 cap. */}
+      <main className="w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
         <section className="mb-10">
           <div className="mb-6">
@@ -109,10 +111,10 @@ export default async function RestaurantDetailPage({
             </div>
             <div className="col-span-12 lg:col-span-5 lg:text-right">
               <Link
-                href="/how-it-works#priority-violations"
+                href="/how-it-works#definitions"
                 className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
               >
-                What is a priority violation?
+                Term definitions →
               </Link>
             </div>
           </div>
