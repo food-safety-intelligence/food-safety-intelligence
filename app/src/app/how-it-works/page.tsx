@@ -12,6 +12,8 @@ export const metadata = {
 
 export default async function HowItWorksPage() {
   const methodology = await loadMethodology();
+  const top5 = methodology.operating_points.find((p) => p.frac === 0.05);
+  const top10 = methodology.operating_points.find((p) => p.frac === 0.1);
   const top20 = methodology.operating_points.find((p) => p.frac === 0.2);
 
   return (
@@ -192,6 +194,43 @@ export default async function HowItWorksPage() {
               with an event). &ldquo;Lift&rdquo; is precision divided by that
               base rate.
             </p>
+
+            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-[14px] leading-relaxed text-ink/85">
+              <p className="font-medium mb-1.5">
+                Reading the two tightest slices
+              </p>
+              <ul className="space-y-1.5 list-disc pl-5">
+                <li>
+                  <span className="font-medium">Top 5%</span>
+                  {top5
+                    ? ` (~${top5.n_flagged.toLocaleString()} restaurants): about ${Math.round(
+                        top5.precision * 100,
+                      )}% of those visits find a real problem — ${top5.lift.toFixed(
+                        1,
+                      )}× better than picking at random — and that sliver alone covers ${Math.round(
+                        top5.recall * 100,
+                      )}% of every problem city-wide.`
+                    : " — run the metrics pipeline to populate."}
+                </li>
+                <li>
+                  <span className="font-medium">Top 10%</span>
+                  {top10
+                    ? ` (~${top10.n_flagged.toLocaleString()} restaurants): roughly ${Math.round(
+                        top10.precision * 100,
+                      )}% of visits find a problem (${top10.lift.toFixed(
+                        1,
+                      )}× random), catching about ${Math.round(
+                        top10.recall * 100,
+                      )}% of all problems.`
+                    : ""}
+                </li>
+              </ul>
+              <p className="mt-2 text-[13px] text-muted">
+                The tighter the slice, the higher the hit-rate but the fewer
+                problems you cover — that&apos;s the precision/recall trade an
+                inspection team tunes to its capacity.
+              </p>
+            </div>
           </article>
 
           <article>
