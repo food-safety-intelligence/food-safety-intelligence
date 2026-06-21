@@ -23,6 +23,9 @@ def add_license_features(df: pd.DataFrame) -> pd.DataFrame:
         static_zip             — 5-digit ZIP
         static_zip3            — first 3 digits of ZIP. Less sparse than full
                                  ZIP; useful as a fallback when ZIP has few rows.
+        static_inspection_type — scheduled inspection trigger (Canvass /
+                                 Complaint / Re-Inspection / License). Known at
+                                 scheduling time, before the outcome.
 
     All four are cast to pandas' nullable ``category`` dtype — XGBoost reads
     these natively, and scikit-learn pipelines can one-hot via
@@ -32,6 +35,17 @@ def add_license_features(df: pd.DataFrame) -> pd.DataFrame:
 
     out["static_facility_type"] = out["facility_type"].astype("string").astype("category")
     out["static_risk_tier"] = out["risk"].astype("string").astype("category")
+
+    # The scheduled inspection trigger (Canvass / Complaint / Re-Inspection /
+    # License). It's known when the visit is dispatched — before the outcome —
+    # so it's leak-safe as an anchor categorical, same status as facility_type.
+    # Absent in minimal test inputs → fall back to "Unknown".
+    if "inspection_type" in out.columns:
+        out["static_inspection_type"] = (
+            out["inspection_type"].astype("string").fillna("Unknown").astype("category")
+        )
+    else:
+        out["static_inspection_type"] = pd.Series("Unknown", index=out.index, dtype="category")
 
     # ZIP cleaning: cast to string, strip trailing decimals (some upstream
     # parquet round-trips can yield "60614.0"), then require an exact 5-digit

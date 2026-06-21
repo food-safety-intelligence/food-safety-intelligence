@@ -10,7 +10,11 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from foodsafety.utils.time import summarize, temporal_split
+from foodsafety.utils.time import (
+    expanding_year_folds,
+    summarize,
+    temporal_split,
+)
 
 
 def _df(dates: list[str], **extra) -> pd.DataFrame:
@@ -106,6 +110,65 @@ def test_cutoffs_stored_on_split():
     s = temporal_split(df, train_end="2024-01-01", val_end="2025-06-30")
     assert s.train_end == pd.Timestamp("2024-01-01")
     assert s.val_end == pd.Timestamp("2025-06-30")
+
+
+# ---------------------------------------------------------------------------
+# expanding_year_folds() — inner-loop CV with embargo
+# ---------------------------------------------------------------------------
+
+
+def test_expanding_year_folds_one_fold_per_year_after_first():
+    # 2019 has no fold (earliest year, no embargoed history before it);
+    # 2020/2021/2022 each get a val fold.
+    df = _df([f"{y}-06-01" for y in (2019, 2020, 2021, 2022)])
+    folds = expanding_year_folds(df)
+    assert len(folds) == 3
+
+
+def test_expanding_year_folds_val_is_exactly_one_year():
+    df = _df(["2019-06-01", "2020-03-01", "2020-09-01", "2021-06-01"])
+    folds = expanding_year_folds(df)
+    # First fold validates on 2020 → both 2020 rows, nothing else.
+    _, val_idx = folds[0]
+    val_years = pd.to_datetime(df.iloc[val_idx]["inspection_date"]).dt.year.tolist()
+    assert val_years == [2020, 2020]
+
+
+def test_expanding_year_folds_embargo_excludes_tail_of_train():
+    # A train anchor inside the 180-day embargo before the val year must be
+    # excluded; one comfortably before it must be kept.
+    df = _df(
+        [
+            "2019-01-15",  # well before embargo → train
+            "2019-10-01",  # within 180d of 2020-01-01 → embargoed out
+            "2020-06-01",  # the validation year
+        ]
+    )
+    folds = expanding_year_folds(df, embargo_days=180)
+    train_idx, val_idx = folds[0]
+    train_dates = pd.to_datetime(df.iloc[train_idx]["inspection_date"]).tolist()
+    assert train_dates == [pd.Timestamp("2019-01-15")]
+    assert pd.to_datetime(df.iloc[val_idx]["inspection_date"]).tolist() == [
+        pd.Timestamp("2020-06-01")
+    ]
+
+
+def test_expanding_year_folds_train_expands_and_never_overlaps_val():
+    df = _df(
+        ["2019-01-01", "2020-01-01", "2021-01-01", "2022-01-01", "2023-01-01"]
+    )
+    folds = expanding_year_folds(df)
+    prev_train = -1
+    for train_idx, val_idx in folds:
+        # train grows (or holds) each fold
+        assert len(train_idx) >= prev_train
+        prev_train = len(train_idx)
+        # train and val never share a row
+        assert not (set(train_idx) & set(val_idx))
+
+
+def test_expanding_year_folds_empty_input():
+    assert expanding_year_folds(_df([])) == []
 
 
 # ---------------------------------------------------------------------------

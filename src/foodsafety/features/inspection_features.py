@@ -54,10 +54,18 @@ def add_inspection_features(
         prior_priority_violations    int   — count of prior priority (code 1-29) violations
         prior_core_violations        int   — count of prior core (code 30+) violations
         prior_fail_or_priority_events int  — count of prior is_fail_or_priority=True rows
+        prior_pass_w_conditions      int   — count of prior "Pass w/ Conditions" results
+        prior_reinspections          int   — count of prior Re-Inspection visits
+        prior_complaint_inspections  int   — count of prior Complaint-triggered visits
         prior_fail_rate              float — prior_fails / prior_inspections, NaN if no priors
         prior_event_rate             float — prior_fail_or_priority / prior_inspections, NaN if no priors
         days_since_last_inspection   float — days; NaN if this is the first inspection
         days_since_last_fail         float — days since last prior Fail; NaN if no prior Fail
+        last_was_fail                float — was the previous inspection a Fail (1/0); NaN if first
+        prev_priority_violations     float — priority violations at the previous inspection; NaN if first
+        priority_violation_trend     float — prev minus prev-prev priority count (worsening if >0)
+        prior_fails_365d             float — Fails in the trailing 365 days (leak-free, exclusive)
+        prior_priority_violations_365d float — priority violations in trailing 365 days (leak-free)
     """
     # We need stable sort order for the cumsum/shift patterns to produce
     # the right semantics. The group-key sort is also required for the
@@ -76,6 +84,19 @@ def add_inspection_features(
     if "is_fail_or_priority" not in out.columns:
         out["is_fail_or_priority"] = (out["_is_fail_int"] == 1) | (out["_priority_int"] > 0)
     out["_event_int"] = out["is_fail_or_priority"].astype("int8")
+
+    # Building blocks for the new prior_* rollups: near-misses ("Pass w/
+    # Conditions") and the visit trigger (Re-Inspection / Complaint). The
+    # inspection_type column is absent in minimal test inputs → treat as
+    # no-signal so the module stays self-contained.
+    out["_pass_cond_int"] = (out["results"] == "Pass w/ Conditions").astype("int8")
+    _itype = (
+        out["inspection_type"].astype("string").fillna("").str.lower()
+        if "inspection_type" in out.columns
+        else pd.Series("", index=out.index)
+    )
+    out["_reinsp_int"] = _itype.str.contains("re-inspection|reinspection", regex=True).astype("int8")
+    out["_complaint_int"] = _itype.str.contains("complaint", regex=True).astype("int8")
 
     group = out.groupby(license_col, sort=False)
 
@@ -100,6 +121,17 @@ def add_inspection_features(
     ).astype("int32")
     out["prior_fail_or_priority_events"] = (
         group["_event_int"].cumsum() - out["_event_int"]
+    ).astype("int32")
+    # Prior near-misses and prior visit-trigger mix — same exclusive-cumsum
+    # guard (count over strictly-earlier rows at this license).
+    out["prior_pass_w_conditions"] = (
+        group["_pass_cond_int"].cumsum() - out["_pass_cond_int"]
+    ).astype("int32")
+    out["prior_reinspections"] = (
+        group["_reinsp_int"].cumsum() - out["_reinsp_int"]
+    ).astype("int32")
+    out["prior_complaint_inspections"] = (
+        group["_complaint_int"].cumsum() - out["_complaint_int"]
     ).astype("int32")
 
     # Ratios: only defined when there's at least one prior. NaN otherwise —
@@ -140,8 +172,37 @@ def add_inspection_features(
         (out[date_col] - last_fail_strictly_before).dt.days.astype("float64")
     )
 
+    # --- Recency / last-outcome / trend (own-history only; leak-free) ------
+    # These describe the restaurant's OWN prior inspections — individually fair,
+    # with no neighborhood/demographic proxy. (We deliberately DECLINED a
+    # neighborhood peer-fail feature on fairness grounds; see docs/weekly.)
+    # shift(1)/shift(2) reference strictly-earlier inspections within the
+    # license group; the 365d window counts only earlier rows.
+    out["last_was_fail"] = group["_is_fail_int"].shift(1).astype("float64")
+    out["prev_priority_violations"] = group["_priority_int"].shift(1).astype("float64")
+    # Trend: priority-violation count at the previous inspection minus the one
+    # before that. Positive ⇒ the last visit was worse than the prior visit
+    # (deteriorating). NaN until there are two priors.
+    out["priority_violation_trend"] = (
+        group["_priority_int"].shift(1) - group["_priority_int"].shift(2)
+    ).astype("float64")
+    # Trailing-365d counts: a recency-weighted alternative to the LIFETIME
+    # prior_fails / prior_priority_violations totals. Tests whether recent
+    # history beats all-time history on a non-stationary risk process.
+    out["prior_fails_365d"] = _trailing_window_count(
+        out, license_col, date_col, "_is_fail_int", 365
+    )
+    out["prior_priority_violations_365d"] = _trailing_window_count(
+        out, license_col, date_col, "_priority_int", 365
+    )
+
     # Drop intermediate columns; they were named with `_` prefix on purpose.
-    return out.drop(columns=["_is_fail_int", "_priority_int", "_core_int", "_event_int"])
+    return out.drop(
+        columns=[
+            "_is_fail_int", "_priority_int", "_core_int", "_event_int",
+            "_pass_cond_int", "_reinsp_int", "_complaint_int",
+        ]
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -167,3 +228,37 @@ def _count_priority(text: object) -> int:
 
 def _count_core(text: object) -> int:
     return sum(1 for c in _violation_codes(text) if c > 29)
+
+
+def _trailing_window_count(
+    out: pd.DataFrame,
+    license_col: str,
+    date_col: str,
+    value_col: str,
+    window_days: int,
+) -> np.ndarray:
+    """Per-anchor sum of ``value_col`` over the restaurant's own STRICTLY
+    EARLIER inspections within ``window_days`` (leak-free; current row excluded).
+
+    Requires ``out`` sorted by ``[license_col, date_col]`` (the caller sorts
+    once at the top of ``add_inspection_features``), so each license's rows are
+    a contiguous, date-ascending block. Within a block we prefix-sum the values
+    and use ``searchsorted`` to find ``lo`` — the first earlier row still inside
+    the window — then ``cum[i] - cum[lo]`` sums rows ``[lo, i)``: earlier rows
+    only, current row ``i`` excluded. This is the same leak-free guarantee as
+    the exclusive-cumsum ``prior_*`` columns, but bounded to a time window.
+    """
+    dates = out[date_col].to_numpy().astype("datetime64[D]")
+    vals = out[value_col].to_numpy()
+    lic = out[license_col].to_numpy()
+    res = np.zeros(len(out), dtype="float64")
+    win = np.timedelta64(window_days, "D")
+    # Contiguous license blocks (out is sorted by [license, date]).
+    bounds = np.flatnonzero(np.r_[True, lic[1:] != lic[:-1], True])
+    for s, e in zip(bounds[:-1], bounds[1:], strict=True):
+        d = dates[s:e]
+        cum = np.concatenate(([0], np.cumsum(vals[s:e])))
+        lo = np.searchsorted(d, d - win, side="right")
+        idx = np.arange(e - s)
+        res[s:e] = cum[idx] - cum[lo]
+    return res

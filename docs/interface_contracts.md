@@ -67,8 +67,12 @@ not a contract change.
 | `prior_*` features | various | varies | **MUST use `.shift()` or `event_date < as_of_date` guards.** Examples below. |
 | `static_*` features | various | varies | Facility-level constants that don't change over time (facility_type, risk tier, zip). |
 
-**Required `prior_*` features** (canonical 26-feature contract — single
-source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`):
+**Required `prior_*` features** (canonical **33-feature** contract — single
+source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`. The
+feature-refresh added the recency/trend rows below and **dropped
+`static_facility_type` + `static_zip` from the model feature set** on fairness +
+accuracy grounds — see decision record 0004. Those two columns remain in the
+parquet but are no longer consumed by the model):
 
 | Column | dtype | Description |
 |---|---|---|
@@ -79,6 +83,11 @@ source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`):
 | `prior_fail_or_priority_events` | `int` | Combined count of failed inspections OR inspections with any priority violation, strictly before `as_of_date`. |
 | `days_since_last_inspection` | `float` | Days from most recent prior inspection to `as_of_date`. NaN if none. |
 | `days_since_last_fail` | `float` | Days from most recent prior `Fail` to `as_of_date`. NaN if none. |
+| `last_was_fail` | `float` | 1/0 — was the immediately previous inspection a `Fail`. NaN if first. |
+| `prev_priority_violations` | `float` | Priority-violation count at the previous inspection. NaN if first. |
+| `priority_violation_trend` | `float` | Previous minus prev-prev priority count (worsening if > 0). |
+| `prior_fails_365d` | `float` | `Fail` count in the trailing 365 days (leak-free, exclusive). |
+| `prior_priority_violations_365d` | `float` | Priority-violation count in the trailing 365 days (leak-free). |
 
 Note: `prior_fail_rate` / `prior_fail_rate_2y` ratio features were dropped
 in Phase 5 — tree models can reconstruct ratios from numerator + denominator
@@ -88,12 +97,18 @@ and the ratios added noise without orthogonal signal.
 
 | Column | dtype | Description |
 |---|---|---|
-| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". |
-| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. |
-| `static_zip` | `category` | 5-digit ZIP. |
+| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. **Model feature.** |
+| `static_inspection_type` | `category` | Canvass / Complaint / Re-Inspection / License — the visit trigger, known before the outcome (leak-safe). **Model feature.** |
+| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". In the parquet but **dropped from the model** (DR 0004). |
+| `static_zip` | `category` | 5-digit ZIP. In the parquet but **dropped from the model** (DR 0004). |
 
 Note: `static_zip3` was dropped — strict subset of `static_zip` with no
-orthogonal information.
+orthogonal information. `static_facility_type` and `static_zip` were dropped
+from the **model feature set** in the feature-refresh (decision record 0004) —
+geographic/business-type proxies that added ~no accuracy (`static_zip` actually
+overfit the chronological split); the columns remain in the parquet but the
+model no longer consumes them. `static_risk_tier` (and `static_inspection_type`)
+remain.
 
 **Required temporal features**:
 
