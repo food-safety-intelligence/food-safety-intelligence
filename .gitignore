@@ -14,6 +14,7 @@
 !/app/public/data/scores_mock.json
 !/app/public/data/scores.json
 !/app/public/data/inspection_history.json
+!/app/public/data/methodology.json
 **/_partial_*/
 
 # Saved model files
