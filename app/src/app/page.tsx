@@ -49,8 +49,10 @@ export default async function HomePage({
       <SiteHeader activeNav="search" />
       {payload.is_mock && <DemoBanner />}
 
-      {/* MAP-FIRST viewport — the design's "Chicago Safety Map" screen. */}
-      <main className="flex-1 flex flex-col pt-4">
+      {/* MAP-FIRST viewport — the design's "Chicago Safety Map" screen.
+          overflow-x-clip guards against a few px of horizontal overflow on very
+          narrow screens (≤320px); vertical scroll is unaffected. */}
+      <main className="flex-1 flex flex-col pt-4 overflow-x-clip">
         <MapExplorer
           view={view}
           query={query}

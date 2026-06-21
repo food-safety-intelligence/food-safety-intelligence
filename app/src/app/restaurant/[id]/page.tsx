@@ -53,7 +53,11 @@ export default async function RestaurantDetailPage({
 
       {payload.is_mock && <DemoBanner />}
 
-      <main className="max-w-[1240px] mx-auto px-8 pt-8 pb-24 flex-1">
+      {/* max-w-full on mobile (capped to the viewport) so content wraps instead
+          of forcing a horizontal scroll; overflow-x-clip trims any small residual
+          overhang from intrinsic-width content (gauge, waterfall) without
+          clipping text or the fixed term popover. Desktop keeps the 1240 cap. */}
+      <main className="w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
         <section className="mb-10">
           <div className="mb-6">

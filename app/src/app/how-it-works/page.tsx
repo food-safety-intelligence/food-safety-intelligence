@@ -90,7 +90,11 @@ export default async function HowItWorksPage() {
     <>
       <SiteHeader activeNav="how" />
 
-      <main className="max-w-[820px] mx-auto px-8 pt-10 pb-24 flex-1">
+      {/* max-w-full on mobile (capped to the viewport) so the prose wraps
+          instead of forcing a horizontal scroll; overflow-x-clip trims the small
+          residual overhang from intrinsic-width content (operating-points table)
+          without clipping text. Desktop keeps the 820 reading cap. */}
+      <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
