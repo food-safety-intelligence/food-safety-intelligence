@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import type { Driver, RestaurantScore } from "@/lib/scores";
-import { computeWaterfall, toPinDriver, trendDirection } from "@/lib/scores";
+import type { Driver, RestaurantScore, RiskTier } from "@/lib/scores";
+import {
+  ALL_TIERS,
+  computeWaterfall,
+  isAllTiers,
+  matchesQuery,
+  parseTiers,
+  toPinDriver,
+  trendDirection,
+} from "@/lib/scores";
 
 const driver = (over: Partial<Driver> = {}): Driver => ({
   feature: "prior_fails",
@@ -112,5 +120,72 @@ describe("trendDirection", () => {
 
   it("falls back to 'stable' for a NaN slope", () => {
     expect(trendDirection(Number.NaN)).toBe("stable");
+  });
+});
+
+describe("parseTiers", () => {
+  it("returns all tiers when the param is absent", () => {
+    expect(parseTiers(undefined)).toEqual(ALL_TIERS);
+  });
+
+  it("returns all tiers for an empty string", () => {
+    expect(parseTiers("")).toEqual(ALL_TIERS);
+  });
+
+  it("keeps only the valid tiers, in canonical order", () => {
+    // Input order is ignored — the result follows ALL_TIERS order.
+    expect(parseTiers("High,Low")).toEqual(["Low", "High"]);
+  });
+
+  it("drops unknown values", () => {
+    expect(parseTiers("Low,Bogus,High")).toEqual(["Low", "High"]);
+  });
+
+  it("falls back to all tiers when every value is invalid", () => {
+    expect(parseTiers("Bogus,Nope")).toEqual(ALL_TIERS);
+  });
+
+  it("de-duplicates repeated tiers", () => {
+    expect(parseTiers("Low,Low")).toEqual(["Low"]);
+  });
+});
+
+describe("isAllTiers", () => {
+  it("is true when every tier is selected", () => {
+    expect(isAllTiers([...ALL_TIERS])).toBe(true);
+  });
+
+  it("is false for a strict subset", () => {
+    expect(isAllTiers(["Low", "High"] as RiskTier[])).toBe(false);
+  });
+
+  it("is false for the empty selection", () => {
+    expect(isAllTiers([])).toBe(false);
+  });
+});
+
+describe("matchesQuery", () => {
+  const row = { dba_name: "Pizza Palace", address: "123 Main St" };
+
+  it("matches everything when the query is empty or whitespace", () => {
+    expect(matchesQuery(row, "")).toBe(true);
+    expect(matchesQuery(row, "   ")).toBe(true);
+  });
+
+  it("matches a case-insensitive substring of the name", () => {
+    expect(matchesQuery(row, "PIZZA")).toBe(true);
+    expect(matchesQuery(row, "palace")).toBe(true);
+  });
+
+  it("matches against the address too", () => {
+    expect(matchesQuery(row, "main st")).toBe(true);
+  });
+
+  it("trims surrounding whitespace before matching", () => {
+    expect(matchesQuery(row, "  pizza  ")).toBe(true);
+  });
+
+  it("returns false when neither name nor address contains the query", () => {
+    expect(matchesQuery(row, "sushi")).toBe(false);
   });
 });

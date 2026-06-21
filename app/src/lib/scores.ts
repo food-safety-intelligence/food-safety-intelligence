@@ -236,3 +236,64 @@ export function trendDirection(slope: number | null): TrendDirection {
   if (slope < -0.001) return "improving";
   return "stable";
 }
+
+// ---------------------------------------------------------------------------
+// Home search/sort — shared between the server loader and the client shell.
+// ---------------------------------------------------------------------------
+
+export const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
+
+export type HomeSort = "risk" | "low" | "name";
+
+/** Lean row for the home side-list. Carries trend (the pin set does not). */
+export interface HomeListRow {
+  license_id: string;
+  dba_name: string;
+  address: string;
+  risk_score: number;
+  risk_tier: RiskTier;
+  trend_slope_90d: number | null;
+  top_driver?: PinDriver;
+}
+
+/**
+ * What the server hands the home shell after applying the URL query/filters.
+ * Both the side list and the map pins are pre-filtered server-side, so the
+ * client component only renders and edits the URL — no client-side filtering.
+ */
+export interface HomeView {
+  listRows: HomeListRow[];
+  pins: PinSummary[];
+  /** Total matches before the list cap (so the UI can say "200 of 1,402"). */
+  matchCount: number;
+  /** Total establishments in the index, for the "of N" denominator. */
+  total: number;
+  tierCounts: Record<RiskTier, number>;
+  listLimit: number;
+}
+
+/**
+ * Parse the `?tier=` URL value (comma-separated tier names) into a validated
+ * set. Absent / empty / all-invalid → all tiers (the default browse state).
+ */
+export function parseTiers(raw: string | undefined): RiskTier[] {
+  if (!raw) return [...ALL_TIERS];
+  const wanted = new Set(raw.split(","));
+  const valid = ALL_TIERS.filter((t) => wanted.has(t));
+  return valid.length > 0 ? valid : [...ALL_TIERS];
+}
+
+/** True when every tier is selected — i.e. the tier filter is a no-op. */
+export function isAllTiers(tiers: RiskTier[]): boolean {
+  return tiers.length === ALL_TIERS.length;
+}
+
+/** Case-insensitive substring match over name + address. */
+export function matchesQuery(
+  row: { dba_name: string; address: string },
+  q: string,
+): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
+}

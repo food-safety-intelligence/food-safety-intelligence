@@ -10,13 +10,17 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type {
+  HomeListRow,
+  HomeSort,
+  HomeView,
   InspectionEvent,
   PinSummary,
   PopulationStats,
   RestaurantScore,
+  RiskTier,
   ScoresPayload,
 } from "@/lib/scores";
-import { toPinDriver } from "@/lib/scores";
+import { isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
 
 // Cached in module scope to avoid re-reading the file on every render. A
 // production build of Next.js calls server modules per request; this cache
@@ -143,40 +147,101 @@ export async function getInspectionHistory(
   return payload.inspection_history[licenseId] ?? [];
 }
 
-let cachedPins: PinSummary[] | null = null;
+// Lean pin record for the home map — every matching establishment with valid
+// lat/lon. Sorted by risk_score descending so the map's zoom-aware density
+// surfaces the most prominent first.
+function pinFromScore(r: RestaurantScore): PinSummary {
+  // #1 driver in compact form so the map popup can answer "what's driving this".
+  const d = r.top_drivers[0];
+  return {
+    license_id: r.license_id,
+    dba_name: r.dba_name,
+    address: r.address,
+    lat: r.lat,
+    lon: r.lon,
+    risk_score: r.risk_score,
+    risk_tier: r.risk_tier,
+    top_driver: d ? toPinDriver(d) : undefined,
+  };
+}
+
+function hasCoords(r: RestaurantScore): boolean {
+  return (
+    r.lat != null &&
+    r.lon != null &&
+    !Number.isNaN(r.lat) &&
+    !Number.isNaN(r.lon)
+  );
+}
 
 /**
- * Minimal pin set for the home map — every restaurant with valid lat/lon.
- * Derived from the full scores payload server-side so the RSC sends only
- * what the map needs. Sorted by risk_score descending so the client can
- * use array position as a prominence rank when filtering by zoom level.
+ * Apply the home page's URL state (search query, tier filter, sort) to the
+ * full scored population, server-side. Returns the capped side-list AND the
+ * filtered map pins so the client shell is purely presentational — all
+ * filtering happens here, not in the browser. This is what makes search reach
+ * every establishment (incl. the ~0.5% with no coordinates, which never make
+ * it into the map-pin set) instead of only the top-N shipped to the client.
+ *
+ * Still reads the precomputed scores.json only — no live data, no model call.
  */
-export async function getMapPins(): Promise<PinSummary[]> {
-  if (cachedPins) return cachedPins;
+export async function getHomeView(opts: {
+  q: string;
+  tiers: RiskTier[];
+  sort: HomeSort;
+  listLimit?: number;
+}): Promise<HomeView> {
+  const { q, tiers, sort } = opts;
+  const listLimit = opts.listLimit ?? 200;
   const payload = await loadScores();
-  cachedPins = payload.scores
-    .filter(
-      (r) =>
-        r.lat != null &&
-        r.lon != null &&
-        !Number.isNaN(r.lat) &&
-        !Number.isNaN(r.lon),
+
+  const query = q.trim().toLowerCase();
+  const tierSet = new Set(tiers);
+  const tierActive = !isAllTiers(tiers);
+
+  // One pass over the full population: keep rows matching tier + query.
+  const matched = payload.scores.filter(
+    (r) =>
+      (!tierActive || tierSet.has(r.risk_tier)) && matchesQuery(r, query),
+  );
+
+  // List: sort by the chosen key, then cap. Name surfaces all tiers
+  // alphabetically; "low" surfaces the lowest-risk end; default is highest-risk.
+  const sorted = matched.slice().sort((a, b) => {
+    if (sort === "name") return a.dba_name.localeCompare(b.dba_name);
+    if (sort === "low") return a.risk_score - b.risk_score;
+    return b.risk_score - a.risk_score;
+  });
+  const listRows: HomeListRow[] = sorted.slice(0, listLimit).map((r) => {
+    // Carry the #1 driver (compact) so list rows can show "what's driving this".
+    const d = r.top_drivers[0];
+    return {
+      license_id: r.license_id,
+      dba_name: r.dba_name,
+      address: r.address,
+      risk_score: r.risk_score,
+      risk_tier: r.risk_tier,
+      trend_slope_90d: r.trend_slope_90d,
+      top_driver: d ? toPinDriver(d) : undefined,
+    };
+  });
+
+  // Map pins: the matches that have coordinates. MapView surfaces the first N
+  // by array order at low zoom, so order them to match the list — lowest-risk
+  // first in "low" mode (the map goes green), highest-risk first otherwise —
+  // so the map and the side list never contradict each other.
+  const pins: PinSummary[] = matched
+    .filter(hasCoords)
+    .sort((a, b) =>
+      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
     )
-    .map<PinSummary>((r) => {
-      // Reduce the full top_drivers list (already in scores.json) to the #1
-      // driver in compact form. `up` = this factor raises risk.
-      const d = r.top_drivers[0];
-      return {
-        license_id: r.license_id,
-        dba_name: r.dba_name,
-        address: r.address,
-        lat: r.lat,
-        lon: r.lon,
-        risk_score: r.risk_score,
-        risk_tier: r.risk_tier,
-        top_driver: d ? toPinDriver(d) : undefined,
-      };
-    })
-    .sort((a, b) => b.risk_score - a.risk_score);
-  return cachedPins;
+    .map(pinFromScore);
+
+  return {
+    listRows,
+    pins,
+    matchCount: matched.length,
+    total: payload.totals.establishments,
+    tierCounts: payload.totals.tier_counts,
+    listLimit,
+  };
 }
