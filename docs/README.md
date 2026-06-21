@@ -2,6 +2,9 @@
 
 Map of this folder. Short markdown only (per `CLAUDE.md` — no auto-generated API docs).
 
+- **[project_plan.md](project_plan.md)** — the project's intent and testable
+  claims (problem, data, approach, NLP + fairness strategy, success criteria).
+  `CLAUDE.md` remains the scope authority; this is the why/what/how behind it.
 - **[decisions/](decisions/)** — decision records: the "why" behind choices that
   aren't recoverable from a diff. Start at [decisions/README.md](decisions/README.md)
   for the themed index.
