@@ -1,14 +1,15 @@
 ---
-name: verify-app
-description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. Invoke as /verify-app when verifying an app/ UI change. Covers npm ci, next dev, a Playwright screenshot recipe, and the key routes / test restaurants.
+name: verifier-app
+description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers npm ci, next dev, a Playwright screenshot recipe, and the key routes / test restaurants.
 ---
 
-# verify-app
+# verifier-app
 
-Evidence-capture protocol for the Next.js app (`app/`) — invoke it
-(`/verify-app`) when verifying an app/ UI change. Goal: get the changed page
-rendering and capture a screenshot a reviewer can look at, not just inspect
-HTML.
+Evidence-capture protocol for the Next.js app (`app/`). The built-in `verify`
+skill looks for a `verifier-*` skill matching the surface — this is it for the
+web UI, so running `/verify` on an `app/` change picks it up automatically.
+Goal: get the changed page rendering and capture a screenshot a reviewer can
+look at, not just inspect HTML.
 
 ## Build + launch
 
