@@ -34,8 +34,8 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
       <div className="grid grid-cols-12 gap-4 items-center px-6 pt-5 pb-2 border-b border-line">
         <div className="col-span-6" />
         <div className="col-span-5 flex justify-between text-[11px] uppercase tracking-[0.12em] text-muted">
-          <span className="text-sage">&larr; lowers risk</span>
-          <span className="text-terra">raises risk &rarr;</span>
+          <span className="text-sage-strong">&larr; lowers risk</span>
+          <span className="text-terra-strong">raises risk &rarr;</span>
         </div>
         <div className="col-span-1" />
       </div>
@@ -97,7 +97,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
               <div
                 className={cn(
                   "col-span-1 num text-right font-medium tabular-nums",
-                  isPositive ? "text-terra" : "text-sage",
+                  isPositive ? "text-terra-strong" : "text-sage-strong",
                 )}
               >
                 {sign}

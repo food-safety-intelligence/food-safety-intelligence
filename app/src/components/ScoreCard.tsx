@@ -87,7 +87,7 @@ export function ScoreCard({
             title={topDriver.label}
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-w-full text-[12.5px] font-medium",
-              topRaises ? "bg-terra/10 text-terra" : "bg-sage/15 text-sage",
+              topRaises ? "bg-terra/10 text-terra-strong" : "bg-sage/15 text-sage-strong",
             )}
           >
             <TopIcon className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
