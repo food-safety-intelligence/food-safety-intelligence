@@ -173,13 +173,8 @@ export function MapExplorer({
                   placeholder="Search food establishments or addresses"
                   className="bg-transparent flex-1 text-[16px] placeholder:text-muted/70 focus:outline-none"
                   aria-label="Search food establishments or addresses"
+                  title={`Searches all ${total.toLocaleString()} indexed food establishments, across every risk tier.`}
                 />
-                <span
-                  className="text-[10px] text-muted/80 px-2 py-1 rounded-md bg-tint"
-                  title={`Searches all ${total.toLocaleString()} indexed food establishments server-side, across every risk tier.`}
-                >
-                  {total.toLocaleString()} indexed
-                </span>
               </div>
               <div className="flex flex-wrap items-center gap-1.5 px-2 pt-2 pb-1">
                 {ALL_TIERS.map((tier) => (
@@ -275,9 +270,8 @@ export function MapExplorer({
                   </>
                 ) : (
                   <>
-                    Top {listRows.length.toLocaleString()} by risk ·{" "}
-                    {total.toLocaleString()} indexed (search or sort A–Z for the
-                    rest)
+                    Top {listRows.length.toLocaleString()} by risk — search or
+                    sort A–Z for the rest
                   </>
                 )}
               </p>

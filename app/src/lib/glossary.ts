@@ -43,7 +43,7 @@ export const GLOSSARY = {
     id: "risk-tiers",
     term: "Risk tier",
     short:
-      "Our Low / Moderate / Elevated / High bands, assigned from the model's predicted probability (decision record 0008). Distinct from Chicago's own Risk 1–3 category.",
+      "Our Low / Moderate / Elevated / High bands, assigned from the model's predicted probability. Distinct from Chicago's own Risk 1–3 category.",
   },
 } satisfies Record<string, GlossaryEntry>;
 

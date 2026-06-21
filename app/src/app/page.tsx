@@ -8,10 +8,11 @@ import { PinDriverLine } from "@/components/MapView";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
-// The home list is capped for payload size; search/sort/filters narrow the
-// full population server-side (see getHomeView), so the cap never hides a
-// match — it only bounds the no-query "highest-risk" preview.
-const HOME_LIMIT = 200;
+// The no-query default is a "highest-risk" preview, so a small cap is fine.
+// When the user searches or browses A–Z they want to reach matches, so the
+// list is capped much higher there (revealed incrementally via "show more").
+const PREVIEW_LIMIT = 200;
+const SEARCH_LIMIT = 1000;
 
 // A static, generic example of the kind of drivers the model surfaces, so the
 // caregivers promise ("we show the top three drivers") is concrete on the home
@@ -39,9 +40,12 @@ export default async function HomePage({
   const sort: HomeSort = sp.sort === "name" ? "name" : "risk";
   const tiers = parseTiers(sp.tier);
 
+  // Searching or browsing A–Z wants reach; the plain risk view wants a preview.
+  const listLimit = query || sort === "name" ? SEARCH_LIMIT : PREVIEW_LIMIT;
+
   const [payload, view] = await Promise.all([
     loadScores(),
-    getHomeView({ q: query, tiers, sort, listLimit: HOME_LIMIT }),
+    getHomeView({ q: query, tiers, sort, listLimit }),
   ]);
 
   return (
