@@ -437,9 +437,13 @@ export default async function HowItWorksPage() {
                 doesn&apos;t adjust for kitchen volume.
               </li>
               <li>
-                Group performance across facility type and neighborhood
-                hasn&apos;t yet been audited end-to-end; expect uneven
-                calibration in segments with sparse training history.
+                Group performance is audited across facility type and ZIP —
+                per-group precision, coverage, and ranking quality. No systematic
+                unfairness shows up on the coverage lens, though a few small,
+                low-event groups dip on the strictest ranking metric (a base-rate
+                artifact, not bias). The fuller demographic disparate-impact audit
+                — joining census data — is deferred to a later phase, so expect
+                uneven calibration where training history is sparse.
               </li>
             </ul>
           </article>
