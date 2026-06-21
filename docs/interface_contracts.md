@@ -297,6 +297,16 @@ model inference happens in the app** — predictions are precomputed and written
 | `top_drivers` | `list[struct]` | no | 3–5 top SHAP-style drivers. Each struct: `{feature: string, value: string, shap: float, label: string}` where `label` is the plain-English UI string. |
 | `trend_slope_90d` | `float64` | yes | OLS slope of `risk_score` over the last 90 days at this license. Positive = worsening. Null if <2 prior dates. |
 
+**Top-level JSON envelope** (`scores.json`, `schema_version` `0.4.0`): alongside
+`scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
+`label_window_days`, `totals`, and **`calibration`**. `calibration` is the
+Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
+uses it to reconstruct each establishment's calibrated-log-odds driver
+*waterfall* from the row's own `risk_score` + `top_drivers` shap values
+(`calibrated_logit = −(a·L + b)`, `L = intercept + Σ contributions`), so the
+full per-profile waterfall costs three floats total. `top_drivers` now ships
+**5** drivers per row (within the documented 3–5).
+
 **Risk-tier thresholds** (recalibrated in Phase 6 against the actual score distribution):
 
 | Score range | Tier | Approx population share |
