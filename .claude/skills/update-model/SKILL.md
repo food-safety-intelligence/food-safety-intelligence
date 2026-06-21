@@ -131,7 +131,7 @@ Feature *code* may stay if cheap and self-contained (note it's unwired).
 ## Before committing / PR
 - `make test` (or `.venv/bin/python -m pytest -q`) green; `make lint` clean for the
   files you touched (don't expand scope to repo-wide lint debt).
-- Notebook outputs stripped on commit (nbstripout / the `clear-outputs` skill).
+- Notebook outputs stripped on commit by the repo's nbstripout filter.
 - One PR per experiment; squash-merge. If a feature **resets the baseline** that
   later experiments are measured against, land it **first**.
 - Run `/update-docs` to propagate to the changelog + handoff memory.
