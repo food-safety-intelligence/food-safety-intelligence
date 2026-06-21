@@ -1,4 +1,11 @@
-import { ArrowDown, ArrowUp, Minus, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Minus,
+  TrendingDown,
+  TrendingUp,
+  type LucideIcon,
+} from "lucide-react";
 import type { PopulationStats, RestaurantScore } from "@/lib/scores";
 import { trendDirection } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
@@ -27,6 +34,15 @@ const TREND_META = {
     fg: "text-muted",
   },
 } as const;
+
+/**
+ * Render a feature's lucide icon. The icon component is resolved by the caller
+ * and passed in as a prop (a stable reference), so it isn't created during
+ * render — which keeps the dynamic `<Icon/>` out of the component body.
+ */
+function DriverIcon({ icon: Icon, className }: { icon: LucideIcon; className?: string }) {
+  return <Icon className={className} strokeWidth={2} />;
+}
 
 /**
  * Centerpiece score panel on the detail page. A full-width horizontal band:
@@ -59,11 +75,10 @@ export function ScoreCard({
   // the dominant reason is visible without scrolling to the full driver panel.
   const topDriver = restaurant.top_drivers[0] ?? null;
   const topRaises = topDriver ? topDriver.shap > 0 : false;
-  const TopIcon = topDriver ? iconForFeature(topDriver.feature) : null;
 
   // --- band sections ---
   const topFactor =
-    topDriver && TopIcon ? (
+    topDriver ? (
       <div className="flex flex-col gap-1">
         <span className="text-[10.5px] tracking-widest uppercase text-muted">
           Top factor
@@ -75,7 +90,10 @@ export function ScoreCard({
             topRaises ? "bg-terra/10 text-terra-strong" : "bg-sage/15 text-sage-strong",
           )}
         >
-          <TopIcon className="w-3.5 h-3.5 shrink-0" strokeWidth={2} />
+          <DriverIcon
+            icon={iconForFeature(topDriver.feature)}
+            className="w-3.5 h-3.5 shrink-0"
+          />
           <span className="truncate">{topDriver.label}</span>
           {topRaises ? (
             <ArrowUp className="w-3.5 h-3.5 shrink-0" strokeWidth={2.5} />
