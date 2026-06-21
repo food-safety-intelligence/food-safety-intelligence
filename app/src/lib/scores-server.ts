@@ -16,6 +16,7 @@ import type {
   RestaurantScore,
   ScoresPayload,
 } from "@/lib/scores";
+import { toPinDriver } from "@/lib/scores";
 
 // Cached in module scope to avoid re-reading the file on every render. A
 // production build of Next.js calls server modules per request; this cache
@@ -161,15 +162,21 @@ export async function getMapPins(): Promise<PinSummary[]> {
         !Number.isNaN(r.lat) &&
         !Number.isNaN(r.lon),
     )
-    .map<PinSummary>((r) => ({
-      license_id: r.license_id,
-      dba_name: r.dba_name,
-      address: r.address,
-      lat: r.lat,
-      lon: r.lon,
-      risk_score: r.risk_score,
-      risk_tier: r.risk_tier,
-    }))
+    .map<PinSummary>((r) => {
+      // Reduce the full top_drivers list (already in scores.json) to the #1
+      // driver in compact form. `up` = this factor raises risk.
+      const d = r.top_drivers[0];
+      return {
+        license_id: r.license_id,
+        dba_name: r.dba_name,
+        address: r.address,
+        lat: r.lat,
+        lon: r.lon,
+        risk_score: r.risk_score,
+        risk_tier: r.risk_tier,
+        top_driver: d ? toPinDriver(d) : undefined,
+      };
+    })
     .sort((a, b) => b.risk_score - a.risk_score);
   return cachedPins;
 }

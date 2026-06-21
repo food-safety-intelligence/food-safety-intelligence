@@ -11,10 +11,29 @@
 export type RiskTier = "Low" | "Moderate" | "Elevated" | "High";
 
 /**
+ * The single biggest driver, in the compact form carried by a map pin /
+ * list row. This is `top_drivers[0]` reduced to what a one-line glance needs:
+ * the plain-English `label`, the `feature` key (for the topic icon), and the
+ * `up` direction (true = raises risk). The signed `shap` magnitude is dropped
+ * — rows show direction, not the precise log-odds value (that lives on the
+ * detail page).
+ */
+export interface PinDriver {
+  feature: string;
+  label: string;
+  up: boolean;
+}
+
+/**
  * Minimal per-restaurant record shipped to the map for zoom-aware density.
  * Keep this lean — at 23k+ rows every extra field is a noticeable RSC
  * payload hit. The map uses this set for pins; clicking a pin opens the
  * detail page (which fetches the full record server-side).
+ *
+ * `top_driver` is the one deliberate exception to "keep it lean": carrying
+ * the #1 driver lets the map popup and the search-result list rows answer
+ * "what's driving this?" without a detail-page round-trip. We ship only the
+ * top driver (not all 4), so the per-pin cost stays bounded.
  */
 export interface PinSummary {
   license_id: string;
@@ -24,6 +43,7 @@ export interface PinSummary {
   lon: number;
   risk_score: number;
   risk_tier: RiskTier;
+  top_driver?: PinDriver;
 }
 
 export interface Driver {
@@ -133,6 +153,16 @@ export const TIER_HEX: Record<RiskTier, string> = {
   Elevated: "#DA8A6C",
   High: "#B8634A",
 };
+
+/**
+ * Reduce a full {@link Driver} to the compact {@link PinDriver} a map pin /
+ * list row carries: keep the label + feature key (for the icon), and collapse
+ * the signed `shap` to an `up` direction (true = raises risk). A zero `shap`
+ * counts as not-raising (`up=false`), matching the sage "lowers risk" styling.
+ */
+export function toPinDriver(d: Driver): PinDriver {
+  return { feature: d.feature, label: d.label, up: d.shap > 0 };
+}
 
 export type TrendDirection = "improving" | "stable" | "worsening";
 

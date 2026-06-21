@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
-import type { PinSummary, RestaurantScore, RiskTier } from "@/lib/scores";
-import { TIER_HEX, TIER_TEXT_CLASS } from "@/lib/scores";
+import type { PinDriver, PinSummary, RestaurantScore, RiskTier } from "@/lib/scores";
+import { TIER_HEX, TIER_TEXT_CLASS, toPinDriver } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
-import { MapView } from "@/components/MapView";
+import { MapView, PinDriverLine } from "@/components/MapView";
 import { cn } from "@/lib/utils";
 
 const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
@@ -20,6 +20,7 @@ type ListRow = {
   risk_score: number;
   risk_tier: RiskTier;
   trend_slope_90d: number | null;
+  top_driver?: PinDriver;
 };
 
 /**
@@ -78,14 +79,18 @@ export function MapExplorer({
         .slice()
         .sort((a, b) => b.risk_score - a.risk_score)
         .slice(0, 200)
-        .map<ListRow>((r) => ({
-          license_id: r.license_id,
-          dba_name: r.dba_name,
-          address: r.address,
-          risk_score: r.risk_score,
-          risk_tier: r.risk_tier,
-          trend_slope_90d: r.trend_slope_90d,
-        }));
+        .map<ListRow>((r) => {
+          const d = r.top_drivers[0];
+          return {
+            license_id: r.license_id,
+            dba_name: r.dba_name,
+            address: r.address,
+            risk_score: r.risk_score,
+            risk_tier: r.risk_tier,
+            trend_slope_90d: r.trend_slope_90d,
+            top_driver: d ? toPinDriver(d) : undefined,
+          };
+        });
     }
     return pins
       .filter((p) => activeTiers.has(p.risk_tier))
@@ -100,6 +105,7 @@ export function MapExplorer({
         risk_score: p.risk_score,
         risk_tier: p.risk_tier,
         trend_slope_90d: null,
+        top_driver: p.top_driver,
       }));
   }, [scores, pins, activeTiers, hasQuery, trimmedQuery]);
 
@@ -214,6 +220,11 @@ export function MapExplorer({
                       <TierPill tier={r.risk_tier} size="sm" />
                       <TrendIndicator slope={r.trend_slope_90d} />
                     </div>
+                    {r.top_driver && (
+                      <div className="mt-1.5">
+                        <PinDriverLine driver={r.top_driver} />
+                      </div>
+                    )}
                   </div>
                   <div
                     className={cn(
