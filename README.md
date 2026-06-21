@@ -31,6 +31,7 @@ git clone <repo> && cd food-safety-intelligence
 uv sync --extra dev          # creates .venv, installs deps
 uv run nbstripout --install  # one-time: wire the git filter that
                              # strips notebook outputs on commit
+git config core.hooksPath .githooks  # one-time: enable the ruff pre-commit hook
 cp .env.example .env         # default settings work; edit if needed
 ```
 

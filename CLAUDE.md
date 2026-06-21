@@ -217,6 +217,14 @@ source of truth.
 - No `print(df)` in committed notebooks — use `df.head()` or `peek(df, name)`.
 - Every modeling notebook starts with: owner, date, train cutoff, label window,
   dataset version (parquet mtime). Ends with: saved artifact path + one-line metric.
+- **Run `make lint` before every commit so ruff errors don't accumulate.** The
+  `.githooks/pre-commit` hook enforces `ruff check` + `ruff format --check` on
+  commit — enable it once per clone with `git config core.hooksPath .githooks`
+  (see README setup). Fix with `ruff check --fix . && ruff format .`. **Notebooks
+  are NOT linted** (excluded in `pyproject.toml` — cell idioms like
+  imports-after-markdown are normal); only the package, scripts, tests, and agents
+  are. Suppress a genuinely-deliberate finding with a scoped `# noqa: <CODE>`
+  (e.g. an import that must follow `sys.path` setup), not a bare `# noqa`.
 
 ### TypeScript (`app/`)
 
