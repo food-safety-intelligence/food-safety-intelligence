@@ -2,7 +2,8 @@
 
 - **Status**: Accepted (living charter for this iteration; review before any real deployment)
 - **Date**: 2026-06-15 (revised 2026-06-21 — added principle 6 + the re-inspection
-  feedback-loop residual risk for the current-inspection outcome features)
+  feedback-loop residual risk for the current-inspection outcome features; added
+  principle 7 — label scope as a responsible-AI choice, per [0007](0007-target-label-definition-and-scope.md))
 - **Owners to ack**: all (Bella, Jun, Arun, Deepak, Aurelia) — fairness is everyone's
 
 > This record consolidates the project's responsible-AI stance and the bias
@@ -91,6 +92,28 @@ isn't a post-hoc checkbox here; it shapes what we build.
      and SHAP shows `was_fail` driving it openly. But the methodology page and UI
      must say plainly that many top-decile flags are "recently failed," consistent
      with principle 1 (a signal, not a verdict).
+
+7. **Label scope (`fail-or-priority`, not `fail-only`) — a responsible-AI choice.**
+   The label sets the *breadth* of the risk signal, so its choice is an ethics
+   decision, not only a modeling one (full rationale + CV evidence in
+   [0007](0007-target-label-definition-and-scope.md)). The tension: a broader
+   target (Fail **or** a priority violation, codes 1–29) flags more restaurants —
+   a real over-flagging / reputational-harm risk — while a narrower fail-only
+   target under-protects the people the product is most for. Our stance:
+   - **The broader net favors recall of genuine hazards.** Codes 1–29 are the
+     city's own serious tier; many of them occur on inspections that technically
+     *pass*. For the vulnerable-diner / `caregivers` persona, a missed
+     serious-but-passing hazard is a worse error than an over-flag, so the broader
+     label is the more protective choice.
+   - **We manage over-flagging by framing, not by narrowing the target.**
+     Principle 1 ("risk signal, not verdict"), the risk-tier presentation, and the
+     top-K operating point bound how many restaurants we actually surface
+     regardless of the label's prevalence — that's the right lever, not amputating
+     the priority-violation arm.
+   - **Narrowing to fail-only would make the signal *less* defensible**, not more:
+     it concentrates the target on the mandated re-inspection cadence (principle 6
+     / the re-inspection residual risk), i.e. more administrative artifact and less
+     food safety.
 
 ## Known residual risks (carry into the model card + Phase 2)
 
