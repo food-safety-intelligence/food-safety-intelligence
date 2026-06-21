@@ -22,6 +22,7 @@ import pandas as pd
 
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
 from foodsafety.models.evaluate import evaluate, operating_point_table
+from foodsafety.tracking import provenance
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
@@ -44,8 +45,11 @@ def main() -> None:
 
     df = pd.read_parquet(FEATURES_PATH)
     df["inspection_date"] = pd.to_datetime(df["inspection_date"])
-    # Honest basis: drop burn-in (no label) and right-truncated rows (their
+    # Served basis: drop burn-in (no label) and right-truncated rows (their
     # forward window runs past the data, so their labels are under-counted).
+    # This is the review-time-filtered "served" test in docs/experiments.md
+    # (n≈7,008), not the unfiltered "honest test" (n≈13,812) — they are not
+    # directly comparable, so we report one basis and name it.
     df = df[(~df["is_burnin"]) & (~df["right_truncated"])].dropna(subset=[LABEL_COL])
 
     train = df[df["inspection_date"] < TRAIN_END]
@@ -61,7 +65,13 @@ def main() -> None:
 
     payload = {
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "model_version": "baseline_logreg_sigmoid",
+        # Uncalibrated baseline: operating points + PR/ROC-AUC are rank-based, so
+        # they're identical to the sigmoid-calibrated served form (see docstring).
+        # The string names the estimator family, not a calibration step we ran.
+        "model_version": "baseline_logreg",
+        # Provenance — ties these numbers to the exact code + dataset that
+        # produced them, so the page can't silently drift from the served model.
+        "provenance": provenance(FEATURES_PATH, ALL_FEATURES, REPO_ROOT),
         "test": {
             "n": int(len(test)),
             "prevalence": round(float(report.positive_rate), 4),
