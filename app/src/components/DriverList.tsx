@@ -59,11 +59,11 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
       {/* Axis legend — full width on mobile (bars stack full width below each
           label); aligned over the bar column on desktop. */}
       <div className="px-5 sm:px-6 pt-5 pb-2 border-b border-line">
-        <div className="flex justify-between text-[11px] uppercase tracking-[0.12em] sm:grid sm:grid-cols-12 sm:gap-4">
-          <span className="text-sage-strong sm:col-start-7 sm:col-span-3">
+        <div className="flex justify-center gap-8 text-[11px] uppercase tracking-[0.12em] sm:grid sm:grid-cols-12 sm:gap-4">
+          <span className="text-sage-strong sm:col-start-7 sm:col-span-3 sm:text-right">
             &larr; lowers risk
           </span>
-          <span className="text-terra-strong text-right sm:col-span-2">
+          <span className="text-terra-strong sm:col-start-10 sm:col-span-2 sm:text-left">
             raises risk &rarr;
           </span>
         </div>

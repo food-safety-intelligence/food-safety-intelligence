@@ -41,7 +41,7 @@ export default async function RestaurantDetailPage({
     <>
       <SiteHeader activeNav="search" />
 
-      <div className="max-w-[1240px] mx-auto px-8 mt-5">
+      <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
@@ -131,7 +131,7 @@ export default async function RestaurantDetailPage({
                   How the score adds up
                 </h3>
                 <Link
-                  href="/how-it-works"
+                  href="/how-it-works#calibrated-log-odds"
                   className="text-[13px] text-teal hover:underline"
                 >
                   What is calibrated log-odds?
