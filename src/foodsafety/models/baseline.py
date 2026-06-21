@@ -68,6 +68,14 @@ NUMERIC_FEATURES: list[str] = [
     "priority_violation_trend",
     "prior_fails_365d",
     "prior_priority_violations_365d",
+    # Current-inspection own outcome (the anchor's own result + code counts).
+    # Leak-free: observed at as_of_date, label window is strictly after it. The
+    # model otherwise only sees PRIOR outcomes + the current comment's keyword
+    # flags, never the current visit's own Fail / code counts. (Re-inspection
+    # dynamic noted in inspection_features.py — validated at eval.)
+    "was_fail",
+    "n_priority_this_inspection",
+    "n_core_this_inspection",
     # Calendar. Deliberate omissions:
     #   - `temporal_year`: time-anchored, doesn't generalise across the
     #     chronological split (every test row has year > all train years).
