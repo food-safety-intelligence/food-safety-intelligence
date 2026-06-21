@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { loadMethodology } from "@/lib/methodology-server";
+import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import { cn } from "@/lib/utils";
 
 /**
@@ -118,10 +119,7 @@ export default async function HowItWorksPage() {
             <h2 className="text-[1.5rem] font-medium tracking-tight">
               The label
             </h2>
-            <p
-              id="priority-violations"
-              className="text-[15.5px] text-muted leading-relaxed mt-2"
-            >
+            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
               For each inspection, we ask: in the 180 days that follow, does
               the same food establishment have either a Fail result OR a priority
               violation (Chicago codes 1–29)? Priority violations are the
@@ -442,6 +440,33 @@ export default async function HowItWorksPage() {
                 calibration in segments with sparse training history.
               </li>
             </ul>
+          </article>
+
+          <article id="definitions">
+            <h2 className="text-[1.5rem] font-medium tracking-tight">
+              Definitions
+            </h2>
+            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+              The recurring terms used across the score, the drivers, and the
+              inspection history.
+            </p>
+            <dl className="mt-4 space-y-4">
+              {GLOSSARY_ORDER.map((key) => {
+                const entry = GLOSSARY[key];
+                return (
+                  <div
+                    key={entry.id}
+                    id={entry.id}
+                    className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
+                  >
+                    <dt className="font-medium text-ink">{entry.term}</dt>
+                    <dd className="text-[14.5px] text-muted leading-relaxed mt-1">
+                      {entry.short}
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
           </article>
         </section>
       </main>

@@ -1,6 +1,8 @@
 import type { Driver } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { descriptionForFeature } from "@/lib/driver-descriptions";
+import { glossaryKeyForFeature } from "@/lib/glossary";
+import { DefineTerm } from "@/components/DefineTerm";
 import { cn } from "@/lib/utils";
 
 /**
@@ -73,6 +75,8 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
           const Icon = iconForFeature(d.feature);
           // Prefer a server-provided detail; otherwise explain the feature.
           const description = d.detail || descriptionForFeature(d.feature);
+          // If this factor maps to a defined term, offer an in-context definition.
+          const termKey = glossaryKeyForFeature(d.feature);
           const barStyle = isPositive
             ? { left: "50%", width: `${halfPct}%` }
             : { right: "50%", width: `${halfPct}%` };
@@ -106,6 +110,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div className="font-semibold">{d.label}</div>
+                  {termKey && <DefineTerm termKey={termKey} />}
                 </div>
                 {description && (
                   <div className="text-[12.5px] text-muted mt-0.5 leading-snug">

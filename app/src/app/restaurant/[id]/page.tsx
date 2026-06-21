@@ -107,10 +107,10 @@ export default async function RestaurantDetailPage({
             </div>
             <div className="col-span-12 lg:col-span-5 lg:text-right">
               <Link
-                href="/how-it-works#priority-violations"
+                href="/how-it-works#definitions"
                 className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
               >
-                What is a priority violation?
+                Term definitions →
               </Link>
             </div>
           </div>
