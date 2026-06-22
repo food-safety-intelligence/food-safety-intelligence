@@ -23,6 +23,7 @@ import pandas as pd
 import requests
 
 from foodsafety.config import SODA_BASE
+from foodsafety.io import storage
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -138,19 +139,20 @@ def fetch_soda_keyset(
     url = f"{SODA_BASE}/{dataset_id}.json"
     cursor = cursor_start
     frames: list[pd.DataFrame] = []
-    shards: list[Path] = []
-    shard_dir_path: Path | None = Path(shard_dir) if shard_dir is not None else None
+    # shard_dir may be a local path or an s3:// prefix — route every shard read/write
+    # through storage so crash-resume works in both. Never Path()-wrap it (that
+    # collapses the // after the s3 scheme).
+    shards: list[str] = []
 
-    # Resume from existing shards on disk, if any.
-    if shard_dir_path is not None:
-        shard_dir_path.mkdir(parents=True, exist_ok=True)
-        existing = sorted(shard_dir_path.glob("page_*.parquet"))
+    # Resume from existing shards already written, if any.
+    if shard_dir is not None:
+        existing = storage.glob(shard_dir, "page_*.parquet")
         if existing:
             shards = existing
-            last = pd.read_parquet(existing[-1])
+            last = storage.read_parquet(existing[-1])
             cursor = str(last[cursor_col].max())
             if verbose:
-                cum = sum(len(pd.read_parquet(s)) for s in shards)
+                cum = sum(len(storage.read_parquet(s)) for s in shards)
                 print(
                     f"  resuming from {len(shards)} shard(s): {cum:,} rows, cursor -> {cursor[:19]}"
                 )
@@ -171,12 +173,14 @@ def fetch_soda_keyset(
             break
         frames.append(chunk)
 
-        # Persist this page to disk immediately so a downstream crash (or a
-        # killed kernel) doesn't lose it.
-        if shard_dir_path is not None:
-            shard_path = shard_dir_path / f"page_{page:04d}.parquet"
-            chunk.astype({c: "string" for c in chunk.select_dtypes("object").columns}).to_parquet(
-                shard_path, index=False
+        # Persist this page immediately so a downstream crash (or a killed kernel)
+        # doesn't lose it. Goes to local disk or S3 depending on shard_dir.
+        if shard_dir is not None:
+            shard_path = storage.join(str(shard_dir), f"page_{page:04d}.parquet")
+            storage.write_parquet(
+                chunk.astype({c: "string" for c in chunk.select_dtypes("object").columns}),
+                shard_path,
+                index=False,
             )
             shards.append(shard_path)
 
@@ -189,10 +193,10 @@ def fetch_soda_keyset(
         cursor = chunk[cursor_col].iloc[-1]
         time.sleep(0.2)
 
-    # Prefer shards if available (already on disk, dtype-normalized). Else use
+    # Prefer shards if available (already persisted, dtype-normalized). Else use
     # the in-memory frames. Empty case returns an empty DataFrame.
     if shards:
-        out = pd.concat([pd.read_parquet(s) for s in shards], ignore_index=True)
+        out = pd.concat([storage.read_parquet(s) for s in shards], ignore_index=True)
     elif frames:
         out = pd.concat(frames, ignore_index=True)
     else:
@@ -203,14 +207,12 @@ def fetch_soda_keyset(
     if verbose and len(out) != before:
         print(f"  after dedupe: {len(out):,} rows (removed {before - len(out):,})")
 
-    # On clean success, remove the shard dir so the next run starts fresh.
-    if shard_dir_path is not None:
+    # On clean success, drop the shard files so the next run starts fresh. No
+    # directory removal: S3 has no real directories, and an empty local shard dir
+    # under data/ is gitignored and harmless.
+    if shard_dir is not None:
         for s in shards:
-            s.unlink(missing_ok=True)
-        try:
-            shard_dir_path.rmdir()
-        except OSError:
-            pass  # not empty for some reason; leave it for the user to inspect
+            storage.delete(s)
 
     return out
 
