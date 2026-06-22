@@ -307,6 +307,19 @@ uses it to reconstruct each establishment's calibrated-log-odds driver
 full per-profile waterfall costs three floats total. `top_drivers` now ships
 **5** drivers per row (within the documented 3–5).
 
+> **PROPOSED — worklist surface (pending owner sign-off; NOT yet active).** To
+> support an inspector-facing worklist (stakes-weighted + an early-warning watch
+> list), add three **additive, backward-compatible** columns — existing columns are
+> unchanged, so an app that ignores unknown fields is unaffected. This is a schema
+> change, so it requires a PR tagging all owners (Arun, Bella, Deepak, Aurelia, Jun).
+> Evidence + rationale: [`worklist_surface_proposal.md`](worklist_surface_proposal.md).
+>
+> | Column | dtype | Nullable | Description |
+> |---|---|---|---|
+> | `last_inspection_passed` | `bool` | no | Did the anchor (most recent) inspection pass? Drives Active-risk vs Early-warning-watch segmentation (`= was_fail == 0`). |
+> | `stakes_weight` | `float64` | no | Vulnerability multiplier for the population the facility serves (1.0 default; 3.0 for daycare / school / children's / long-term-care / hospital / shelter). Tunable policy knob. |
+> | `stakes_score` | `float64` | no | `risk_score × stakes_weight` — the worklist ranking key. |
+
 **Risk-tier thresholds** (recalibrated in Phase 6 against the actual score distribution):
 
 | Score range | Tier | Approx population share |
