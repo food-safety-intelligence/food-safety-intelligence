@@ -22,25 +22,37 @@ _PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 _DATA_DIR: str = os.environ.get("FOODSAFETY_DATA_DIR") or str(_PROJECT_ROOT / "data")
 
 
-def _sub(base: str, name: str) -> str | Path:
-    """Join a subdir onto a base that may be local or s3://.
+def _join(base: str | Path, *parts: str) -> str | Path:
+    """Join path parts onto a base that may be local or s3://.
 
     Keep local roots as ``Path`` (notebooks/scripts do Path ops on them); for an
     ``s3://`` base return a plain string prefix, because ``Path`` collapses the
     ``//`` after the scheme into ``s3:/bucket``.
     """
-    if base.startswith("s3://"):
-        return f"{base.rstrip('/')}/{name}"
-    return Path(base) / name
+    if str(base).startswith("s3://"):
+        out = str(base).rstrip("/")
+        for part in parts:
+            out = f"{out}/{part.strip('/')}"
+        return out
+    return Path(base).joinpath(*parts)
 
 
 DATA_DIR: str | Path = _DATA_DIR if _DATA_DIR.startswith("s3://") else Path(_DATA_DIR)
 
-RAW_DIR: str | Path = _sub(_DATA_DIR, "raw")
-INTERIM_DIR: str | Path = _sub(_DATA_DIR, "interim")
-PROCESSED_DIR: str | Path = _sub(_DATA_DIR, "processed")
-MODELS_DIR: str | Path = _sub(_DATA_DIR, "models")
-PREDICTIONS_DIR: str | Path = _sub(_DATA_DIR, "predictions")
+RAW_DIR: str | Path = _join(_DATA_DIR, "raw")
+INTERIM_DIR: str | Path = _join(_DATA_DIR, "interim")
+PROCESSED_DIR: str | Path = _join(_DATA_DIR, "processed")
+MODELS_DIR: str | Path = _join(_DATA_DIR, "models")
+PREDICTIONS_DIR: str | Path = _join(_DATA_DIR, "predictions")
+
+# Canonical feature-set artifact for the migrated pipeline. Versioned under
+# processed/features/<name>.parquet (rather than a flat processed/features.parquet) so
+# multiple experiments can keep distinctly-named sets side by side; the exact contract
+# version is still recorded as the feature_set_version hash in each run's metadata.
+# Override the name with FOODSAFETY_FEATURES_NAME. build_features.py writes this path;
+# retrain reads it.
+FEATURES_NAME: str = os.environ.get("FOODSAFETY_FEATURES_NAME") or "features_current_inspection"
+FEATURES_PATH: str | Path = _join(PROCESSED_DIR, "features", f"{FEATURES_NAME}.parquet")
 
 # Web-app JSON targets — the three files the Next.js app reads (scores.json,
 # inspection_history.json, methodology.json). Default writes under app/public/data

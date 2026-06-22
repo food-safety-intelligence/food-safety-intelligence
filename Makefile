@@ -1,29 +1,33 @@
 # Food Safety Intelligence — top-level commands.
 #
-# Pipeline order for a clean rebuild:
-#   1. make features                — build features.parquet
-#   2. make retrain                 — train baseline + write scores.json
-#      make history                 — export per-restaurant inspection history
+# Pipeline scripts (all read/write FOODSAFETY_DATA_DIR — local by default, or an
+# s3:// base):
+#     data       — pull raw SODA datasets → RAW_DIR
+#     features   — build the feature set → processed/features/<name>.parquet
+#     retrain    — train + score + export scores.json
+#     history    — export per-restaurant inspection history → JSON sidecar
+#     publish    — upload the built deploy artifacts (model, features, scores, JSON) → S3
+#     normalize  — clean nbformat cell IDs on all notebooks
+#     test, lint
 #
-# Quick rebuild (raw data already fetched):
-#   make features && make retrain history
-#
-# EDA / labels / other raw data: open notebooks/0{0..6}_*.ipynb
+# Full local rebuild:           make data features retrain history
+# Against S3:  FOODSAFETY_DATA_DIR=s3://food-safety-intelligence-data make data features retrain history
+# Publish a local build to S3:  make features retrain history && make publish
+# The EDA / label-construction steps still run from notebooks/0{1,2}_*.ipynb.
 
-.PHONY: help fetch_bldg_violations features retrain history normalize test lint clean
+.PHONY: help data features retrain history publish normalize test lint clean
 
 help:
-	@echo "Python pipeline:"
-	@echo "  features               Build features.parquet (inspections + licenses)"
-	@echo "  retrain                Retrain baseline w/ sigmoid calibration → scores.json"
-	@echo "  history                Export inspections_labeled.parquet → inspection_history.json"
-	@echo "  normalize              Rewrite notebooks so nbformat cell IDs are persisted"
+	@echo "Python pipeline (working today):"
+	@echo "  data       Pull raw SODA datasets → RAW_DIR"
+	@echo "  features   Build the feature set → processed/features/<name>.parquet"
+	@echo "  retrain    Retrain baseline w/ sigmoid calibration → scores.json"
+	@echo "  history    Export inspections_labeled.parquet → inspection_history.json"
+	@echo "  publish    Upload the built deploy artifacts to S3 (scripts/publish.py)"
+	@echo "  normalize  Rewrite notebooks so nbformat cell IDs are persisted"
 	@echo ""
-	@echo "Not yet scripted — run from notebooks/:"
-	@echo "  data       Fetch raw datasets (run notebooks/00_feasibility_eda.ipynb)"
-	@echo ""
-	@echo "Optional (building-violation features are unwired — revisit only):"
-	@echo "  fetch_bldg_violations  Fetch building violations → data/raw/building_violations.parquet"
+	@echo "  data/features/retrain/history read/write FOODSAFETY_DATA_DIR (local or s3://)."
+	@echo "  Label construction still runs from notebooks/0{1,2}_*.ipynb."
 	@echo ""
 	@echo "Quality:"
 	@echo "  test       Run pytest"
@@ -32,8 +36,8 @@ help:
 	@echo ""
 	@echo "Web app (run separately, see README): cd app && npm run dev"
 
-fetch_bldg_violations:
-	PYTHONPATH=src $(PYTHON) scripts/fetch_building_violations.py
+data:
+	PYTHONPATH=src $(PYTHON) scripts/ingest_raw.py
 
 features:
 	PYTHONPATH=src $(PYTHON) scripts/build_features.py
@@ -43,6 +47,9 @@ retrain:
 
 history:
 	PYTHONPATH=src $(PYTHON) scripts/export_inspection_history.py
+
+publish:
+	PYTHONPATH=src $(PYTHON) scripts/publish.py
 
 normalize:
 	$(PYTHON) scripts/normalize_notebooks.py
