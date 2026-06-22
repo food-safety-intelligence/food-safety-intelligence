@@ -39,13 +39,16 @@ def git_info(repo_root: Path) -> dict:
         return {"commit": None, "short": "nogit", "dirty": None}
 
 
-def sha256_file(path: Path, chunk: int = 1 << 20) -> str:
-    """Content hash of a file — a stable dataset identity (mtime is not)."""
-    h = hashlib.sha256()
-    with open(path, "rb") as f:
-        for block in iter(lambda: f.read(chunk), b""):
-            h.update(block)
-    return h.hexdigest()
+def sha256_file(path: Path | str) -> str:
+    """Content hash of a file/object — a stable dataset identity (mtime is not).
+
+    Reads through the storage layer so it hashes a local path or an ``s3://`` URI
+    identically. Lazy import keeps this module import-light for callers that only
+    need ``git_info`` / ``feature_set_version``.
+    """
+    from foodsafety.io import storage
+
+    return hashlib.sha256(storage.read_bytes(path)).hexdigest()
 
 
 def feature_set_version(features: list[str]) -> str:
