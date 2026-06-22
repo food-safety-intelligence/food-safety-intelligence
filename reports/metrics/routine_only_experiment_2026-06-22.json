@@ -1,0 +1,174 @@
+{
+  "experiment": "routine_only_target_reframe",
+  "date": "2026-06-22",
+  "config": {
+    "routine_type": "Canvass (exact, case-insensitive)",
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_train_full": 79268,
+    "n_train_canvass": 38751,
+    "n_test_full": 13812,
+    "n_test_canvass": 6678
+  },
+  "v36_full_test_reference": {
+    "logreg": [
+      0.332,
+      0.37
+    ],
+    "xgb": [
+      0.338,
+      0.376
+    ]
+  },
+  "gate_note": "The reframe's gate is routine_only vs full_on_canvass (SAME canvass test set), NOT vs the v36 full-test numbers \u2014 removing re-inspection anchors lowers headline metrics by construction. A single-split pass is not final: confirm any win with expanding_year_folds CV.",
+  "results": {
+    "logreg": {
+      "full_baseline": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344211,
+        "roc_auc": 0.826518,
+        "precision_at_5pct": 0.434153,
+        "precision_at_10pct": 0.36903,
+        "precision_at_20pct": 0.284111,
+        "recall_at_5pct": 0.245298,
+        "recall_at_10pct": 0.417007,
+        "recall_at_20pct": 0.641864,
+        "top_decile_lift": 4.16766,
+        "brier_score": 0.154269,
+        "log_loss": 0.490802
+      },
+      "full_baseline_reproduces_v36": false,
+      "full_on_canvass": {
+        "n": 6678,
+        "positive_rate": 0.07652,
+        "pr_auc": 0.333297,
+        "roc_auc": 0.83398,
+        "precision_at_5pct": 0.41018,
+        "precision_at_10pct": 0.353293,
+        "precision_at_20pct": 0.259731,
+        "recall_at_5pct": 0.268102,
+        "recall_at_10pct": 0.46184,
+        "recall_at_20pct": 0.679061,
+        "top_decile_lift": 4.617013,
+        "brier_score": 0.138164,
+        "log_loss": 0.446874
+      },
+      "routine_only": {
+        "n": 6678,
+        "positive_rate": 0.07652,
+        "pr_auc": 0.329235,
+        "roc_auc": 0.834288,
+        "precision_at_5pct": 0.416168,
+        "precision_at_10pct": 0.350299,
+        "precision_at_20pct": 0.261228,
+        "recall_at_5pct": 0.272016,
+        "recall_at_10pct": 0.457926,
+        "recall_at_20pct": 0.682975,
+        "top_decile_lift": 4.577885,
+        "brier_score": 0.143312,
+        "log_loss": 0.4615
+      },
+      "delta_routine_vs_full_on_canvass": {
+        "pr_auc": -0.004062,
+        "precision_at_10pct": -0.002994
+      },
+      "routine_clears_gate_vs_full_on_canvass": false,
+      "diagnostic_full_test": {
+        "top_decile_frac_was_fail": 0.9117,
+        "overall_frac_was_fail": 0.2088,
+        "spearman_score_vs_was_fail": 0.6712
+      },
+      "diagnostic_routine_on_canvass": {
+        "top_decile_frac_was_fail": 0.9686,
+        "overall_frac_was_fail": 0.2221,
+        "spearman_score_vs_was_fail": 0.7082
+      }
+    },
+    "xgb": {
+      "full_baseline": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.352609,
+        "roc_auc": 0.828969,
+        "precision_at_5pct": 0.458755,
+        "precision_at_10pct": 0.372648,
+        "precision_at_20pct": 0.283026,
+        "recall_at_5pct": 0.259199,
+        "recall_at_10pct": 0.421096,
+        "recall_at_20pct": 0.639411,
+        "top_decile_lift": 4.208519,
+        "brier_score": 0.138878,
+        "log_loss": 0.435668
+      },
+      "full_baseline_reproduces_v36": false,
+      "full_on_canvass": {
+        "n": 6678,
+        "positive_rate": 0.07652,
+        "pr_auc": 0.33855,
+        "roc_auc": 0.838828,
+        "precision_at_5pct": 0.428144,
+        "precision_at_10pct": 0.350299,
+        "precision_at_20pct": 0.258234,
+        "recall_at_5pct": 0.279843,
+        "recall_at_10pct": 0.457926,
+        "recall_at_20pct": 0.675147,
+        "top_decile_lift": 4.577885,
+        "brier_score": 0.124746,
+        "log_loss": 0.402865
+      },
+      "routine_only": {
+        "n": 6678,
+        "positive_rate": 0.07652,
+        "pr_auc": 0.33759,
+        "roc_auc": 0.838108,
+        "precision_at_5pct": 0.428144,
+        "precision_at_10pct": 0.35479,
+        "precision_at_20pct": 0.251497,
+        "recall_at_5pct": 0.279843,
+        "recall_at_10pct": 0.463796,
+        "recall_at_20pct": 0.657534,
+        "top_decile_lift": 4.636576,
+        "brier_score": 0.195798,
+        "log_loss": 0.582977
+      },
+      "delta_routine_vs_full_on_canvass": {
+        "pr_auc": -0.00096,
+        "precision_at_10pct": 0.004491
+      },
+      "routine_clears_gate_vs_full_on_canvass": false,
+      "diagnostic_full_test": {
+        "top_decile_frac_was_fail": 0.9653,
+        "overall_frac_was_fail": 0.2088,
+        "spearman_score_vs_was_fail": 0.6175
+      },
+      "diagnostic_routine_on_canvass": {
+        "top_decile_frac_was_fail": 0.991,
+        "overall_frac_was_fail": 0.2221,
+        "spearman_score_vs_was_fail": 0.695
+      }
+    }
+  },
+  "fairness_vulnerable_groups": {
+    "Children's Services Facility": {
+      "n": 174,
+      "recall_full_on_canvass": 0.375,
+      "recall_routine": 0.375
+    },
+    "Daycare": {
+      "n": 127,
+      "recall_full_on_canvass": 0.6667,
+      "recall_routine": 0.6667
+    },
+    "Long Term Care": {
+      "n": 64,
+      "recall_full_on_canvass": 0.2,
+      "recall_routine": 0.4
+    },
+    "School": {
+      "n": 779,
+      "recall_full_on_canvass": 0.6452,
+      "recall_routine": 0.5484
+    }
+  }
+}
