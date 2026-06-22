@@ -10,21 +10,26 @@ notebook run.
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
-from pathlib import Path
 
 import pandas as pd
 
 from foodsafety.config import RAW_DIR
+from foodsafety.io import storage
 
 
 def load_or_fetch(
     name: str,
     fetch_fn: Callable[[], pd.DataFrame],
-    cache_dir: Path | None = None,
+    cache_dir: str | os.PathLike | None = None,
     verbose: bool = True,
 ) -> pd.DataFrame:
     """Load `<cache_dir>/<name>.parquet` if it exists, else fetch and persist.
+
+    The cache target is resolved through `foodsafety.io.storage`, so `cache_dir`
+    may be a local path (default) or an `s3://…` prefix — the same fetch-or-load
+    behaviour serves both. Local parent dirs are created on write.
 
     Args:
         name: dataset name without extension (e.g. "inspections"). The parquet
@@ -33,14 +38,13 @@ def load_or_fetch(
         cache_dir: defaults to `RAW_DIR` from config.
         verbose: print one line on hit / miss.
     """
-    cache_dir = cache_dir or RAW_DIR
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    cache = cache_dir / f"{name}.parquet"
+    cache_dir = cache_dir if cache_dir is not None else RAW_DIR
+    cache = storage.join(str(cache_dir), f"{name}.parquet")
 
-    if cache.exists():
+    if storage.exists(cache):
         if verbose:
             print(f"✓ loading {name} from cache: {cache}")
-        return pd.read_parquet(cache)
+        return storage.read_parquet(cache)
 
     if verbose:
         print(f"↻ fetching {name} from API...")
@@ -50,7 +54,7 @@ def load_or_fetch(
     # SODA returns everything as strings on the wire, but DataFrame inference
     # can promote some to object dtype with stray ints/floats mixed in.
     df = df.astype({c: "string" for c in df.select_dtypes("object").columns})
-    df.to_parquet(cache, index=False)
+    storage.write_parquet(df, cache, index=False)
     if verbose:
         print(f"  saved -> {cache}  ({len(df):,} rows)")
     return df
