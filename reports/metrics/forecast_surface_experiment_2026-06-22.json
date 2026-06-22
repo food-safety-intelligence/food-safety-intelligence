@@ -1,0 +1,114 @@
+{
+  "experiment": "forecast_surface_drop_current_outcome",
+  "date": "2026-06-22",
+  "config": {
+    "dropped_features": [
+      "was_fail",
+      "n_priority_this_inspection",
+      "n_core_this_inspection"
+    ],
+    "estimator": "xgboost (both arms)",
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test": 13812
+  },
+  "overall": {
+    "main": {
+      "n": 13812,
+      "positive_rate": 0.088546,
+      "pr_auc": 0.352609,
+      "roc_auc": 0.828969,
+      "precision_at_5pct": 0.458755,
+      "precision_at_10pct": 0.372648,
+      "precision_at_20pct": 0.283026,
+      "recall_at_5pct": 0.259199,
+      "recall_at_10pct": 0.421096,
+      "recall_at_20pct": 0.639411,
+      "top_decile_lift": 4.208519,
+      "brier_score": 0.138878,
+      "log_loss": 0.435668,
+      "top_decile_frac_was_fail": 0.9653,
+      "top_decile_n_clean": 48
+    },
+    "forecast": {
+      "n": 13812,
+      "positive_rate": 0.088546,
+      "pr_auc": 0.291649,
+      "roc_auc": 0.788179,
+      "precision_at_5pct": 0.397974,
+      "precision_at_10pct": 0.314038,
+      "precision_at_20pct": 0.247195,
+      "recall_at_5pct": 0.224857,
+      "recall_at_10pct": 0.354865,
+      "recall_at_20pct": 0.558463,
+      "top_decile_lift": 3.546597,
+      "brier_score": 0.177296,
+      "log_loss": 0.534173,
+      "top_decile_frac_was_fail": 0.6968,
+      "top_decile_n_clean": 419
+    }
+  },
+  "clean_slice": {
+    "n": 10928,
+    "base_rate": 0.0433,
+    "main": {
+      "pr_auc": 0.1569,
+      "precision_at_10pct": 0.1647,
+      "top_decile_lift": 3.805
+    },
+    "forecast": {
+      "pr_auc": 0.1229,
+      "precision_at_10pct": 0.1345,
+      "top_decile_lift": 3.107
+    }
+  },
+  "early_warning_surfaced": {
+    "forecast_topdecile_n": 1382,
+    "newly_vs_main": 593,
+    "newly_and_clean": 380,
+    "newly_clean_fail_rate": 0.1289,
+    "newly_clean_lift_vs_base": 1.46
+  },
+  "examples": [
+    {
+      "license_id": "2608920",
+      "dba_name": "4 SEASONS",
+      "address": "4755 S ASHLAND AVE"
+    },
+    {
+      "license_id": "2771455",
+      "dba_name": "THE AVONDALE COFFEE CLUB",
+      "address": "3185 N ELSTON AVE"
+    },
+    {
+      "license_id": "3060585",
+      "dba_name": "HENRIETTA",
+      "address": "151 W ADAMS ST"
+    },
+    {
+      "license_id": "2551804",
+      "dba_name": "SEASHELL",
+      "address": "3944 W ROOSEVELT RD"
+    },
+    {
+      "license_id": "2982917",
+      "dba_name": "MASALA MAGIC",
+      "address": "1009-1011 N ORLEANS ST"
+    },
+    {
+      "license_id": "3030724",
+      "dba_name": "BABA'S FAMOUS STEAK AND LEMONADE",
+      "address": "101 E 51ST ST"
+    },
+    {
+      "license_id": "3051312",
+      "dba_name": "RICKETTE WORLD FAMOUS",
+      "address": "641 E 75TH ST"
+    },
+    {
+      "license_id": "3046001",
+      "dba_name": "SHARKS ON DIVISION CORPORATION",
+      "address": "5751 W DIVISION ST"
+    }
+  ]
+}

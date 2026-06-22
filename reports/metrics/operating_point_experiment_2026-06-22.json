@@ -1,0 +1,96 @@
+{
+  "experiment": "operating_point_and_early_warning_worklist",
+  "date": "2026-06-22",
+  "config": {
+    "estimator": "xgboost v36 (main model scores)",
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test_pool": 13812,
+    "base_rate": 0.0885,
+    "policy": {
+      "vuln_multiplier": 3.0,
+      "watch_frac": 0.2,
+      "vulnerable_groups": [
+        "Children's Services Facility",
+        "Daycare",
+        "Hospital",
+        "Long Term Care",
+        "School",
+        "Shelter"
+      ]
+    },
+    "context_city_capacity_per_month": 1529
+  },
+  "stakes_weighting": {
+    "top_5pct": {
+      "k": 691,
+      "random_events": 61.2,
+      "unweighted": {
+        "k": 691,
+        "events_caught": 317,
+        "precision": 0.4588,
+        "vuln_events_caught": 29,
+        "vuln_event_recall": 0.232
+      },
+      "stakes_weighted": {
+        "k": 691,
+        "events_caught": 244,
+        "precision": 0.3531,
+        "vuln_events_caught": 105,
+        "vuln_event_recall": 0.84
+      }
+    },
+    "top_10pct": {
+      "k": 1382,
+      "random_events": 122.4,
+      "unweighted": {
+        "k": 1382,
+        "events_caught": 515,
+        "precision": 0.3726,
+        "vuln_events_caught": 64,
+        "vuln_event_recall": 0.512
+      },
+      "stakes_weighted": {
+        "k": 1382,
+        "events_caught": 485,
+        "precision": 0.3509,
+        "vuln_events_caught": 109,
+        "vuln_event_recall": 0.872
+      }
+    },
+    "top_20pct": {
+      "k": 2763,
+      "random_events": 244.7,
+      "unweighted": {
+        "k": 2763,
+        "events_caught": 782,
+        "precision": 0.283,
+        "vuln_events_caught": 92,
+        "vuln_event_recall": 0.736
+      },
+      "stakes_weighted": {
+        "k": 2763,
+        "events_caught": 767,
+        "precision": 0.2776,
+        "vuln_events_caught": 113,
+        "vuln_event_recall": 0.904
+      }
+    }
+  },
+  "early_warning": {
+    "k": 1382,
+    "pure_topk": {
+      "events_caught": 515,
+      "clean_events_caught": 18,
+      "clean_places_shown": 48
+    },
+    "reserved": {
+      "watch_slots": 276,
+      "events_caught": 502,
+      "clean_events_caught": 72,
+      "watch_slot_events": 61,
+      "watch_slot_fail_rate": 0.221
+    }
+  },
+  "note": "Decision-layer prototype on existing v36 scores \u2014 no model change, no scores.parquet/json contract change. Exposing the watch list + stakes ranking in the app is a separate owner-signed step (Jun/Aurelia) needing a /verify pass. Policy knobs (vuln_multiplier, watch_frac) are defaults to tune with the PM / label owner."
+}
