@@ -120,12 +120,23 @@ the audit in `notebooks/06` and `fairness_audit.md`.
 
 ---
 
-## 2. `data/processed/features.parquet`
+## 2. `processed/features/<name>.parquet`
 
 **Grain**: one row per `(license_id, as_of_date)`.
 **Key**: `(license_id, as_of_date)`.
-**Producer**: `src/foodsafety/features/build.py` (Bella + Deepak).
-**Consumers**: model training, batch scoring.
+**Producer**: `scripts/build_features.py` → `src/foodsafety/features/build.py`
+(Bella + Deepak). Default name `features_current_inspection` (config `FEATURES_NAME`).
+**Consumers**: `scripts/retrain_baseline_sigmoid.py`, batch scoring.
+
+**Storage location.** All pipeline artifacts live under `FOODSAFETY_DATA_DIR` (config) —
+a local path by default (`./data`, so `data/processed/features/<name>.parquet`) or an
+`s3://…` base for the AWS iteration (`s3://<bucket>/processed/features/<name>.parquet`).
+Reads/writes go through `foodsafety.io.storage`, which resolves either to the same
+`(filesystem, path)` interface, so the pipeline runs identically local or on S3. The
+web-app JSON targets live under `FOODSAFETY_WEB_APP_DATA_DIR` (default `app/public/data`,
+or `s3://<bucket>/web-app-data`). The flat `data/processed/features.parquet` is the
+legacy location still used by notebook 03 and the local experiment scripts; the migrated
+pipeline (`make data features retrain`) uses the versioned path above.
 
 `as_of_date` is one row per inspection in the MVP — `as_of_date =
 inspection_date` is set as a synonym in `features/build.py`. The Phase-4
