@@ -1,0 +1,103 @@
+{
+  "experiment": "learning_to_rank_objective",
+  "date": "2026-06-22",
+  "config": {
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test": 13812,
+    "objectives": [
+      "binary:logistic",
+      "rank:pairwise",
+      "rank:ndcg"
+    ],
+    "query_group_size": 256,
+    "ranker_min_child_weight": 1.0,
+    "ranker_params_note": "matches build_xgb_estimator except min_child_weight (1.0 vs 10.0, ranking Hessian scale)"
+  },
+  "v36_xgb_reference": {
+    "pr_auc": 0.338,
+    "precision_at_10pct": 0.376
+  },
+  "note": "Eval-only. Ranker scores min-max scaled for the shared bundle; brier/log_loss are meaningless for the rank arms. A win needs expanding_year_folds CV before any serve/UI change; served LogReg untouched.",
+  "results": {
+    "classifier": {
+      "n": 13812,
+      "positive_rate": 0.088546,
+      "pr_auc": 0.352609,
+      "roc_auc": 0.828969,
+      "precision_at_5pct": 0.458755,
+      "precision_at_10pct": 0.372648,
+      "precision_at_20pct": 0.283026,
+      "recall_at_5pct": 0.259199,
+      "recall_at_10pct": 0.421096,
+      "recall_at_20pct": 0.639411,
+      "top_decile_lift": 4.208519,
+      "brier_score": 0.138878,
+      "log_loss": 0.435668
+    },
+    "rank_pairwise": {
+      "n": 13812,
+      "positive_rate": 0.088546,
+      "pr_auc": 0.338874,
+      "roc_auc": 0.820871,
+      "precision_at_5pct": 0.439942,
+      "precision_at_10pct": 0.363965,
+      "precision_at_20pct": 0.277959,
+      "recall_at_5pct": 0.248569,
+      "recall_at_10pct": 0.411284,
+      "recall_at_20pct": 0.627964,
+      "top_decile_lift": 4.110456,
+      "brier_score": 0.099803,
+      "log_loss": 0.3261,
+      "delta_vs_classifier": {
+        "pr_auc": -0.013735,
+        "precision_at_10pct": -0.008683
+      },
+      "clears_gate_vs_classifier": false,
+      "clears_gate_vs_v36": false
+    },
+    "rank_ndcg": {
+      "n": 13812,
+      "positive_rate": 0.088546,
+      "pr_auc": 0.348068,
+      "roc_auc": 0.829066,
+      "precision_at_5pct": 0.450072,
+      "precision_at_10pct": 0.369754,
+      "precision_at_20pct": 0.281216,
+      "recall_at_5pct": 0.254293,
+      "recall_at_10pct": 0.417825,
+      "recall_at_20pct": 0.635323,
+      "top_decile_lift": 4.175832,
+      "brier_score": 0.102694,
+      "log_loss": 0.350841,
+      "delta_vs_classifier": {
+        "pr_auc": -0.004541,
+        "precision_at_10pct": -0.002894
+      },
+      "clears_gate_vs_classifier": false,
+      "clears_gate_vs_v36": false
+    }
+  },
+  "fairness_vulnerable_groups": {
+    "Children's Services Facility": {
+      "n": 543,
+      "recall_ctrl": 0.5217,
+      "recall_best": 0.5217
+    },
+    "Daycare": {
+      "n": 344,
+      "recall_ctrl": 0.6,
+      "recall_best": 0.5333
+    },
+    "Long Term Care": {
+      "n": 101,
+      "recall_ctrl": 0.5,
+      "recall_best": 0.3333
+    },
+    "School": {
+      "n": 1013,
+      "recall_ctrl": 0.6076,
+      "recall_best": 0.6203
+    }
+  }
+}
