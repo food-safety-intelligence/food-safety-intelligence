@@ -36,6 +36,7 @@ from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 
 from foodsafety.config import DATASETS, PROCESSED_DIR, RAW_DIR
+from foodsafety.features.build import build_features
 from foodsafety.features.building_features import add_building_features
 from foodsafety.io.soda import fetch_soda_keyset
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
@@ -152,47 +153,86 @@ def fetch_building_violations() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 
-def build_experiment_features(violations: pd.DataFrame) -> pd.DataFrame:
-    """Layer building-violation features onto the existing features.parquet.
+def _rebuild_canonical_features() -> pd.DataFrame:
+    """Rebuild features.parquet from inspections_labeled + licenses_historical.
 
-    Rather than re-running the full feature build pipeline (which would
-    require reloading complaints + licenses and re-running all prior_*
-    aggregates), we read the canonical features.parquet — which already has
-    inspection_date, latitude, longitude, and all 36 canonical features —
-    and call add_building_features to append the 9 new columns:
+    Called when features.parquet is stale (missing columns added to ALL_FEATURES
+    since it was last built). Skips the 311 complaints join — those features were
+    tested and dropped from ALL_FEATURES (see baseline.py comments), so omitting
+    them here doesn't affect the experiment.
+    """
+    labeled_path = PROCESSED_DIR / "inspections_labeled.parquet"
+    licenses_hist_path = RAW_DIR / "licenses_historical.parquet"
+    for p in (labeled_path, licenses_hist_path):
+        if not p.exists():
+            raise SystemExit(f"Missing {p} — cannot rebuild features.parquet.")
+
+    print("  Loading inspections_labeled + licenses_historical...")
+    labeled = pd.read_parquet(labeled_path)
+    licenses_historical = pd.read_parquet(licenses_hist_path)
+
+    print("  Running build_features (complaints skipped — not in ALL_FEATURES)...")
+    features = build_features(labeled, complaints=None, licenses_historical=licenses_historical)
+
+    out = features.copy()
+    obj_cols = out.select_dtypes("object").columns
+    out[obj_cols] = out[obj_cols].astype("string")
+    out.to_parquet(FEATURES_PATH, index=False)
+    print(f"  Rebuilt features.parquet → {features.shape[0]:,} rows × {features.shape[1]} cols")
+    return features
+
+
+def build_experiment_features(violations: pd.DataFrame) -> pd.DataFrame:
+    """Build features.parquet (rebuilding if stale) then layer building-violation
+    features on top, saving the result to features_bldg_violations.parquet.
+
+    Adds 9 new columns on top of the 36 canonical ALL_FEATURES:
       - 3 aggregate (all bureaus): 365d/730d counts + recency
       - 5 bureau-specific 365d counts (CONSERVATION / REFRIGERATION / PLUMBING /
         VENTILATION / ELECTRICAL)
       - 1 combined food-safety-bureau recency
 
-    This is safe because add_building_features is stateless: it only uses
-    the anchor's inspection_date + lat/lon to query a BallTree over the
-    building violations, applying the date leak guard independently per row.
+    Stale-cache detection: if either the canonical features.parquet is missing
+    columns from ALL_FEATURES, or the experiment parquet is missing the building
+    violation columns, both are rebuilt from source.
     """
-    if EXPERIMENT_FEATURES_PATH.exists():
-        print(f"Loading cached experiment features → {EXPERIMENT_FEATURES_PATH}")
-        features = pd.read_parquet(EXPERIMENT_FEATURES_PATH)
-        # Verify the new columns are actually present (cache could be stale).
-        if all(c in features.columns for c in BLDG_VIOLATION_FEATURES):
-            return features
-        print("  cache missing violation columns — rebuilding.")
+    # Step 1: ensure canonical features.parquet has all ALL_FEATURES columns.
+    canonical_ok = False
+    if FEATURES_PATH.exists():
+        canonical_cols = set(pd.read_parquet(FEATURES_PATH, columns=[]).columns)
+        missing_canonical = [c for c in ALL_FEATURES if c not in canonical_cols]
+        if missing_canonical:
+            print(
+                f"features.parquet is stale — missing {len(missing_canonical)} columns "
+                f"from ALL_FEATURES: {missing_canonical}"
+            )
+            print("Rebuilding features.parquet from source...")
+            _rebuild_canonical_features()
+        else:
+            canonical_ok = True
+    if not canonical_ok and not FEATURES_PATH.exists():
+        print("features.parquet not found — building from source...")
+        _rebuild_canonical_features()
 
+    # Step 2: check experiment parquet cache.
+    if EXPERIMENT_FEATURES_PATH.exists():
+        exp_cols = set(pd.read_parquet(EXPERIMENT_FEATURES_PATH, columns=[]).columns)
+        if all(c in exp_cols for c in BLDG_VIOLATION_FEATURES + ALL_FEATURES):
+            print(f"Loading cached experiment features → {EXPERIMENT_FEATURES_PATH}")
+            return pd.read_parquet(EXPERIMENT_FEATURES_PATH)
+        print("Experiment features cache is stale — rebuilding.")
+
+    # Step 3: load canonical features and add building violation features.
     print(f"Loading canonical features → {FEATURES_PATH}")
     features = pd.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}")
 
     print("Adding block-face building violation features (~30m BallTree)...")
-    features = add_building_features(
-        features,
-        permits=None,
-        violations=violations,
-    )
+    features = add_building_features(features, permits=None, violations=violations)
 
-    # Validate new columns are present and report coverage.
     for col in BLDG_VIOLATION_FEATURES:
-        n_nonmissing = features[col].notna().sum()
-        pct = 100.0 * n_nonmissing / len(features)
-        print(f"  {col}: {n_nonmissing:,}/{len(features):,} non-null ({pct:.1f}%)")
+        n_nn = features[col].notna().sum()
+        print(f"  {col}: {n_nn:,}/{len(features):,} non-null ({100.0 * n_nn / len(features):.1f}%)")
 
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
     features.to_parquet(EXPERIMENT_FEATURES_PATH, index=False)
