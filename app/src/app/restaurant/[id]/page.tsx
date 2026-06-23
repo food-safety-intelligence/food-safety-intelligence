@@ -17,6 +17,18 @@ import {
 } from "@/lib/scores-server";
 import { formatInspectionDate } from "@/lib/utils";
 
+// Required for `output: 'export'` — pre-generates pages for the top-N restaurants
+// by risk score. Capping at 500 keeps the static build to a manageable size;
+// lower-risk restaurants simply return 404 from the deployed static site.
+export async function generateStaticParams() {
+  const payload = await loadScores();
+  return payload.scores
+    .slice()
+    .sort((a, b) => b.risk_score - a.risk_score)
+    .slice(0, 500)
+    .map((s) => ({ id: s.license_id }));
+}
+
 // In Next.js 16 with the App Router, `params` is a Promise that must be awaited.
 // See node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md.
 export default async function RestaurantDetailPage({
