@@ -104,9 +104,12 @@ def fetch_building_violations() -> pd.DataFrame:
     """Load from cache or fetch from SODA (22u3-xenr).
 
     Fetches violation_date, latitude, longitude, department_bureau — the four
-    columns needed for aggregate + bureau-specific spatial features. The full
-    dataset is ~1.9M records; pulling from 2005-01-01 ensures we have block-face
-    history for every inspection anchor back to the 2019 burn-in period.
+    columns needed for aggregate + bureau-specific spatial features.
+
+    Start date is 2010-01-01 to align with the inspection dataset (earliest
+    inspection: 2010-01-04). Pre-2010 violations would only ever back-fill
+    burn-in rows (pre-2019 inspections) that never enter training, so pulling
+    them wastes bandwidth and disk space.
 
     Cache check: if the parquet already has department_bureau we reuse it;
     if it's an old fetch without that column we re-fetch.
@@ -123,7 +126,10 @@ def fetch_building_violations() -> pd.DataFrame:
     df = fetch_soda_keyset(
         dataset_id=DATASETS["building_violations"],
         cursor_col="violation_date",
-        cursor_start="2005-01-01T00:00:00",
+        # Align with the inspection dataset start (2010-01-04). Pre-2010 violations
+        # would only ever be relevant to burn-in rows (pre-2019 inspections) which
+        # never enter training, so pulling them wastes bandwidth and disk space.
+        cursor_start="2010-01-01T00:00:00",
         where_extra="latitude IS NOT NULL AND longitude IS NOT NULL AND violation_date IS NOT NULL",
         page_size=50_000,
         shard_dir=shard_dir,
