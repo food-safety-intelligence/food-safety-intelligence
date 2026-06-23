@@ -85,6 +85,25 @@ NUMERIC_FEATURES: list[str] = [
     # License-history features (joined from licenses_historical.parquet)
     "license_age_days",
     "license_n_history_rows",
+    # Block-face building violation features (Chicago Building Violations,
+    # 22u3-xenr, 2010-present; BallTree spatial join ~30m radius).
+    # Experiment on this branch: XGBoost test PR-AUC +0.020, precision@10% +0.023.
+    # Bureau split matters — REFRIGERATION/PLUMBING failures are direct food-
+    # safety signals that deserved separate weights from the general CONSERVATION
+    # pool (86% of all violations). 365d single window for sparse bureaus (32–43k
+    # city-wide vs 1.3M for CONSERVATION). See building_features.py + the
+    # experiment metrics in reports/metrics/xgb_bldg_violations_*.json.
+    # Leak guard: events strictly BEFORE inspection_date only (age > 0 in BallTree
+    # date pass; see building_features._block_face_stats).
+    "prior_bldg_violations_365d",
+    "prior_bldg_violations_730d",
+    "days_since_last_bldg_violation",
+    "prior_bldg_conservation_365d",
+    "prior_bldg_refrigeration_365d",
+    "prior_bldg_plumbing_365d",
+    "prior_bldg_ventilation_365d",
+    "prior_bldg_electrical_365d",
+    "days_since_last_food_safety_bldg_violation",
     # 311 features tested across several angles and ALL left OUT — the 311
     # signal is redundant with prior_* inspection history at every spatial scale:
     #   - Spatial RADIUS counts (BallTree 300m): served PR-AUC 0.3147->0.3152
