@@ -66,13 +66,30 @@ ES_START = pd.Timestamp("2024-01-01")
 EMBARGO = pd.Timedelta(days=180)
 
 # --- New features this experiment adds on top of ALL_FEATURES ---------------
-# Only violation features (not permit features) per the experiment scope.
-# The leak guard lives in add_building_features: only events strictly BEFORE the
-# anchor inspection_date count (age > 0 in the BallTree date pass).
+# Two groups, both leak-free (add_building_features enforces age > 0):
+#
+# 1. AGGREGATE: total violation count + recency regardless of bureau type.
+# 2. BUREAU-SPECIFIC: per-bureau counts for the five bureaus directly tied to
+#    food-safety risk (see FOOD_SAFETY_BUREAUS in building_features.py).
+#    CONSERVATION dominates (86% of all violations) but the per-bureau split
+#    lets XGBoost weight REFRIGERATION / PLUMBING separately — REFRIGERATION
+#    failures are a direct food-safety risk and should score differently than
+#    a general structural complaint. Bureau-specific features use a single
+#    365d window to keep the feature count manageable for sparse bureaus
+#    (32–43k rows city-wide vs 1.3M for CONSERVATION).
 BLDG_VIOLATION_FEATURES: list[str] = [
+    # Aggregate (all bureaus)
     "prior_bldg_violations_365d",
     "prior_bldg_violations_730d",
     "days_since_last_bldg_violation",
+    # Food-safety bureau-specific counts (365d)
+    "prior_bldg_conservation_365d",
+    "prior_bldg_refrigeration_365d",
+    "prior_bldg_plumbing_365d",
+    "prior_bldg_ventilation_365d",
+    "prior_bldg_electrical_365d",
+    # Combined food-safety bureau recency
+    "days_since_last_food_safety_bldg_violation",
 ]
 
 EXPERIMENT_FEATURES: list[str] = ALL_FEATURES + BLDG_VIOLATION_FEATURES
@@ -86,14 +103,20 @@ EXPERIMENT_FEATURES: list[str] = ALL_FEATURES + BLDG_VIOLATION_FEATURES
 def fetch_building_violations() -> pd.DataFrame:
     """Load from cache or fetch from SODA (22u3-xenr).
 
-    Selects only violation_date, latitude, longitude — the three columns
-    needed by add_building_features — to minimise transfer size. The full
-    dataset is ~1.4M records; we pull from 2005-01-01 to ensure we have
-    block-face history for every inspection anchor back to the 2019 burn-in.
+    Fetches violation_date, latitude, longitude, department_bureau — the four
+    columns needed for aggregate + bureau-specific spatial features. The full
+    dataset is ~1.9M records; pulling from 2005-01-01 ensures we have block-face
+    history for every inspection anchor back to the 2019 burn-in period.
+
+    Cache check: if the parquet already has department_bureau we reuse it;
+    if it's an old fetch without that column we re-fetch.
     """
     if BV_RAW_PATH.exists():
-        print(f"Loading cached violations → {BV_RAW_PATH}")
-        return pd.read_parquet(BV_RAW_PATH)
+        cached = pd.read_parquet(BV_RAW_PATH)
+        if "department_bureau" in cached.columns:
+            print(f"Loading cached violations → {BV_RAW_PATH} ({len(cached):,} rows)")
+            return cached
+        print("Cached violations missing department_bureau — re-fetching.")
 
     print("Fetching Chicago Building Violations (22u3-xenr)...")
     shard_dir = RAW_DIR / "_partial_building_violations"
@@ -101,15 +124,14 @@ def fetch_building_violations() -> pd.DataFrame:
         dataset_id=DATASETS["building_violations"],
         cursor_col="violation_date",
         cursor_start="2005-01-01T00:00:00",
-        # Select only the three columns needed for the spatial join.
         where_extra="latitude IS NOT NULL AND longitude IS NOT NULL AND violation_date IS NOT NULL",
         page_size=50_000,
         shard_dir=shard_dir,
         verbose=True,
     )
 
-    # Keep only what we need; drop everything else to save disk.
-    keep = ["violation_date", "latitude", "longitude"]
+    # Retain only the four columns needed; drop everything else to save disk.
+    keep = ["violation_date", "latitude", "longitude", "department_bureau"]
     keep = [c for c in keep if c in df.columns]
     df = df[keep].copy()
 
@@ -131,7 +153,11 @@ def build_experiment_features(violations: pd.DataFrame) -> pd.DataFrame:
     require reloading complaints + licenses and re-running all prior_*
     aggregates), we read the canonical features.parquet — which already has
     inspection_date, latitude, longitude, and all 36 canonical features —
-    and call add_building_features to append the three new columns.
+    and call add_building_features to append the 9 new columns:
+      - 3 aggregate (all bureaus): 365d/730d counts + recency
+      - 5 bureau-specific 365d counts (CONSERVATION / REFRIGERATION / PLUMBING /
+        VENTILATION / ELECTRICAL)
+      - 1 combined food-safety-bureau recency
 
     This is safe because add_building_features is stateless: it only uses
     the anchor's inspection_date + lat/lon to query a BallTree over the
