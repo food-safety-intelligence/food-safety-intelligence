@@ -34,17 +34,18 @@ for _tool in ["find_restaurants", "get_safety_score", "explain_restaurant"]:
 # ---------------------------------------------------------------------------
 # Default env vars — overridden by AgentCore runtime environment config.
 # ---------------------------------------------------------------------------
-os.environ.setdefault("SCORES_JSON_PATH",   "/tmp/scores.json")
-os.environ.setdefault("HISTORY_JSON_PATH",  "/tmp/inspection_history.json")
+os.environ.setdefault("SCORES_JSON_PATH", "/tmp/scores.json")
+os.environ.setdefault("HISTORY_JSON_PATH", "/tmp/inspection_history.json")
 os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
-os.environ.setdefault("AWS_REGION",         "us-east-1")
-os.environ.setdefault("DATA_BUCKET",        "food-safety-intelligence-data")
-os.environ.setdefault("DATA_PREFIX",        "web-app-data")
+os.environ.setdefault("AWS_REGION", "us-east-1")
+os.environ.setdefault("DATA_BUCKET", "food-safety-intelligence-data")
+os.environ.setdefault("DATA_PREFIX", "web-app-data")
 
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
 # ---------------------------------------------------------------------------
 import boto3  # noqa: E402
+
 
 def _warm_data_files() -> None:
     """Download scores files from S3 to /tmp on first cold start."""
@@ -53,8 +54,8 @@ def _warm_data_files() -> None:
     s3 = boto3.client("s3", region_name=os.environ["AWS_REGION"])
 
     files = {
-        os.environ["SCORES_JSON_PATH"]:   f"{prefix}/scores.json",
-        os.environ["HISTORY_JSON_PATH"]:  f"{prefix}/inspection_history.json",
+        os.environ["SCORES_JSON_PATH"]: f"{prefix}/scores.json",
+        os.environ["HISTORY_JSON_PATH"]: f"{prefix}/inspection_history.json",
     }
     for local_path, s3_key in files.items():
         if not os.path.exists(local_path):
@@ -62,29 +63,32 @@ def _warm_data_files() -> None:
             s3.download_file(bucket, s3_key, local_path)
             print(f"[warm-up] Done: {os.path.getsize(local_path):,} bytes")
 
+
 _warm_data_files()
 
 # ---------------------------------------------------------------------------
 # Tool handler loader.
 # ---------------------------------------------------------------------------
 
+
 def _load_handler(tool_name: str):
     path = os.path.join(_HERE, "tools", tool_name, "handler.py")
     spec = importlib.util.spec_from_file_location(f"_{tool_name}_handler", path)
-    mod  = importlib.util.module_from_spec(spec)
+    mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
 
-_find_handler    = _load_handler("find_restaurants")
-_score_handler   = _load_handler("get_safety_score")
+
+_find_handler = _load_handler("find_restaurants")
+_score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
 # ---------------------------------------------------------------------------
 from bedrock_agentcore import BedrockAgentCoreApp  # noqa: E402
-from strands import Agent, tool                     # noqa: E402
-from strands.models.bedrock import BedrockModel     # noqa: E402
+from strands import Agent, tool  # noqa: E402
+from strands.models.bedrock import BedrockModel  # noqa: E402
 
 
 @tool
@@ -102,9 +106,13 @@ def find_restaurants(
     ALWAYS call this first before get_safety_score.
     """
     ev: dict = {"radius_km": radius_km, "limit": limit}
-    if neighborhood: ev["neighborhood"] = neighborhood
-    if lat and lon:  ev["lat"] = lat; ev["lon"] = lon
-    if cuisine:      ev["cuisine"] = cuisine
+    if neighborhood:
+        ev["neighborhood"] = neighborhood
+    if lat and lon:
+        ev["lat"] = lat
+        ev["lon"] = lon
+    if cuisine:
+        ev["cuisine"] = cuisine
     return _find_handler.handler(ev, None)
 
 
@@ -135,7 +143,7 @@ SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else "
 # ---------------------------------------------------------------------------
 # Agent + AgentCore app.
 # ---------------------------------------------------------------------------
-app   = BedrockAgentCoreApp()
+app = BedrockAgentCoreApp()
 model = BedrockModel(
     model_id="us.amazon.nova-2-lite-v1:0",
     region_name=os.environ["AWS_REGION"],

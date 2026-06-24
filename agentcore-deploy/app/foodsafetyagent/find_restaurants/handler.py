@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import math
-import re
 import urllib.error
 import urllib.request
 from typing import Any
@@ -30,51 +29,52 @@ OVERPASS_TIMEOUT_S = 18  # HTTP socket timeout; slightly above the QL timeout
 # OSM uses semicolon-separated values (e.g. "sushi;japanese"), so we match
 # with a case-insensitive substring regex rather than exact equality.
 CUISINE_ALIASES: dict[str, str] = {
-    "sushi":       "sushi|japanese",
-    "ramen":       "ramen|japanese",
-    "japanese":    "japanese|sushi|ramen",
-    "thai":        "thai",
-    "chinese":     "chinese",
-    "korean":      "korean",
-    "vietnamese":  "vietnamese",
-    "mexican":     "mexican|taco|burrito",
-    "pizza":       "pizza|italian",
-    "italian":     "italian|pizza|pasta",
-    "indian":      "indian|curry",
-    "mediterranean":"mediterranean|greek|middle_eastern|turkish|falafel",
-    "american":    "american|burger|barbecue|bbq",
-    "burger":      "burger|american",
-    "barbecue":    "barbecue|bbq",
-    "bbq":         "barbecue|bbq",
-    "seafood":     "seafood|fish",
-    "sandwich":    "sandwich|deli|sub",
-    "breakfast":   "breakfast|brunch|diner",
-    "brunch":      "brunch|breakfast",
-    "coffee":      "coffee|cafe|bakery",
-    "bakery":      "bakery|pastry",
-    "vegan":       "vegan|vegetarian",
-    "vegetarian":  "vegetarian|vegan",
-    "fast_food":   "fast_food|burger|pizza|sandwich",
-    "fast food":   "fast_food|burger|pizza|sandwich",
-    "steakhouse":  "steak|steakhouse|american",
-    "steak":       "steak|steakhouse",
-    "french":      "french",
-    "spanish":     "spanish|tapas",
-    "tapas":       "tapas|spanish",
-    "peruvian":    "peruvian|latin_american",
-    "latin":       "latin_american|mexican|peruvian",
-    "ethiopian":   "ethiopian|african",
-    "african":     "african|ethiopian",
+    "sushi": "sushi|japanese",
+    "ramen": "ramen|japanese",
+    "japanese": "japanese|sushi|ramen",
+    "thai": "thai",
+    "chinese": "chinese",
+    "korean": "korean",
+    "vietnamese": "vietnamese",
+    "mexican": "mexican|taco|burrito",
+    "pizza": "pizza|italian",
+    "italian": "italian|pizza|pasta",
+    "indian": "indian|curry",
+    "mediterranean": "mediterranean|greek|middle_eastern|turkish|falafel",
+    "american": "american|burger|barbecue|bbq",
+    "burger": "burger|american",
+    "barbecue": "barbecue|bbq",
+    "bbq": "barbecue|bbq",
+    "seafood": "seafood|fish",
+    "sandwich": "sandwich|deli|sub",
+    "breakfast": "breakfast|brunch|diner",
+    "brunch": "brunch|breakfast",
+    "coffee": "coffee|cafe|bakery",
+    "bakery": "bakery|pastry",
+    "vegan": "vegan|vegetarian",
+    "vegetarian": "vegetarian|vegan",
+    "fast_food": "fast_food|burger|pizza|sandwich",
+    "fast food": "fast_food|burger|pizza|sandwich",
+    "steakhouse": "steak|steakhouse|american",
+    "steak": "steak|steakhouse",
+    "french": "french",
+    "spanish": "spanish|tapas",
+    "tapas": "tapas|spanish",
+    "peruvian": "peruvian|latin_american",
+    "latin": "latin_american|mexican|peruvian",
+    "ethiopian": "ethiopian|african",
+    "african": "african|ethiopian",
     "middle eastern": "middle_eastern|falafel|mediterranean",
-    "falafel":     "falafel|middle_eastern",
-    "greek":       "greek|mediterranean",
-    "polish":      "polish",
+    "falafel": "falafel|middle_eastern",
+    "greek": "greek|mediterranean",
+    "polish": "polish",
 }
 
 
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     """
@@ -119,6 +119,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _resolve_geometry(
     neighborhood: str | None,
@@ -227,18 +228,20 @@ def _parse_elements(
             continue
         seen_names.add(dedup_key)
 
-        results.append({
-            "osm_id":        str(el["id"]),
-            "name":          name,
-            "address":       _build_address(tags),
-            "lat":           el_lat,
-            "lon":           el_lon,
-            "cuisine":       tags.get("cuisine", ""),
-            "opening_hours": tags.get("opening_hours", ""),
-            "phone":         tags.get("phone") or tags.get("contact:phone", ""),
-            "website":       tags.get("website") or tags.get("contact:website", ""),
-            "dist_km":       _haversine(centroid[0], centroid[1], el_lat, el_lon),
-        })
+        results.append(
+            {
+                "osm_id": str(el["id"]),
+                "name": name,
+                "address": _build_address(tags),
+                "lat": el_lat,
+                "lon": el_lon,
+                "cuisine": tags.get("cuisine", ""),
+                "opening_hours": tags.get("opening_hours", ""),
+                "phone": tags.get("phone") or tags.get("contact:phone", ""),
+                "website": tags.get("website") or tags.get("contact:website", ""),
+                "dist_km": _haversine(centroid[0], centroid[1], el_lat, el_lon),
+            }
+        )
 
     return results
 
@@ -247,10 +250,10 @@ def _build_address(tags: dict[str, str]) -> str:
     """Assemble a human-readable address from OSM addr:* tags."""
     parts: list[str] = []
     housenumber = tags.get("addr:housenumber", "")
-    street      = tags.get("addr:street", "")
-    city        = tags.get("addr:city", "Chicago")
-    state       = tags.get("addr:state", "IL")
-    postcode    = tags.get("addr:postcode", "")
+    street = tags.get("addr:street", "")
+    city = tags.get("addr:city", "Chicago")
+    state = tags.get("addr:state", "IL")
+    postcode = tags.get("addr:postcode", "")
 
     if housenumber and street:
         parts.append(f"{housenumber} {street}")
@@ -274,8 +277,6 @@ def _haversine(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     dlon = math.radians(lon2 - lon1)
     a = (
         math.sin(dlat / 2) ** 2
-        + math.cos(math.radians(lat1))
-        * math.cos(math.radians(lat2))
-        * math.sin(dlon / 2) ** 2
+        + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
     )
     return R * 2 * math.asin(math.sqrt(a))

@@ -49,9 +49,7 @@ def main() -> None:
         # Align with inspection dataset start (earliest inspection: 2010-01-04).
         cursor_start="2010-01-01T00:00:00",
         where_extra=(
-            "latitude IS NOT NULL"
-            " AND longitude IS NOT NULL"
-            " AND violation_date IS NOT NULL"
+            "latitude IS NOT NULL AND longitude IS NOT NULL AND violation_date IS NOT NULL"
         ),
         page_size=50_000,
         shard_dir=SHARD_DIR,

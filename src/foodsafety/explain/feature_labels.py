@@ -144,6 +144,47 @@ FEATURES: dict[str, FeaturePresentation] = {
     "flag_kw_certified_manager": FeaturePresentation(
         "Certified-manager issue (recent text)", "Certified-manager certification issue"
     ),
+    # Block-face building-violation features (see features/building_features.py):
+    # counts and recency of City building-code violations recorded on the
+    # establishment's block-face, strictly before the anchor date. "Nearby"
+    # reflects the block-face granularity (this building plus its immediate
+    # neighbours), not the exact parcel.
+    "prior_bldg_violations_365d": FeaturePresentation(
+        "Nearby building violations (last year)",
+        "{value:.0f} nearby building violations in the last year",
+    ),
+    "prior_bldg_violations_730d": FeaturePresentation(
+        "Nearby building violations (last 2 years)",
+        "{value:.0f} nearby building violations in the last 2 years",
+    ),
+    "days_since_last_bldg_violation": FeaturePresentation(
+        "Days since last nearby building violation",
+        "Last nearby building violation {value:.0f} days ago",
+    ),
+    "prior_bldg_conservation_365d": FeaturePresentation(
+        "Nearby structural / conservation violations (last year)",
+        "{value:.0f} nearby structural / conservation building violations in the last year",
+    ),
+    "prior_bldg_refrigeration_365d": FeaturePresentation(
+        "Nearby refrigeration violations (last year)",
+        "{value:.0f} nearby refrigeration building violations in the last year",
+    ),
+    "prior_bldg_plumbing_365d": FeaturePresentation(
+        "Nearby plumbing violations (last year)",
+        "{value:.0f} nearby plumbing building violations in the last year",
+    ),
+    "prior_bldg_ventilation_365d": FeaturePresentation(
+        "Nearby ventilation violations (last year)",
+        "{value:.0f} nearby ventilation building violations in the last year",
+    ),
+    "prior_bldg_electrical_365d": FeaturePresentation(
+        "Nearby electrical violations (last year)",
+        "{value:.0f} nearby electrical building violations in the last year",
+    ),
+    "days_since_last_food_safety_bldg_violation": FeaturePresentation(
+        "Days since last nearby food-safety building violation",
+        "Last nearby food-safety building violation {value:.0f} days ago",
+    ),
 }
 
 # Derived view — the per-row label map. Existing call sites (top_drivers_for_row,

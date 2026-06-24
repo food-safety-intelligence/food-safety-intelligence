@@ -79,11 +79,11 @@ PERMIT_WINDOWS_D: tuple[int, ...] = (365,)
 # distribution; these five account for ~1.5M of ~1.9M total violations.
 # See module docstring for the food-safety rationale per bureau.
 FOOD_SAFETY_BUREAUS: tuple[str, ...] = (
-    "CONSERVATION",   # structural / pest / plumbing — highest-volume signal
+    "CONSERVATION",  # structural / pest / plumbing — highest-volume signal
     "REFRIGERATION",  # commercial refrigeration failures — direct risk
-    "PLUMBING",       # hot water / drainage — tied to food-inspection codes
-    "VENTILATION",    # kitchen exhaust systems
-    "ELECTRICAL",     # power failures → refrigeration failures
+    "PLUMBING",  # hot water / drainage — tied to food-inspection codes
+    "VENTILATION",  # kitchen exhaust systems
+    "ELECTRICAL",  # power failures → refrigeration failures
 )
 
 # Column in the Building Violations SODA dataset that holds the bureau name.
@@ -195,11 +195,7 @@ def add_building_features(
     # the caller fetched it). Each bureau gets a 365d count. A single-window
     # design keeps the feature count manageable for sparse bureaus (32–43k
     # rows city-wide). Also compute a combined food-safety-bureau recency.
-    if (
-        violations is not None
-        and bureau_col in violations.columns
-        and len(anchor_coords_rad) > 0
-    ):
+    if violations is not None and bureau_col in violations.columns and len(anchor_coords_rad) > 0:
         _add_bureau_features(
             out=out,
             violations=violations,
@@ -258,9 +254,7 @@ def _add_bureau_features(
             continue
 
         counts, _ = _block_face_stats(
-            event_coords_rad=np.radians(
-                ev_b[["latitude", "longitude"]].to_numpy(dtype=np.float64)
-            ),
+            event_coords_rad=np.radians(ev_b[["latitude", "longitude"]].to_numpy(dtype=np.float64)),
             event_dates=ev_b[date_col].to_numpy(dtype="datetime64[D]"),
             anchor_coords_rad=anchor_coords_rad,
             anchor_dates=anchor_dates,

@@ -122,13 +122,16 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [sessionId, setSessionId] = useState<string>("");
+  // Session id is read only when sending a request, never during render, so it
+  // lives in a ref. A ref also keeps the client-only localStorage read out of an
+  // effect setState (which would trigger a cascading render).
+  const sessionIdRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Initialise session on client only (avoids SSR mismatch).
   useEffect(() => {
-    setSessionId(getOrCreateSessionId());
+    sessionIdRef.current = getOrCreateSessionId();
   }, []);
 
   // Scroll to latest message whenever messages update.
@@ -145,7 +148,7 @@ export function ChatInterface() {
     setLoading(true);
 
     try {
-      const result = await queryAgent(trimmed, sessionId);
+      const result = await queryAgent(trimmed, sessionIdRef.current);
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
@@ -168,7 +171,7 @@ export function ChatInterface() {
 
   function handleClear() {
     setMessages([]);
-    setSessionId(resetSession());
+    sessionIdRef.current = resetSession();
     setInput("");
     inputRef.current?.focus();
   }

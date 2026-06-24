@@ -107,9 +107,7 @@ def _response(status: int, body: dict) -> dict:
         "statusCode": status,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": os.environ.get(
-                "ALLOWED_ORIGIN", "*"
-            ),
+            "Access-Control-Allow-Origin": os.environ.get("ALLOWED_ORIGIN", "*"),
             "Access-Control-Allow-Headers": "Content-Type",
             "Access-Control-Allow-Methods": "POST, OPTIONS",
         },
