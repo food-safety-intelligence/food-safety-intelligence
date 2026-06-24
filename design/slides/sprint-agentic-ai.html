@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Food Safety Intelligence — Agentic AI Sprint</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cream:  #F6F1E9;
+    --ink:    #2B3239;
+    --teal:   #486073;
+    --sage:   #7A8F6A;
+    --terra:  #B05C44;
+    --card:   #FFFFFF;
+    --line:   #E2DDD6;
+    --muted:  #6B7280;
+    --tint:   #EEE9E1;
+    --stub:   #FBF5EE;
+  }
+
+  html, body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Slide wrapper ── */
+  .slide {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 56px 64px 72px;
+  }
+
+  /* ── Header ── */
+  .slide-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+    padding-bottom: 28px;
+    border-bottom: 1.5px solid var(--line);
+  }
+  .slide-header h1 {
+    font-size: 2rem;
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    color: var(--ink);
+  }
+  .slide-header h1 strong {
+    font-weight: 600;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    margin-top: 6px;
+  }
+  .badge-teal  { background: var(--teal);  color: #fff; }
+  .badge-sage  { background: var(--sage);  color: #fff; }
+  .badge-terra { background: var(--terra); color: #fff; }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--sage);
+    margin-bottom: 16px;
+  }
+
+  /* ── Two-column grid ── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-bottom: 28px;
+  }
+  .grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 28px;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px 26px;
+  }
+  .card-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 17px;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .icon-teal  { background: #EBF1F5; }
+  .icon-sage  { background: #EDF1EA; }
+  .icon-terra { background: #F8EDE9; }
+  .icon-ink   { background: var(--tint); }
+
+  .card h3 {
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+  .card p, .card li {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+  .card ul {
+    padding-left: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  /* ── Architecture diagram ── */
+  .arch {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+  }
+  .arch-flow {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    overflow-x: auto;
+    padding: 8px 0;
+  }
+  .arch-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    flex-shrink: 0;
+  }
+  .arch-box {
+    background: var(--tint);
+    border: 1.5px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+    min-width: 100px;
+    white-space: nowrap;
+  }
+  .arch-box.highlight {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+  }
+  .arch-box.highlight-sage {
+    background: var(--sage);
+    border-color: var(--sage);
+    color: #fff;
+  }
+  .arch-box.highlight-terra {
+    background: var(--terra);
+    border-color: var(--terra);
+    color: #fff;
+  }
+  .arch-sub {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 5px;
+    white-space: nowrap;
+  }
+  .arch-arrow {
+    flex-shrink: 0;
+    padding: 0 8px;
+    font-size: 16px;
+    color: var(--muted);
+    margin-top: -14px;
+  }
+  .arch-arrow.down { margin-top: 0; font-size: 12px; padding: 2px 0; }
+
+  /* ── Status pill ── */
+  .pill {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 2px 9px;
+    border-radius: 999px;
+    letter-spacing: 0.06em;
+  }
+  .pill-done  { background: #EDF1EA; color: var(--sage); }
+  .pill-stub  { background: #F8EDE9; color: var(--terra); }
+  .pill-next  { background: #EBF1F5; color: var(--teal); }
+
+  /* ── Stub callout ── */
+  .stub-banner {
+    background: var(--stub);
+    border: 1.5px solid #E8D5C8;
+    border-radius: 14px;
+    padding: 22px 26px;
+    margin-bottom: 28px;
+    display: flex;
+    gap: 18px;
+    align-items: flex-start;
+  }
+  .stub-icon {
+    font-size: 22px;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .stub-banner h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--terra);
+    margin-bottom: 6px;
+  }
+  .stub-banner p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.65;
+  }
+
+  /* ── Next steps ── */
+  .next-steps {
+    background: var(--ink);
+    border-radius: 16px;
+    padding: 28px 32px;
+    color: #fff;
+  }
+  .next-steps .section-label { color: #7A9BAD; }
+  .next-steps h2 {
+    font-size: 1.25rem;
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    margin-bottom: 20px;
+    color: #fff;
+  }
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .step-card {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 12px;
+    padding: 18px 20px;
+  }
+  .step-num {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #7A9BAD;
+    margin-bottom: 8px;
+  }
+  .step-card h4 {
+    font-size: 13px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 7px;
+  }
+  .step-card p {
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    line-height: 1.6;
+  }
+
+  /* ── Footer ── */
+  .slide-footer {
+    margin-top: 36px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+
+  @media print {
+    body { background: #fff; }
+    .slide { padding: 32px 40px; }
+  }
+</style>
+</head>
+<body>
+<div class="slide">
+
+  <!-- Header -->
+  <div class="slide-header">
+    <div>
+      <p class="section-label" style="margin-bottom:10px">Food Safety Intelligence · Sprint Update</p>
+      <h1>Agentic AI &amp; Cloud Deployment<br><strong>What shipped this sprint</strong></h1>
+    </div>
+    <div style="text-align:right;display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+      <span class="badge badge-teal">Live on CloudFront</span>
+      <span style="font-size:12px;color:var(--muted)">https://d1uefdb2te19wk.cloudfront.net</span>
+      <span style="font-size:12px;color:var(--muted)">June 2026</span>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <p class="section-label">End-to-end request flow</p>
+  <div class="arch" style="margin-bottom:28px">
+    <div class="arch-flow">
+
+      <div class="arch-node">
+        <div class="arch-box highlight">Browser</div>
+        <div class="arch-sub">HTTPS only</div>
+      </div>
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-node">
+        <div class="arch-box highlight">CloudFront CDN</div>
+        <div class="arch-sub">d1uefdb2te19wk.cloudfront.net<br>Static site + /api/* proxy</div>
+      </div>
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-node">
+        <div class="arch-box">S3 Bucket</div>
+        <div class="arch-sub">Next.js static export<br>Top-500 pages pre-built</div>
+      </div>
+
+      <div style="margin: 0 16px; color:var(--line); font-size:20px; margin-top:-14px">|</div>
+
+      <div class="arch-node">
+        <div class="arch-box highlight-sage">ALB</div>
+        <div class="arch-sub">HTTP · CORS: *<br>food-safety-alb-…</div>
+      </div>
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-node">
+        <div class="arch-box highlight-sage">Lambda Proxy</div>
+        <div class="arch-sub">Signs requests<br>Parses SSE stream</div>
+      </div>
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-node">
+        <div class="arch-box highlight-terra">AgentCore</div>
+        <div class="arch-sub">Bedrock AgentCore Runtime<br>Claude Sonnet 4.6</div>
+      </div>
+      <div class="arch-arrow">→</div>
+
+      <div class="arch-node">
+        <div class="arch-box">S3 Data Bucket</div>
+        <div class="arch-sub">scores.json<br>inspection_history.json</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Feature cards -->
+  <p class="section-label">What was built</p>
+  <div class="grid-2" style="margin-bottom:24px">
+
+    <div class="card">
+      <div class="card-icon icon-teal">🤖</div>
+      <h3>Agentic AI over HTTP <span class="pill pill-done">Shipped</span></h3>
+      <ul>
+        <li>AWS Bedrock AgentCore Runtime hosts a Claude Sonnet 4.6 agent with access to Chicago inspection data and risk scores</li>
+        <li>Lambda proxy sits between the public ALB and AgentCore — signs all requests using the Lambda execution role (IAM SigV4), so AgentCore is never directly exposed</li>
+        <li>Lambda parses AgentCore's SSE streaming response into clean JSON text before returning to the browser</li>
+        <li>Session IDs (36-char UUID) preserved across turns for multi-turn conversation</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-icon icon-sage">💬</div>
+      <h3>Chat UI <span class="pill pill-done">Shipped</span></h3>
+      <ul>
+        <li>New <code>/chat</code> route in the Next.js app — added to the global navigation</li>
+        <li>Suggested query chips, auto-growing textarea, Shift+Enter for newlines</li>
+        <li>Session state in <code>sessionStorage</code> — cleared on "New conversation"</li>
+        <li>Graceful error states with terra-coloured warning bubbles</li>
+        <li>Disclaimer: "Scores are 180-day predictions from public Chicago data"</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-icon icon-ink">☁️</div>
+      <h3>CloudFront CDN Deployment <span class="pill pill-done">Shipped</span></h3>
+      <ul>
+        <li>Next.js static export (<code>output: 'export'</code>) — no Node server needed</li>
+        <li>Top 500 highest-risk restaurant detail pages pre-generated at build time; lower-risk pages return 404 (chat covers discovery)</li>
+        <li>S3 bucket + CloudFront distribution with HTTPS enforcement, gzip compression, and 1h cache TTL</li>
+        <li>Custom 404 page wired up in CloudFront error response config</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <div class="card-icon icon-terra">🔒</div>
+      <h3>Auth &amp; CORS <span class="pill pill-done">Shipped</span></h3>
+      <ul>
+        <li><strong>Mixed-content fix:</strong> CloudFront proxies <code>/api/agent → ALB</code>, so the browser always calls HTTPS and never touches the HTTP ALB directly</li>
+        <li>Lambda returns <code>Access-Control-Allow-Origin: *</code> and handles <code>OPTIONS</code> preflight requests</li>
+        <li>AgentCore protected behind IAM — only the Lambda execution role can call <code>InvokeAgentRuntime</code>; the ALB has no auth of its own</li>
+        <li><strong>Upgrade path:</strong> Add Cognito User Pool to the ALB listener rule → pass JWT as <code>Authorization: Bearer</code> from the browser</li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- Stub callout -->
+  <div class="stub-banner">
+    <div class="stub-icon">⚠️</div>
+    <div>
+      <h3>Current limitation: ML inference is stubbed</h3>
+      <p>
+        AgentCore's tool implementations today return <em>estimated / heuristic scores</em> — not predictions from the trained XGBoost model.
+        The agent reads <code>scores.json</code> from S3 at warm-up, but that file currently contains mock data (<code>is_mock: true</code>) because
+        the real model hasn't been run end-to-end and written to <code>data/predictions/scores.parquet</code> yet.
+        All restaurant rankings, risk tiers, and SHAP driver text shown in chat responses are therefore illustrative, not real model output.
+        The S3 IAM permissions for the AgentCore role also need to be finalised before the bucket read will succeed in all environments.
+      </p>
+    </div>
+  </div>
+
+  <!-- Next steps -->
+  <div class="next-steps">
+    <p class="section-label">Next steps</p>
+    <h2>Integrating real ML inference</h2>
+    <div class="steps-grid">
+
+      <div class="step-card">
+        <div class="step-num">STEP 01</div>
+        <h4>Run the XGBoost pipeline end-to-end</h4>
+        <p>Execute <code>make all</code> to produce <code>data/predictions/scores.parquet</code> with real risk scores, calibrated probabilities, and SHAP top-drivers from the trained model.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">STEP 02</div>
+        <h4>Publish real scores.json to S3</h4>
+        <p>Run <code>scripts/parquet_to_json.py</code> to convert <code>scores.parquet → scores.json</code>, then upload to <code>s3://food-safety-intelligence-data/web-app-data/</code>. Fix AgentCore IAM role's <code>s3:GetObject</code> permission (currently blocked by org RCP).</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">STEP 03</div>
+        <h4>Rebuild and redeploy the web app</h4>
+        <p>Rerun <code>npm run build</code> inside <code>app/</code> and sync <code>out/</code> to S3. The static pages will embed real risk scores. Redeploy AgentCore so it loads the real scores on warm-up. Invalidate CloudFront.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">STEP 04</div>
+        <h4>Wire SHAP drivers into the agent</h4>
+        <p>The agent's tool currently returns hard-coded driver text. Once <code>scores.json</code> has real <code>top_drivers</code> (from <code>shap.TreeExplainer</code>), update the tool to return the actual SHAP feature names and contribution values.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">STEP 05</div>
+        <h4>Tighten authentication</h4>
+        <p>Move from <code>CORS: *</code> to Cognito JWT auth on the ALB listener. Restrict <code>Access-Control-Allow-Origin</code> to the CloudFront domain only. Consider rate-limiting at the ALB or API Gateway level.</p>
+      </div>
+
+      <div class="step-card">
+        <div class="step-num">STEP 06</div>
+        <h4>Scheduled score refresh</h4>
+        <p>Chicago posts new inspection data weekly. An EventBridge cron → Lambda → <code>parquet_to_json.py</code> → S3 upload keeps scores current without manual reruns. (Out of scope for this capstone iteration, but documented.)</p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="slide-footer">
+    <span>Food Safety Intelligence · UC Berkeley MIDS Capstone 2026</span>
+    <span>Deepak Srivastava &nbsp;·&nbsp; Arun &nbsp;·&nbsp; Bella &nbsp;·&nbsp; Aurelia &nbsp;·&nbsp; Jun</span>
+  </div>
+
+</div>
+</body>
+</html>

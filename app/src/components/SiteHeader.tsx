@@ -8,10 +8,11 @@ import { MapPin } from "lucide-react";
  * navigation is fine for this iteration; we'll lift to a config when more
  * routes land.
  */
-export type NavItem = "search" | "caregivers" | "how" | "sources";
+export type NavItem = "search" | "chat" | "caregivers" | "how" | "sources";
 
 const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "search", label: "Search", href: "/" },
+  { id: "chat", label: "Chat", href: "/chat" },
   { id: "caregivers", label: "For caregivers", href: "/caregivers" },
   { id: "how", label: "How this works", href: "/how-it-works" },
   { id: "sources", label: "Sources", href: "/sources" },

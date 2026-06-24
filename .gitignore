@@ -50,6 +50,9 @@ dist/
 build/
 *.egg-info/
 
+# AgentCore CLI build cache (compiled deps, ~100MB)
+agentcore-deploy/agentcore/.cache/
+
 # Next.js (in app/)
 app/node_modules/
 app/.next/
