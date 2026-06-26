@@ -29,10 +29,22 @@ import { isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
 const S3_BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
 const S3_REGION = process.env.AWS_REGION ?? "us-east-1";
 const S3_PREFIX = "web-app-data";
+// Shared with scripts/prebuild-sync-s3.mjs. During `next build --webpack`
+// the prebuild step downloads scores.json + inspection_history.json once
+// into this directory, then the parallel SSR workers read from here instead
+// of hitting S3 N times.
+const BUILD_CACHE_DIR = "/tmp/fsi-build-cache";
 
 const s3 = new S3Client({ region: S3_REGION });
 
 async function fetchS3Text(key: string): Promise<string> {
+  // Build-time cache first; avoids 10 workers each downloading 18 MB.
+  const cachePath = path.join(BUILD_CACHE_DIR, key);
+  try {
+    return await fs.readFile(cachePath, "utf-8");
+  } catch {
+    // No cache file — fall through to a live S3 fetch (dev workflow).
+  }
   const res = await s3.send(
     new GetObjectCommand({ Bucket: S3_BUCKET, Key: `${S3_PREFIX}/${key}` }),
   );
