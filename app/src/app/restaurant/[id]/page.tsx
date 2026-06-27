@@ -10,6 +10,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { Waterfall } from "@/components/Waterfall";
 import {
+  getInspectionComments,
   getInspectionHistory,
   getPopulationStats,
   getRestaurant,
@@ -38,14 +39,24 @@ export default async function RestaurantDetailPage({
 }) {
   const { id } = await params;
 
-  const [restaurant, history, payload, populationStats] = await Promise.all([
-    getRestaurant(id),
-    getInspectionHistory(id),
-    loadScores(),
-    getPopulationStats(),
-  ]);
+  const [restaurant, history, comments, payload, populationStats] =
+    await Promise.all([
+      getRestaurant(id),
+      getInspectionHistory(id),
+      getInspectionComments(id),
+      loadScores(),
+      getPopulationStats(),
+    ]);
 
   if (!restaurant) notFound();
+
+  // Attach each inspection's full comment text (index-aligned sidecar) so the
+  // timeline can expand a row to show it. Carried on the event object so it
+  // survives the timeline's re-sort.
+  const historyWithComments = history.map((e, i) => ({
+    ...e,
+    comments: comments[i] ?? "",
+  }));
 
   const lastInspection = history[0]?.date;
 
@@ -212,7 +223,7 @@ export default async function RestaurantDetailPage({
 
           <div className="grid grid-cols-12 gap-6">
             <div className="col-span-12 md:col-span-7">
-              <InspectionTimeline events={history} />
+              <InspectionTimeline events={historyWithComments} />
             </div>
 
             <aside className="col-span-12 md:col-span-5 space-y-5">

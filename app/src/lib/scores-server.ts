@@ -7,6 +7,7 @@
  */
 
 import "server-only";
+import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -75,16 +76,25 @@ export async function loadScores(): Promise<ScoresPayload> {
     raw = await fetchS3Text("scores.json");
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[scores-server] S3 fetch failed for scores.json, falling back to mock: ${msg}`,
-    );
-    const mockPath = path.join(
-      process.cwd(),
-      "public",
-      "data",
-      "scores_mock.json",
-    );
-    raw = await fs.readFile(mockPath, "utf-8");
+    // Local fallbacks for a build without AWS creds: the committed
+    // scores.json first (real data), then the synthetic mock (demo banner).
+    try {
+      raw = await fs.readFile(
+        path.join(process.cwd(), "public", "data", "scores.json"),
+        "utf-8",
+      );
+      console.warn(
+        `[scores-server] S3 fetch failed for scores.json, using local committed copy: ${msg}`,
+      );
+    } catch {
+      console.warn(
+        `[scores-server] S3 + local scores.json failed, falling back to mock: ${msg}`,
+      );
+      raw = await fs.readFile(
+        path.join(process.cwd(), "public", "data", "scores_mock.json"),
+        "utf-8",
+      );
+    }
   }
   const payload = JSON.parse(raw) as ScoresPayload;
 
@@ -161,12 +171,21 @@ async function loadInspectionHistory(): Promise<
     return JSON.parse(raw) as Record<string, InspectionEvent[]>;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.warn(
-      `[scores-server] S3 fetch failed for inspection_history.json: ${msg}`,
-    );
-    // Missing file is expected on a fresh clone before AWS creds are set
-    // up. The UI falls back to "0 inspections" — degraded but functional.
-    return {};
+    // Local fallback so a build without AWS creds renders real history (the
+    // committed copy). Only a fresh clone missing both degrades to "0
+    // inspections" — functional but empty.
+    try {
+      const raw = await fs.readFile(
+        path.join(process.cwd(), "public", "data", "inspection_history.json"),
+        "utf-8",
+      );
+      return JSON.parse(raw) as Record<string, InspectionEvent[]>;
+    } catch {
+      console.warn(
+        `[scores-server] S3 + local inspection_history.json failed: ${msg}`,
+      );
+      return {};
+    }
   }
 }
 
@@ -182,6 +201,67 @@ export async function getInspectionHistory(
 ): Promise<InspectionEvent[]> {
   const payload = await loadScores();
   return payload.inspection_history[licenseId] ?? [];
+}
+
+// Full violation-comment text lives in sharded sidecars
+// (web-app-data/comments/<xx>.json), keyed by license_id, each value an array
+// index-aligned to that license's inspection_history events. The text is too
+// large (~277MB) for one file, so each shard holds ~1/256th and we load only
+// the shards the static build's pages touch. Shards are cached per process.
+const commentShards = new Map<string, Record<string, string[]>>();
+
+// Must match `_shard_of` in scripts/export_inspection_history.py: first two
+// md5 hex chars of the license_id → one of 256 even buckets.
+function commentShardOf(licenseId: string): string {
+  return crypto.createHash("md5").update(licenseId).digest("hex").slice(0, 2);
+}
+
+async function loadCommentShard(
+  shard: string,
+): Promise<Record<string, string[]>> {
+  const cached = commentShards.get(shard);
+  if (cached) return cached;
+
+  let parsed: Record<string, string[]> = {};
+  try {
+    parsed = JSON.parse(
+      await fetchS3Text(`comments/${shard}.json`),
+    ) as Record<string, string[]>;
+  } catch (s3Err) {
+    // Local fallback: a fresh clone / local build with no AWS creds reads the
+    // shards the exporter wrote under public/data/comments/ (gitignored).
+    try {
+      const localPath = path.join(
+        process.cwd(),
+        "public",
+        "data",
+        "comments",
+        `${shard}.json`,
+      );
+      parsed = JSON.parse(
+        await fs.readFile(localPath, "utf-8"),
+      ) as Record<string, string[]>;
+    } catch {
+      const msg = s3Err instanceof Error ? s3Err.message : String(s3Err);
+      console.warn(
+        `[scores-server] comment shard ${shard} unavailable (S3 + local miss): ${msg}`,
+      );
+    }
+  }
+  commentShards.set(shard, parsed);
+  return parsed;
+}
+
+/**
+ * Full comment text per inspection for one license, index-aligned to
+ * getInspectionHistory(licenseId). Empty array if the shard is missing; an
+ * empty string at index i means that inspection recorded no comments.
+ */
+export async function getInspectionComments(
+  licenseId: string,
+): Promise<string[]> {
+  const shard = await loadCommentShard(commentShardOf(licenseId));
+  return shard[licenseId] ?? [];
 }
 
 // Lean pin record for the home map — every matching establishment with valid

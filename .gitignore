@@ -15,6 +15,10 @@
 !/app/public/data/scores.json
 !/app/public/data/inspection_history.json
 !/app/public/data/methodology.json
+# Full violation-comment shards (~277MB across all establishments) — too large
+# to commit (over GitHub's 100MB file cap). S3 is the source of truth; written
+# locally only so `next build`/dev can read them without AWS creds.
+/app/public/data/comments/
 **/_partial_*/
 
 # Saved model files
