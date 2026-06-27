@@ -96,6 +96,9 @@ export function InspectionTimeline({
           const isOpen = open.has(key);
           const panelId = `inspection-comments-${key}`;
           const violations = e.comments ? parseViolations(e.comments) : [];
+          // Collapsed teaser names the top violation only — the inspector's
+          // comment text stays hidden until the row is expanded.
+          const teaser = e.headline?.split(COMMENTS_MARKER)[0].trim();
           return (
             <li key={key}>
               <button
@@ -125,11 +128,11 @@ export function InspectionTimeline({
                     }`}
                   >
                     {e.type}
-                    {e.headline && (
+                    {teaser && (
                       <>
                         {" · "}
                         <span className={isFail ? "font-medium" : ""}>
-                          {e.headline}
+                          {teaser}
                         </span>
                       </>
                     )}

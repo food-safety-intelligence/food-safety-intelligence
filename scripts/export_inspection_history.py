@@ -78,12 +78,13 @@ def main() -> None:
     df["license_id"] = df["license_id"].astype(str)
     df = df.sort_values(["license_id", "date"], ascending=[True, False])
 
-    # Headline = first violation line, truncated. Keeps the row dense without
-    # shipping the full multi-kilobyte violations text.
+    # Headline = first violation's NAME, truncated. The "- Comments:" inspector
+    # note is dropped — it stays hidden in the collapsed timeline row and only
+    # appears (in full) when the row is expanded, from the comment shards.
     def _headline(v: object) -> str:
         if pd.isna(v):
             return ""
-        s = str(v).split("|")[0].strip()
+        s = str(v).split("|")[0].split(" - Comments:")[0].strip()
         return s[:HEADLINE_MAX_CHARS] + ("…" if len(s) > HEADLINE_MAX_CHARS else "")
 
     df["headline"] = df["violations"].apply(_headline) if "violations" in df.columns else ""
