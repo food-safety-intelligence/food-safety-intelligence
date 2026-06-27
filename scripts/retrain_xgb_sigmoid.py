@@ -24,14 +24,21 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import joblib
 import numpy as np
 import pandas as pd
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
 
-from foodsafety.config import LABEL_WINDOW_DAYS, RANDOM_STATE
+from foodsafety.config import (
+    FEATURES_PATH,
+    LABEL_WINDOW_DAYS,
+    MODELS_DIR,
+    PREDICTIONS_DIR,
+    RANDOM_STATE,
+    WEB_APP_DATA_DIR,
+)
 from foodsafety.explain.shap_drivers import tree_contributions
+from foodsafety.io import storage
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
 from foodsafety.models.evaluate import evaluate
 from foodsafety.models.xgb import (
@@ -45,10 +52,10 @@ from foodsafety.tracking import provenance
 from foodsafety.utils.time import temporal_split
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
-MODELS_DIR = REPO_ROOT / "data" / "models"
-PRED_DIR = REPO_ROOT / "data" / "predictions"
-SCORES_JSON_PATH = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+# FEATURES_PATH / MODELS_DIR / PREDICTIONS_DIR / WEB_APP_DATA_DIR come from config and
+# may be local or s3://. Metrics reports stay repo-local (small, git-committed/diffable).
+SCORES_JSON_PATH = storage.join(str(WEB_APP_DATA_DIR), "scores.json")
+SCORES_PARQUET_PATH = storage.join(str(PREDICTIONS_DIR), "scores.parquet")
 REPORTS_METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 
 TRAIN_END = "2024-07-01"
@@ -87,12 +94,12 @@ class XGBServeModel:
 
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
-    if not FEATURES_PATH.exists():
+    if not storage.exists(FEATURES_PATH):
         raise SystemExit(
-            "Missing data artifact: data/processed/features.parquet was not found. "
-            "Run notebooks/03_feature_engineering.ipynb first."
+            f"Missing data artifact: {FEATURES_PATH} was not found. "
+            "Run `make features` (scripts/build_features.py) first."
         )
-    features = pd.read_parquet(FEATURES_PATH)
+    features = storage.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}")
 
     # Drop right-truncated rows from modeling (under-counted labels); keep the
@@ -144,9 +151,9 @@ def main() -> None:
     # --- Provenance + tracked metrics -------------------------------------
     prov = provenance(FEATURES_PATH, list(ALL_FEATURES), REPO_ROOT)
     run_id = prov["run_id"]
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODELS_DIR / f"{MODEL_VERSION}_{run_id}.joblib"
-    joblib.dump(served, model_path)
+    # Target may be local or s3:// — storage creates local parents / puts S3 objects.
+    model_path = storage.join(str(MODELS_DIR), f"{MODEL_VERSION}_{run_id}.joblib")
+    storage.dump_joblib(served, model_path)
     print(f"Saved model → {model_path}")
 
     REPORTS_METRICS_DIR.mkdir(parents=True, exist_ok=True)
@@ -180,9 +187,8 @@ def main() -> None:
         n_drivers=5,
         contributions_fn=lambda X: served.contributions(X)[0],
     )
-    PRED_DIR.mkdir(parents=True, exist_ok=True)
-    scores.to_parquet(PRED_DIR / "scores.parquet")
-    print(f"Wrote scores.parquet: {len(scores):,} restaurants")
+    storage.write_parquet(scores, SCORES_PARQUET_PATH)
+    print(f"Wrote {SCORES_PARQUET_PATH}: {len(scores):,} restaurants")
     print("Tier distribution:", scores["risk_tier"].value_counts().to_dict())
 
     # Calibration triple: a = -coef, b = -inter (app uses logit = -(a*margin+b)),
@@ -198,8 +204,7 @@ def main() -> None:
         model_version=MODEL_VERSION,
         calibration=calibration,
     )
-    size_mb = SCORES_JSON_PATH.stat().st_size / 1024 / 1024
-    print(f"Wrote {SCORES_JSON_PATH} ({size_mb:.1f} MB)")
+    print(f"Wrote {SCORES_JSON_PATH}")
 
 
 if __name__ == "__main__":

@@ -108,11 +108,13 @@ a residual-risk bullet + revision date) rather than spawning a new record.
 - **Decision records**: update `0005` (ethics) if Step 5 found something; add a new
   `docs/decisions/NNNN-*.md` only for a genuine decision (confirm before creating).
 - **Re-ship the served model + app JSON** (else the demo runs the old model):
-  `PYTHONPATH=src .venv/bin/python scripts/retrain_baseline_sigmoid.py` →
+  `PYTHONPATH=src .venv/bin/python scripts/retrain_xgb_sigmoid.py` (the served
+  estimator is the depth-3 monotone XGBoost — `0002`/`0009`; the LogReg path is
+  `scripts/retrain_baseline_sigmoid.py`) →
   served model + `data/predictions/scores.parquet` → `app/public/data/scores.json`
   (schema `0.4.0`: **5** `top_drivers` per row + a top-level `calibration
   {a, b, intercept}` Platt triple — both written automatically) +
-  `reports/metrics/baseline_sigmoid_<run>.json`; then
+  `reports/metrics/xgb_monotone_sigmoid_<run>.json`; then
   `PYTHONPATH=src .venv/bin/python scripts/build_methodology_json.py` →
   `app/public/data/methodology.json` (also carries the **global feature-impact**
   ranking + the worked **calibrated-waterfall** example). A new feature flows into
