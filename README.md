@@ -3,7 +3,7 @@
 Predicting forward-window food-safety risk for Chicago restaurants from public
 inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
 
-**Team**: Jun Xu (PM), Arun Agarwal, Bella Davis, Deepak Srivastava, Aurelia Yang
+**Team**: Jun Xu (PM), Arun Agarwal, Bella Davies, Deepak Srivastava, Aurelia Yang
 
 > **Latest status**: see [`docs/weekly/`](docs/weekly/) — newest dated file is
 > the current snapshot of what's built, what's open, and how to verify locally.
@@ -31,6 +31,7 @@ git clone <repo> && cd food-safety-intelligence
 uv sync --extra dev          # creates .venv, installs deps
 uv run nbstripout --install  # one-time: wire the git filter that
                              # strips notebook outputs on commit
+git config core.hooksPath .githooks  # one-time: enable the ruff pre-commit hook
 cp .env.example .env         # default settings work; edit if needed
 ```
 
@@ -87,7 +88,7 @@ npm run dev      # http://localhost:3000
 - **DE / loaders (Arun)**: `src/foodsafety/io/` — lift loader cell from `notebooks/01_dataset_overview_eda.ipynb`
 - **EDA / labels (Aurelia)**: `notebooks/01_dataset_overview_eda.ipynb`, then `02_label_construction.ipynb`
 - **Modeling (Bella + Deepak)**: `notebooks/04_baseline_logreg.ipynb`, then `05_xgboost_model.ipynb`
-- **Eval / SHAP (Bella)**: `notebooks/06_eval_and_calibration.ipynb`, `07_shap_explanations.ipynb`
+- **Eval / SHAP (Bella)**: `notebooks/06_eval_and_shap.ipynb`
 - **App (Aurelia + Jun)**: `app/src/app/page.tsx` against the mock `app/public/data/scores_mock.json` (converted from `tests/fixtures/scores_mock.parquet`)
 
 See `CLAUDE.md` for the full project rules and `docs/interface_contracts.md`

@@ -21,10 +21,18 @@ import pandas as pd
 # Winter = Dec/Jan/Feb (months 12/1/2), Spring = Mar/Apr/May, etc. We treat
 # December as Winter — a calendar quarter would put it with Q4.
 _MONTH_TO_SEASON = {
-    12: "Winter", 1: "Winter", 2: "Winter",
-    3: "Spring", 4: "Spring", 5: "Spring",
-    6: "Summer", 7: "Summer", 8: "Summer",
-    9: "Fall",  10: "Fall",  11: "Fall",
+    12: "Winter",
+    1: "Winter",
+    2: "Winter",
+    3: "Spring",
+    4: "Spring",
+    5: "Spring",
+    6: "Summer",
+    7: "Summer",
+    8: "Summer",
+    9: "Fall",
+    10: "Fall",
+    11: "Fall",
 }
 
 

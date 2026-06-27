@@ -1,0 +1,17 @@
+{
+  "targets": {
+    "default": {
+      "resources": {
+        "runtimes": {
+          "foodsafetyagent": {
+            "runtimeId": "foodsafety_foodsafetyagent-4UtF42EBno",
+            "runtimeArn": "arn:aws:bedrock-agentcore:us-west-2:991500268971:runtime/foodsafety_foodsafetyagent-4UtF42EBno",
+            "roleArn": "arn:aws:iam::991500268971:role/AgentCore-foodsafety-defa-ApplicationAgentFoodsafet-wMqqRqVPcPK3"
+          }
+        },
+        "stackName": "AgentCore-foodsafety-default",
+        "deployHash": "4d1701a066bc4568"
+      }
+    }
+  }
+}

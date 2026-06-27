@@ -1,0 +1,34 @@
+{
+  "model": "baseline_logreg_sigmoid",
+  "run_id": "20260614_3fa7cf934",
+  "git_commit": "3fa7cf93486dfb61f1a8a9f16ba2d3e6d77ba4d8",
+  "git_dirty": true,
+  "calibration": "sigmoid",
+  "right_truncation_filtered": 6804,
+  "feature_set_version": "f0e0b9e0ce5b",
+  "features_sha256": "87b41485ba094fcb6cfe1cd3c8babf2e3d6ddef64aa7e77515433c3809eed13a",
+  "val": {
+    "n": 16564,
+    "positive_rate": 0.105289,
+    "pr_auc": 0.266565,
+    "roc_auc": 0.742319,
+    "precision_at_5pct": 0.369119,
+    "precision_at_10pct": 0.326494,
+    "precision_at_20pct": 0.251434,
+    "top_decile_lift": 3.100941,
+    "brier_score": 0.086494,
+    "log_loss": 0.300578
+  },
+  "test": {
+    "n": 7008,
+    "positive_rate": 0.107877,
+    "pr_auc": 0.314682,
+    "roc_auc": 0.769237,
+    "precision_at_5pct": 0.433048,
+    "precision_at_10pct": 0.352354,
+    "precision_at_20pct": 0.285307,
+    "top_decile_lift": 3.266264,
+    "brier_score": 0.085344,
+    "log_loss": 0.295769
+  }
+}

@@ -36,10 +36,7 @@ VALID_TIERS = {"Low", "Moderate", "Elevated", "High"}
 @pytest.fixture(scope="module")
 def scores() -> pd.DataFrame:
     if not FIXTURE.exists():
-        pytest.skip(
-            f"{FIXTURE} missing — run `python scripts/build_scores_mock.py` "
-            "to regenerate."
-        )
+        pytest.skip(f"{FIXTURE} missing — run `python scripts/build_scores_mock.py` to regenerate.")
     return pd.read_parquet(FIXTURE)
 
 
@@ -51,7 +48,9 @@ def test_scores_has_all_required_columns(scores):
 def test_scores_dtypes(scores):
     # We're permissive on exact dtype names (string vs object, datetime64 vs Timestamp)
     # and just check semantics.
-    assert pd.api.types.is_string_dtype(scores["license_id"]) or scores["license_id"].dtype == object
+    assert (
+        pd.api.types.is_string_dtype(scores["license_id"]) or scores["license_id"].dtype == object
+    )
     assert pd.api.types.is_string_dtype(scores["dba_name"]) or scores["dba_name"].dtype == object
     assert pd.api.types.is_float_dtype(scores["lat"])
     assert pd.api.types.is_float_dtype(scores["lon"])
@@ -62,7 +61,12 @@ def test_scores_dtypes(scores):
 
 def test_scores_in_valid_range(scores):
     # risk_score in [0, 1], OR the sentinel -1.0 for stub rows.
-    invalid = scores[~(((scores["risk_score"] >= 0) & (scores["risk_score"] <= 1)) | (scores["risk_score"] == -1.0))]
+    invalid = scores[
+        ~(
+            ((scores["risk_score"] >= 0) & (scores["risk_score"] <= 1))
+            | (scores["risk_score"] == -1.0)
+        )
+    ]
     assert invalid.empty, f"{len(invalid)} rows have risk_score outside [0,1] and != -1.0"
 
 
@@ -81,7 +85,9 @@ def test_top_drivers_structure(scores):
         assert len(drivers) > 0
         for d in drivers:
             assert isinstance(d, dict), f"driver is not a dict: {type(d)}"
-            assert required_keys.issubset(d.keys()), f"driver missing keys: {required_keys - d.keys()}"
+            assert required_keys.issubset(d.keys()), (
+                f"driver missing keys: {required_keys - d.keys()}"
+            )
 
 
 def test_mock_fixture_marker_present(scores):

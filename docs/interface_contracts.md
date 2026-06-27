@@ -9,6 +9,82 @@ the full schema.
 
 ---
 
+## Scope — what establishments are covered
+
+The source is Chicago's **Food Inspections** dataset, which covers **all licensed
+establishments that handle or serve food — not just restaurants.** In the modelable
+data ~**69% are restaurants**; the other ~31% are grocery stores, school / daycare
+kitchens, hospital / nursing-home kitchens, bakeries, caterers, taverns, mobile
+vendors, etc. The pipeline does **not** filter to restaurants — the model trains on
+and scores all of them, and the fairness audit groups by `facility_type` precisely
+because vulnerable-population facilities (daycare, school, hospital, long-term care)
+are in scope.
+
+> **Copy caveat:** product / UI wording that says "restaurants" is imprecise — it
+> should read "food establishments" / "places that serve food." Tracked as a
+> Phase-2 copy fix (app workstream).
+
+---
+
+## Data cleaning & the train/val/test split
+
+The cleaning and split are implemented across the loader, `labels.py`,
+`build.py`, and `utils/time.py`; this is the single place that describes them.
+
+### Split — chronological, never shuffled
+`src/foodsafety/utils/time.py::temporal_split` (cutoffs are recorded in each
+model's `metadata.json`):
+- **train**: `inspection_date < 2024-07-01`
+- **val** (calibration / early stopping): `2024-07-01 ≤ date < 2025-07-01`
+- **test** (time-held-out): `date ≥ 2025-07-01`
+
+Boundaries are right-exclusive. **Never** `train_test_split(shuffle=True)` — a
+shuffle would leak the future into the past. Cross-validation uses
+`expanding_year_folds` (full-year expanding windows + a 180-day embargo); see
+decision 0002.
+
+### Cleaning (where each step lives)
+- **Dedup** — at fetch (`io/soda.py`, on `inspection_id`); the raw snapshot has
+  0 duplicate ids.
+- **`license_id`** — `license_` → `license_id`, `fillna("")`→str; placeholder
+  tokens `""` / `"0"` get a NULL label and are dropped in `build.py`.
+- **Results filter** — only `{Pass, Pass w/ Conditions, Fail}` are modelable; the
+  4 operational non-outcomes (Out of Business, No Entry, Not Ready, Business Not
+  Located) are dropped during feature build.
+- **Burn-in** — inspections before 2019-01-01 are kept to seed `prior_*` history
+  but get a NULL label and are excluded from train/test.
+- **Right-truncation** — anchors whose 180-day forward window runs past the
+  snapshot's max date are flagged (`right_truncated`) and dropped from honest
+  train/test (their labels are under-counted).
+- **Dates** — coerced to datetime (`errors="coerce"` where the source is dirty).
+- **ZIP** — strip trailing `.0`, require exactly 5 digits else `""` (short codes
+  are not zero-padded — `00606` isn't a real ZIP). `static_zip` is dropped from
+  the model but still cleaned for the fairness audit.
+- **Geo** — lat/lon coerced to numeric; 311 rows without geo are dropped before
+  the spatial join. Inspection coords outside the Chicago bbox are flagged and
+  **nulled** (the row is kept, not dropped — it's routed into the existing
+  missing-geo path: the map skips the pin, the 311 join counts 0). lat/lon are
+  **not** model features (they drive only the map and the 311 join); the current
+  snapshot is 100% in-bbox, so this is defensive for future ingestion.
+
+### Nulls
+`prior_*` / recency / `license_*` NaNs are **structural** ("no prior history
+yet" — e.g. `days_since_last_fail` is NaN for ~29% that never failed,
+`license_age_days` ~20% not in the license-history table), not dirty data:
+XGBoost reads NaN natively; the LogReg pipeline median-imputes numerics. The
+**label has 0 nulls** in the modeling set (burn-in/invalid already dropped). Raw
+`violations` is ~28% null — those are clean Pass inspections with nothing cited.
+
+### facility_type normalization (done)
+`facility_type` has ~500 distinct raw values (a casing/typo/variant tail). It is
+**not** a model feature (`static_facility_type` was dropped for fairness), but it
+is normalized to canonical buckets for the group-performance fairness audit via
+`license_features.normalize_facility_type` (collapses the daycare family; keeps
+senior/adult daycare out of child daycare and culinary out of child schools). See
+the audit in `notebooks/06` and `fairness_audit.md`.
+
+---
+
 ## 1. `data/processed/inspections_labeled.parquet`
 
 **Grain**: one row per inspection.
@@ -67,8 +143,13 @@ not a contract change.
 | `prior_*` features | various | varies | **MUST use `.shift()` or `event_date < as_of_date` guards.** Examples below. |
 | `static_*` features | various | varies | Facility-level constants that don't change over time (facility_type, risk tier, zip). |
 
-**Required `prior_*` features** (canonical 26-feature contract — single
-source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`):
+**Required `prior_*` features** (part of the canonical **36-feature** contract —
+single source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`. The
+feature-refresh added the recency/trend rows below and **dropped
+`static_facility_type` + `static_zip` from the model feature set** on fairness +
+accuracy grounds — see decision record 0004. Those two columns remain in the
+parquet but are no longer consumed by the model. The current-inspection outcome
+block below took the contract 33→36):
 
 | Column | dtype | Description |
 |---|---|---|
@@ -77,23 +158,54 @@ source of truth is `src/foodsafety/models/baseline.py::ALL_FEATURES`):
 | `prior_priority_violations` | `int` | Number of priority (code 1–29) violations strictly before `as_of_date`. |
 | `prior_core_violations` | `int` | Number of core (code 30+) violations strictly before `as_of_date`. |
 | `prior_fail_or_priority_events` | `int` | Combined count of failed inspections OR inspections with any priority violation, strictly before `as_of_date`. |
+| `prior_pass_w_conditions` | `int` | Count of prior "Pass w/ Conditions" results (near-miss signal), strictly before `as_of_date`. |
+| `prior_reinspections` | `int` | Count of prior Re-Inspection visits, strictly before `as_of_date`. |
+| `prior_complaint_inspections` | `int` | Count of prior Complaint-triggered visits, strictly before `as_of_date`. |
 | `days_since_last_inspection` | `float` | Days from most recent prior inspection to `as_of_date`. NaN if none. |
 | `days_since_last_fail` | `float` | Days from most recent prior `Fail` to `as_of_date`. NaN if none. |
+| `last_was_fail` | `float` | 1/0 — was the immediately previous inspection a `Fail`. NaN if first. |
+| `prev_priority_violations` | `float` | Priority-violation count at the previous inspection. NaN if first. |
+| `priority_violation_trend` | `float` | Previous minus prev-prev priority count (worsening if > 0). |
+| `prior_fails_365d` | `float` | `Fail` count in the trailing 365 days (leak-free, exclusive). |
+| `prior_priority_violations_365d` | `float` | Priority-violation count in the trailing 365 days (leak-free). |
 
 Note: `prior_fail_rate` / `prior_fail_rate_2y` ratio features were dropped
 in Phase 5 — tree models can reconstruct ratios from numerator + denominator
 and the ratios added noise without orthogonal signal.
 
+**Required current-inspection outcome features** (the anchor inspection's OWN
+result + violation-code counts — *not* `prior_*`. Leak-free because the 180-day
+label window is strictly **after** `as_of_date`, so the anchor's own outcome
+cannot leak its own forward label):
+
+| Column | dtype | Description |
+|---|---|---|
+| `was_fail` | `int` | Was THIS inspection a `Fail` (1/0). |
+| `n_priority_this_inspection` | `int` | Priority (code 1–29) violation count on THIS inspection. |
+| `n_core_this_inspection` | `int` | Core (code 30+) violation count on THIS inspection. |
+
+Note: with these added, the model's flagged top decile becomes ~91%
+recently-failed restaurants (a Fail triggers a mandated re-inspection that often
+lands in the window). That is legitimate forward risk but must be surfaced as
+"recently failed" in the UI — see decision record 0005 (principle 6) for the
+ethics review and the re-inspection feedback-loop disclosure.
+
 **Required `static_*` features**:
 
 | Column | dtype | Description |
 |---|---|---|
-| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". |
-| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. |
-| `static_zip` | `category` | 5-digit ZIP. |
+| `static_risk_tier` | `category` | Chicago's "Risk 1 (High)" / 2 / 3. **Model feature.** |
+| `static_inspection_type` | `category` | Canvass / Complaint / Re-Inspection / License — the visit trigger, known before the outcome (leak-safe). **Model feature.** |
+| `static_facility_type` | `category` | e.g. "Restaurant", "Grocery Store". In the parquet but **dropped from the model** (DR 0004). |
+| `static_zip` | `category` | 5-digit ZIP. In the parquet but **dropped from the model** (DR 0004). |
 
 Note: `static_zip3` was dropped — strict subset of `static_zip` with no
-orthogonal information.
+orthogonal information. `static_facility_type` and `static_zip` were dropped
+from the **model feature set** in the feature-refresh (decision record 0004) —
+geographic/business-type proxies that added ~no accuracy (`static_zip` actually
+overfit the chronological split); the columns remain in the parquet but the
+model no longer consumes them. `static_risk_tier` (and `static_inspection_type`)
+remain.
 
 **Required temporal features**:
 
@@ -116,10 +228,12 @@ generalise across the chronological train/test split. `temporal_dow` and
 **Required keyword-flag features (Phase 4, hybrid NLP layer B)**:
 
 `flag_kw_*` boolean columns from regex matching the residual `violations` text,
-after stripping the numbered codes. The exact keyword list lives in
-`src/foodsafety/features/keyword_flags.py`. Expected ~20 flags, e.g.:
-`flag_kw_temperature`, `flag_kw_rodent`, `flag_kw_raw_chicken`,
-`flag_kw_no_soap`, `flag_kw_expired`, `flag_kw_cross_contamination`.
+after stripping the numbered codes. Source of truth for the list is
+`src/foodsafety/features/keyword_flags.py`. There are **12** flags:
+`flag_kw_temperature`, `flag_kw_cooling`, `flag_kw_raw_food`,
+`flag_kw_cross_contamination`, `flag_kw_expired`, `flag_kw_rodent`,
+`flag_kw_pest`, `flag_kw_no_soap`, `flag_kw_no_paper_towels`,
+`flag_kw_handwash_sink`, `flag_kw_sewage`, `flag_kw_certified_manager`.
 
 **311 spatial complaint features**: dropped from the production contract.
 The Phase-5 ablation showed `n_311_*` features sat at the bottom of XGBoost
@@ -135,6 +249,26 @@ build by default.
 `tfidf_svd_*` — 50 columns of TruncatedSVD-reduced TF-IDF features on residual
 violation text. Only added if Phase 6 has slack.
 
+### Feature contract changelog
+
+This tracks **contract version bumps** only. The full experiment history — including
+the experiments that came up flat and were reverted — is in
+[`docs/experiments.md`](experiments.md). Impact below is on the **served** basis
+(baseline LogReg + sigmoid, review-time-filtered) unless noted; exact run metrics live
+in `reports/metrics/`.
+
+| Version | PR | Added | Removed | Impact | Decision |
+|---|---|---|---|---|---|
+| 26 | #7 | baseline contract | — | reference | — |
+| 30 | #8 | `prior_pass_w_conditions`, `prior_reinspections`, `prior_complaint_inspections`, `static_inspection_type` (visit-trigger + near-miss priors) | — | incremental over 26 (served settled at PR-AUC ≈0.3147; exact 26→30 delta blurred by a concurrent data refresh) | — |
+| 33 | #10 | `last_was_fail`, `prev_priority_violations`, `priority_violation_trend`, `prior_fails_365d`, `prior_priority_violations_365d` (recency/trend) | `static_zip`, `static_facility_type` (fairness proxies) | served PR-AUC 0.3147→0.3246, precision@10% 0.352→0.364; XGB 0.2681→0.2882; + fairness win | 0004 |
+| 36 | #15 | `was_fail`, `n_priority_this_inspection`, `n_core_this_inspection` (current-inspection own outcome) | — | honest test (n=13,812), controlled A/B: LogReg PR-AUC 0.291→0.344, P@10 0.326→0.369; XGB 0.280→0.344, P@10 0.306→0.367. Both metrics, both models. Ethics-reviewed (re-inspection feedback-loop disclosure) | 0002 gate; 0005 (principle 6) |
+
+Tried and kept **out** (came up flat — risk is largely already captured by
+`prior_*` inspection history): operator / license-status priors, per-code 1–29
+prior counts, comment-severity text, the 311 geotemporal counts above, and the
+Layer-C TF-IDF→SVD(50) violation-text embedding.
+
 ---
 
 ## 3. `data/predictions/scores.parquet`
@@ -144,10 +278,11 @@ violation text. Only added if Phase 6 has slack.
 trend chart.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `src/foodsafety/serve/predict_batch.py` (Bella).
-**Consumer**: `app/Home.py` and pages.
+**Consumer**: the Next.js web app, via the exported `app/public/data/scores.json`.
 
-This is the file the Streamlit app reads. **No live model inference happens
-in the app** — predictions are precomputed and written here.
+This is the Python pipeline artifact; it is exported to
+`app/public/data/scores.json`, which the Next.js web app reads. **No live
+model inference happens in the app** — predictions are precomputed and written here.
 
 | Column | dtype | Nullable | Description |
 |---|---|---|---|
@@ -161,6 +296,16 @@ in the app** — predictions are precomputed and written here.
 | `risk_tier` | `string` | no | `Low` / `Moderate` / `Elevated` / `High`. Discretized from `risk_score` via thresholds in `src/foodsafety/serve/predict_batch.py`. |
 | `top_drivers` | `list[struct]` | no | 3–5 top SHAP-style drivers. Each struct: `{feature: string, value: string, shap: float, label: string}` where `label` is the plain-English UI string. |
 | `trend_slope_90d` | `float64` | yes | OLS slope of `risk_score` over the last 90 days at this license. Positive = worsening. Null if <2 prior dates. |
+
+**Top-level JSON envelope** (`scores.json`, `schema_version` `0.4.0`): alongside
+`scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
+`label_window_days`, `totals`, and **`calibration`**. `calibration` is the
+Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
+uses it to reconstruct each establishment's calibrated-log-odds driver
+*waterfall* from the row's own `risk_score` + `top_drivers` shap values
+(`calibrated_logit = −(a·L + b)`, `L = intercept + Σ contributions`), so the
+full per-profile waterfall costs three floats total. `top_drivers` now ships
+**5** drivers per row (within the documented 3–5).
 
 **Risk-tier thresholds** (recalibrated in Phase 6 against the actual score distribution):
 

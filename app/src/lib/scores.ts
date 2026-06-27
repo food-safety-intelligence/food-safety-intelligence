@@ -11,10 +11,29 @@
 export type RiskTier = "Low" | "Moderate" | "Elevated" | "High";
 
 /**
+ * The single biggest driver, in the compact form carried by a map pin /
+ * list row. This is `top_drivers[0]` reduced to what a one-line glance needs:
+ * the plain-English `label`, the `feature` key (for the topic icon), and the
+ * `up` direction (true = raises risk). The signed `shap` magnitude is dropped
+ * — rows show direction, not the precise log-odds value (that lives on the
+ * detail page).
+ */
+export interface PinDriver {
+  feature: string;
+  label: string;
+  up: boolean;
+}
+
+/**
  * Minimal per-restaurant record shipped to the map for zoom-aware density.
  * Keep this lean — at 23k+ rows every extra field is a noticeable RSC
  * payload hit. The map uses this set for pins; clicking a pin opens the
  * detail page (which fetches the full record server-side).
+ *
+ * `top_driver` is the one deliberate exception to "keep it lean": carrying
+ * the #1 driver lets the map popup and the search-result list rows answer
+ * "what's driving this?" without a detail-page round-trip. We ship only the
+ * top driver (not all 4), so the per-pin cost stays bounded.
  */
 export interface PinSummary {
   license_id: string;
@@ -24,6 +43,7 @@ export interface PinSummary {
   lon: number;
   risk_score: number;
   risk_tier: RiskTier;
+  top_driver?: PinDriver;
 }
 
 export interface Driver {
@@ -72,6 +92,18 @@ export interface InspectionEvent {
   headline: string;
 }
 
+/**
+ * Platt-calibration triple, shipped ONCE per payload (not per row). With it,
+ * the detail page reconstructs each establishment's calibrated-log-odds
+ * waterfall from data it already has (the row's `risk_score` + `top_drivers`
+ * shap values) — see {@link computeWaterfall}. Absent in older scores.json.
+ */
+export interface Calibration {
+  a: number;
+  b: number;
+  intercept: number;
+}
+
 export interface ScoresPayload {
   schema_version: string;
   generated_at: string;
@@ -85,6 +117,8 @@ export interface ScoresPayload {
     worsening_30d: number;
     improving_30d: number;
   };
+  /** Absent in older JSON written before the per-profile waterfall was added. */
+  calibration?: Calibration;
   scores: RestaurantScore[];
   inspection_history: Record<string, InspectionEvent[]>;
 }
@@ -93,12 +127,9 @@ export interface ScoresPayload {
 // Pure helpers — safe to call from server or client.
 // ---------------------------------------------------------------------------
 
-export function tierFromScore(score: number): RiskTier {
-  if (score < 0.2) return "Low";
-  if (score < 0.4) return "Moderate";
-  if (score < 0.65) return "Elevated";
-  return "High";
-}
+// Tiers are assigned in Python (score_to_tier / RISK_TIER_THRESHOLDS) and shipped
+// in scores.json's risk_tier field — the app reads that directly and never buckets
+// scores itself. See decision record 0008 (risk-tier thresholds).
 
 /**
  * Map a tier to its colour-token name. Useful for inline styles and lookup
@@ -137,6 +168,66 @@ export const TIER_HEX: Record<RiskTier, string> = {
   High: "#B8634A",
 };
 
+/**
+ * Reduce a full {@link Driver} to the compact {@link PinDriver} a map pin /
+ * list row carries: keep the label + feature key (for the icon), and collapse
+ * the signed `shap` to an `up` direction (true = raises risk). A zero `shap`
+ * counts as not-raising (`up=false`), matching the sage "lowers risk" styling.
+ */
+export function toPinDriver(d: Driver): PinDriver {
+  return { feature: d.feature, label: d.label, up: d.shap > 0 };
+}
+
+/** One step of a per-establishment waterfall, in calibrated log-odds. */
+export interface WaterfallStep {
+  feature: string;
+  label: string;
+  /** Calibrated log-odds contribution (signed). */
+  contribution: number;
+  up: boolean;
+}
+
+/**
+ * The score broken into calibrated log-odds: `base + Σ steps + (everything else)
+ * = total`, and `sigmoid(total) = probability`. The caller renders `steps`,
+ * then derives the "everything else" bucket as `total − base − Σ(shown steps)`
+ * so the displayed column reconciles exactly at whatever precision it shows.
+ */
+export interface WaterfallBreakdown {
+  base: number;
+  steps: WaterfallStep[];
+  total: number;
+  probability: number;
+}
+
+/**
+ * Reconstruct an establishment's calibrated-log-odds waterfall from the shipped
+ * {@link Calibration} triple and the row's own `risk_score` + `top_drivers`.
+ *
+ * Platt calibration is linear in the raw logit L: `calibrated_logit = −(a·L + b)`
+ * and `L = intercept + Σ raw_contributions`. So each driver's calibrated
+ * contribution is `−a · shap`, the base is `−a · intercept − b`, and the total
+ * calibrated logit is simply `logit(risk_score)` — recovered from the published
+ * probability (clamped so the rare p=1.0 doesn't diverge). By construction
+ * `sigmoid(total) = risk_score`, so the waterfall lands exactly on the gauge.
+ */
+export function computeWaterfall(
+  r: RestaurantScore,
+  cal: Calibration,
+): WaterfallBreakdown {
+  const slope = -cal.a;
+  const base = slope * cal.intercept - cal.b;
+  const steps: WaterfallStep[] = r.top_drivers.map((d) => ({
+    feature: d.feature,
+    label: d.label,
+    contribution: slope * d.shap,
+    up: d.shap > 0,
+  }));
+  const p = Math.min(Math.max(r.risk_score, 1e-6), 1 - 1e-6);
+  const total = Math.log(p / (1 - p));
+  return { base, steps, total, probability: r.risk_score };
+}
+
 export type TrendDirection = "improving" | "stable" | "worsening";
 
 export function trendDirection(slope: number | null): TrendDirection {
@@ -144,4 +235,65 @@ export function trendDirection(slope: number | null): TrendDirection {
   if (slope > 0.001) return "worsening";
   if (slope < -0.001) return "improving";
   return "stable";
+}
+
+// ---------------------------------------------------------------------------
+// Home search/sort — shared between the server loader and the client shell.
+// ---------------------------------------------------------------------------
+
+export const ALL_TIERS: RiskTier[] = ["Low", "Moderate", "Elevated", "High"];
+
+export type HomeSort = "risk" | "low" | "name";
+
+/** Lean row for the home side-list. Carries trend (the pin set does not). */
+export interface HomeListRow {
+  license_id: string;
+  dba_name: string;
+  address: string;
+  risk_score: number;
+  risk_tier: RiskTier;
+  trend_slope_90d: number | null;
+  top_driver?: PinDriver;
+}
+
+/**
+ * What the server hands the home shell after applying the URL query/filters.
+ * Both the side list and the map pins are pre-filtered server-side, so the
+ * client component only renders and edits the URL — no client-side filtering.
+ */
+export interface HomeView {
+  listRows: HomeListRow[];
+  pins: PinSummary[];
+  /** Total matches before the list cap (so the UI can say "200 of 1,402"). */
+  matchCount: number;
+  /** Total establishments in the index, for the "of N" denominator. */
+  total: number;
+  tierCounts: Record<RiskTier, number>;
+  listLimit: number;
+}
+
+/**
+ * Parse the `?tier=` URL value (comma-separated tier names) into a validated
+ * set. Absent / empty / all-invalid → all tiers (the default browse state).
+ */
+export function parseTiers(raw: string | undefined): RiskTier[] {
+  if (!raw) return [...ALL_TIERS];
+  const wanted = new Set(raw.split(","));
+  const valid = ALL_TIERS.filter((t) => wanted.has(t));
+  return valid.length > 0 ? valid : [...ALL_TIERS];
+}
+
+/** True when every tier is selected — i.e. the tier filter is a no-op. */
+export function isAllTiers(tiers: RiskTier[]): boolean {
+  return tiers.length === ALL_TIERS.length;
+}
+
+/** Case-insensitive substring match over name + address. */
+export function matchesQuery(
+  row: { dba_name: string; address: string },
+  q: string,
+): boolean {
+  const needle = q.trim().toLowerCase();
+  if (!needle) return true;
+  return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
 }

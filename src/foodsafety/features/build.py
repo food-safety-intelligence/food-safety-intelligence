@@ -25,13 +25,14 @@ from __future__ import annotations
 
 import pandas as pd
 
+from foodsafety.features.building_features import add_building_features
 from foodsafety.features.complaint_features import add_complaint_features
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.features.license_features import add_license_features
 from foodsafety.features.license_history_features import add_license_history_features
 from foodsafety.features.temporal_features import add_temporal_features
-
+from foodsafety.utils.geo import warn_and_null_out_of_bbox
 
 MODELABLE_RESULTS = frozenset({"Pass", "Pass w/ Conditions", "Fail"})
 
@@ -40,6 +41,8 @@ def build_features(
     inspections_labeled: pd.DataFrame,
     complaints: pd.DataFrame | None = None,
     licenses_historical: pd.DataFrame | None = None,
+    building_permits: pd.DataFrame | None = None,
+    building_violations: pd.DataFrame | None = None,
     *,
     drop_burnin: bool = True,
     drop_invalid_license: bool = True,
@@ -87,12 +90,23 @@ def build_features(
     df = add_temporal_features(df)
 
     # Spatial 311 counts (BallTree 300m). Skipped if no complaints provided.
+    # Venue-level + neighborhood 311 angles (address-exact counts/recency/trend,
+    # ring excess) were tested in Run 2 and dropped — all flat vs prior_* history
+    # (see complaint_features.py + docs/experiments.md). The functions remain in
+    # complaint_features.py, just not wired into the contract.
     if complaints is not None:
         df = add_complaint_features(df, complaints)
 
     # License history (age + activity). Skipped if no historical-licenses df provided.
     if licenses_historical is not None:
         df = add_license_history_features(df, licenses_historical)
+
+    # Block-face building permits / violations (BallTree ~30m). Skipped if
+    # neither building df is provided. Physical-plant condition, orthogonal to
+    # inspection history; the leak guard (events strictly before the anchor)
+    # lives in add_building_features.
+    if building_permits is not None or building_violations is not None:
+        df = add_building_features(df, building_permits, building_violations)
 
     # Add as_of_date as a synonym of inspection_date — per contract the row
     # key is (license_id, as_of_date). We set them equal here so the contract
@@ -115,5 +129,14 @@ def build_features(
         # the most affected since it's the most recent slice; on the current
         # snapshot about half of the test rows are right-truncated).
         df = df[~df["right_truncated"]]
+
+    # Geo sanity: warn + null (don't drop) any coords outside the Chicago bbox.
+    # A bad geocode is a broken display field, not a reason to drop a valid
+    # inspection — nulling routes it into the same missing-geo path the map
+    # already handles (skip the pin), instead of plotting a pin in Lake Michigan.
+    # Runs AFTER the 311 join, so it doesn't change the spatial counts on the
+    # current snapshot (which is 100% in-bbox anyway); it's display + Phase-2
+    # ingestion insurance. lat/lon aren't model features.
+    df = warn_and_null_out_of_bbox(df)
 
     return df.reset_index(drop=True)

@@ -30,7 +30,7 @@ const plexSans = IBM_Plex_Sans({
 export const metadata: Metadata = {
   title: "Food Safety — Chicago",
   description:
-    "Predicted 180-day food-safety risk for licensed Chicago restaurants. A research preview.",
+    "Predicted 180-day food-safety risk for licensed Chicago food establishments. A research preview.",
 };
 
 export default function RootLayout({

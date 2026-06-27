@@ -8,11 +8,53 @@ import {
   useMap,
 } from "react-map-gl/maplibre";
 import Link from "next/link";
+import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import type { PinSummary, RiskTier } from "@/lib/scores";
+import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
 import { TIER_HEX } from "@/lib/scores";
+import { iconForFeature } from "@/lib/driver-icons";
+import { cn } from "@/lib/utils";
+
+/**
+ * Render a feature's topic icon. The icon component is resolved by the caller
+ * and passed in as a prop (a stable reference), so it isn't created during
+ * render — satisfying react-hooks/static-components (same pattern as ScoreCard).
+ */
+function DriverGlyph({ icon: Icon }: { icon: LucideIcon }) {
+  return <Icon className="w-3 h-3 shrink-0" strokeWidth={2} />;
+}
+
+/**
+ * One-line "top factor" for a list row / popup: topic icon + plain-English
+ * label + an up/down arrow for direction. Terra = raises risk, sage = lowers.
+ * Defined here (the leaf map component, where the popup uses it) and imported
+ * by MapExplorer for the side-list rows — keeping a single import direction.
+ */
+export function PinDriverLine({ driver }: { driver: PinDriver }) {
+  return (
+    <span
+      // Direction is in the accessible name too — not just the arrow + colour —
+      // so it isn't a colour-only signal (matches DriverList's row title).
+      title={`${driver.label} — ${driver.up ? "raises" : "lowers"} risk`}
+      className={cn(
+        "flex items-center gap-1 text-[11px]",
+        driver.up ? "text-terra-strong" : "text-sage-strong",
+      )}
+    >
+      <DriverGlyph icon={iconForFeature(driver.feature)} />
+      {/* min-w-0 lets the label shrink so `truncate` ellipsizes a long label
+          instead of overflowing the narrow popup / list row. */}
+      <span className="truncate min-w-0">{driver.label}</span>
+      {driver.up ? (
+        <ArrowUp className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+      ) : (
+        <ArrowDown className="w-3 h-3 shrink-0" strokeWidth={2.5} />
+      )}
+    </span>
+  );
+}
 
 /**
  * Real Chicago map via maplibre-gl + CartoDB Voyager raster tiles. No API
@@ -136,6 +178,11 @@ export function MapView({
               <div className="text-[11.5px] text-muted mt-0.5">
                 {selected.address}
               </div>
+              {selected.top_driver && (
+                <div className="mt-1.5">
+                  <PinDriverLine driver={selected.top_driver} />
+                </div>
+              )}
               <Link
                 href={`/restaurant/${selected.license_id}`}
                 className="text-[12px] text-teal underline mt-2 inline-block"
