@@ -125,6 +125,42 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   per-profile waterfall reconciles when `sigmoid(base + Σdrivers + other) ==
   risk_score`).
 - Commit the metrics JSONs (they're git-tracked; **never** commit `data/`).
+- **Publish to S3 — this is what updates the DEPLOYED model.** The re-ship above
+  only refreshes the local laptop bundle. The deployed app (Amplify/Vercel) reads
+  its JSON from `s3://food-safety-intelligence-data/web-app-data/` at request time
+  (`app/src/lib/scores-server.ts` does an SDK GetObject), so the new model goes live
+  only once you push the built artifacts up with `scripts/publish.py`.
+  - **The app reads only the JSON — never the model.** Confirmed in `app/src`: the
+    live app loads `web-app-data/{scores.json, inspection_history.json,
+    methodology.json}` and never the `.joblib` (batch-score-to-JSON contract). So the
+    JSON bundle is what makes the new model *visible*; the model/features/parquet are
+    **archival** (rollback / re-scoring / provenance), not read at request time.
+  - **Ask the user which model and which scores file to publish — don't assume the
+    latest.** Several `data/models/baseline_sigmoid_*.joblib` accumulate over runs,
+    and `scores.parquet`/`scores.json` are single-copy (each retrain overwrites them).
+    List the available models with their dates and the current `scores.json`
+    (path + mtime + row count), and have the user pick. They **must be a coherent
+    set** — the model, `features.parquet`, `scores.parquet` and `scores.json` from the
+    **same retrain run** (the on-disk set is coherent right after a retrain; an older
+    model paired with current scores is a mismatch). Then pass the choices explicitly:
+    ```
+    PYTHONPATH=src .venv/bin/python scripts/publish.py --dry-run \
+        --model data/models/baseline_sigmoid_<run>.joblib \
+        --scores-json app/public/data/scores.json \
+        --scores-parquet data/predictions/scores.parquet      # preview, upload nothing
+    PYTHONPATH=src .venv/bin/python scripts/publish.py --model … --scores-json … --scores-parquet …
+    ```
+    Omitting `--model` defaults to the most-recent local model; `make publish` runs
+    the all-defaults form. The model + its `_metadata.json` sidecar publish under
+    their versioned `models/baseline_sigmoid_<run>` names (never overwritten — the
+    binary is gitignored, so S3 is the only rollback copy); features / scores /
+    web-app JSON overwrite in place.
+  - **AWS creds first.** This space runs as the execution role, which is **not**
+    authorised on the bucket — mint `bella_davies` session-token creds into
+    `~/.aws/credentials` (the standard chain pyarrow reads) before publishing, or
+    the upload 403s.
+  - `inspections_labeled.parquet` is skipped if already in S3 — pass `--force` only
+    when a data refresh (notebook 02) actually changed it.
 
 ## Step 7 — If FLAT (missed the gate)
 Remove the column(s) from `ALL_FEATURES`, add a "Reverted" row to

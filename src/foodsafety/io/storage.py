@@ -133,6 +133,31 @@ def write_bytes(data: bytes, target: Target) -> None:
         f.write(data)
 
 
+def basename(target: Target) -> str:
+    """Final path component of a local path or s3:// URI (e.g. ``model.joblib``)."""
+    return str(target).rstrip("/").rsplit("/", 1)[-1]
+
+
+# Stream copies in 8 MiB chunks so a large artifact (the ~100 MB labeled parquet, the
+# ~47 MB history JSON) never has to sit fully in memory the way read_bytes would.
+_COPY_CHUNK = 8 * 1024 * 1024
+
+
+def copy(src: Target, dst: Target) -> None:
+    """Copy a file/object byte-for-byte from ``src`` to ``dst`` (any local↔s3 mix).
+
+    A raw byte copy, not a parquet/JSON round-trip, so the destination is identical to
+    the source — no pandas re-serialisation, no risk of a schema/encoding drift on the
+    way up to S3. Streams in chunks to bound memory; creates local parents on write.
+    """
+    src_fs, src_path = resolve(src)
+    dst_fs, dst_path = resolve(dst)
+    _ensure_parent(dst_fs, dst_path)
+    with src_fs.open_input_stream(src_path) as fin, dst_fs.open_output_stream(dst_path) as fout:
+        while chunk := fin.read(_COPY_CHUNK):
+            fout.write(chunk)
+
+
 def read_text(target: Target, encoding: str = "utf-8") -> str:
     """Read UTF-8 text (e.g. a JSON document)."""
     return read_bytes(target).decode(encoding)
