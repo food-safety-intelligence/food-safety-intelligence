@@ -13,7 +13,7 @@
  */
 
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
@@ -26,16 +26,26 @@ const s3 = new S3Client({ region: REGION });
 
 async function fetchAndCache(key) {
   const t0 = Date.now();
-  const res = await s3.send(
-    new GetObjectCommand({ Bucket: BUCKET, Key: `${PREFIX}/${key}` }),
-  );
-  if (!res.Body) throw new Error(`empty body for ${key}`);
-  const text = await res.Body.transformToString();
   const out = path.join(CACHE_DIR, key);
+  let text;
+  try {
+    const res = await s3.send(
+      new GetObjectCommand({ Bucket: BUCKET, Key: `${PREFIX}/${key}` }),
+    );
+    if (!res.Body) throw new Error("empty body");
+    text = await res.Body.transformToString();
+  } catch (err) {
+    // No creds / offline / object missing: fall back to the committed copy so
+    // the build still works without AWS. (Slightly stale, but functional.)
+    const committed = path.join("public", "data", key);
+    text = await readFile(committed, "utf-8");
+    console.warn(
+      `  ${key.padEnd(28)} S3 failed (${err.message}); using committed ${committed}`,
+    );
+  }
   await writeFile(out, text, "utf-8");
   const mb = (text.length / 1024 / 1024).toFixed(1);
-  const ms = Date.now() - t0;
-  console.log(`  ${key.padEnd(28)} ${mb} MB  ${ms} ms  → ${out}`);
+  console.log(`  ${key.padEnd(28)} ${mb} MB  ${Date.now() - t0} ms  → ${out}`);
 }
 
 async function main() {
@@ -46,6 +56,7 @@ async function main() {
 }
 
 main().catch((err) => {
+  // Only fails if BOTH S3 and the committed fallback are unavailable.
   console.error("[prebuild] FAILED:", err.message);
   process.exit(1);
 });

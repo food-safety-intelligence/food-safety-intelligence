@@ -55,12 +55,11 @@ export default async function HomePage() {
           overflow-x-clip guards against a few px of horizontal overflow on very
           narrow screens (≤320px); vertical scroll is unaffected. */}
       <main className="flex-1 flex flex-col pt-4 overflow-x-clip">
-        <MapExplorer
-          view={view}
-          query={DEFAULT_QUERY}
-          sort={DEFAULT_SORT}
-          activeTiers={DEFAULT_TIERS}
-        />
+        {/* Server renders this default (unfiltered) view for the first paint;
+            MapExplorer then fetches the search index and filters per the URL
+            client-side, so search/sort/filter and shareable `/?q=` links work
+            on the statically-exported page. */}
+        <MapExplorer initialView={view} />
 
         {/* Below-the-fold supplementary content. Map-first means scroll for the rest. */}
         <section className="max-w-[1240px] mx-auto px-8 mt-16 w-full">

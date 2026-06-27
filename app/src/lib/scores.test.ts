@@ -1,11 +1,19 @@
 import { describe, expect, it } from "vitest";
 
-import type { Driver, RestaurantScore, RiskTier } from "@/lib/scores";
+import type {
+  Driver,
+  RestaurantScore,
+  RiskTier,
+  SearchIndex,
+  SearchIndexRow,
+} from "@/lib/scores";
 import {
   ALL_TIERS,
+  computeHomeView,
   computeWaterfall,
   isAllTiers,
   matchesQuery,
+  parseSort,
   parseTiers,
   toPinDriver,
   trendDirection,
@@ -187,5 +195,110 @@ describe("matchesQuery", () => {
 
   it("returns false when neither name nor address contains the query", () => {
     expect(matchesQuery(row, "sushi")).toBe(false);
+  });
+});
+
+describe("parseSort", () => {
+  it("accepts the two non-default sorts", () => {
+    expect(parseSort("name")).toBe("name");
+    expect(parseSort("low")).toBe("low");
+  });
+
+  it("defaults to risk for missing or unknown values", () => {
+    expect(parseSort("risk")).toBe("risk");
+    expect(parseSort(null)).toBe("risk");
+    expect(parseSort(undefined)).toBe("risk");
+    expect(parseSort("garbage")).toBe("risk");
+  });
+});
+
+describe("computeHomeView", () => {
+  const mk = (
+    license_id: string,
+    dba_name: string,
+    risk_score: number,
+    risk_tier: RiskTier,
+    coords: boolean,
+  ): SearchIndexRow => ({
+    license_id,
+    dba_name,
+    address: `${license_id} Main St`,
+    lat: coords ? 41.9 : null,
+    lon: coords ? -87.6 : null,
+    risk_score,
+    risk_tier,
+    trend_slope_90d: null,
+    top_driver: null,
+  });
+
+  const INDEX: SearchIndex = {
+    schema_version: "1",
+    generated_at: null,
+    total: 4,
+    tier_counts: { Low: 1, Moderate: 1, Elevated: 1, High: 1 },
+    rows: [
+      mk("1", "Zeta Pizza", 0.9, "High", true),
+      mk("2", "Bravo Tacos", 0.5, "Elevated", true),
+      mk("3", "Alpha Pizza", 0.2, "Moderate", false), // no coords
+      mk("4", "Delta Diner", 0.1, "Low", true),
+    ],
+  };
+
+  const opts = (o: Partial<Parameters<typeof computeHomeView>[1]> = {}) => ({
+    q: "",
+    tiers: [...ALL_TIERS],
+    sort: "risk" as const,
+    listLimit: 100,
+    ...o,
+  });
+
+  const ids = (rows: { license_id: string }[]) => rows.map((r) => r.license_id);
+
+  it("defaults to all rows, highest-risk first, with full counts", () => {
+    const v = computeHomeView(INDEX, opts());
+    expect(ids(v.listRows)).toEqual(["1", "2", "3", "4"]);
+    expect(v.matchCount).toBe(4);
+    expect(v.total).toBe(4);
+    expect(v.tierCounts).toEqual(INDEX.tier_counts);
+  });
+
+  it("filters by case-insensitive query over name + address", () => {
+    const v = computeHomeView(INDEX, opts({ q: "PIZZA" }));
+    expect(ids(v.listRows)).toEqual(["1", "3"]);
+    expect(v.matchCount).toBe(2);
+  });
+
+  it("filters by tier", () => {
+    const v = computeHomeView(INDEX, opts({ tiers: ["High"] }));
+    expect(ids(v.listRows)).toEqual(["1"]);
+  });
+
+  it("sorts lowest-risk first", () => {
+    expect(ids(computeHomeView(INDEX, opts({ sort: "low" })).listRows)).toEqual([
+      "4",
+      "3",
+      "2",
+      "1",
+    ]);
+  });
+
+  it("sorts alphabetically by name", () => {
+    expect(ids(computeHomeView(INDEX, opts({ sort: "name" })).listRows)).toEqual([
+      "3",
+      "2",
+      "4",
+      "1",
+    ]);
+  });
+
+  it("caps the list but keeps the true match count", () => {
+    const v = computeHomeView(INDEX, opts({ listLimit: 2 }));
+    expect(v.listRows).toHaveLength(2);
+    expect(v.matchCount).toBe(4);
+  });
+
+  it("drops rows without coordinates from the map pins", () => {
+    const v = computeHomeView(INDEX, opts());
+    expect(ids(v.pins)).toEqual(["1", "2", "4"]); // "3" has null lat/lon
   });
 });

@@ -129,7 +129,10 @@ export interface ScoresPayload {
   /** Absent in older JSON written before the per-profile waterfall was added. */
   calibration?: Calibration;
   scores: RestaurantScore[];
-  inspection_history: Record<string, InspectionEvent[]>;
+  // History is no longer merged into the payload — it's read per-license from
+  // shards (see scores-server.ts getInspectionHistory). Kept optional for the
+  // raw pipeline JSON shape.
+  inspection_history?: Record<string, InspectionEvent[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -305,4 +308,116 @@ export function matchesQuery(
   const needle = q.trim().toLowerCase();
   if (!needle) return true;
   return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
+}
+
+/** Validate a raw `?sort=` value into a {@link HomeSort}; default "risk". */
+export function parseSort(raw: string | null | undefined): HomeSort {
+  return raw === "name" ? "name" : raw === "low" ? "low" : "risk";
+}
+
+// ---------------------------------------------------------------------------
+// Client search index
+//
+// The home page is statically exported, so it can't filter per-request on the
+// server. Instead the browser fetches a slim index of EVERY establishment
+// (scripts/gen-search-index.mjs) and filters with `computeHomeView` below —
+// the client-side twin of the server's `getHomeView`, producing the same
+// `HomeView` shape so `MapExplorer` renders identically either way.
+// ---------------------------------------------------------------------------
+
+/** One establishment in the slim client search index. */
+export interface SearchIndexRow {
+  license_id: string;
+  dba_name: string;
+  address: string;
+  lat: number | null;
+  lon: number | null;
+  risk_score: number;
+  risk_tier: RiskTier;
+  trend_slope_90d: number | null;
+  top_driver: PinDriver | null;
+}
+
+/** The whole `search-index.json` file the client fetches once. */
+export interface SearchIndex {
+  schema_version: string;
+  generated_at: string | null;
+  total: number;
+  tier_counts: Record<RiskTier, number>;
+  rows: SearchIndexRow[];
+}
+
+function hasCoords(r: SearchIndexRow): boolean {
+  return (
+    r.lat != null &&
+    r.lon != null &&
+    !Number.isNaN(r.lat) &&
+    !Number.isNaN(r.lon)
+  );
+}
+
+/**
+ * Apply the URL query/tier/sort to the slim index, client-side. Mirrors the
+ * server's `getHomeView`: filter by tier + query over the full population,
+ * sort, cap the list, and build the (coordinate-bearing) map pins — so the
+ * statically-exported page gets the same search/sort/filter the server used
+ * to do per-request, now in the browser.
+ */
+export function computeHomeView(
+  index: SearchIndex,
+  opts: { q: string; tiers: RiskTier[]; sort: HomeSort; listLimit: number },
+): HomeView {
+  const { q, tiers, sort, listLimit } = opts;
+  const tierSet = new Set(tiers);
+  const tierActive = !isAllTiers(tiers);
+
+  const matched = index.rows.filter(
+    (r) => (!tierActive || tierSet.has(r.risk_tier)) && matchesQuery(r, q),
+  );
+
+  const byScore = (a: SearchIndexRow, b: SearchIndexRow) =>
+    sort === "name"
+      ? a.dba_name.localeCompare(b.dba_name)
+      : sort === "low"
+        ? a.risk_score - b.risk_score
+        : b.risk_score - a.risk_score;
+
+  const listRows: HomeListRow[] = matched
+    .slice()
+    .sort(byScore)
+    .slice(0, listLimit)
+    .map((r) => ({
+      license_id: r.license_id,
+      dba_name: r.dba_name,
+      address: r.address,
+      risk_score: r.risk_score,
+      risk_tier: r.risk_tier,
+      trend_slope_90d: r.trend_slope_90d,
+      top_driver: r.top_driver ?? undefined,
+    }));
+
+  const pins: PinSummary[] = matched
+    .filter(hasCoords)
+    .sort((a, b) =>
+      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
+    )
+    .map((r) => ({
+      license_id: r.license_id,
+      dba_name: r.dba_name,
+      address: r.address,
+      lat: r.lat as number,
+      lon: r.lon as number,
+      risk_score: r.risk_score,
+      risk_tier: r.risk_tier,
+      top_driver: r.top_driver ?? undefined,
+    }));
+
+  return {
+    listRows,
+    pins,
+    matchCount: matched.length,
+    total: index.total,
+    tierCounts: index.tier_counts,
+    listLimit,
+  };
 }
