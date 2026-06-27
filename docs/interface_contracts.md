@@ -332,6 +332,34 @@ production `scores.parquet` will NOT include this column.
 
 ---
 
+## 4. Web-app sidecars: inspection history + comment shards
+
+These are read by the web app's restaurant detail page, never by the model.
+Both are written by `scripts/export_inspection_history.py` from
+`inspections_labeled.parquet` in one pass, and both live under
+`web-app-data/` on S3 (the static build reads them; a local build falls back
+to the committed/locally-generated copies under `app/public/data/`).
+
+- **`inspection_history.json`** — `{ license_id: [ {date, type, result,
+  headline} ] }`, most-recent first, capped at the 30 latest inspections per
+  license. `headline` is the first violation line, truncated to 100 chars.
+  Committed (~45 MB) as the local fallback.
+
+- **`comments/<xx>.json`** (new) — the full violation-comment text, too large
+  for one file (~255 MB across all establishments, over GitHub's 100 MB cap),
+  so sharded into 256 buckets by `<xx>` = first two md5 hex chars of the
+  `license_id`. Each file is `{ license_id: [ comments ] }` where the array is
+  **index-aligned** to that license's `inspection_history` events (built in the
+  same pass) — `comments[i]` is the full text for event `i`, `""` if the
+  inspection recorded none. Each entry is the `|`-separated violations rejoined
+  as newlines (`"<code>. <NAME> - Comments: <text>"`). **Gitignored** — S3 is
+  the source of truth; the build reads only the shards covering its pre-rendered
+  pages. Producer `_shard_of()` and the web app's `commentShardOf()` must use
+  the same md5 scheme. Regenerate and upload `inspection_history.json` and the
+  shards **together** so the index alignment holds.
+
+---
+
 ## Schema enforcement
 
 `tests/test_contracts.py` (Phase 6) will validate each parquet against the
