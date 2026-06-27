@@ -126,7 +126,8 @@ the audit in `notebooks/06` and `fairness_audit.md`.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `scripts/build_features.py` → `src/foodsafety/features/build.py`
 (Bella + Deepak). Default name `features_current_inspection` (config `FEATURES_NAME`).
-**Consumers**: `scripts/retrain_baseline_sigmoid.py`, batch scoring.
+**Consumers** (all read it through `foodsafety.io.storage`): `scripts/retrain_xgb_sigmoid.py`,
+`scripts/retrain_baseline_sigmoid.py`, `scripts/build_methodology_json.py`, batch scoring.
 
 **Storage location.** All pipeline artifacts live under `FOODSAFETY_DATA_DIR` (config) —
 a local path by default (`./data`, so `data/processed/features/<name>.parquet`) or an
