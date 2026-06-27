@@ -35,6 +35,9 @@ const S3_PREFIX = "web-app-data";
 // into this directory, then the parallel SSR workers read from here instead
 // of hitting S3 N times.
 const BUILD_CACHE_DIR = "/tmp/fsi-build-cache";
+// Per-license inspection-history shards (scripts/shard-history.mjs), so a
+// detail page reads only its own slice instead of the whole 45 MB map.
+const HISTORY_SHARD_DIR = path.join(BUILD_CACHE_DIR, "history");
 
 const s3 = new S3Client({ region: S3_REGION });
 
@@ -98,14 +101,11 @@ export async function loadScores(): Promise<ScoresPayload> {
   }
   const payload = JSON.parse(raw) as ScoresPayload;
 
-  // scores.json from the Python pipeline doesn't include an
-  // `inspection_history` map (would balloon the payload from 18MB to ~60MB
-  // in one file). The history lives in a sidecar file written by
-  // `scripts/export_inspection_history.py`. Load it once on first scores
-  // fetch and merge it in.
-  if (!payload.inspection_history) {
-    payload.inspection_history = await loadInspectionHistory();
-  }
+  // NB: we deliberately do NOT merge the ~45 MB inspection_history map into the
+  // cached payload. The static export pre-renders ~500 detail pages in parallel
+  // workers; holding the whole map resident in each worker exhausts memory and
+  // crashes `next build`. Instead `getInspectionHistory` reads a per-license
+  // shard (scripts/shard-history.mjs), so each page loads only its own slice.
 
   augmentWithPercentiles(payload);
 
@@ -163,7 +163,29 @@ export async function getPopulationStats(): Promise<PopulationStats> {
   return cachedStats;
 }
 
-async function loadInspectionHistory(): Promise<
+// Whether the per-license shard directory exists (checked once). When the
+// prebuild/predev shard step ran, we read slices from it; otherwise we fall
+// back to loading the whole map once.
+let shardDirChecked = false;
+let shardDirExists = false;
+let fullHistoryFallback: Record<string, InspectionEvent[]> | null = null;
+
+async function hasHistoryShards(): Promise<boolean> {
+  if (!shardDirChecked) {
+    shardDirChecked = true;
+    try {
+      shardDirExists = (await fs.stat(HISTORY_SHARD_DIR)).isDirectory();
+    } catch {
+      shardDirExists = false;
+    }
+  }
+  return shardDirExists;
+}
+
+// Fallback only: load the whole history map once if the shard step didn't run
+// (e.g. `next build` invoked without the prebuild). Accepts the memory cost so
+// the page still works; the normal path is per-license shards.
+async function loadFullHistoryMap(): Promise<
   Record<string, InspectionEvent[]>
 > {
   try {
@@ -199,8 +221,21 @@ export async function getRestaurant(
 export async function getInspectionHistory(
   licenseId: string,
 ): Promise<InspectionEvent[]> {
-  const payload = await loadScores();
-  return payload.inspection_history[licenseId] ?? [];
+  if (await hasHistoryShards()) {
+    try {
+      const raw = await fs.readFile(
+        path.join(HISTORY_SHARD_DIR, `${licenseId}.json`),
+        "utf-8",
+      );
+      return JSON.parse(raw) as InspectionEvent[];
+    } catch {
+      // No shard for this license → no inspections on record.
+      return [];
+    }
+  }
+  // No shard directory: load the whole map once (degraded fallback).
+  if (!fullHistoryFallback) fullHistoryFallback = await loadFullHistoryMap();
+  return fullHistoryFallback[licenseId] ?? [];
 }
 
 // Full violation-comment text lives in sharded sidecars

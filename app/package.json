@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/gen-search-index.mjs public/data/scores.json && node scripts/shard-history.mjs public/data/inspection_history.json /tmp/fsi-build-cache/history",
     "dev": "next dev",
-    "prebuild": "node scripts/prebuild-sync-s3.mjs",
+    "prebuild": "node scripts/prebuild-sync-s3.mjs && node scripts/gen-search-index.mjs /tmp/fsi-build-cache/scores.json && node scripts/shard-history.mjs /tmp/fsi-build-cache/inspection_history.json /tmp/fsi-build-cache/history",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
