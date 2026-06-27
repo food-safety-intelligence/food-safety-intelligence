@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
 
@@ -29,6 +32,8 @@ export function InspectionTimeline({
   events: InspectionEvent[];
   maxVisible?: number;
 }) {
+  const [expanded, setExpanded] = useState(false);
+
   if (events.length === 0) {
     return (
       <div className="rounded-3xl bg-card border border-line p-6 text-muted text-[14px]">
@@ -39,7 +44,7 @@ export function InspectionTimeline({
 
   // Most recent first
   const sorted = events.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
-  const visible = sorted.slice(0, maxVisible);
+  const visible = expanded ? sorted : sorted.slice(0, maxVisible);
   const hidden = sorted.length - visible.length;
 
   return (
@@ -94,8 +99,19 @@ export function InspectionTimeline({
         })}
       </ul>
       {hidden > 0 && (
-        <button className="block w-full text-center text-[13px] mt-6 text-teal hover:underline">
+        <button
+          onClick={() => setExpanded(true)}
+          className="block w-full text-center text-[13px] mt-6 text-teal hover:underline"
+        >
           Show {hidden} older inspection{hidden === 1 ? "" : "s"}
+        </button>
+      )}
+      {expanded && sorted.length > maxVisible && (
+        <button
+          onClick={() => setExpanded(false)}
+          className="block w-full text-center text-[13px] mt-6 text-teal hover:underline"
+        >
+          Show fewer
         </button>
       )}
     </div>
