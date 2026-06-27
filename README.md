@@ -36,46 +36,40 @@ The only switch is one env var, `FOODSAFETY_DATA_DIR` — everything routes
 through `foodsafety.io.storage`, which abstracts local vs `s3://`.
 
 ```mermaid
-flowchart TD
-    subgraph sources["Public data — Chicago Open Data (SODA API)"]
-        SODA["Food Inspections · Business Licenses<br/>311 Complaints · Building Permits/Violations"]
-    end
+flowchart LR
+    SODA[("Chicago Open Data<br/>(SODA API)")]
 
-    subgraph pipeline["Python batch pipeline — src/foodsafety + scripts"]
+    subgraph P1["1 — Batch pipeline (Python, offline)"]
         direction TB
-        ING["ingest_raw.py<br/><i>SODA → raw/*.parquet</i>"]
-        LBL["labels.py (notebooks 01/02)<br/><i>→ inspections_labeled.parquet</i>"]
-        FEAT["build_features.py<br/><i>leak-guarded prior_* + keyword flags<br/>→ features/*.parquet</i>"]
-        TRAIN["retrain_baseline_sigmoid.py<br/><i>LogReg → CalibratedClassifierCV(sigmoid)<br/>+ XGBoost A/B · SHAP drivers</i>"]
-        SCORE["serve/predict_batch.py<br/><i>risk_score · risk_tier · top_drivers · trend<br/>→ scores.parquet</i>"]
-        EXPORT["scores.json · inspection_history.json<br/>methodology.json"]
-        ING --> LBL --> FEAT --> TRAIN --> SCORE --> EXPORT
+        ING["Ingest"] --> LBL["Label"] --> FEAT["Feature build"] --> TRAIN["Train + calibrate<br/>LogReg · XGBoost · SHAP"] --> SCORE["Batch score"] --> EXP["Export JSON"]
     end
 
-    subgraph seam["JSON seam — the cross-team contract"]
-        JSON["app/public/data/*.json<br/><i>(bundled locally · or CloudFront-fronted S3)</i>"]
-    end
-
-    subgraph app["Next.js web app — app/ (App Router, server components)"]
+    subgraph P2["2 — Precomputed JSON (the contract)"]
         direction TB
-        LOAD["lib/scores-server.ts<br/><i>loadScores() · real → mock fallback</i>"]
-        PAGES["Map · Restaurant detail · How-it-works<br/>Caregivers · Sources"]
-        LOAD --> PAGES
+        SJ["scores.json"]
+        IH["inspection_history.json"]
+        MJ["methodology.json"]
     end
 
-    AGENT["Strands agent — agents/<br/><i>Nova 2 Lite via Bedrock · find/score/explain tools<br/>standalone, not in the web request path</i>"]
-
-    STORAGE["foodsafety.io.storage<br/><i>local ./data  ⇄  s3://…  (one env var)</i>"]
+    subgraph P3["3 — Consumers (read JSON only)"]
+        direction TB
+        APP["Next.js web app<br/>map · detail · methodology"] --> USERS(["Browser / users"])
+        AGENT["AI agent — Bedrock<br/>standalone finder"]
+    end
 
     SODA --> ING
-    EXPORT --> JSON
-    JSON --> LOAD
-    JSON -.reads same JSON.-> AGENT
-    STORAGE -.abstracts all pipeline I/O.-> pipeline
+    EXP --> P2
+    P2 --> APP
+    P2 --> AGENT
 
-    classDef store fill:#eef,stroke:#88a
-    class STORAGE,seam store
+    style P2 fill:#eef4ff,stroke:#2e8b57,stroke-width:2px
 ```
+
+Flow is one-way, left to right: the model runs on the left, writes the JSON
+contract in the middle, and the consumers on the right only read that JSON —
+they never call the model. Every pipeline step reads and writes through one
+storage layer (`foodsafety.io.storage`), so the same code runs against local
+files or S3.
 
 ### The three planes
 
