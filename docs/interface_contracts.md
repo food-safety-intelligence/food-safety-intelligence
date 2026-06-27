@@ -389,14 +389,16 @@ re-scores; run `make features retrain history` first. Two tiers:
 | `processed/inspections_labeled.parquet` | `data/processed/inspections_labeled.parquet` | archival | yes (skipped if present unless `--force`) |
 | `predictions/scores.parquet` | `data/predictions/scores.parquet` | archival | yes |
 
-The deployed Next.js app reads **only** the `web-app-data/` JSON (the three top-level
-files plus the comment shards), via an SDK GetObject (`app/src/lib/scores-server.ts`) —
-it never loads the model (batch-score-to-JSON contract). The model/parquets are kept in
-S3 for rollback, re-scoring and provenance only. The model is **versioned** (never
-overwritten) because the binary is gitignored, so S3 is the only rollback copy; its
-`_metadata.json` sidecar records the producing run (git SHA, `features_sha256`, run_id).
-Publishing the JSON is what makes a newly-trained model go live — see the `update-model`
-skill, Step 6.
+The Next.js app is a **static export** (`output: 'export'`): `app/src/lib/scores-server.ts`
+reads **only** the `web-app-data/` JSON (the three top-level files plus the comment shards)
+at **build time** — never at request time, and never the model (batch-score-to-JSON
+contract). The model/parquets are kept in S3 for rollback, re-scoring and provenance only.
+The model is **versioned** (never overwritten) because the binary is gitignored, so S3 is
+the only rollback copy; its `_metadata.json` sidecar records the producing run (git SHA,
+`features_sha256`, run_id). A newly-trained model goes live in **two steps** — publish the
+JSON to S3, **then** rebuild/redeploy the app (an Amplify/Vercel rebuild re-reads S3 and
+re-exports); publishing alone does not change the live site. See the `update-model` skill,
+Step 6.
 
 ---
 

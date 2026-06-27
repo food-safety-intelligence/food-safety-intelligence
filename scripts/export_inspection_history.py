@@ -6,7 +6,8 @@ and was never plumbed through to `scores.json` — the original export script
 skipped it to keep the main payload small.
 
 This script writes a sidecar file `app/public/data/inspection_history.json`
-keyed by `license_id` so the web app can read it server-side at request time.
+keyed by `license_id`. The app is a static export, so it reads this at build time
+(see the comment-shard note below), not per request.
 
 It ALSO writes the full violation-comment text, sharded into
 `app/public/data/comments/<xx>.json` (xx = first two md5 hex chars of the

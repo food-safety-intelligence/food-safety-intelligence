@@ -125,16 +125,20 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   per-profile waterfall reconciles when `sigmoid(base + Σdrivers + other) ==
   risk_score`).
 - Commit the metrics JSONs (they're git-tracked; **never** commit `data/`).
-- **Publish to S3 — this is what updates the DEPLOYED model.** The re-ship above
-  only refreshes the local laptop bundle. The deployed app (Amplify/Vercel) reads
-  its JSON from `s3://food-safety-intelligence-data/web-app-data/` at request time
-  (`app/src/lib/scores-server.ts` does an SDK GetObject), so the new model goes live
-  only once you push the built artifacts up with `scripts/publish.py`.
+- **Publish to S3, then redeploy — together these update the DEPLOYED model.** The
+  re-ship above only refreshes the local laptop bundle. The app is a **static export**
+  (`output: 'export'`): `app/src/lib/scores-server.ts` reads the JSON from
+  `s3://food-safety-intelligence-data/web-app-data/` at **build time**, not per
+  request. So a new model goes live in two steps — (1) push the built artifacts to S3
+  with `scripts/publish.py`, then (2) trigger an app rebuild/redeploy (Amplify/Vercel
+  rebuild on a push to `main` re-reads S3 and re-exports the static site). Publishing
+  alone does not change the live site.
   - **The app reads only the JSON — never the model.** Confirmed in `app/src`: the
-    live app loads `web-app-data/{scores.json, inspection_history.json,
-    methodology.json}` and never the `.joblib` (batch-score-to-JSON contract). So the
-    JSON bundle is what makes the new model *visible*; the model/features/parquet are
-    **archival** (rollback / re-scoring / provenance), not read at request time.
+    static build loads `web-app-data/{scores.json, inspection_history.json,
+    methodology.json}` (+ comment shards) and never the `.joblib` (batch-score-to-JSON
+    contract). So the JSON bundle is what makes the new model *visible*; the
+    model/features/parquet are **archival** (rollback / re-scoring / provenance), not
+    read by the app at all.
   - **Ask the user which model and which scores file to publish — don't assume the
     latest.** Several `data/models/baseline_sigmoid_*.joblib` accumulate over runs,
     and `scores.parquet`/`scores.json` are single-copy (each retrain overwrites them).
