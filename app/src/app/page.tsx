@@ -1,7 +1,7 @@
 import { ArrowRight, Heart } from "lucide-react";
 import Link from "next/link";
 import { getHomeView, loadScores } from "@/lib/scores-server";
-import { parseTiers, type HomeSort, type PinDriver } from "@/lib/scores";
+import { ALL_TIERS, type HomeSort, type PinDriver } from "@/lib/scores";
 import { DemoBanner } from "@/components/DemoBanner";
 import { MapExplorer } from "@/components/MapExplorer";
 import { PinDriverLine } from "@/components/MapView";
@@ -27,21 +27,23 @@ const EXAMPLE_DRIVERS: PinDriver[] = [
   { feature: "flag_kw_handwash_sink", label: "Handwashing lapses", up: true },
 ];
 
-export default async function HomePage({
-  searchParams,
-}: {
-  // Next 16: searchParams is async.
-  searchParams: Promise<{ q?: string; tier?: string; sort?: string }>;
-}) {
-  const sp = await searchParams;
-  const query = (sp.q ?? "").trim();
-  const sort: HomeSort =
-    sp.sort === "name" ? "name" : sp.sort === "low" ? "low" : "risk";
-  const tiers = parseTiers(sp.tier);
+// `output: "export"` pre-renders this page once at build time, so we can't
+// read URL params here. Server renders the default unfiltered view; the
+// client (MapExplorer) handles search/sort/tier via its own state. URL-driven
+// filter persistence is a follow-up — see Scope B in the deploy plan.
+const DEFAULT_QUERY = "";
+const DEFAULT_SORT: HomeSort = "risk";
+const DEFAULT_TIERS = ALL_TIERS;
 
+export default async function HomePage() {
   const [payload, view] = await Promise.all([
     loadScores(),
-    getHomeView({ q: query, tiers, sort, listLimit: LIST_LIMIT }),
+    getHomeView({
+      q: DEFAULT_QUERY,
+      tiers: DEFAULT_TIERS,
+      sort: DEFAULT_SORT,
+      listLimit: LIST_LIMIT,
+    }),
   ]);
 
   return (
@@ -55,9 +57,9 @@ export default async function HomePage({
       <main className="flex-1 flex flex-col pt-4 overflow-x-clip">
         <MapExplorer
           view={view}
-          query={query}
-          sort={sort}
-          activeTiers={tiers}
+          query={DEFAULT_QUERY}
+          sort={DEFAULT_SORT}
+          activeTiers={DEFAULT_TIERS}
         />
 
         {/* Below-the-fold supplementary content. Map-first means scroll for the rest. */}
