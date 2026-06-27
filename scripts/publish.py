@@ -20,21 +20,24 @@ The artifacts split into two tiers:
 
   ARCHIVAL — never read by the app (the batch-score-to-JSON contract means the app
   never loads the model). Kept in S3 for rollback / re-scoring / provenance:
-      models/baseline_sigmoid_<run>.joblib + …_metadata.json   (VERSIONED — never overwrite)
-      processed/features.parquet                               (overwrite in place)
-      processed/inspections_labeled.parquet                    (overwrite in place)
-      predictions/scores.parquet                               (overwrite in place)
+      models/<model>_sigmoid_<run>.joblib (+ _metadata.json if present)  (VERSIONED — never overwrite)
+      processed/features.parquet                                         (overwrite in place)
+      processed/inspections_labeled.parquet                              (overwrite in place)
+      predictions/scores.parquet                                         (overwrite in place)
 
-The model is kept VERSIONED because the binary is gitignored — S3 is the only rollback
-copy. The model's *_metadata.json sidecar records the run (git SHA, features_sha256,
-run_id) that produced it. Everything else overwrites in place.
+The served model is model-agnostic: whichever sigmoid-calibrated model the latest retrain
+wrote — ``baseline_sigmoid_<run>.joblib`` (LogReg) or ``xgb_monotone_sigmoid_<run>.joblib``
+(XGBoost), per the current production estimator. It is kept VERSIONED because the binary is
+gitignored — S3 is the only rollback copy. A ``<model>_metadata.json`` sidecar is published
+when the retrain emits one (baseline does; XGB keeps provenance in the git-committed
+reports/metrics/<run>.json instead). Everything else overwrites in place.
 
 PICK A COHERENT SET. The model, features, scores.parquet and scores.json must come from
 the SAME retrain run — retrain writes them together, so the current on-disk set is
 coherent. Use the flags to publish a specific (e.g. older, for rollback) model and its
-matching scores instead of the latest. ``--model`` defaults to the most-recent local
-``baseline_sigmoid_*.joblib``; the scores / features paths default to their single
-current locations.
+matching scores instead of the latest. ``--model`` defaults to the newest local model
+matching ``--model-glob`` (``*_sigmoid_*.joblib``); the scores / features paths default to
+their single current locations.
 
 ``inspections_labeled.parquet`` is the notebook-02 label output — an input, not a retrain
 product — and changes only on a data refresh, so it is skipped if already in S3 unless
@@ -63,18 +66,21 @@ WEB = REPO_ROOT / "app" / "public" / "data"
 DEFAULT_DEST = "s3://food-safety-intelligence-data"
 
 
-def _latest_model(models_dir: str) -> str:
-    """Most-recent served model under ``models_dir`` (newest by modified time).
+def _latest_model(models_dir: str, pattern: str) -> str:
+    """Most-recent served model under ``models_dir`` matching ``pattern`` (newest mtime).
 
-    The served model is the sigmoid-calibrated baseline that retrain writes
-    (``baseline_sigmoid_<run_id>.joblib``). Same-day reruns differ only by the run_id
-    hash, so newest-by-mtime is the right "latest", not lexical order.
+    Model-agnostic: the served model is whichever sigmoid-calibrated model a retrain
+    last wrote — ``baseline_sigmoid_<run>.joblib`` (LogReg) or
+    ``xgb_monotone_sigmoid_<run>.joblib`` (XGBoost), depending on the current production
+    estimator. The default pattern ``*_sigmoid_*.joblib`` matches both; newest-by-mtime
+    picks the one the most recent retrain produced (not lexical order — same-day reruns
+    differ only by the run_id hash). Pass ``--model`` to publish a specific one.
     """
-    candidates = storage.glob(models_dir, "baseline_sigmoid_*.joblib")
+    candidates = storage.glob(models_dir, pattern)
     if not candidates:
         raise SystemExit(
-            f"No baseline_sigmoid_*.joblib under {models_dir}. "
-            "Run scripts/retrain_baseline_sigmoid.py (make retrain) first, or pass --model."
+            f"No model matching {pattern!r} under {models_dir}. "
+            "Run a retrain (make retrain) first, or pass --model."
         )
 
     def _mtime(target: str) -> float:
@@ -93,7 +99,15 @@ def main() -> None:
     ap.add_argument(
         "--model",
         default=None,
-        help="model joblib to publish (default: latest data/models/baseline_sigmoid_*.joblib)",
+        help="model joblib to publish (default: newest data/models match for --model-glob)",
+    )
+    ap.add_argument(
+        "--model-glob",
+        default="*_sigmoid_*.joblib",
+        help=(
+            "glob for picking the latest served model when --model is omitted "
+            "(default matches baseline_sigmoid_* and xgb_monotone_sigmoid_*)"
+        ),
     )
     ap.add_argument(
         "--features",
@@ -136,16 +150,12 @@ def main() -> None:
     if not storage.is_s3(dest):
         print(f"warning: --dest {dest} is not an s3:// URI; publishing to a local path.")
 
-    model_src = args.model or _latest_model(str(DATA / "models"))
-    meta_src = model_src[: -len(".joblib")] + "_metadata.json"
-    if not storage.exists(meta_src):
-        raise SystemExit(f"Model {model_src} has no metadata sidecar at {meta_src}")
+    model_src = args.model or _latest_model(str(DATA / "models"), args.model_glob)
 
     # (source, dest, skip_if_exists). The model keeps its versioned name (never
     # overwrite); the data/score/JSON dests are stable keys that overwrite in place.
     plan: list[tuple[str, str, bool]] = [
         (model_src, storage.join(dest, "models", storage.basename(model_src)), False),
-        (meta_src, storage.join(dest, "models", storage.basename(meta_src)), False),
         (args.features, storage.join(dest, "processed", "features.parquet"), False),
         (
             args.labeled,
@@ -155,6 +165,15 @@ def main() -> None:
         (args.scores_parquet, storage.join(dest, "predictions", "scores.parquet"), False),
         (args.scores_json, storage.join(dest, "web-app-data", "scores.json"), False),
     ]
+    # Model metadata sidecar, if the retrain wrote one. The baseline retrain emits a
+    # `<model>_metadata.json` next to the joblib; the XGBoost retrain doesn't (its
+    # provenance lives in the git-committed reports/metrics/<run>.json). So it's optional
+    # — publish it when present, otherwise carry on (the model itself is the artifact).
+    meta_src = model_src[: -len(".joblib")] + "_metadata.json"
+    if storage.exists(meta_src):
+        plan.append((meta_src, storage.join(dest, "models", storage.basename(meta_src)), False))
+    else:
+        print(f"note: no metadata sidecar for {storage.basename(model_src)} — skipping it")
     # The other web-app JSONs (inspection_history, methodology) from --src-web.
     # scores.json is published explicitly above; scores_mock.json is a dev fixture.
     for src in storage.glob(args.src_web, "*.json"):

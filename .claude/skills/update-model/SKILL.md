@@ -140,8 +140,10 @@ a residual-risk bullet + revision date) rather than spawning a new record.
     model/features/parquet are **archival** (rollback / re-scoring / provenance), not
     read by the app at all.
   - **Ask the user which model and which scores file to publish — don't assume the
-    latest.** Several `data/models/baseline_sigmoid_*.joblib` accumulate over runs,
-    and `scores.parquet`/`scores.json` are single-copy (each retrain overwrites them).
+    latest.** Several `data/models/*_sigmoid_*.joblib` accumulate over runs — the served
+    sigmoid-calibrated models, `baseline_sigmoid_*` (LogReg) or `xgb_monotone_sigmoid_*`
+    (XGBoost), whichever is the production estimator — and `scores.parquet`/`scores.json`
+    are single-copy (each retrain overwrites them).
     List the available models with their dates and the current `scores.json`
     (path + mtime + row count), and have the user pick. They **must be a coherent
     set** — the model, `features.parquet`, `scores.parquet` and `scores.json` from the
@@ -154,11 +156,11 @@ a residual-risk bullet + revision date) rather than spawning a new record.
         --scores-parquet data/predictions/scores.parquet      # preview, upload nothing
     PYTHONPATH=src .venv/bin/python scripts/publish.py --model … --scores-json … --scores-parquet …
     ```
-    Omitting `--model` defaults to the most-recent local model; `make publish` runs
-    the all-defaults form. The model + its `_metadata.json` sidecar publish under
-    their versioned `models/baseline_sigmoid_<run>` names (never overwritten — the
-    binary is gitignored, so S3 is the only rollback copy); features / scores /
-    web-app JSON overwrite in place.
+    Omitting `--model` defaults to the newest local model matching `--model-glob`
+    (`*_sigmoid_*.joblib`); `make publish` runs the all-defaults form. The model (and its
+    `_metadata.json` sidecar, if the retrain wrote one) publishes under its versioned
+    `models/<model>_sigmoid_<run>` name (never overwritten — the binary is gitignored, so
+    S3 is the only rollback copy); features / scores / web-app JSON overwrite in place.
   - **AWS creds first.** This space runs as the execution role, which is **not**
     authorised on the bucket — mint `bella_davies` session-token creds into
     `~/.aws/credentials` (the standard chain pyarrow reads) before publishing, or
