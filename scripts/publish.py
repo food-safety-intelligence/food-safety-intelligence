@@ -8,8 +8,11 @@ retrain + history). It does NOT train or re-score. Build first, then publish:
 
 The artifacts split into two tiers:
 
-  LIVE-APP-CRITICAL — what the deployed Next.js app actually reads from S3 at request
-  time (``app/src/lib/scores-server.ts`` does an SDK GetObject on these keys):
+  LIVE-APP-CRITICAL — what the Next.js app reads from S3. The app is a STATIC export
+  (next.config ``output: 'export'``), so ``app/src/lib/scores-server.ts`` reads these
+  during ``next build`` — at BUILD time, not per request. Publishing therefore takes
+  effect only after the app is rebuilt/redeployed (Amplify/Vercel rebuild on push to
+  main re-reads S3); uploading alone does not change the live site:
       web-app-data/scores.json
       web-app-data/inspection_history.json
       web-app-data/methodology.json
