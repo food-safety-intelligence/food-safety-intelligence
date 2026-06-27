@@ -1,11 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
-import type { HomeSort, HomeView, RiskTier } from "@/lib/scores";
-import { ALL_TIERS, isAllTiers, TIER_HEX, TIER_TEXT_CLASS } from "@/lib/scores";
+import type { HomeSort, HomeView, RiskTier, SearchIndex } from "@/lib/scores";
+import {
+  ALL_TIERS,
+  computeHomeView,
+  isAllTiers,
+  parseSort,
+  parseTiers,
+  TIER_HEX,
+  TIER_TEXT_CLASS,
+} from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
@@ -20,6 +28,10 @@ const SEARCH_DEBOUNCE_MS = 300;
 // the whole capped set at once. Same on web and mobile.
 const LIST_PAGE = 100;
 
+// Client-side list cap — mirrors LIST_LIMIT in app/page.tsx so the browser's
+// computed view matches the server's default first paint.
+const LIST_LIMIT = 500;
+
 /**
  * Map-first home shell — the design's "Chicago Safety Map" screen.
  *
@@ -31,22 +43,60 @@ const LIST_PAGE = 100;
  *
  * Mobile shows one pane at a time (Map / List toggle); desktop shows both.
  */
-export function MapExplorer({
-  view,
-  query,
-  sort,
-  activeTiers,
-}: {
-  view: HomeView;
-  query: string;
-  sort: HomeSort;
-  activeTiers: RiskTier[];
-}) {
+export function MapExplorer({ initialView }: { initialView: HomeView }) {
+  // useSearchParams must sit under a Suspense boundary for the statically
+  // exported page to build.
+  return (
+    <Suspense fallback={null}>
+      <MapExplorerInner initialView={initialView} />
+    </Suspense>
+  );
+}
+
+function MapExplorerInner({ initialView }: { initialView: HomeView }) {
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // The URL is the source of truth for search/sort/filter, so links are
+  // shareable (`/?q=pizza`). Read it here and filter in the browser.
+  const query = (searchParams.get("q") ?? "").trim();
+  const sort = parseSort(searchParams.get("sort"));
+  const activeTiers = parseTiers(searchParams.get("tier") ?? undefined);
+
+  // Fetch the slim index of every establishment ONCE, then filter client-side
+  // (the page is statically exported, so the server can't filter per request).
+  // Until it loads we render the server's default `initialView`.
+  const [index, setIndex] = useState<SearchIndex | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/data/search-index.json")
+      .then((r) =>
+        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
+      )
+      .then((d: SearchIndex) => {
+        if (alive) setIndex(d);
+      })
+      .catch(() => {
+        /* keep initialView as the fallback if the index can't load */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const indexLoading = index === null;
+  const view = index
+    ? computeHomeView(index, {
+        q: query,
+        tiers: activeTiers,
+        sort,
+        listLimit: LIST_LIMIT,
+      })
+    : initialView;
 
   // Local mirror of the query so the input stays responsive while the URL
-  // catches up on a debounce. Seeded from the URL-derived prop.
+  // catches up on a debounce. Seeded from the URL-derived value.
   const [input, setInput] = useState(query);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -274,7 +324,9 @@ export function MapExplorer({
                 </div>
               </div>
               <p className="text-[11px] text-muted mt-0.5">
-                {hasQuery ? (
+                {indexLoading && hasQuery ? (
+                  "Searching all establishments…"
+                ) : hasQuery ? (
                   <>
                     {capped
                       ? `First ${listRows.length.toLocaleString()} of ${matchCount.toLocaleString()} matches`

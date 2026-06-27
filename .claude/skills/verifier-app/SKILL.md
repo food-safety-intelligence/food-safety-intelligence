@@ -1,6 +1,6 @@
 ---
 name: verifier-app
-description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers npm ci, next dev, a Playwright screenshot recipe, and the key routes / test restaurants.
+description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers npm ci, the static-export build served from out/ (next dev is not faithful), a Playwright screenshot recipe, and the key routes / test restaurants.
 ---
 
 # verifier-app
@@ -13,11 +13,33 @@ look at, not just inspect HTML.
 
 ## Build + launch
 
+The app is a **static export** (`app/next.config.ts` → `output: "export"`): it reads
+its data from S3 at **build** time and emits a fully pre-rendered site in `out/`. Two
+consequences for verification:
+
+- **`next dev` is NOT a faithful surface.** Under `output: "export"` the home page 500s
+  (it can't read `searchParams`), and only the detail pages whose id is in
+  `generateStaticParams` (top-500 by risk) exist. **Verify against a real build served
+  from `out/`**, not `next dev`.
+- The build's prebuild step pulls `scores.json` + `inspection_history.json` from S3 and
+  falls back to the committed `app/public/data/*` when there are no AWS creds — so it
+  builds offline, just with the committed (possibly older) data.
+
 ```bash
 cd app
-npm ci          # deps are NOT committed; use npm, not pnpm
-npm run dev     # serves http://localhost:3000 (compiles on first request)
+npm ci                                         # deps are NOT committed; use npm, not pnpm
+npm run build                                  # prebuild syncs S3 → /tmp, then exports to out/ (~2 min, 500+ pages)
+python3 -m http.server 4100 --directory out    # serve the static export
 ```
+
+Drive `http://localhost:4100/…` (note `trailingSlash` is on — use `/restaurant/<id>/`).
+Search/sort/filter are **client-side**, so query strings work even though the server is
+static: `/?q=pizza`, `/?tier=High`, `/?sort=name` all filter in the browser.
+
+If `npm run build` runs **out of memory** (`heap out of memory` / `SIGABRT`), do NOT just
+raise `NODE_OPTIONS` — Next's static-gen workers don't inherit it (they cap at ~2 GB
+regardless). The cause is a server loader holding too much data per worker; fix the loader
+to read per-page slices.
 
 ## Capture pixels
 
@@ -51,7 +73,7 @@ const { chromium } = require("playwright");
 (async () => {
   const browser = await chromium.launch();          // headless by default
   const page = await browser.newPage({ viewport: { width: 1280, height: 1600 } });
-  await page.goto("http://localhost:3000/restaurant/2304080", { waitUntil: "networkidle" });
+  await page.goto("http://localhost:4100/restaurant/2304080/", { waitUntil: "networkidle" });
   await page.waitForTimeout(800);                    // let client hydration settle
   await page.screenshot({ path: "/tmp/detail-desktop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 1800 }); // mobile
@@ -77,6 +99,10 @@ Route `/restaurant/<license_id>`. Known test restaurants:
 | Mixed drivers | `2304080` | diverging bars on BOTH sides of the centre zero axis |
 | High risk | `1493350` | drivers mostly raise risk (terra, bars extend right) |
 | Low risk | `2627692` | drivers mostly lower risk (sage, bars extend left) |
+
+Only the **top-500-by-risk** detail pages are built into `out/`. If a test id 404s
+(it wasn't in that cut, or the build used a different data snapshot), pick a built one
+from `ls app/out/restaurant/`.
 
 Surfaces to confirm:
 
