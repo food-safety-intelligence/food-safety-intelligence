@@ -384,7 +384,7 @@ re-scores; run `make features retrain history` first. Two tiers:
 | `web-app-data/inspection_history.json` | `app/public/data/inspection_history.json` | live app reads it | yes |
 | `web-app-data/methodology.json` | `app/public/data/methodology.json` | live app reads it | yes |
 | `web-app-data/comments/<xx>.json` (256 shards) | `app/public/data/comments/` | live app build reads it | yes |
-| `models/baseline_sigmoid_<run>.joblib` (+ `_metadata.json`) | `data/models/…` | archival (rollback) | **no — versioned** |
+| `models/<model>_sigmoid_<run>.joblib` (+ `_metadata.json` if written) | `data/models/…` | archival (rollback) | **no — versioned** |
 | `processed/features.parquet` | `data/processed/features/<name>.parquet` | archival | yes |
 | `processed/inspections_labeled.parquet` | `data/processed/inspections_labeled.parquet` | archival | yes (skipped if present unless `--force`) |
 | `predictions/scores.parquet` | `data/predictions/scores.parquet` | archival | yes |
@@ -393,9 +393,11 @@ The Next.js app is a **static export** (`output: 'export'`): `app/src/lib/scores
 reads **only** the `web-app-data/` JSON (the three top-level files plus the comment shards)
 at **build time** — never at request time, and never the model (batch-score-to-JSON
 contract). The model/parquets are kept in S3 for rollback, re-scoring and provenance only.
-The model is **versioned** (never overwritten) because the binary is gitignored, so S3 is
-the only rollback copy; its `_metadata.json` sidecar records the producing run (git SHA,
-`features_sha256`, run_id). A newly-trained model goes live in **two steps** — publish the
+The served model is **model-agnostic** (`baseline_sigmoid_*` for LogReg or
+`xgb_monotone_sigmoid_*` for XGBoost, per the production estimator) and **versioned** (never
+overwritten) because the binary is gitignored, so S3 is the only rollback copy; a
+`_metadata.json` sidecar is published when the retrain emits one. A newly-trained model goes
+live in **two steps** — publish the
 JSON to S3, **then** rebuild/redeploy the app (an Amplify/Vercel rebuild re-reads S3 and
 re-exports); publishing alone does not change the live site. See the `update-model` skill,
 Step 6.
