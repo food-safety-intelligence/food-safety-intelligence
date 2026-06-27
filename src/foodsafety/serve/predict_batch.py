@@ -72,6 +72,7 @@ def build_scores_table(
     *,
     n_drivers: int = 4,
     keep_columns: tuple = ("license_id", "dba_name", "address", "lat", "lon"),
+    contributions_fn=None,
 ) -> pd.DataFrame:
     """Produce the scores table for every restaurant in ``features``.
 
@@ -111,8 +112,16 @@ def build_scores_table(
 
     # SHAP attribution for the latest-anchor rows. Done in one batched call
     # against the latest set rather than the full feature frame.
+    # Per-feature attribution for the latest-anchor rows. Defaults to the linear
+    # (LogReg) explainer; the XGB serve path injects a TreeSHAP-based fn that
+    # returns the same (rows × original_features) log-odds contribution frame.
     latest_X = latest_per_license[list(feature_columns)]
-    contributions = linear_contributions(model, latest_X, original_features=list(feature_columns))
+    if contributions_fn is None:
+        contributions = linear_contributions(
+            model, latest_X, original_features=list(feature_columns)
+        )
+    else:
+        contributions = contributions_fn(latest_X)
 
     # Build top_drivers list per row.
     drivers_per_row: list[list[dict]] = []
