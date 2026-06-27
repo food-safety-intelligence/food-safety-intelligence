@@ -26,6 +26,16 @@ type Violation = { title: string; note: string };
 
 const COMMENTS_MARKER = " - Comments:";
 
+// Chicago's records often omit the space after a period/comma
+// ("CERTIFICATE.MUST PROVIDE", "TOMATO,ETC"). Insert one for readability when
+// punctuation is immediately followed by a letter or an opening paren. The
+// lookahead skips cases that already have a space and leaves digits alone (so
+// codes like 7-38-012 and any decimals are untouched). Display-only — the
+// stored text stays verbatim.
+function tidySpacing(s: string): string {
+  return s.replace(/([.,;:)])(?=[A-Za-z(])/g, "$1 ");
+}
+
 // Split the rejoined violation text (one violation per line) into its code/name
 // and the inspector's comment. Lines without the marker show as a bare title.
 function parseViolations(comments: string): Violation[] {
@@ -33,10 +43,10 @@ function parseViolations(comments: string): Violation[] {
     .split("\n")
     .map((line) => {
       const i = line.indexOf(COMMENTS_MARKER);
-      if (i === -1) return { title: line.trim(), note: "" };
+      if (i === -1) return { title: tidySpacing(line.trim()), note: "" };
       return {
-        title: line.slice(0, i).trim(),
-        note: line.slice(i + COMMENTS_MARKER.length).trim(),
+        title: tidySpacing(line.slice(0, i).trim()),
+        note: tidySpacing(line.slice(i + COMMENTS_MARKER.length).trim()),
       };
     })
     .filter((v) => v.title || v.note);
