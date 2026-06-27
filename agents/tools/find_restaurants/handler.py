@@ -76,7 +76,7 @@ CUISINE_ALIASES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
+def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str, Any]:
     """
     Lambda entry point.
 
@@ -90,7 +90,8 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
         "limit":        int           # default 20, max 50
     }
 
-    Returns list[RestaurantStub] sorted by distance from query centroid.
+    Returns list[RestaurantStub] sorted by distance from query centroid, or a
+    top-level {"error": ...} object if the Overpass directory is unreachable.
     """
     neighborhood: str | None = event.get("neighborhood")
     lat: float | None = event.get("lat")
@@ -107,8 +108,10 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     try:
         raw = _fetch_overpass(query)
     except urllib.error.URLError as exc:
-        # Surface the error so the agent can retry or degrade gracefully.
-        return [{"error": f"Overpass API unavailable: {exc}"}]
+        # Surface a top-level error object (not a list with a fake restaurant)
+        # so a downstream tool never reads osm_id off a malformed element and
+        # the agent can degrade gracefully on an upstream outage.
+        return {"error": f"Overpass API unavailable: {exc}"}
 
     elements: list[dict] = raw.get("elements", [])
     results = _parse_elements(elements, centroid)

@@ -75,6 +75,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
             "pass":        int,
             "fail":        int,
             "pass_w_conditions": int,
+            "other":       int,   # Out of Business / No Entry / Not Ready / etc.
             "last_date":   str | null,
             "days_since_last": int | null
         },
@@ -98,7 +99,9 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
             "error": f"No score record found for license_id={license_id}",
         }
 
-    events: list[dict] = history.get(str(license_id), [])
+    # Sort newest-first here so the "last inspection" and the displayed history
+    # are correct regardless of the upstream JSON's ordering.
+    events: list[dict] = _sort_events_desc(history.get(str(license_id), []))
 
     return {
         "found": True,
@@ -166,29 +169,56 @@ def _format_drivers(drivers: list[dict]) -> list[dict]:
     return sorted(formatted, key=lambda d: abs(d["shap"]), reverse=True)
 
 
+def _event_sort_key(ev: dict) -> date:
+    """Parse an event's date for sorting; undated/bad events sort oldest."""
+    raw = ev.get("date")
+    try:
+        return date.fromisoformat(str(raw)[:10])
+    except (TypeError, ValueError):
+        return date.min
+
+
+def _sort_events_desc(events: list[dict]) -> list[dict]:
+    """Return events newest-first, tolerating missing or malformed dates."""
+    return sorted(events, key=_event_sort_key, reverse=True)
+
+
+def _classify_result(result: str) -> str:
+    """Map a Chicago inspection `result` string to a summary bucket.
+
+    The feed is not just Pass / Fail / Pass w/ Conditions: it also carries
+    "Out of Business", "No Entry", "Not Ready" and "Business Not Located",
+    which are not inspection outcomes. They go to `other` so they are never
+    miscounted as passes (the old catch-all `else` inflated the pass count).
+    """
+    r = result.strip().lower()
+    if "fail" in r:
+        return "fail"
+    if "conditions" in r:  # "Pass w/ Conditions"
+        return "pass_w_conditions"
+    if r == "pass":
+        return "pass"
+    return "other"
+
+
 def _summarise(events: list[dict]) -> dict[str, Any]:
-    """Compute aggregate stats over inspection history."""
+    """Compute aggregate stats over inspection history (expects newest-first)."""
     if not events:
         return {
             "total": 0,
             "pass": 0,
             "fail": 0,
             "pass_w_conditions": 0,
+            "other": 0,
             "last_date": None,
             "days_since_last": None,
         }
 
-    counts = {"pass": 0, "fail": 0, "pass_w_conditions": 0}
+    counts = {"pass": 0, "fail": 0, "pass_w_conditions": 0, "other": 0}
     for ev in events:
-        result = ev.get("result", "").lower()
-        if "fail" in result:
-            counts["fail"] += 1
-        elif "conditions" in result:
-            counts["pass_w_conditions"] += 1
-        else:
-            counts["pass"] += 1
+        counts[_classify_result(ev.get("result", ""))] += 1
 
-    last_date: str | None = events[0].get("date") if events else None
+    last_date: str | None = events[0].get("date")
     days_since: int | None = None
     if last_date:
         try:
@@ -201,6 +231,7 @@ def _summarise(events: list[dict]) -> dict[str, Any]:
         "pass": counts["pass"],
         "fail": counts["fail"],
         "pass_w_conditions": counts["pass_w_conditions"],
+        "other": counts["other"],
         "last_date": last_date,
         "days_since_last": days_since,
     }
