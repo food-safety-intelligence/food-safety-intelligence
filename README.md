@@ -15,7 +15,131 @@ inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
 2. A Next.js web app that runs on a laptop and answers three questions for any
    Chicago restaurant: *Is risk elevated? Improving or worsening? What's driving it?*
 
-No deployment, no AWS — see `CLAUDE.md` for the full scope contract.
+See `CLAUDE.md` for the full scope contract.
+
+## System architecture
+
+The system is **two languages joined at a JSON seam**, plus a standalone
+conversational agent that reads the same JSON.
+
+1. A **Python batch pipeline** pulls public Chicago data, builds leak-guarded
+   features, trains a calibrated model, and scores every establishment.
+2. It writes a small set of **precomputed JSON files** — the contract.
+3. A **Next.js web app** reads only that JSON. It never calls the model at
+   request time. This batch-score-to-JSON pattern is permanent by design.
+4. A separate **Strands agent** answers natural-language queries by reading the
+   same precomputed JSON (not part of the web request path).
+
+The same code runs on a laptop (local `./data`, JSON bundled in
+`app/public/data/`) or on AWS (S3 for data, CloudFront-fronted S3 for the JSON).
+The only switch is one env var, `FOODSAFETY_DATA_DIR` — everything routes
+through `foodsafety.io.storage`, which abstracts local vs `s3://`.
+
+```mermaid
+flowchart TD
+    subgraph sources["Public data — Chicago Open Data (SODA API)"]
+        SODA["Food Inspections · Business Licenses<br/>311 Complaints · Building Permits/Violations"]
+    end
+
+    subgraph pipeline["Python batch pipeline — src/foodsafety + scripts"]
+        direction TB
+        ING["ingest_raw.py<br/><i>SODA → raw/*.parquet</i>"]
+        LBL["labels.py (notebooks 01/02)<br/><i>→ inspections_labeled.parquet</i>"]
+        FEAT["build_features.py<br/><i>leak-guarded prior_* + keyword flags<br/>→ features/*.parquet</i>"]
+        TRAIN["retrain_baseline_sigmoid.py<br/><i>LogReg → CalibratedClassifierCV(sigmoid)<br/>+ XGBoost A/B · SHAP drivers</i>"]
+        SCORE["serve/predict_batch.py<br/><i>risk_score · risk_tier · top_drivers · trend<br/>→ scores.parquet</i>"]
+        EXPORT["scores.json · inspection_history.json<br/>methodology.json"]
+        ING --> LBL --> FEAT --> TRAIN --> SCORE --> EXPORT
+    end
+
+    subgraph seam["JSON seam — the cross-team contract"]
+        JSON["app/public/data/*.json<br/><i>(bundled locally · or CloudFront-fronted S3)</i>"]
+    end
+
+    subgraph app["Next.js web app — app/ (App Router, server components)"]
+        direction TB
+        LOAD["lib/scores-server.ts<br/><i>loadScores() · real → mock fallback</i>"]
+        PAGES["Map · Restaurant detail · How-it-works<br/>Caregivers · Sources"]
+        LOAD --> PAGES
+    end
+
+    AGENT["Strands agent — agents/<br/><i>Nova 2 Lite via Bedrock · find/score/explain tools<br/>standalone, not in the web request path</i>"]
+
+    STORAGE["foodsafety.io.storage<br/><i>local ./data  ⇄  s3://…  (one env var)</i>"]
+
+    SODA --> ING
+    EXPORT --> JSON
+    JSON --> LOAD
+    JSON -.reads same JSON.-> AGENT
+    STORAGE -.abstracts all pipeline I/O.-> pipeline
+
+    classDef store fill:#eef,stroke:#88a
+    class STORAGE,seam store
+```
+
+### The three planes
+
+**1. Python pipeline (`src/foodsafety/`, `scripts/`, driven by the `Makefile`).**
+Stages run in order — `make data features retrain history`:
+
+| Stage | Entry point | Reads | Writes |
+|---|---|---|---|
+| Ingest | `scripts/ingest_raw.py` | Chicago SODA API (6 datasets) | `data/raw/*.parquet` |
+| Label | `notebooks/01`,`02` → `data/labels.py` | `raw/inspections.parquet` | `processed/inspections_labeled.parquet` |
+| Features | `scripts/build_features.py` → `features/build.py` | labeled + raw side-inputs | `processed/features/<name>.parquet` |
+| Train + score | `scripts/retrain_baseline_sigmoid.py` | features | model `.joblib` + `predictions/scores.parquet` + `scores.json` + `reports/metrics/*.json` |
+| History sidecar | `scripts/export_inspection_history.py` | labeled | `inspection_history.json` |
+| Methodology | `scripts/build_methodology_json.py` | features | `methodology.json` |
+| Publish (AWS) | `scripts/publish.py` | local artifacts | uploads to `s3://…` |
+
+Discipline baked into the code: chronological train/val/test split only (never
+shuffled), every `prior_*` feature uses a `.shift()` / `< as_of_date` leakage
+guard, training starts 2019-01-01 (the July 2018 procedure change makes older
+labels non-comparable), and class imbalance is handled with weights, never
+SMOTE. The feature contract lives in one place, `models/baseline.py::ALL_FEATURES`,
+shared by the baseline, XGBoost, scoring, and SHAP so A/B comparisons stay clean.
+
+**2. The JSON seam (`docs/interface_contracts.md` is source of truth).** Three
+parquets plus one exported JSON are the only cross-team contract; schema changes
+require a PR tagging every owner. `scores.json` (schema 0.4.0) carries the scored
+population (~23k establishments: `risk_score`, `risk_tier`, 3–5 SHAP
+`top_drivers`, `trend_slope_90d`) plus a single top-level Platt `calibration`
+triple the app uses to reconstruct each profile's calibrated-log-odds waterfall.
+`inspection_history.json` is a separate sidecar (~47 MB, kept out of the main
+payload), and `methodology.json` holds the eval metrics and operating-point
+table for the methodology page.
+
+**3. Next.js web app (`app/`, App Router + React 19 + Tailwind 4 + MapLibre).**
+Pages are server components; data loads through a server-only stack
+(`lib/data-source.ts` → `lib/scores-server.ts` → `lib/methodology-server.ts`).
+The fallback chain: remote `scores.json` via `DATA_BASE_URL` → local
+`public/data/scores.json` → committed `scores_mock.json` (which flips on a demo
+banner). There are **no API routes** — the app reads precomputed JSON only and
+never runs the model. Routes: the map home, restaurant detail (gauge + driver
+waterfall + inspection timeline), how-it-works (methodology), caregivers, and
+sources.
+
+**The agent (`agents/`).** A standalone Strands agent on Amazon Nova 2 Lite
+(Bedrock) with three tools — find restaurants (OpenStreetMap/Overpass), score
+them (SageMaker endpoint with a local stub, falling back to `scores.json`), and
+explain one establishment (SHAP drivers + history from the same JSON). It runs
+locally via `agents/run_local.py` or as Lambda-backed AgentCore tools. It is a
+separate runtime that happens to read the same precomputed JSON — it is **not**
+wired into the web app's request path.
+
+### Local vs AWS — the storage seam
+
+Every pipeline I/O call routes through `src/foodsafety/io/storage.py`, which
+resolves a target to a pyarrow filesystem (`LocalFileSystem` or
+`S3FileSystem`) based on whether the path starts with `s3://`. So the entire
+pipeline runs unchanged in either mode:
+
+- **Local (default):** `FOODSAFETY_DATA_DIR=./data`, JSON written to the
+  committed `app/public/data/` bundle, app reads from disk.
+- **AWS (Phase 2):** `FOODSAFETY_DATA_DIR=s3://food-safety-intelligence-data`;
+  the web JSON lives behind CloudFront and the app fetches it at build/render
+  time via `DATA_BASE_URL`. No request-time inference is added — only *where*
+  the batch job runs and *where* the JSON lives change.
 
 ## Run locally
 
