@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
@@ -20,10 +21,42 @@ function styleFor(result: string) {
   };
 }
 
+/** One cited violation: the code + name, and the inspector's free-text note. */
+type Violation = { title: string; note: string };
+
+const COMMENTS_MARKER = " - Comments:";
+
+// Chicago's records often omit the space after a period/comma
+// ("CERTIFICATE.MUST PROVIDE", "TOMATO,ETC"). Insert one for readability when
+// punctuation is immediately followed by a letter or an opening paren. The
+// lookahead skips cases that already have a space and leaves digits alone (so
+// codes like 7-38-012 and any decimals are untouched). Display-only — the
+// stored text stays verbatim.
+function tidySpacing(s: string): string {
+  return s.replace(/([.,;:)])(?=[A-Za-z(])/g, "$1 ");
+}
+
+// Split the rejoined violation text (one violation per line) into its code/name
+// and the inspector's comment. Lines without the marker show as a bare title.
+function parseViolations(comments: string): Violation[] {
+  return comments
+    .split("\n")
+    .map((line) => {
+      const i = line.indexOf(COMMENTS_MARKER);
+      if (i === -1) return { title: tidySpacing(line.trim()), note: "" };
+      return {
+        title: tidySpacing(line.slice(0, i).trim()),
+        note: tidySpacing(line.slice(i + COMMENTS_MARKER.length).trim()),
+      };
+    })
+    .filter((v) => v.title || v.note);
+}
+
 /**
  * Vertical timeline of inspection events. The leftmost rail is implied by
  * absolute-positioning a 2px line behind the colored dots. Renders the most
- * recent event first.
+ * recent event first. Each row is a button that expands to show the full
+ * violation comments for that inspection (or a note when there were none).
  */
 export function InspectionTimeline({
   events,
@@ -32,7 +65,10 @@ export function InspectionTimeline({
   events: InspectionEvent[];
   maxVisible?: number;
 }) {
+  // Whether the older inspections (past maxVisible) are revealed.
   const [expanded, setExpanded] = useState(false);
+  // Which rows are expanded to show their comments, keyed by row's stable key.
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
   if (events.length === 0) {
     return (
@@ -41,6 +77,14 @@ export function InspectionTimeline({
       </div>
     );
   }
+
+  const toggle = (key: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Most recent first
   const sorted = events.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -54,46 +98,88 @@ export function InspectionTimeline({
         className="absolute top-6 bottom-6 w-[2px] bg-line"
         style={{ left: 35 }}
       />
-      <ul className="space-y-5 relative">
+      <ul className="space-y-3 relative">
         {visible.map((e, i) => {
           const s = styleFor(e.result);
           const isFail = e.result === "Fail";
+          const key = `${e.date}-${i}`;
+          const isOpen = open.has(key);
+          const panelId = `inspection-comments-${key}`;
+          const violations = e.comments ? parseViolations(e.comments) : [];
+          // Collapsed teaser names the top violation only — the inspector's
+          // comment text stays hidden until the row is expanded.
+          const teaser = e.headline?.split(COMMENTS_MARKER)[0].trim();
           return (
-            <li key={`${e.date}-${i}`} className="flex items-start gap-4">
-              <span
-                className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-[10px] font-semibold text-white ${s.bg}`}
+            <li key={key}>
+              <button
+                type="button"
+                onClick={() => toggle(key)}
+                aria-expanded={isOpen}
+                aria-controls={panelId}
+                className="group flex items-start gap-4 w-full text-left rounded-xl px-2 py-2 -mx-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
               >
-                {s.label}
-              </span>
-              <div className="flex-1">
-                <div className="flex items-baseline justify-between">
+                <span
+                  className={`shrink-0 inline-flex w-6 h-6 rounded-full items-center justify-center text-[10px] font-semibold text-white ${s.bg}`}
+                >
+                  {s.label}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <div className={`font-semibold ${isFail ? "text-terra" : ""}`}>
+                      {e.result}
+                    </div>
+                    <div className="num text-[12px] text-muted shrink-0">
+                      {formatInspectionDate(e.date)}
+                    </div>
+                  </div>
                   <div
-                    className={`font-semibold ${
-                      isFail ? "text-terra" : ""
+                    className={`text-[13px] mt-0.5 ${
+                      isFail ? "text-ink/90" : "text-muted"
                     }`}
                   >
-                    {e.result}
-                  </div>
-                  <div className="num text-[12px] text-muted">
-                    {formatInspectionDate(e.date)}
+                    {e.type}
+                    {teaser && (
+                      <>
+                        {" · "}
+                        <span className={isFail ? "font-medium" : ""}>
+                          {teaser}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
-                <div
-                  className={`text-[13px] mt-0.5 ${
-                    isFail ? "text-ink/90" : "text-muted"
+                <ChevronDown
+                  className={`shrink-0 w-4 h-4 mt-1 text-muted group-hover:text-ink transition-transform ${
+                    isOpen ? "rotate-180" : ""
                   }`}
+                  strokeWidth={2}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {isOpen && (
+                <div
+                  id={panelId}
+                  className="ml-10 mr-2 mt-1 mb-2 rounded-xl bg-tint border border-line p-4 text-[13px] leading-relaxed"
                 >
-                  {e.type}
-                  {e.headline && (
-                    <>
-                      {" · "}
-                      <span className={isFail ? "font-medium" : ""}>
-                        {e.headline}
-                      </span>
-                    </>
+                  {violations.length === 0 ? (
+                    <p className="text-ink/75 italic">
+                      No comments were recorded for this inspection.
+                    </p>
+                  ) : (
+                    <ul className="space-y-3">
+                      {violations.map((v, vi) => (
+                        <li key={vi}>
+                          <p className="font-medium text-ink/90">{v.title}</p>
+                          {v.note && (
+                            <p className="text-ink/80 mt-0.5">{v.note}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-              </div>
+              )}
             </li>
           );
         })}

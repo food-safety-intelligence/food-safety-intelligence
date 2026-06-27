@@ -90,6 +90,15 @@ export interface InspectionEvent {
   type: string;
   result: "Pass" | "Pass w/ Conditions" | "Fail" | string;
   headline: string;
+  /**
+   * Full violation text for this inspection — the pipe-delimited violations
+   * rejoined as newline-separated lines, each "<code>. <NAME> - Comments:
+   * <text>". Shown when a timeline row is expanded. Loaded from a separate
+   * sharded sidecar (see getInspectionComments) and merged in on the detail
+   * page, so it's absent on rows that haven't had comments attached. Empty
+   * string means the inspection recorded no violations/comments.
+   */
+  comments?: string;
 }
 
 /**
