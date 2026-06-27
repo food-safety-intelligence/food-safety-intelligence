@@ -148,6 +148,9 @@ model = BedrockModel(
     model_id="us.amazon.nova-2-lite-v1:0",
     region_name=os.environ["AWS_REGION"],
     max_tokens=4096,
+    # Low temperature: this is a factual lookup-and-report task, not a creative
+    # one. Sampling variance only adds room for fabricated scores or names.
+    temperature=0.2,
 )
 agent = Agent(
     model=model,
