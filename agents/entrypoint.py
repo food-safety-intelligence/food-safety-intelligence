@@ -129,7 +129,7 @@ def get_safety_score(restaurants: list) -> list:
 def explain_restaurant(license_id: str) -> dict:
     """
     Get full SHAP driver breakdown and inspection history for one restaurant.
-    Call for the top 2-3 safest results.
+    Call for the 2-3 lowest predicted-risk results.
     """
     return _explain_handler.handler({"license_id": license_id}, None)
 

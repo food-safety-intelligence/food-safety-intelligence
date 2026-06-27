@@ -144,7 +144,7 @@ def explain_restaurant(license_id: str) -> dict:
     """
     Get the full SHAP driver breakdown and inspection history for one restaurant
     identified by its Chicago license_id (from get_safety_score results).
-    Call this for the top 2-3 safest results to give the user meaningful context.
+    Call this for the 2-3 lowest predicted-risk results to give the user meaningful context.
 
     Args:
         license_id: Chicago business license ID (from get_safety_score result)
