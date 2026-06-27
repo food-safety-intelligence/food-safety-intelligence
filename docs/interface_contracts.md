@@ -372,6 +372,34 @@ to the committed/locally-generated copies under `app/public/data/`).
 
 ---
 
+## S3 deploy layout (publish pipeline)
+
+`scripts/publish.py` (`make publish`) uploads a built, coherent artifact set to
+`s3://food-safety-intelligence-data/`. It is publish-only — it never trains or
+re-scores; run `make features retrain history` first. Two tiers:
+
+| S3 key | Source | Tier | Overwrite? |
+|---|---|---|---|
+| `web-app-data/scores.json` | `app/public/data/scores.json` | live app reads it | yes |
+| `web-app-data/inspection_history.json` | `app/public/data/inspection_history.json` | live app reads it | yes |
+| `web-app-data/methodology.json` | `app/public/data/methodology.json` | live app reads it | yes |
+| `web-app-data/comments/<xx>.json` (256 shards) | `app/public/data/comments/` | live app build reads it | yes |
+| `models/baseline_sigmoid_<run>.joblib` (+ `_metadata.json`) | `data/models/…` | archival (rollback) | **no — versioned** |
+| `processed/features.parquet` | `data/processed/features/<name>.parquet` | archival | yes |
+| `processed/inspections_labeled.parquet` | `data/processed/inspections_labeled.parquet` | archival | yes (skipped if present unless `--force`) |
+| `predictions/scores.parquet` | `data/predictions/scores.parquet` | archival | yes |
+
+The deployed Next.js app reads **only** the `web-app-data/` JSON (the three top-level
+files plus the comment shards), via an SDK GetObject (`app/src/lib/scores-server.ts`) —
+it never loads the model (batch-score-to-JSON contract). The model/parquets are kept in
+S3 for rollback, re-scoring and provenance only. The model is **versioned** (never
+overwritten) because the binary is gitignored, so S3 is the only rollback copy; its
+`_metadata.json` sidecar records the producing run (git SHA, `features_sha256`, run_id).
+Publishing the JSON is what makes a newly-trained model go live — see the `update-model`
+skill, Step 6.
+
+---
+
 ## Schema enforcement
 
 `tests/test_contracts.py` (Phase 6) will validate each parquet against the

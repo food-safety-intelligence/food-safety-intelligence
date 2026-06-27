@@ -80,3 +80,24 @@ def test_glob_matches_pattern(tmp_path):
 
 def test_glob_missing_dir_is_empty(tmp_path):
     assert storage.glob(tmp_path / "nope", "*.parquet") == []
+
+
+def test_basename_local_and_s3():
+    assert storage.basename("s3://bucket/models/baseline_sigmoid_abc.joblib") == (
+        "baseline_sigmoid_abc.joblib"
+    )
+    assert storage.basename("/data/predictions/scores.parquet") == "scores.parquet"
+    # Trailing slash is stripped before taking the final component.
+    assert storage.basename("s3://bucket/web-app-data/") == "web-app-data"
+
+
+def test_copy_is_byte_identical_and_creates_parent(tmp_path):
+    # Larger-than-one-chunk payload exercises the streaming loop.
+    src = tmp_path / "src" / "blob.bin"
+    payload = bytes(range(256)) * 5000  # ~1.3 MB
+    storage.write_bytes(payload, src)
+    # Nested dst dir does not exist yet — copy must create it.
+    dst = tmp_path / "dst" / "nested" / "blob.bin"
+    storage.copy(src, dst)
+    assert storage.exists(dst)
+    assert storage.read_bytes(dst) == payload
