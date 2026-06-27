@@ -13,7 +13,7 @@ const SOURCES = [
     name: "Chicago Food Inspections",
     href: "https://data.cityofchicago.org/Health-Human-Services/Food-Inspections/4ijn-s7e5",
     summary:
-      "Every restaurant inspection conducted by Chicago Department of Public Health since 2010. Used for both labels and most of the prior-history features.",
+      "Every food establishment inspection conducted by Chicago Department of Public Health since 2010. Used for both labels and most of the prior-history features.",
   },
   {
     name: "Chicago 311 Service Requests",

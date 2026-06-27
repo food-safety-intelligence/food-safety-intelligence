@@ -3,13 +3,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
-import {
-  InspectionTimeline,
-  ResultTally,
-} from "@/components/InspectionTimeline";
+import { InspectionTimeline } from "@/components/InspectionTimeline";
+import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
+import { Waterfall } from "@/components/Waterfall";
 import {
   getInspectionHistory,
   getPopulationStats,
@@ -17,6 +16,18 @@ import {
   loadScores,
 } from "@/lib/scores-server";
 import { formatInspectionDate } from "@/lib/utils";
+
+// Required for `output: 'export'` — pre-generates pages for the top-N restaurants
+// by risk score. Capping at 500 keeps the static build to a manageable size;
+// lower-risk restaurants simply return 404 from the deployed static site.
+export async function generateStaticParams() {
+  const payload = await loadScores();
+  return payload.scores
+    .slice()
+    .sort((a, b) => b.risk_score - a.risk_score)
+    .slice(0, 500)
+    .map((s) => ({ id: s.license_id }));
+}
 
 // In Next.js 16 with the App Router, `params` is a Promise that must be awaited.
 // See node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md.
@@ -42,7 +53,7 @@ export default async function RestaurantDetailPage({
     <>
       <SiteHeader activeNav="search" />
 
-      <div className="max-w-[1240px] mx-auto px-8 mt-5">
+      <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
@@ -54,12 +65,16 @@ export default async function RestaurantDetailPage({
 
       {payload.is_mock && <DemoBanner />}
 
-      <main className="max-w-[1240px] mx-auto px-8 pt-8 pb-24 flex-1">
+      {/* max-w-full on mobile (capped to the viewport) so content wraps instead
+          of forcing a horizontal scroll; overflow-x-clip trims any small residual
+          overhang from intrinsic-width content (gauge, waterfall) without
+          clipping text or the fixed term popover. Desktop keeps the 1240 cap. */}
+      <main className="w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
-        <section className="grid grid-cols-12 gap-8 mb-10">
-          <div className="col-span-12 lg:col-span-7">
+        <section className="mb-10">
+          <div className="mb-6">
             <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
-              Restaurant profile
+              Food establishment profile
             </p>
             <h1 className="text-[3.4rem] font-light leading-[1.04] tracking-tight">
               {restaurant.dba_name}
@@ -83,12 +98,7 @@ export default async function RestaurantDetailPage({
             </div>
           </div>
 
-          <div className="col-span-12 lg:col-span-5">
-            <ScoreCard
-              restaurant={restaurant}
-              populationStats={populationStats}
-            />
-          </div>
+          <ScoreCard restaurant={restaurant} populationStats={populationStats} />
         </section>
 
         {/* Drivers */}
@@ -113,15 +123,43 @@ export default async function RestaurantDetailPage({
             </div>
             <div className="col-span-12 lg:col-span-5 lg:text-right">
               <Link
-                href="/how-it-works#priority-violations"
+                href="/how-it-works#definitions"
                 className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
               >
-                What is a priority violation?
+                Term definitions →
               </Link>
             </div>
           </div>
 
           <DriverList drivers={restaurant.top_drivers} />
+
+          {/* How the score adds up — the same drivers as an additive,
+              reconciling waterfall (calibrated log-odds). Only when the payload
+              ships the calibration triple. */}
+          {payload.calibration && (
+            <div className="mt-8">
+              <div className="flex items-baseline justify-between gap-4 flex-wrap mb-3">
+                <h3 className="text-[1.2rem] font-medium tracking-tight">
+                  How the score adds up
+                </h3>
+                <Link
+                  href="/how-it-works#calibrated-log-odds"
+                  className="text-[13px] text-teal hover:underline"
+                >
+                  What is calibrated log-odds?
+                </Link>
+              </div>
+              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[60ch]">
+                The same drivers as the bars above, rescaled to the model&apos;s
+                calibrated scale so they add up — so the numbers here are smaller
+                than the bars (which show raw influence and don&apos;t sum). The
+                base, each driver, and everything else total one number, which a
+                sigmoid turns into the probability on the gauge — so this column
+                reconciles exactly with the score.
+              </p>
+              <Waterfall restaurant={restaurant} calibration={payload.calibration} />
+            </div>
+          )}
         </section>
 
         {/* Caregiver note */}
@@ -210,7 +248,7 @@ export default async function RestaurantDetailPage({
               <p className="font-medium mb-2">It is not a verdict.</p>
               <p>
                 A &quot;{restaurant.risk_tier}&quot; prediction does not mean
-                this restaurant is unsafe to eat at today. It means the
+                this food establishment is unsafe to eat at today. It means the
                 patterns in the record resemble those that historically precede
                 a failed inspection.
               </p>

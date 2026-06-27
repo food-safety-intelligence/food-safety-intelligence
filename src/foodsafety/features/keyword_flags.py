@@ -38,21 +38,17 @@ KEYWORD_PATTERNS: dict[str, str] = {
     # --- temperature / cold chain ---
     "flag_kw_temperature": r"\btemp(?:erature)?\b|holding[- ]?temp|cold[- ]?holding|hot[- ]?holding",
     "flag_kw_cooling": r"\bcooling\b|cool(ed|ing)? properly|cool[- ]?down|within 4 ?hr",
-
     # --- contamination / handling ---
     "flag_kw_raw_food": r"\braw\s+(chicken|beef|pork|meat|poultry|seafood|fish|egg)",
     "flag_kw_cross_contamination": r"cross[- ]?contam(ination)?|separat(e|ion)\s+raw|ready[- ]?to[- ]?eat",
     "flag_kw_expired": r"\bexpire[ds]?\b|past\s+(?:expir|use)\s+date|date[- ]?mark(ed|ing)?",
-
     # --- vermin / pest evidence ---
     "flag_kw_rodent": r"\brodent\b|\brat[s]?\b|\bmice\b|\bmouse\b|droppings|gnaw",
     "flag_kw_pest": r"\bpest\b|\bcockroach(es)?\b|\broaches?\b|insect activity",
-
     # --- handwashing / hygiene ---
     "flag_kw_no_soap": r"\bno\s+(?:hand[- ]?)?soap\b|missing\s+(?:hand[- ]?)?soap",
     "flag_kw_no_paper_towels": r"\bno\s+(?:paper\s+)?towels?\b|missing\s+(?:paper\s+)?towels?",
     "flag_kw_handwash_sink": r"hand[- ]?wash(ing)?\s+sink|handwash\s+sign",
-
     # --- sanitation / facility ---
     "flag_kw_sewage": r"\bsewage\b|backed[- ]?up|sewer\s+line",
     "flag_kw_certified_manager": r"certified\s+food\s+(?:protection\s+)?manager|cfpm|food\s+manager\s+certif",

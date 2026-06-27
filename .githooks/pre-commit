@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+# Pre-commit hook: keep ruff lint + format clean so errors don't accumulate.
+#
+# One-time install (per clone):  git config core.hooksPath .githooks
+# (documented in README.md alongside `nbstripout --install`).
+#
+# Notebooks are intentionally NOT linted — they're excluded in pyproject.toml
+# (`[tool.ruff] extend-exclude`). This hook only gates the package, scripts,
+# tests, and agents.
+
+# Prefer the project venv's ruff; fall back to PATH, then `python -m ruff`.
+if [ -x ".venv/bin/ruff" ]; then
+    RUFF=".venv/bin/ruff"
+elif command -v ruff >/dev/null 2>&1; then
+    RUFF="ruff"
+else
+    RUFF=".venv/bin/python -m ruff"
+fi
+
+echo "pre-commit: ruff check + format --check"
+
+if ! $RUFF check . ; then
+    echo
+    echo "✗ ruff check failed. Fix with:  $RUFF check --fix .   then re-stage."
+    exit 1
+fi
+
+if ! $RUFF format --check . ; then
+    echo
+    echo "✗ ruff format check failed. Fix with:  $RUFF format .   then re-stage."
+    exit 1
+fi

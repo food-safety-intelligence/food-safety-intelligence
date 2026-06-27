@@ -13,13 +13,14 @@ decision function ties). Tier counts stay roughly the same; the within-tier
 ranking becomes strictly ordered.
 
 Run with the project's Python:
-    PYTHONPATH=src /Users/jun/anaconda3/bin/python scripts/retrain_baseline_sigmoid.py
+    PYTHONPATH=src uv run python scripts/retrain_baseline_sigmoid.py
 
 This script:
   1. Loads features.parquet + chronologically splits on the cutoffs in
      `data/models/baseline_<date>_metadata.json` (2024-07-01 / 2025-07-01).
-  2. Fits the baseline pipeline on train, then wraps in
-     CalibratedClassifierCV(cv='prefit', method='sigmoid') on val.
+  2. Fits the baseline pipeline on train, then calibrates with
+     CalibratedClassifierCV(FrozenEstimator(base), method='sigmoid') on val
+     (sklearn 1.9 dropped cv='prefit'; FrozenEstimator marks base as prefit).
   3. Persists model + metadata under `data/models/baseline_<today>.joblib`.
   4. Scores every restaurant, writes:
        - data/predictions/scores.parquet
@@ -36,25 +37,20 @@ import joblib
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
-from sklearn.metrics import (
-    average_precision_score,
-    brier_score_loss,
-    log_loss,
-    roc_auc_score,
-)
+from sklearn.frozen import FrozenEstimator
 
-from foodsafety.config import RANDOM_STATE
+from foodsafety.config import LABEL_WINDOW_DAYS, RANDOM_STATE
 from foodsafety.models.baseline import (
     ALL_FEATURES,
     LABEL_COL,
     build_baseline_pipeline,
 )
+from foodsafety.models.evaluate import evaluate
 from foodsafety.serve.predict_batch import (
-    RISK_TIER_THRESHOLDS,
     build_scores_table,
-    score_to_tier,
     write_scores_json,
 )
+from foodsafety.tracking import provenance
 from foodsafety.utils.time import temporal_split
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -62,6 +58,7 @@ FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
 MODELS_DIR = REPO_ROOT / "data" / "models"
 PRED_DIR = REPO_ROOT / "data" / "predictions"
 SCORES_JSON_PATH = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+REPORTS_METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 
 # Mirror the original training run's cutoffs so the comparison is apples-to-
 # apples. If those change, update both this constant AND the metadata audit.
@@ -71,29 +68,13 @@ VAL_END = "2025-07-01"
 MODEL_VERSION = "baseline_logreg_sigmoid"
 
 
-def _precision_at_k(y_true: np.ndarray, y_score: np.ndarray, frac: float) -> float:
-    k = max(1, int(round(frac * len(y_true))))
-    top_idx = np.argsort(-y_score)[:k]
-    return float(y_true[top_idx].mean())
-
-
-def _evaluate(y_true: np.ndarray, y_proba: np.ndarray, label: str) -> dict:
-    return {
-        "n": int(len(y_true)),
-        "positive_rate": float(y_true.mean()),
-        "pr_auc": float(average_precision_score(y_true, y_proba)),
-        "roc_auc": float(roc_auc_score(y_true, y_proba)),
-        "precision_at_5pct": _precision_at_k(y_true, y_proba, 0.05),
-        "precision_at_10pct": _precision_at_k(y_true, y_proba, 0.10),
-        "precision_at_20pct": _precision_at_k(y_true, y_proba, 0.20),
-        "brier_score": float(brier_score_loss(y_true, y_proba)),
-        "log_loss": float(log_loss(y_true, y_proba, labels=[0, 1])),
-        "split": label,
-    }
-
-
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
+    if not FEATURES_PATH.exists():
+        raise SystemExit(
+            "Missing data artifact: data/processed/features.parquet was not found. "
+            "Run notebooks/03_feature_engineering.ipynb to generate the feature parquet before `make retrain`."
+        )
     features = pd.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}, dtypes verified for {len(ALL_FEATURES)} feature cols")
 
@@ -113,9 +94,7 @@ def main() -> None:
     #     and we don't want to drop ~3% of restaurants whose most-recent
     #     inspection happens to fall in the trailing 180 days.
     if "right_truncated" in features.columns:
-        features_modelable = features.loc[~features["right_truncated"]].reset_index(
-            drop=True
-        )
+        features_modelable = features.loc[~features["right_truncated"]].reset_index(drop=True)
         n_dropped = len(features) - len(features_modelable)
         if n_dropped:
             print(
@@ -125,12 +104,11 @@ def main() -> None:
             )
     else:
         features_modelable = features
+        n_dropped = 0
 
     print(f"Temporal split (train_end={TRAIN_END}, val_end={VAL_END})")
     split = temporal_split(features_modelable, train_end=TRAIN_END, val_end=VAL_END)
-    print(
-        f"  train n={len(split.train):,}  val n={len(split.val):,}  test n={len(split.test):,}"
-    )
+    print(f"  train n={len(split.train):,}  val n={len(split.val):,}  test n={len(split.test):,}")
 
     X_train = split.train[ALL_FEATURES]
     y_train = split.train[LABEL_COL].astype(int).to_numpy()
@@ -143,30 +121,42 @@ def main() -> None:
     base = build_baseline_pipeline()
     base.fit(X_train, y_train)
 
-    # Sigmoid (Platt) calibration fitted on val. cv='prefit' tells
-    # CalibratedClassifierCV to use the provided already-fit estimator.
-    print("Wrapping with CalibratedClassifierCV(method='sigmoid', cv='prefit')")
-    calibrated = CalibratedClassifierCV(base, method="sigmoid", cv="prefit")
+    # Sigmoid (Platt) calibration of the already-fit pipeline on val. Wrapping
+    # in FrozenEstimator marks `base` as pre-fit, so only the calibration
+    # mapping is learned — the base estimator is not refit.
+    print("Calibrating (sigmoid) on val without refitting the base estimator")
+    calibrated = CalibratedClassifierCV(FrozenEstimator(base), method="sigmoid")
     calibrated.fit(X_val, y_val)
 
     # Evaluate
     p_val = calibrated.predict_proba(X_val)[:, 1]
     p_test = calibrated.predict_proba(X_test)[:, 1]
-    val_metrics = _evaluate(y_val, p_val, "val")
-    test_metrics = _evaluate(y_test, p_test, "test")
+    val_metrics = evaluate(y_val, p_val).to_dict()
+    test_metrics = evaluate(y_test, p_test).to_dict()
     print("Val:", json.dumps(val_metrics, indent=2))
     print("Test:", json.dumps(test_metrics, indent=2))
 
-    # Persist model + metadata (NEVER overwrite per CLAUDE.md — date-stamp it).
-    today = datetime.now().strftime("%Y%m%d")
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODELS_DIR / f"baseline_sigmoid_{today}.joblib"
-    meta_path = MODELS_DIR / f"baseline_sigmoid_{today}_metadata.json"
-    joblib.dump(calibrated, model_path)
+    # --- Provenance / experiment-tracking fields (Tier-0) ------------------
+    # Tie this run to exact code (git SHA), exact data (content hash of the
+    # features parquet — NOT its mtime, which changes on every rebuild), and
+    # the feature-contract version, so a metrics record fully identifies what
+    # produced it and same-day reruns don't collide.
+    prov = provenance(FEATURES_PATH, list(ALL_FEATURES), REPO_ROOT)
+    run_id = prov["run_id"]
+
     metadata = {
         "model": MODEL_VERSION,
+        "run_id": run_id,
+        "git_commit": prov["git_commit"],
+        "git_dirty": prov["git_dirty"],
         "random_state": RANDOM_STATE,
         "date_trained": datetime.now().strftime("%Y-%m-%d"),
+        "calibration": "sigmoid (Platt) on val (FrozenEstimator prefit)",
+        "label_window_days": LABEL_WINDOW_DAYS,
+        "right_truncation": {
+            "filtered_from_modeling": int(n_dropped),
+            "kept_for_scoring": True,
+        },
         "split": {
             "train_end": TRAIN_END,
             "val_end": VAL_END,
@@ -174,27 +164,62 @@ def main() -> None:
             "val_n": len(split.val),
             "test_n": len(split.test),
         },
-        "features": {"all": list(ALL_FEATURES), "label_col": LABEL_COL},
+        "features": {
+            "all": list(ALL_FEATURES),
+            "label_col": LABEL_COL,
+            "n_features": len(ALL_FEATURES),
+            "feature_set_version": prov["feature_set_version"],
+        },
+        "dataset": {
+            "features_parquet": str(FEATURES_PATH.relative_to(REPO_ROOT)),
+            "features_sha256": prov["features_sha256"],
+            "rows_total": int(len(features)),
+            "rows_modelable": int(len(features_modelable)),
+        },
         "metrics": {"val": val_metrics, "test": test_metrics},
-        "calibration": "sigmoid (Platt) on val set, cv='prefit'",
-        "features_parquet_mtime": (
-            datetime.fromtimestamp(FEATURES_PATH.stat().st_mtime).isoformat()
-        ),
     }
+
+    # Persist model + metadata (NEVER overwrite per CLAUDE.md — run-id stamps it).
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    model_path = MODELS_DIR / f"baseline_sigmoid_{run_id}.joblib"
+    meta_path = MODELS_DIR / f"baseline_sigmoid_{run_id}_metadata.json"
+    joblib.dump(calibrated, model_path)
     with open(meta_path, "w") as f:
         json.dump(metadata, f, indent=2)
     print(f"Saved model → {model_path}")
     print(f"Saved metadata → {meta_path}")
 
+    # RECONCILE: write the SERVED model's metrics to the git-tracked ledger
+    # (reports/metrics/), alongside baseline_*/xgb_* — so the numbers we cite
+    # describe the model that actually feeds scores.json. data/models/ is
+    # gitignored, so without this the served (sigmoid, RT-filtered) model had
+    # no tracked metrics, while the committed reports described a different
+    # (isotonic, unfiltered) model.
+    REPORTS_METRICS_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = REPORTS_METRICS_DIR / f"baseline_sigmoid_{run_id}.json"
+    report = {
+        "model": MODEL_VERSION,
+        "run_id": run_id,
+        "git_commit": prov["git_commit"],
+        "git_dirty": prov["git_dirty"],
+        "calibration": "sigmoid",
+        "right_truncation_filtered": int(n_dropped),
+        "feature_set_version": prov["feature_set_version"],
+        "features_sha256": prov["features_sha256"],
+        "val": val_metrics,
+        "test": test_metrics,
+    }
+    with open(report_path, "w") as f:
+        json.dump(report, f, indent=2)
+    print(f"Saved metrics report → {report_path}")
+
     # Sanity: confirm we got continuous probabilities this time.
     full_p = calibrated.predict_proba(features[ALL_FEATURES])[:, 1]
-    print(
-        f"Unique probability values across {len(full_p):,} rows: {len(np.unique(full_p)):,}"
-    )
+    print(f"Unique probability values across {len(full_p):,} rows: {len(np.unique(full_p)):,}")
 
     # Score every restaurant + export JSON for the web app.
     print("Building scores table (per-license_id, anchored on latest inspection)")
-    scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=4)
+    scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=5)
 
     PRED_DIR.mkdir(parents=True, exist_ok=True)
     scores_parquet_path = PRED_DIR / "scores.parquet"
@@ -209,7 +234,8 @@ def main() -> None:
     for col in extras:
         if col not in scores.columns and col in features.columns:
             scores[col] = (
-                features.drop_duplicates("license_id").set_index("license_id")[col]
+                features.drop_duplicates("license_id")
+                .set_index("license_id")[col]
                 .reindex(scores["license_id"].astype(str))
                 .to_numpy()
             )
@@ -221,11 +247,24 @@ def main() -> None:
     tier_counts = scores["risk_tier"].value_counts().to_dict()
     print("  ", tier_counts)
 
+    # Platt calibration triple, shipped once so the web app can reconstruct each
+    # establishment's calibrated-log-odds waterfall (calibrated_logit = -(a*L+b),
+    # L = intercept + Σ contributions). a/b come from the fitted sigmoid
+    # calibrator; intercept from the base logistic regression.
+    sigmoid_cal = calibrated.calibrated_classifiers_[0].calibrators[0]
+    calibration = {
+        "a": float(sigmoid_cal.a_),
+        "b": float(sigmoid_cal.b_),
+        "intercept": float(base.named_steps["model"].intercept_[0]),
+    }
+    print(f"Calibration triple: {calibration}")
+
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.3.0",
+        schema_version="0.4.0",
         model_version=MODEL_VERSION,
+        calibration=calibration,
     )
     print(f"Wrote {SCORES_JSON_PATH}")
     size_mb = SCORES_JSON_PATH.stat().st_size / 1024 / 1024

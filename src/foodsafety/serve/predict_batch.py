@@ -21,18 +21,16 @@ sufficient and matches what the detail page renders today.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
 
 from foodsafety.explain.shap_drivers import (
-    Driver,
     linear_contributions,
     top_drivers_for_row,
 )
-
 
 # Tier thresholds calibrated to the actual score distribution.
 #
@@ -43,12 +41,14 @@ from foodsafety.explain.shap_drivers import (
 #   p50 ≈ 0.06   p90 ≈ 0.17   p99 ≈ 0.29   max = 1.00
 #
 # These thresholds split the population into:
-#   Low       ~33% — model is confident this restaurant is low-risk
-#   Moderate  ~45% — typical Chicago restaurant
-#   Elevated  ~20% — several risk signals present
-#   High      ~2%  — strong risk signals; warrants attention
+#   Low       — model is confident this restaurant is low-risk
+#   Moderate  — typical Chicago restaurant
+#   Elevated  — several risk signals present
+#   High      — strong risk signals; warrants attention
 #
-# Update `docs/interface_contracts.md` § 3 if these change again.
+# Canonical tier-share split lives in `docs/interface_contracts.md` § 3 (the
+# served script also prints the actual split at runtime). Specific percentages
+# were removed from this comment to avoid drift across three sources.
 RISK_TIER_THRESHOLDS = [
     (0.04, "Low"),
     (0.13, "Moderate"),
@@ -106,45 +106,38 @@ def build_scores_table(
 
     # Per-restaurant aggregation.
     latest_per_license = (
-        df.sort_values("inspection_date")
-        .drop_duplicates("license_id", keep="last")
-        .copy()
+        df.sort_values("inspection_date").drop_duplicates("license_id", keep="last").copy()
     )
 
     # SHAP attribution for the latest-anchor rows. Done in one batched call
     # against the latest set rather than the full feature frame.
     latest_X = latest_per_license[list(feature_columns)]
-    contributions = linear_contributions(
-        model, latest_X, original_features=list(feature_columns)
-    )
+    contributions = linear_contributions(model, latest_X, original_features=list(feature_columns))
 
     # Build top_drivers list per row.
     drivers_per_row: list[list[dict]] = []
     for idx, row in latest_per_license.iterrows():
         row_values = row[feature_columns]
         row_contribs = contributions.loc[idx]
-        drivers = top_drivers_for_row(
-            row_values, row_contribs, k=n_drivers
-        )
+        drivers = top_drivers_for_row(row_values, row_contribs, k=n_drivers)
         drivers_per_row.append([d.to_dict() for d in drivers])
     latest_per_license["top_drivers"] = drivers_per_row
 
     # 90-day trend slope per license.
-    latest_per_license["trend_slope_90d"] = _compute_trend_slopes(
-        df, latest_per_license
-    )
+    latest_per_license["trend_slope_90d"] = _compute_trend_slopes(df, latest_per_license)
 
     # Tier + as_of_date.
-    latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(
-        score_to_tier
-    )
+    latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(score_to_tier)
     latest_per_license["as_of_date"] = latest_per_license["inspection_date"]
 
     # Output schema per contract.
-    output_cols = (
-        list(keep_columns)
-        + ["as_of_date", "risk_score", "risk_tier", "top_drivers", "trend_slope_90d"]
-    )
+    output_cols = list(keep_columns) + [
+        "as_of_date",
+        "risk_score",
+        "risk_tier",
+        "top_drivers",
+        "trend_slope_90d",
+    ]
     return latest_per_license[output_cols].reset_index(drop=True)
 
 
@@ -162,9 +155,9 @@ def _compute_trend_slopes(
     """
     slopes: list[float] = []
     full_indexed = full_scored.set_index("license_id")
-    for license_id, latest_row in latest_per_license[
-        ["license_id", "inspection_date"]
-    ].itertuples(index=False):
+    for license_id, latest_row in latest_per_license[["license_id", "inspection_date"]].itertuples(
+        index=False
+    ):
         # All inspections at this license — pandas .loc lookup is fast.
         try:
             subset = full_indexed.loc[[license_id]]
@@ -176,8 +169,7 @@ def _compute_trend_slopes(
         upper = latest_row
         lower = upper - pd.Timedelta(days=window_days)
         in_window = subset[
-            (subset["inspection_date"] > lower)
-            & (subset["inspection_date"] <= upper)
+            (subset["inspection_date"] > lower) & (subset["inspection_date"] <= upper)
         ]
         if len(in_window) < 2:
             slopes.append(np.nan)
@@ -201,15 +193,22 @@ def write_scores_json(
     out_path,
     *,
     schema_version: str = "0.2.0",
-    model_version: str = "baseline_logreg_isotonic",
+    model_version: str = "baseline_logreg_sigmoid",
     label_window_days: int = 180,
     totals: dict | None = None,
+    calibration: dict | None = None,
 ) -> None:
     """Convert ``scores.parquet`` to the JSON the Next.js app reads.
 
     Schema matches ``app/public/data/scores_mock.json`` minus the
     ``_is_mock`` field — that omission is what makes the web app drop the
     demo banner automatically when this file replaces the mock.
+
+    ``calibration`` is the Platt triple ``{a, b, intercept}`` shipped ONCE at
+    the top level (not per row). The detail page reconstructs each
+    establishment's calibrated-log-odds waterfall from it plus the per-row
+    ``risk_score`` and ``top_drivers`` shap values — so the full waterfall costs
+    three floats total, not a payload field per restaurant.
     """
     import json
 
@@ -234,15 +233,14 @@ def write_scores_json(
 
     payload = {
         "schema_version": schema_version,
-        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "generated_at": datetime.now(UTC).isoformat(),
         "as_of_date": df["as_of_date"].max(),
         "is_mock": False,
         "model_version": model_version,
         "label_window_days": label_window_days,
         "totals": totals,
-        "scores": [
-            _row_to_json(r) for r in df.itertuples(index=False)
-        ],
+        "calibration": calibration,
+        "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 
     with open(out_path, "w") as f:
@@ -262,9 +260,7 @@ def _row_to_json(row) -> dict:
         "as_of_date": str(row.as_of_date),
         "risk_score": float(row.risk_score),
         "risk_tier": str(row.risk_tier),
-        "trend_slope_90d": (
-            None if pd.isna(row.trend_slope_90d) else float(row.trend_slope_90d)
-        ),
+        "trend_slope_90d": (None if pd.isna(row.trend_slope_90d) else float(row.trend_slope_90d)),
         "trend_ci_low": None,
         "trend_ci_high": None,
         "top_drivers": list(row.top_drivers) if row.top_drivers is not None else [],

@@ -6,6 +6,13 @@ headlines. ROC-AUC is reported but never treated as the decision metric
 metric — "of the top 10% the model flags, how many actually fail?" — can be
 mediocre).
 
+**Accuracy is deliberately NOT reported.** With a ~11% positive rate, a
+do-nothing "always predict safe" classifier already scores ~89% accuracy while
+catching zero real risk, and ``class_weight='balanced'`` trades raw accuracy for
+recall on the minority — so the model's 0.5-threshold accuracy is actually
+*lower* than that trivial baseline. Accuracy is misleading under this imbalance;
+PR-AUC + precision/recall@k are the honest read.
+
 Every metric function here takes ``y_true`` and ``y_score`` as 1-D arrays;
 they don't depend on the estimator type, so the same code evaluates LogReg,
 XGBoost, and any future model.
@@ -13,8 +20,8 @@ XGBoost, and any future model.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 import numpy as np
 import pandas as pd
@@ -33,9 +40,7 @@ def _as_array(x: ArrayLike) -> np.ndarray:
     return np.asarray(x, dtype=float)
 
 
-def precision_at_k(
-    y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10
-) -> float:
+def precision_at_k(y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10) -> float:
     """Precision in the top ``k_frac`` fraction of predicted scores.
 
     The operational interpretation: if we surface the top K% of restaurants
@@ -54,6 +59,28 @@ def precision_at_k(
     return float(np.mean(y_true_arr[top_k]))
 
 
+def recall_at_k(y_true: ArrayLike, y_score: ArrayLike, k_frac: float = 0.10) -> float:
+    """Recall (coverage) in the top ``k_frac`` fraction of predicted scores.
+
+    Of ALL restaurants that actually fail / incur a priority violation in the
+    window, what fraction land in the top K% we'd surface to an inspector?
+    The complement to ``precision_at_k`` for a capacity-limited triage tool:
+    precision = "how clean is the flagged list", recall = "how much of the
+    real risk did we catch".
+    """
+    if not 0 < k_frac <= 1:
+        raise ValueError(f"k_frac must be in (0, 1]; got {k_frac}")
+    y_true_arr = _as_array(y_true)
+    y_score_arr = _as_array(y_score)
+    total_pos = float(y_true_arr.sum())
+    if total_pos == 0:
+        return float("nan")
+    n = len(y_true_arr)
+    k = max(1, int(np.ceil(n * k_frac)))
+    order = np.argsort(-y_score_arr, kind="stable")
+    return float(y_true_arr[order[:k]].sum() / total_pos)
+
+
 def top_decile_lift(y_true: ArrayLike, y_score: ArrayLike) -> float:
     """precision@10% divided by the base positive rate.
 
@@ -64,6 +91,49 @@ def top_decile_lift(y_true: ArrayLike, y_score: ArrayLike) -> float:
     if base == 0:
         return float("nan")
     return precision_at_k(y_true, y_score, 0.10) / base
+
+
+def operating_point_table(
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    k_fracs: Sequence[float] = (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.40, 0.50),
+) -> pd.DataFrame:
+    """Precision / recall / lift at each capacity-limited operating point.
+
+    The decision-facing view of a triage model: "if an inspector works the
+    top K% by risk this cycle, how many real events do they catch, and how
+    much better than inspecting a random K%?" One row per K in ``k_fracs``.
+    This is what the methodology / how-it-works page reports — a single PR-AUC
+    hides the operating point the city would actually run at.
+
+    Columns: ``inspect_top_frac``, ``n_flagged``, ``precision``, ``recall``
+    (fraction of ALL events captured), ``lift`` (precision / base rate;
+    1.0 = no better than random), ``events_caught``.
+    """
+    y_t = _as_array(y_true)
+    y_s = _as_array(y_score)
+    n = len(y_t)
+    total_pos = float(y_t.sum())
+    base = float(np.mean(y_t))
+    order = np.argsort(-y_s, kind="stable")
+    rows = []
+    for k_frac in k_fracs:
+        if not 0 < k_frac <= 1:
+            raise ValueError(f"k_frac must be in (0, 1]; got {k_frac}")
+        k = max(1, int(np.ceil(n * k_frac)))
+        caught = int(y_t[order[:k]].sum())
+        precision = caught / k
+        rows.append(
+            {
+                "inspect_top_frac": round(k_frac, 4),
+                "n_flagged": k,
+                "precision": round(precision, 4),
+                "recall": round(caught / total_pos, 4) if total_pos else float("nan"),
+                "lift": round(precision / base, 4) if base > 0 else float("nan"),
+                "events_caught": caught,
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def decile_lift_table(y_true: ArrayLike, y_score: ArrayLike) -> pd.DataFrame:
@@ -91,9 +161,7 @@ def decile_lift_table(y_true: ArrayLike, y_score: ArrayLike) -> pd.DataFrame:
     return grouped.round(4)
 
 
-def calibration_table(
-    y_true: ArrayLike, y_score: ArrayLike, n_bins: int = 10
-) -> pd.DataFrame:
+def calibration_table(y_true: ArrayLike, y_score: ArrayLike, n_bins: int = 10) -> pd.DataFrame:
     """Predicted vs observed positive rate per probability bin.
 
     A perfectly calibrated model has ``predicted == observed`` in every bin.
@@ -126,6 +194,9 @@ class EvalReport:
     precision_at_5pct: float
     precision_at_10pct: float
     precision_at_20pct: float
+    recall_at_5pct: float
+    recall_at_10pct: float
+    recall_at_20pct: float
     top_decile_lift: float
     brier_score: float
     log_loss: float
@@ -139,6 +210,9 @@ class EvalReport:
             "precision_at_5pct": round(self.precision_at_5pct, 6),
             "precision_at_10pct": round(self.precision_at_10pct, 6),
             "precision_at_20pct": round(self.precision_at_20pct, 6),
+            "recall_at_5pct": round(self.recall_at_5pct, 6),
+            "recall_at_10pct": round(self.recall_at_10pct, 6),
+            "recall_at_20pct": round(self.recall_at_20pct, 6),
             "top_decile_lift": round(self.top_decile_lift, 6),
             "brier_score": round(self.brier_score, 6),
             "log_loss": round(self.log_loss, 6),
@@ -157,7 +231,85 @@ def evaluate(y_true: ArrayLike, y_score: ArrayLike) -> EvalReport:
         precision_at_5pct=precision_at_k(y_t, y_s, 0.05),
         precision_at_10pct=precision_at_k(y_t, y_s, 0.10),
         precision_at_20pct=precision_at_k(y_t, y_s, 0.20),
+        recall_at_5pct=recall_at_k(y_t, y_s, 0.05),
+        recall_at_10pct=recall_at_k(y_t, y_s, 0.10),
+        recall_at_20pct=recall_at_k(y_t, y_s, 0.20),
         top_decile_lift=top_decile_lift(y_t, y_s),
         brier_score=float(brier_score_loss(y_t, y_s)),
         log_loss=float(log_loss(y_t, np.clip(y_s, 1e-15, 1 - 1e-15))),
     )
+
+
+def group_performance_audit(
+    y_true: ArrayLike,
+    y_score: ArrayLike,
+    groups: ArrayLike,
+    *,
+    min_n: int = 50,
+    floor_frac: float = 0.5,
+    k_frac: float = 0.10,
+) -> pd.DataFrame:
+    """Per-group fairness audit: does the model rank comparably across groups?
+
+    For every value in ``groups`` with at least ``min_n`` rows AND >= 1 positive,
+    compute PR-AUC, precision@k, and recall@k. A group is flagged ``below_floor``
+    when its PR-AUC falls under ``floor_frac`` x the overall PR-AUC — CLAUDE.md's
+    in-scope rule ("no group < 50% of overall PR-AUC"). This is the reusable form
+    of the notebook-06 audit so every new experiment can run the same check.
+
+    Returns one row per audited group, sorted by ``n`` descending, with columns:
+    ``group, n, positive_rate, pr_auc, precision_at_k, recall_at_k, below_floor``.
+    The overall PR-AUC and the floor are attached as ``df.attrs["overall_pr_auc"]``
+    / ``df.attrs["pr_auc_floor"]``.
+
+    CAVEAT (read before concluding "unfair"): PR-AUC is mechanically low at low
+    prevalence (its floor is roughly the base rate), so ``below_floor`` for a
+    rare-event group is usually a base-rate artifact, not bias. Read it alongside
+    ``recall_at_k`` (coverage), and treat sub-~50-positive groups as noise — see
+    decision 0005.
+    """
+    y = _as_array(y_true)
+    s = _as_array(y_score)
+    g = np.asarray(groups)
+    if not (len(y) == len(s) == len(g)):
+        raise ValueError("y_true, y_score, and groups must be the same length")
+
+    overall = float(average_precision_score(y, s)) if y.sum() else float("nan")
+    floor = floor_frac * overall
+
+    df = pd.DataFrame({"y": y, "s": s, "group": g})
+    rows = []
+    for name, grp in df.groupby("group", observed=True):
+        if len(grp) < min_n or grp["y"].sum() == 0:
+            continue
+        pr = float(average_precision_score(grp["y"], grp["s"]))
+        rows.append(
+            {
+                "group": name,
+                "n": int(len(grp)),
+                "positive_rate": round(float(grp["y"].mean()), 4),
+                "pr_auc": round(pr, 4),
+                "precision_at_k": round(precision_at_k(grp["y"], grp["s"], k_frac), 4),
+                "recall_at_k": round(recall_at_k(grp["y"], grp["s"], k_frac), 4),
+                "below_floor": bool(pr < floor),
+            }
+        )
+
+    out = pd.DataFrame(
+        rows,
+        columns=[
+            "group",
+            "n",
+            "positive_rate",
+            "pr_auc",
+            "precision_at_k",
+            "recall_at_k",
+            "below_floor",
+        ],
+    )
+    if not out.empty:
+        out = out.sort_values("n", ascending=False, ignore_index=True)
+    out.attrs["overall_pr_auc"] = round(overall, 4)
+    out.attrs["pr_auc_floor"] = round(floor, 4)
+    out.attrs["floor_frac"] = floor_frac
+    return out

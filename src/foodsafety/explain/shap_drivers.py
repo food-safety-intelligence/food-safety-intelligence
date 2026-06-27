@@ -21,58 +21,21 @@ Two product surfaces depend on this module:
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 import numpy as np
 import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.compose import ColumnTransformer
+from sklearn.frozen import FrozenEstimator
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
-
-# ---------------------------------------------------------------------------
-# Plain-English labels for the UI driver bars.
-# ---------------------------------------------------------------------------
-#
-# Each entry is a format template. ``{value}`` is filled in with the row's
-# value for that feature. Numeric features show the value; boolean features
-# only render when True (the False case is suppressed at the caller); category
-# features show the actual category that triggered.
-#
-# These strings are what end up on the restaurant detail page next to the
-# horizontal driver bars. They were tuned for the Clinical Quiet mockup's
-# tone — neutral, not alarmist.
-FEATURE_LABELS: dict[str, str] = {
-    "prior_inspections": "{value} prior inspections on record",
-    "prior_fails": "{value} failed inspections previously",
-    "prior_priority_violations": "{value} priority violations in prior history",
-    "prior_core_violations": "{value} core violations in prior history",
-    "prior_fail_or_priority_events": "{value} prior fail-or-priority events",
-    "days_since_last_inspection": "Last inspected {value:.0f} days ago",
-    "days_since_last_fail": "Last fail was {value:.0f} days ago",
-    "license_age_days": "License is {value:.0f} days old",
-    "license_n_history_rows": "{value} entries in license history",
-    "temporal_month": "Anchored in month {value}",
-    "temporal_quarter": "Anchored in Q{value}",
-    "static_facility_type": "Facility type: {value}",
-    "static_risk_tier": "Chicago risk tier: {value}",
-    "static_zip": "ZIP {value}",
-    # Boolean flag labels (only rendered when value is True)
-    "flag_kw_temperature": "Temperature-related violation in recent history",
-    "flag_kw_cooling": "Improper cooling cited",
-    "flag_kw_raw_food": "Raw-food handling issue cited",
-    "flag_kw_cross_contamination": "Cross-contamination concerns",
-    "flag_kw_expired": "Expired food / date-marking issue",
-    "flag_kw_rodent": "Vermin / rodent violation noted",
-    "flag_kw_pest": "Pest activity noted",
-    "flag_kw_no_soap": "Missing soap at handwash sink",
-    "flag_kw_no_paper_towels": "Missing paper towels at handwash sink",
-    "flag_kw_handwash_sink": "Handwashing-sink issue",
-    "flag_kw_sewage": "Sewage / plumbing issue",
-    "flag_kw_certified_manager": "Certified-manager certification issue",
-}
+# The feature presentation registry (labels) lives in its own dependency-light
+# module; re-imported here so `from ...shap_drivers import FEATURE_LABELS` (used
+# by the modeling notebook and as the default in top_drivers_for_row) still works.
+from foodsafety.explain.feature_labels import FEATURE_LABELS
 
 
 @dataclass(frozen=True)
@@ -101,15 +64,18 @@ class Driver:
 
 
 def _underlying_pipeline(model) -> Pipeline:
-    """Pull the inner Pipeline out of a CalibratedClassifierCV(prefit) wrapper.
+    """Pull the inner Pipeline out of a calibrated wrapper.
 
-    Our training code wraps the trained pipeline with ``cv='prefit'``
-    calibration, so the inner pipeline lives at
-    ``model.calibrated_classifiers_[0].estimator``. Other shapes are returned
-    unchanged.
+    Training wraps the fitted pipeline in ``FrozenEstimator`` before
+    calibration, so for a ``CalibratedClassifierCV`` the pipeline lives at
+    ``model.calibrated_classifiers_[0].estimator.estimator``. We unwrap the
+    FrozenEstimator layer if present. Other shapes are returned unchanged.
     """
     if isinstance(model, CalibratedClassifierCV):
-        return model.calibrated_classifiers_[0].estimator
+        inner = model.calibrated_classifiers_[0].estimator
+        if isinstance(inner, FrozenEstimator):
+            inner = inner.estimator
+        return inner
     return model
 
 
@@ -152,9 +118,7 @@ def linear_contributions(
     expanded_to_original = _map_expanded_to_original(output_names, original_features)
 
     # Sum into a DataFrame with original-feature columns.
-    contrib_df = pd.DataFrame(
-        0.0, index=X.index, columns=original_features, dtype="float64"
-    )
+    contrib_df = pd.DataFrame(0.0, index=X.index, columns=original_features, dtype="float64")
     for j, expanded_name in enumerate(output_names):
         orig = expanded_to_original.get(expanded_name)
         if orig is None:
@@ -207,7 +171,7 @@ def top_drivers_for_row(
     row_contributions: pd.Series,
     *,
     k: int = 4,
-    labels: Mapping[str, str] | None = None,
+    labels: Mapping[str, str | Mapping[bool, str]] | None = None,
 ) -> list[Driver]:
     """Pick the top-K drivers for one restaurant.
 
@@ -244,10 +208,15 @@ def top_drivers_for_row(
             continue  # don't show purely-zero contributors
         raw_value = row_values.get(feat)
         label_template = labels.get(feat, feat)
-        try:
-            label = label_template.format(value=raw_value)
-        except (TypeError, ValueError):
-            label = label_template
+        if isinstance(label_template, Mapping):
+            # Sign-aware label for a binary outcome feature: the same feature
+            # reads oppositely for the fail vs pass case (and surfaces in both).
+            label = label_template.get(bool(raw_value), feat)
+        else:
+            try:
+                label = label_template.format(value=raw_value)
+            except (TypeError, ValueError):
+                label = label_template
         drivers.append(
             Driver(
                 feature=feat,

@@ -8,8 +8,30 @@ with the workspace file, this file wins.
 
 ## Project goal (this iteration only)
 
+> **Phase 2 status — scope update (the team moved into Phase 2 ~2026-06-15).**
+> The scope text below describes the **MVP-demo iteration** and is kept for the
+> record. Several items it lists as OUT are now **IN scope**: AWS (SageMaker /
+> Bedrock / S3), agentic AI, transformer/LLM NLP **for batch feature extraction**,
+> hosted **batch** inference, and **deployment** — the web app is live on AWS
+> Amplify and Vercel, both auto-deploying on push to `main`, so **merging to
+> `main` publishes to production** (verify app changes before merging). What does
+> **not** change: the permanent **batch-score-to-JSON** pattern (the app never
+> calls the model at request time), the temporal-split / leakage discipline, and
+> the both-metrics promotion gate. See
+> [`docs/project_plan.md`](docs/project_plan.md) for the project intent and
+> [0009](docs/decisions/0009-production-estimator-revisit-logreg-vs-xgb.md) for
+> the production-estimator state; the Phase-2 deep-learning bets are scoped in a
+> separate deep-learning decision record.
+
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
+
+> **Scope note:** the Food Inspections data covers **all licensed food
+> establishments, not just restaurants** (~69% restaurants; the rest are grocery
+> stores, school/daycare/hospital kitchens, bakeries, caterers, etc.). The pipeline
+> does not filter to restaurants — it scores all of them. "Restaurants" is used
+> loosely here; user-facing copy should say "food establishments" (Phase-2 copy
+> fix). Full detail in `docs/interface_contracts.md` § Scope.
 
 1. A measured, calibrated model (logistic regression baseline + XGBoost) with
    SHAP explainability.
@@ -60,7 +82,7 @@ Three layers, in this order — A and B are required, C is a stretch:
 
 1. **Structured violation codes (A)** — count of each code 1–29 plus
    `n_priority` and `n_core` rollups. Already extractable from EDA.
-2. **Keyword flags (B)** — ~20 hand-picked regex flags on the residual
+2. **Keyword flags (B)** — 12 hand-picked regex flags on the residual
    text (e.g. `temperature`, `vermin`/`rodent`, `raw chicken`,
    `cross-contamination`, `expired`, `no soap`, `no paper towels`). Each
    flag becomes one SHAP-friendly column.
@@ -71,6 +93,11 @@ Three layers, in this order — A and B are required, C is a stretch:
 ---
 
 ## What is OUT of scope — do not add, do not stub, do not leave seams
+
+> **See the Phase-2 status note at the top.** Several items below (AWS,
+> deployment, hosted batch inference, transformer/LLM NLP for batch features) are
+> now **IN scope**. The list is kept for the MVP-iteration record; the discipline
+> it encodes — no request-time inference, no premature seams — still applies.
 
 - **AWS this iteration** — no `boto3`, no S3 paths in code, no SageMaker /
   Lambda / Bedrock references. The Phase-2 plan IS hosted training and
@@ -217,6 +244,14 @@ source of truth.
 - No `print(df)` in committed notebooks — use `df.head()` or `peek(df, name)`.
 - Every modeling notebook starts with: owner, date, train cutoff, label window,
   dataset version (parquet mtime). Ends with: saved artifact path + one-line metric.
+- **Run `make lint` before every commit so ruff errors don't accumulate.** The
+  `.githooks/pre-commit` hook enforces `ruff check` + `ruff format --check` on
+  commit — enable it once per clone with `git config core.hooksPath .githooks`
+  (see README setup). Fix with `ruff check --fix . && ruff format .`. **Notebooks
+  are NOT linted** (excluded in `pyproject.toml` — cell idioms like
+  imports-after-markdown are normal); only the package, scripts, tests, and agents
+  are. Suppress a genuinely-deliberate finding with a scoped `# noqa: <CODE>`
+  (e.g. an import that must follow `sys.path` setup), not a bare `# noqa`.
 
 ### TypeScript (`app/`)
 
@@ -236,6 +271,34 @@ source of truth.
 - No emoji in committed code or UI unless explicitly asked.
 - Accessibility is default: keyboard nav, ARIA labels on icon-only buttons,
   ≥44px tap targets, sufficient contrast.
+- **Validate UI changes rigorously — by observing the running app, not
+  `tsc`/tests** (which pass while layout, overflow, colour, and visual
+  regressions ship). For any visible change under `app/`, **run `/verify`** — it
+  auto-uses the repo's `verifier-app` skill (`.claude/skills/verifier-app/`) to
+  build, launch, and capture **real screenshots**. Check each of these *per
+  item* — not one glance and a "looks good":
+  - **every state the change affects**, plus realistic **edge cases** — empty /
+    missing / extreme data (e.g. a record with zero drivers, the longest label
+    that could appear);
+  - **both viewports** — desktop and mobile (~390px) — for wrapping and overflow;
+  - **interactions** — hover / focus / keyboard, not just the static render;
+  - **accessibility** — text contrast ≥ WCAG AA (4.5:1 normal, 3:1 large text)
+    and a **non-colour cue** for anything conveyed by colour alone.
+  Report honestly which items you actually observed and which you could not
+  exercise — **never a blanket pass**. A static "it loads" or an HTML-only check
+  is not verification of a visual change. (You run `/verify`; it discovers
+  `verifier-app` automatically — you don't invoke the verifier skill directly.)
+- **Put ALL the verification screenshots in the PR description** for any visible
+  UI change — every state and viewport you captured while verifying (above), not
+  a hand-picked one. A diff can't show layout, and reviewers shouldn't have to
+  run the branch to see what changed. **This repo is private, so embed them by
+  dragging the image files into the PR description in the GitHub web UI** — that
+  uploads them to GitHub's attachment store and renders inline for everyone. A
+  committed PNG referenced via `raw.githubusercontent.com` will **not** render
+  (GitHub's image proxy fetches it unauthenticated → 404); committing under
+  `design/` and linking the file view is a non-inline fallback. An agent that
+  can't drag-drop should save the screenshots to a known path and ask a human to
+  drop them in.
 
 ---
 
@@ -250,11 +313,14 @@ Workstreams + owners:
 | Modeling (baseline + XGBoost) | **Bella + Deepak** | Jun |
 | Eval + SHAP + `scores.parquet` | **Bella** | Deepak |
 | Web app (Next.js) | **Aurelia + Jun** | Arun |
+| Agentic AI / AWS (Bedrock, SageMaker) | **Deepak** | — |
 | PM / scope guard | **Jun** | Arun (tiebreaker) |
 
 Process:
 
-- Branch per workstream: `de/*`, `eda/*`, `mle/*`, `app/*`, `pm/*`.
+- Branch per **owner + workstream**: `<owner>/<workstream>-<short-desc>` — e.g.
+  `bella/mle-feature-refresh`, `arun/de-loader-fix`. Workstreams: `de`, `eda`,
+  `mle`, `app`, `pm`. (Applies to new branches; existing ones aren't retroactively renamed.)
 - Squash-merge to `main`. No direct pushes to `main`.
 - One reviewer required; backup owner is the default reviewer.
 - PR review SLA = 24h. If silent past 24h on a clearly-scoped workstream
@@ -294,3 +360,23 @@ Process:
   `uv sync`. Web app runnable via `cd app && pnpm install && pnpm dev`.
 - Cache dir configurable via `FOODSAFETY_DATA_DIR` env var (defaults to `./data/`).
   This is the **only** future-proofing seam we leave for AWS.
+
+## Experiment tracking
+
+- Commit code **before** running a tracked experiment, so the run's provenance
+  (git SHA → run id) points to the exact committed code.
+- Flow: commit code → run the experiment (writes `reports/metrics/<run>.json`
+  plus the model + its `metadata.json` sidecar) → review the metrics → commit
+  the metrics JSON. **Never commit `data/` artifacts** (parquets/models) —
+  they're gitignored; the dataset is versioned by the `features_sha256` recorded
+  in the metadata, not by committing the file.
+- One experiment per commit boundary: re-running without committing in between
+  reuses the run id and overwrites the prior metrics file.
+
+## Before changing an area (AI agents + humans)
+
+- Read the relevant notebook's **markdown cells** — especially the header
+  (owner / date / train cutoff / label window / dataset version) and the handoff
+  (saved-artifact path + one-line metric) — and the source-of-truth docs
+  (`docs/interface_contracts.md`, `docs/data_dictionary.md`) before editing in
+  that area.

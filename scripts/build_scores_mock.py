@@ -33,11 +33,20 @@ N_RESTAURANTS = 200
 # refers to so the UI can map feature -> icon / color consistently. `label` is
 # the plain-English UI string with a {value} placeholder we'll fill in.
 DRIVER_TEMPLATES = [
-    {"feature": "prior_priority_violations", "label": "{value} priority violations in prior 2 years"},
+    {
+        "feature": "prior_priority_violations",
+        "label": "{value} priority violations in prior 2 years",
+    },
     {"feature": "prior_fails", "label": "{value} failed inspections previously"},
     {"feature": "days_since_last_inspection", "label": "Last inspected {value} days ago"},
-    {"feature": "n_311_rodent_300m_90d", "label": "{value} rodent complaints within 300m in last 90 days"},
-    {"feature": "n_311_sanitation_300m_90d", "label": "{value} sanitation complaints nearby (90 days)"},
+    {
+        "feature": "n_311_rodent_300m_90d",
+        "label": "{value} rodent complaints within 300m in last 90 days",
+    },
+    {
+        "feature": "n_311_sanitation_300m_90d",
+        "label": "{value} sanitation complaints nearby (90 days)",
+    },
     {"feature": "flag_kw_temperature", "label": "Temperature-related violation in recent history"},
     {"feature": "flag_kw_rodent", "label": "Vermin/pest-related violation noted previously"},
     {"feature": "static_facility_type", "label": "Facility type: {value}"},
@@ -60,7 +69,11 @@ def _sample_drivers(score: float) -> list[dict]:
     low-score rows skew toward 'days since last' / static drivers."""
     n = 3
     if score >= 0.5:
-        candidates = [t for t in DRIVER_TEMPLATES if "violation" in t["feature"] or "311" in t["feature"] or "kw_" in t["feature"]]
+        candidates = [
+            t
+            for t in DRIVER_TEMPLATES
+            if "violation" in t["feature"] or "311" in t["feature"] or "kw_" in t["feature"]
+        ]
     else:
         candidates = DRIVER_TEMPLATES
     picks = random.sample(candidates, k=min(n, len(candidates)))
@@ -151,7 +164,11 @@ def main() -> None:
     print("\n-- tier distribution --")
     print(df["risk_tier"].value_counts().to_string())
     print("\n-- head(3) --")
-    print(df[["license_id", "dba_name", "risk_score", "risk_tier", "trend_slope_90d"]].head(3).to_string())
+    print(
+        df[["license_id", "dba_name", "risk_score", "risk_tier", "trend_slope_90d"]]
+        .head(3)
+        .to_string()
+    )
 
 
 if __name__ == "__main__":

@@ -17,23 +17,33 @@ export function ArcGauge({
   tier: RiskTier;
   size?: number;
 }) {
-  // Geometry — 270° arc centred on bottom-left-to-bottom-right, opening down.
+  // Geometry — 270° arc opening at the bottom: the two endpoints sit at
+  // lower-left (225°) and lower-right (-45°), mirror images across the vertical
+  // centre line, leaving a symmetric 90° gap centred at the bottom.
   const cx = size / 2;
   const cy = size / 2;
   const r = size / 2 - 22;
-  const startAngle = 135; // degrees from 3 o'clock, going CCW
+  // 225° = lower-left endpoint (measured from 3 o'clock, CCW). Sweeping 270°
+  // clockwise from here runs up over the top and down to the lower-right, so
+  // the score fills left-to-right and the gap lands at the bottom.
+  const startAngle = 225;
   const sweep = 270;
 
+  // Clamp to [0, 1] once, and fall back to 0 for a non-finite score (NaN/±∞).
+  // Both the arc geometry and the centre number derive from this, so a bad
+  // input can't produce a broken SVG path or a "NaN" / "150" label.
+  const frac = Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
+
   const trackPath = arcPath(cx, cy, r, startAngle, sweep);
-  const valuePath = arcPath(cx, cy, r, startAngle, sweep * Math.min(1, Math.max(0, score)));
+  const valuePath = arcPath(cx, cy, r, startAngle, sweep * frac);
 
   // Marker position at the score's angle.
-  const markerAngle = startAngle - sweep * Math.min(1, Math.max(0, score));
+  const markerAngle = startAngle - sweep * frac;
   const markerRad = (Math.PI / 180) * markerAngle;
   const markerX = cx + r * Math.cos(markerRad);
   const markerY = cy - r * Math.sin(markerRad);
 
-  const display = Math.round(score * 100);
+  const display = Math.round(frac * 100);
   const color = TIER_HEX[tier];
 
   return (
@@ -91,7 +101,6 @@ export function ArcGauge({
         fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         fontSize={11}
         fontWeight={600}
-        letterSpacing={1.6}
         fill="#6B7280"
       >
         / 100
@@ -105,14 +114,16 @@ export function ArcGauge({
  * starting at `startAngleDeg` (measured from +x axis, CCW) and sweeping
  * `sweepDeg` degrees clockwise (decreasing angle).
  */
-function arcPath(
+export function arcPath(
   cx: number,
   cy: number,
   r: number,
   startAngleDeg: number,
   sweepDeg: number,
 ): string {
-  if (sweepDeg <= 0) return "";
+  // `!(x > 0)` (not `x <= 0`) so a NaN sweep also yields an empty path rather
+  // than "M NaN NaN A …" — a zero/empty value arc just renders nothing.
+  if (!(sweepDeg > 0)) return "";
 
   const startRad = (Math.PI / 180) * startAngleDeg;
   const endRad = (Math.PI / 180) * (startAngleDeg - sweepDeg);
@@ -120,7 +131,14 @@ function arcPath(
   const y1 = cy - r * Math.sin(startRad);
   const x2 = cx + r * Math.cos(endRad);
   const y2 = cy - r * Math.sin(endRad);
-  // SVG sweep-flag=0 means CCW (visually CW because y is flipped).
+  // Two independent flags:
+  //  - large-arc-flag depends on the sweep SIZE (minor <180°, major >180°).
+  //  - sweep-flag is the rotational DIRECTION and is constant: we always draw
+  //    from startAngle toward decreasing angle, which under flipped y (screen
+  //    y-down) is the clockwise sense, i.e. sweep-flag = 1.
+  // Tying the sweep-flag to large-arc (the old bug) only worked for the full
+  // 270° track; partial value arcs ≤180° then reversed and bulged through the
+  // centre.
   const largeArc = sweepDeg > 180 ? 1 : 0;
-  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 0 ${x2} ${y2}`;
+  return `M ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2}`;
 }

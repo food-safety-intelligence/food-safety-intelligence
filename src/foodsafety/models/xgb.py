@@ -116,9 +116,7 @@ def prepare_xgb_features(
     for c in CATEGORICAL_FEATURES:
         if categorical_dtypes is not None and c in categorical_dtypes:
             # Reuse train's categories so codes align across splits.
-            out[c] = pd.Categorical(
-                out[c], categories=categorical_dtypes[c].categories
-            )
+            out[c] = pd.Categorical(out[c], categories=categorical_dtypes[c].categories)
         else:
             out[c] = out[c].astype("category")
 

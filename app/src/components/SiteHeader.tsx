@@ -8,10 +8,11 @@ import { MapPin } from "lucide-react";
  * navigation is fine for this iteration; we'll lift to a config when more
  * routes land.
  */
-export type NavItem = "search" | "caregivers" | "how" | "sources";
+export type NavItem = "search" | "chat" | "caregivers" | "how" | "sources";
 
 const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "search", label: "Search", href: "/" },
+  { id: "chat", label: "Chat", href: "/chat" },
   { id: "caregivers", label: "For caregivers", href: "/caregivers" },
   { id: "how", label: "How this works", href: "/how-it-works" },
   { id: "sources", label: "Sources", href: "/sources" },
@@ -20,7 +21,9 @@ const NAV: { id: NavItem; label: string; href: string }[] = [
 export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
   return (
     <header className="pt-6">
-      <div className="max-w-[1240px] mx-auto px-8 flex items-center justify-between">
+      {/* Wraps on narrow screens (logo on top, nav below) so the four nav
+          pills never overflow the viewport on mobile; single row on desktop. */}
+      <div className="max-w-[1240px] mx-auto px-4 sm:px-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <Link href="/" className="flex items-center gap-3 group">
           <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-sage/15">
             <MapPin className="w-[18px] h-[18px] text-sage" strokeWidth={2} />
@@ -34,7 +37,7 @@ export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
             </div>
           </div>
         </Link>
-        <nav className="flex items-center gap-1 text-[13px]">
+        <nav className="flex flex-wrap items-center gap-1 text-[13px]">
           {NAV.map((item) => {
             const active = item.id === activeNav;
             return (

@@ -2,14 +2,19 @@
 # Anchored so the Python subpackage `src/foodsafety/data/` (which contains
 # `labels.py`) is NOT silently ignored by an unanchored `data/` pattern.
 /data/
-# Web-app generated JSONs are gitignored except the small demo fallback —
-# loader in scores-server.ts falls back to scores_mock.json when scores.json
-# is absent, so a fresh clone can render without running the pipeline first.
+# Web-app data JSONs: the two cross-team contract artifacts (scores.json,
+# inspection_history.json) are tracked so deployments work without a separate
+# data-sync step. Everything else under app/public/data/ is gitignored except
+# the small demo fallback (scores_mock.json) that loadScores() falls back to
+# when scores.json is absent on a fresh clone.
 # Note: a leaf-level pattern is required here. Git's negation rule does NOT
 # re-include files whose parent directory is excluded, so we can't write
 # `/app/public/data/` + `!scores_mock.json`.
 /app/public/data/*.json
 !/app/public/data/scores_mock.json
+!/app/public/data/scores.json
+!/app/public/data/inspection_history.json
+!/app/public/data/methodology.json
 **/_partial_*/
 
 # Saved model files
@@ -45,6 +50,9 @@ dist/
 build/
 *.egg-info/
 
+# AgentCore CLI build cache (compiled deps, ~100MB)
+agentcore-deploy/agentcore/.cache/
+
 # Next.js (in app/)
 app/node_modules/
 app/.next/
@@ -65,3 +73,9 @@ pnpm-debug.log*
 # OS
 .DS_Store
 Thumbs.db
+
+# JupyterLab autosave/lock artifacts
+.~*.ipynb
+
+# Claude Code per-machine local settings (points memory at EFS; never share)
+.claude/settings.local.json

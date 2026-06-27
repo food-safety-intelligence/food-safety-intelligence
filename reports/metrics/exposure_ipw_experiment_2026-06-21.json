@@ -1,0 +1,219 @@
+{
+  "experiment": "exposure_ipw_deconfound_label_3a",
+  "date": "2026-06-21",
+  "config": {
+    "window_days": 180,
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_test": 13812,
+    "exposure_base_rate_train": 0.3462,
+    "p_clip": [
+      0.02,
+      0.98
+    ],
+    "propensity_model": "xgb (no scale_pos_weight)",
+    "propensity_val_eval": {
+      "n": 16564,
+      "positive_rate": 0.332166,
+      "pr_auc": 0.864723,
+      "roc_auc": 0.889173,
+      "precision_at_5pct": 0.991556,
+      "precision_at_10pct": 0.992154,
+      "precision_at_20pct": 0.986115,
+      "recall_at_5pct": 0.1494,
+      "recall_at_10pct": 0.2988,
+      "recall_at_20pct": 0.593784,
+      "top_decile_lift": 2.986922,
+      "brier_score": 0.102534,
+      "log_loss": 0.336591
+    },
+    "ipw_weight_summary": {
+      "inv_p": {
+        "mean": 3.2327,
+        "min": 0.3533,
+        "max": 17.3109
+      },
+      "two_arm": {
+        "mean": 0.8062,
+        "min": 0.3533,
+        "max": 4.1222
+      }
+    }
+  },
+  "v36_published_baseline": {
+    "logreg": [
+      0.332,
+      0.37
+    ],
+    "xgb": [
+      0.338,
+      0.376
+    ]
+  },
+  "diagnostic": {
+    "spearman_score_vs_prior_inspections": 0.0973,
+    "spearman_score_vs_inv_recency": 0.1147,
+    "spearman_score_vs_exposure_propensity": 0.8608,
+    "top_decile": {
+      "mean_prior_inspections": 16.135,
+      "overall_mean_prior_inspections": 11.969,
+      "mean_exposure_propensity": 0.9448,
+      "overall_mean_exposure_propensity": 0.3224,
+      "frac_was_fail": 0.9117,
+      "overall_frac_was_fail": 0.2088
+    }
+  },
+  "results": {
+    "logreg": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.344211,
+        "roc_auc": 0.826518,
+        "precision_at_5pct": 0.434153,
+        "precision_at_10pct": 0.36903,
+        "precision_at_20pct": 0.284111,
+        "recall_at_5pct": 0.245298,
+        "recall_at_10pct": 0.417007,
+        "recall_at_20pct": 0.641864,
+        "top_decile_lift": 4.16766,
+        "brier_score": 0.154269,
+        "log_loss": 0.490802
+      },
+      "spearman_score_vs_exposure_ctrl": 0.8608,
+      "arms": {
+        "inv_p": {
+          "treatment": {
+            "n": 13812,
+            "positive_rate": 0.088546,
+            "pr_auc": 0.317228,
+            "roc_auc": 0.818873,
+            "precision_at_5pct": 0.416787,
+            "precision_at_10pct": 0.34081,
+            "precision_at_20pct": 0.27072,
+            "recall_at_5pct": 0.235487,
+            "recall_at_10pct": 0.385119,
+            "recall_at_20pct": 0.611611,
+            "top_decile_lift": 3.848956,
+            "brier_score": 0.32628,
+            "log_loss": 1.026461
+          },
+          "delta_pr_auc": -0.026983,
+          "delta_precision_at_10pct": -0.02822,
+          "clears_gate_vs_control": false,
+          "clears_gate_vs_v36_published": false,
+          "spearman_score_vs_exposure_treat": 0.8997
+        },
+        "two_arm": {
+          "treatment": {
+            "n": 13812,
+            "positive_rate": 0.088546,
+            "pr_auc": 0.339762,
+            "roc_auc": 0.816573,
+            "precision_at_5pct": 0.432706,
+            "precision_at_10pct": 0.360347,
+            "precision_at_20pct": 0.272168,
+            "recall_at_5pct": 0.244481,
+            "recall_at_10pct": 0.407195,
+            "recall_at_20pct": 0.614881,
+            "top_decile_lift": 4.069597,
+            "brier_score": 0.209793,
+            "log_loss": 0.613804
+          },
+          "delta_pr_auc": -0.004449,
+          "delta_precision_at_10pct": -0.008683,
+          "clears_gate_vs_control": false,
+          "clears_gate_vs_v36_published": false,
+          "spearman_score_vs_exposure_treat": 0.786
+        }
+      }
+    },
+    "xgb": {
+      "control": {
+        "n": 13812,
+        "positive_rate": 0.088546,
+        "pr_auc": 0.352609,
+        "roc_auc": 0.828969,
+        "precision_at_5pct": 0.458755,
+        "precision_at_10pct": 0.372648,
+        "precision_at_20pct": 0.283026,
+        "recall_at_5pct": 0.259199,
+        "recall_at_10pct": 0.421096,
+        "recall_at_20pct": 0.639411,
+        "top_decile_lift": 4.208519,
+        "brier_score": 0.138878,
+        "log_loss": 0.435668
+      },
+      "spearman_score_vs_exposure_ctrl": 0.9079,
+      "arms": {
+        "inv_p": {
+          "treatment": {
+            "n": 13812,
+            "positive_rate": 0.088546,
+            "pr_auc": 0.347907,
+            "roc_auc": 0.829483,
+            "precision_at_5pct": 0.45152,
+            "precision_at_10pct": 0.371925,
+            "precision_at_20pct": 0.288093,
+            "recall_at_5pct": 0.25511,
+            "recall_at_10pct": 0.420278,
+            "recall_at_20pct": 0.650859,
+            "top_decile_lift": 4.200347,
+            "brier_score": 0.137548,
+            "log_loss": 0.428672
+          },
+          "delta_pr_auc": -0.004702,
+          "delta_precision_at_10pct": -0.000723,
+          "clears_gate_vs_control": false,
+          "clears_gate_vs_v36_published": false,
+          "spearman_score_vs_exposure_treat": 0.9172
+        },
+        "two_arm": {
+          "treatment": {
+            "n": 13812,
+            "positive_rate": 0.088546,
+            "pr_auc": 0.342292,
+            "roc_auc": 0.808377,
+            "precision_at_5pct": 0.460203,
+            "precision_at_10pct": 0.372648,
+            "precision_at_20pct": 0.27253,
+            "recall_at_5pct": 0.260016,
+            "recall_at_10pct": 0.421096,
+            "recall_at_20pct": 0.615699,
+            "top_decile_lift": 4.208519,
+            "brier_score": 0.197964,
+            "log_loss": 0.581247
+          },
+          "delta_pr_auc": -0.010317,
+          "delta_precision_at_10pct": 0.0,
+          "clears_gate_vs_control": false,
+          "clears_gate_vs_v36_published": false,
+          "spearman_score_vs_exposure_treat": 0.7517
+        }
+      }
+    }
+  },
+  "fairness_vulnerable_groups": {
+    "Children's Services Facility": {
+      "n": 543,
+      "recall_ctrl": 0.4348,
+      "recall_treat": 0.3913
+    },
+    "Daycare": {
+      "n": 344,
+      "recall_ctrl": 0.6,
+      "recall_treat": 0.6
+    },
+    "Long Term Care": {
+      "n": 101,
+      "recall_ctrl": 0.3333,
+      "recall_treat": 0.3333
+    },
+    "School": {
+      "n": 1013,
+      "recall_ctrl": 0.6456,
+      "recall_treat": 0.5823
+    }
+  },
+  "wrinkle": "TEST labels are also censored (event observed only if an inspection occurred in the test window). IPW deconfounds TRAINING only; the gate measures predicted OBSERVED events, so a flat/down gate is not proof deconfounding failed \u2014 read the diagnostic (corr(score,exposure)) too."
+}

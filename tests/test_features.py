@@ -15,12 +15,11 @@ Other tests pin down:
 from __future__ import annotations
 
 import pandas as pd
-import pytest
 
 from foodsafety.features.build import build_features
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
-from foodsafety.features.license_features import add_license_features
+from foodsafety.features.license_features import add_license_features, normalize_facility_type
 
 
 def _minimal_row(**overrides) -> dict:
@@ -66,8 +65,7 @@ def test_prior_features_do_not_leak_anchor():
     df = _df(
         [
             _minimal_row(inspection_date="2019-04-01", results="Pass"),
-            _minimal_row(inspection_date="2019-08-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-08-01", results="Fail", is_fail_or_priority=True),
         ]
     )
     out = add_inspection_features(df)
@@ -85,8 +83,7 @@ def test_prior_features_count_earlier_events_correctly():
     """
     df = _df(
         [
-            _minimal_row(inspection_date="2019-04-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-04-01", results="Fail", is_fail_or_priority=True),
             _minimal_row(inspection_date="2019-08-01", results="Pass"),
             _minimal_row(inspection_date="2019-12-01", results="Pass"),
         ]
@@ -100,10 +97,13 @@ def test_prior_features_do_not_leak_across_licenses():
     """A Fail at License A should NOT count towards License B's prior_fails."""
     df = _df(
         [
-            _minimal_row(license_id="A", inspection_date="2019-04-01",
-                         results="Fail", is_fail_or_priority=True),
-            _minimal_row(license_id="B", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(
+                license_id="A",
+                inspection_date="2019-04-01",
+                results="Fail",
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(license_id="B", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = add_inspection_features(df)
@@ -132,8 +132,7 @@ def test_days_since_last_fail_is_strictly_before():
     df = _df(
         [
             _minimal_row(inspection_date="2019-01-01", results="Pass"),
-            _minimal_row(inspection_date="2019-04-01", results="Fail",
-                         is_fail_or_priority=True),
+            _minimal_row(inspection_date="2019-04-01", results="Fail", is_fail_or_priority=True),
             _minimal_row(inspection_date="2019-07-01", results="Pass"),  # 91 days after the Fail
         ]
     )
@@ -176,6 +175,43 @@ def test_priority_violation_counts_picked_up():
 
 
 # ---------------------------------------------------------------------------
+# Current-inspection own outcome (the mirror image of the prior_* leak tests:
+# these features DO describe the anchor's own visit — that's correct, because
+# the 180-day label window is strictly AFTER the anchor, so they don't leak).
+# ---------------------------------------------------------------------------
+
+
+def test_current_inspection_outcome_describes_the_anchor_itself():
+    """was_fail / n_priority_this_inspection / n_core_this_inspection summarise
+    THIS inspection — the opposite of the prior_* columns, which exclude it."""
+    df = _df(
+        [
+            _minimal_row(
+                inspection_date="2019-04-01",
+                results="Fail",
+                # one priority code (10) and one core code (45)
+                violations="10. HANDWASHING - Comments: ... | 45. FLOORS - Comments: ...",
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(inspection_date="2019-09-01", results="Pass"),
+        ]
+    )
+    out = add_inspection_features(df).sort_values("inspection_date").reset_index(drop=True)
+    # Anchor row (the Fail) reflects ITS OWN outcome.
+    assert out.loc[0, "was_fail"] == 1
+    assert out.loc[0, "n_priority_this_inspection"] == 1
+    assert out.loc[0, "n_core_this_inspection"] == 1
+    # The later Pass reflects its own (clean) outcome — NOT the earlier Fail.
+    assert out.loc[1, "was_fail"] == 0
+    assert out.loc[1, "n_priority_this_inspection"] == 0
+    assert out.loc[1, "n_core_this_inspection"] == 0
+    # And the prior_* columns still EXCLUDE the anchor (leak guard intact):
+    # the anchor's own Fail is not in its own prior_fails.
+    assert out.loc[0, "prior_fails"] == 0
+    assert out.loc[1, "prior_fails"] == 1
+
+
+# ---------------------------------------------------------------------------
 # Static features
 # ---------------------------------------------------------------------------
 
@@ -183,8 +219,7 @@ def test_priority_violation_counts_picked_up():
 def test_static_features_present_and_typed():
     df = _df(
         [
-            _minimal_row(facility_type="Bakery", risk="Risk 2 (Medium)",
-                         zip="60614"),
+            _minimal_row(facility_type="Bakery", risk="Risk 2 (Medium)", zip="60614"),
         ]
     )
     out = add_license_features(df)
@@ -200,7 +235,7 @@ def test_static_zip_cleans_decimals_and_short_codes():
     df = _df(
         [
             _minimal_row(zip="60614.0"),
-            _minimal_row(zip="606"),       # too short
+            _minimal_row(zip="606"),  # too short
             _minimal_row(zip=None),
         ]
     )
@@ -252,11 +287,9 @@ def test_build_features_drops_burnin_invalid_and_non_modelable():
     df = _df(
         [
             _minimal_row(license_id="L1", inspection_date="2018-06-01", is_burnin=True),
-            _minimal_row(license_id="0",  inspection_date="2019-06-01"),
-            _minimal_row(license_id="L1", inspection_date="2019-07-01",
-                         results="Out of Business"),
-            _minimal_row(license_id="L1", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(license_id="0", inspection_date="2019-06-01"),
+            _minimal_row(license_id="L1", inspection_date="2019-07-01", results="Out of Business"),
+            _minimal_row(license_id="L1", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = build_features(df, complaints=None)
@@ -272,11 +305,14 @@ def test_build_features_uses_burnin_for_priors_before_dropping():
     """
     df = _df(
         [
-            _minimal_row(license_id="L1", inspection_date="2018-06-01",
-                         results="Fail", is_burnin=True,
-                         is_fail_or_priority=True),
-            _minimal_row(license_id="L1", inspection_date="2019-08-01",
-                         results="Pass"),
+            _minimal_row(
+                license_id="L1",
+                inspection_date="2018-06-01",
+                results="Fail",
+                is_burnin=True,
+                is_fail_or_priority=True,
+            ),
+            _minimal_row(license_id="L1", inspection_date="2019-08-01", results="Pass"),
         ]
     )
     out = build_features(df, complaints=None)
@@ -310,13 +346,13 @@ def test_complaint_features_count_recent_events_within_radius():
     )
     complaints = pd.DataFrame(
         {
-            "latitude":   [41.9000, 41.9000, 41.9000, 41.9000],
-            "longitude":  [-87.6500, -87.6500, -87.6500, -87.6500],
+            "latitude": [41.9000, 41.9000, 41.9000, 41.9000],
+            "longitude": [-87.6500, -87.6500, -87.6500, -87.6500],
             "sr_type": [
                 "Rodent Baiting/Rat Complaint",  # 30 d prior — should count
                 "Rodent Baiting/Rat Complaint",  # 95 d prior — outside 90d window
                 "Rodent Baiting/Rat Complaint",  # 30 d prior, but at a FAR coord
-                "Sanitation Code Violation",     # 30 d prior — counts for sanitation
+                "Sanitation Code Violation",  # 30 d prior — counts for sanitation
             ],
             "created_date": pd.to_datetime(
                 ["2020-05-02", "2020-02-26", "2020-05-02", "2020-05-02"]
@@ -383,3 +419,242 @@ def test_complaint_features_respects_radius():
     )
     out = add_complaint_features(inspections, complaints)
     assert out.loc[0, "n_311_rodent_300m_90d"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Address-exact 311 features (venue-level: complaints at the EXACT address,
+# not a radius). The same leak guard as the radius counts — strictly before
+# the anchor day — applies here too.
+# ---------------------------------------------------------------------------
+
+
+def test_address_exact_counts_match_normalized_address_only():
+    """Counts key on the normalised street address, not a radius. Case and
+    whitespace differences still match; a different address, a same-day filing,
+    and an out-of-window filing must all be excluded."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_complaint_features,
+    )
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1",
+                inspection_date="2020-06-01",
+                address="100 W RANDOLPH ST ",  # upper + trailing space, as in the data
+            )
+        ]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": [
+                "100 W Randolph St",  # same address, mixed case -> counts
+                "100 W Randolph St",  # same address, ON anchor day -> excluded (leak)
+                "100 W Randolph St",  # same address, >365d prior -> outside window
+                "200 N State St",  # different address -> excluded
+            ],
+            "sr_type": ["Restaurant Complaint"] * 4,
+            "created_date": pd.to_datetime(
+                ["2020-03-01", "2020-06-01", "2019-01-01", "2020-03-01"]
+            ),
+        }
+    )
+    out = add_address_exact_complaint_features(inspections, complaints)
+    assert out.loc[0, "n_311_addr_restaurant_365d"] == 1
+    # Other complaint types stay at zero — type is not conflated.
+    assert out.loc[0, "n_311_addr_rodent_365d"] == 0
+    assert out.loc[0, "n_311_addr_sanitation_365d"] == 0
+
+
+def test_address_exact_recency_and_trend():
+    """Recency = days to the most recent prior complaint; trend is positive
+    when recent complaints outpace the venue's own yearly baseline. A venue
+    with no matched complaints gets NaN recency and 0 trend (not 0 days)."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_recency_features,
+    )
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2020-06-01", address="100 W RANDOLPH ST "
+            ),
+            _minimal_row(license_id="L2", inspection_date="2020-06-01", address="999 NOWHERE AVE "),
+        ]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": ["100 W Randolph St", "100 W Randolph St"],
+            "sr_type": ["Restaurant Complaint", "Sanitation Code Violation"],
+            # 17 d prior (recent window) and 152 d prior (older part of the year).
+            "created_date": pd.to_datetime(["2020-05-15", "2020-01-01"]),
+        }
+    )
+    out = add_address_exact_recency_features(inspections, complaints)
+    assert out.loc[0, "days_since_last_311_addr_complaint"] == 17
+    # 1 recent (<=90d) minus 1 older * (90/275) ~= +0.67 -> a rising spike.
+    assert out.loc[0, "trend_311_addr_complaint"] > 0
+    # No matched complaints: "never", not "yesterday".
+    assert pd.isna(out.loc[1, "days_since_last_311_addr_complaint"])
+    assert out.loc[1, "trend_311_addr_complaint"] == 0
+
+
+def test_address_exact_recency_excludes_anchor_day():
+    """A complaint filed ON the inspection day must not count — it would leak
+    the anchor (inspectors often file a 311 during the visit)."""
+    from foodsafety.features.complaint_features import (
+        add_address_exact_recency_features,
+    )
+
+    inspections = _df(
+        [_minimal_row(license_id="L1", inspection_date="2020-06-01", address="100 W RANDOLPH ST ")]
+    )
+    complaints = pd.DataFrame(
+        {
+            "street_address": ["100 W Randolph St"],
+            "sr_type": ["Restaurant Complaint"],
+            "created_date": pd.to_datetime(["2020-06-01"]),  # same day as anchor
+        }
+    )
+    out = add_address_exact_recency_features(inspections, complaints)
+    assert pd.isna(out.loc[0, "days_since_last_311_addr_complaint"])
+    assert out.loc[0, "trend_311_addr_complaint"] == 0
+
+
+def test_normalize_facility_type_collapses_vulnerable_families():
+    # Daycare family (many spellings) collapses to one bucket.
+    for raw in [
+        "Daycare Above and Under 2 Years",
+        "Daycare (2 - 6 Years)",
+        "DAYCARE",
+        "Day Care 1023",
+    ]:
+        assert normalize_facility_type(raw) == "Daycare"
+    # Adult / senior "daycare" is long-term care, NOT child Daycare (order matters).
+    for raw in ["ADULT DAYCARE", "SENIOR DAY CARE", "NURSING HOME", "Assisted Living Senior Care"]:
+        assert normalize_facility_type(raw) == "Long Term Care"
+    # Children's-services typos / "1023" prefixes collapse.
+    for raw in [
+        "Children's Services Facility",
+        "1023 CHILDERN'S SERVICES FACILITY",
+        "CHILDRENS SERVICES FACILITY",
+    ]:
+        assert normalize_facility_type(raw) == "Children's Services Facility"
+    # Child schools collapse; adult culinary schools do NOT become child "School".
+    assert normalize_facility_type("CHARTER SCHOOL") == "School"
+    assert normalize_facility_type("PRIVATE SCHOOL") == "School"
+    assert normalize_facility_type("COOKING SCHOOL") == "Culinary School"
+    assert normalize_facility_type("Culinary Arts School") == "Culinary School"
+    # An animal-shelter cafe is not a (human) Shelter.
+    assert normalize_facility_type("Animal Shelter Cafe Permit") != "Shelter"
+    assert normalize_facility_type("Shelter") == "Shelter"
+    # Casing-only duplicates merge via title-case for the long tail.
+    assert normalize_facility_type("TAVERN") == "Tavern"
+    assert normalize_facility_type("GAS STATION") == "Gas Station"
+    # Missing / blank → None. pd.NA is how missing arrives when the audit maps over
+    # a StringDtype column, so it must be caught too (not title-cased to "<Na>").
+    assert normalize_facility_type(None) is None
+    assert normalize_facility_type("   ") is None
+    assert normalize_facility_type(float("nan")) is None
+    assert normalize_facility_type(pd.NA) is None
+
+
+# ---------------------------------------------------------------------------
+# Block-face building permits / violations (add_building_features). Unwired
+# (failed the both-metrics gate under CV — see docs/experiments.md), but the
+# leak guard and block-face radius still need coverage like every feature.
+# ---------------------------------------------------------------------------
+
+
+def test_building_features_count_block_face_within_window():
+    """Violations at the anchor's coordinate, strictly before it, count for the
+    right window; a too-old one falls out of the 365d window but stays in 730d."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9000, longitude=-87.6500
+            )
+        ]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9000, 41.9000],
+            "longitude": [-87.6500, -87.6500],
+            # 90 d prior → in both windows; 500 d prior → only in 730d.
+            "violation_date": pd.to_datetime(["2022-03-03", "2021-01-17"]),
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert out.loc[0, "prior_bldg_violations_365d"] == 1
+    assert out.loc[0, "prior_bldg_violations_730d"] == 2
+    assert out.loc[0, "days_since_last_bldg_violation"] == 90
+
+
+def test_building_features_exclude_anchor_date():
+    """A building record dated ON the anchor day must NOT count (leak guard:
+    physical-plant records from the inspection day itself can't inform a label
+    window that starts after the anchor)."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9, longitude=-87.65
+            )
+        ]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9],
+            "longitude": [-87.65],
+            "violation_date": pd.to_datetime(["2022-06-01"]),  # same day as anchor
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert out.loc[0, "prior_bldg_violations_365d"] == 0
+    assert pd.isna(out.loc[0, "days_since_last_bldg_violation"])
+
+
+def test_building_features_respect_block_face_radius():
+    """A record ~1.5 km away (well past the ~30m block-face radius) must NOT
+    count — the whole point of the tight radius is to stay at the building."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [
+            _minimal_row(
+                license_id="L1", inspection_date="2022-06-01", latitude=41.9000, longitude=-87.6500
+            )
+        ]
+    )
+    permits = pd.DataFrame(
+        {
+            "latitude": [41.913],  # ~1.4 km north
+            "longitude": [-87.6500],
+            "issue_date": pd.to_datetime(["2022-03-03"]),
+        }
+    )
+    out = add_building_features(inspections, permits=permits, violations=None)
+    assert out.loc[0, "prior_bldg_permits_365d"] == 0
+
+
+def test_building_features_no_geo_anchor_is_na_not_zero():
+    """An anchor with missing lat/lon gets NA (signal not computable), never a
+    fabricated 0 — same contract as the 311 spatial features."""
+    from foodsafety.features.building_features import add_building_features
+
+    inspections = _df(
+        [_minimal_row(license_id="L1", inspection_date="2022-06-01", latitude=None, longitude=None)]
+    )
+    violations = pd.DataFrame(
+        {
+            "latitude": [41.9],
+            "longitude": [-87.65],
+            "violation_date": pd.to_datetime(["2022-03-03"]),
+        }
+    )
+    out = add_building_features(inspections, permits=None, violations=violations)
+    assert pd.isna(out.loc[0, "prior_bldg_violations_365d"])
+    assert pd.isna(out.loc[0, "days_since_last_bldg_violation"])

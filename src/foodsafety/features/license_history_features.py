@@ -60,11 +60,7 @@ def add_license_history_features(
     hist = hist.dropna(subset=["date_issued", license_col_historical])
 
     # First-issuance date per license — used for license_age_days.
-    first_issued = (
-        hist.groupby(license_col_historical)["date_issued"]
-        .min()
-        .rename("_first_issued")
-    )
+    first_issued = hist.groupby(license_col_historical)["date_issued"].min().rename("_first_issued")
 
     # We need history-row counts strictly BEFORE the anchor's inspection
     # date. Build a per-license sorted list of date_issued; for each anchor,
@@ -79,8 +75,8 @@ def add_license_history_features(
         right_index=True,
         how="left",
     )
-    out["license_age_days"] = (
-        (out["_inspection_date"] - out["_first_issued"]).dt.days.astype("Float32")
+    out["license_age_days"] = (out["_inspection_date"] - out["_first_issued"]).dt.days.astype(
+        "Float32"
     )
 
     # Per-license sorted issuance dates → vectorised searchsorted.
@@ -89,6 +85,7 @@ def add_license_history_features(
         .groupby(license_col_historical)["date_issued"]
         .apply(list)
     )
+
     # Map and count: how many issuances at this license have date_issued <
     # inspection_date? searchsorted with side='left' gives strict-less-than
     # count when applied to a sorted ascending array.
@@ -105,7 +102,7 @@ def add_license_history_features(
 
     out["license_n_history_rows"] = [
         _count_before(lic, d)
-        for lic, d in zip(out["_license_for_join"], out["_inspection_date"])
+        for lic, d in zip(out["_license_for_join"], out["_inspection_date"], strict=True)
     ]
     out["license_n_history_rows"] = out["license_n_history_rows"].astype("Int32")
 
