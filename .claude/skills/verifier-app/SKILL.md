@@ -91,15 +91,40 @@ Other routes worth a glance: `/` (map + list), `/how-it-works` (methodology).
 
 ## Put the screenshots in the PR (this repo is private)
 
-GitHub **cannot inline-render committed images in a private repo** — its image
-proxy fetches `raw.githubusercontent.com` unauthenticated and gets a 404, so
-`![](raw…)` embeds show as broken. To embed screenshots in a PR description:
+Capture **every state and viewport** the change affects (desktop + mobile 390px,
+each before/after state) — not one hand-picked frame. Then get them into the PR
+description. This repo is private, which constrains how:
 
-- **Human / web UI (the only inline path):** open the PR, edit the description,
-  and **drag the PNG files in**. GitHub uploads them to its attachment store
+GitHub **cannot inline-render committed images in a private repo** — its image
+proxy fetches `raw.githubusercontent.com` / `…/blob/…?raw=true` unauthenticated
+and gets a 404, so `![](…)` embeds show as broken. Two ways to attach:
+
+- **Inline (human / web UI only):** open the PR, edit the description, and
+  **drag the PNG files in**. GitHub uploads them to its attachment store
   (`user-attachments`) and they render inline for everyone with repo access.
-- **Headless / agent (can't drag-drop):** save the PNGs to a known path and ask
-  a human to drop them in. As a non-inline fallback, commit them under `design/`
-  and link to the GitHub **file view** (`…/blob/<sha>/design/…png`) — that works
-  for logged-in reviewers, but is a click, not an inline image. Do **not** rely
-  on `raw.githubusercontent.com` links; they 404 for the renderer.
+  This is the ONLY path that produces inline images; an agent with just the
+  OAuth token cannot reach that store.
+
+- **Committed file-view links (the agent / headless path — the team default,
+  e.g. PRs #19, #27, #29, #31, #32):** commit the PNGs into the repo and
+  reference them as clickable **file-view** links. Steps:
+  1. Open the PR first so you have its number `N` (a draft PR is fine — create
+     it, then finalize the body once the screenshots are committed).
+  2. Commit the PNGs under **`design/pr-<N>/`** (e.g. `design/pr-49/`) — this is
+     the folder convention. `design/` is checked in (not gitignored) and is the
+     documented home for screenshots; a feature-name folder also exists in
+     history but **prefer `design/pr-<N>/`**.
+  3. In the PR body, link each one via the GitHub **file view**, pinned to the
+     screenshot commit's SHA so the link is stable:
+     `https://github.com/<owner>/<repo>/blob/<sha>/design/pr-<N>/<name>.png`.
+     Use a markdown **link** `- [Collapsed — desktop](…blob/<sha>/…png)`, NOT an
+     `![]()` embed (the embed renders broken in a private repo).
+  4. Add one line so reviewers know why they're links, not inline images, and
+     how to upgrade them: *"GitHub can't inline raw images in a private repo, so
+     these are clickable file-view links. For inline rendering, drag the PNGs
+     from `design/pr-<N>/` into this description."*
+
+  The current repo is `food-safety-intelligence/food-safety-intelligence` (the
+  old `junxu315/…` URL redirects there) — use it for both the API and the blob
+  links. `gh pr edit` is broken here; set the body via the REST API
+  (`PATCH /repos/<owner>/<repo>/pulls/<N>` with a JSON `{"body": …}`).
