@@ -8,12 +8,25 @@ skipped it to keep the main payload small.
 This script writes a sidecar file `app/public/data/inspection_history.json`
 keyed by `license_id` so the web app can read it server-side at request time.
 
+It ALSO writes the full violation-comment text, sharded into
+`app/public/data/comments/<xx>.json` (xx = first two md5 hex chars of the
+license_id). The detail-page timeline shows only a 100-char `headline` inline;
+clicking a row expands to the full comments, which live in these shards. The
+full text can't ride in `inspection_history.json` — across all establishments
+it's ~277MB, over GitHub's 100MB file limit and too large to hold in one blob.
+Sharding keeps each file ~1MB so the static build only reads the handful of
+shards covering its pre-generated pages, and the comments dir is gitignored
+(S3 is the source of truth at build time). The shard's per-license array is
+index-aligned to that license's `inspection_history` events — both are built
+in the same pass below from the same sorted frame, so event[i] ↔ comments[i].
+
 Run with the project's Python (anaconda or uv):
     /Users/jun/anaconda3/bin/python scripts/export_inspection_history.py
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -22,12 +35,28 @@ import pandas as pd
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSPECTIONS_PATH = REPO_ROOT / "data" / "processed" / "inspections_labeled.parquet"
 OUT_PATH = REPO_ROOT / "app" / "public" / "data" / "inspection_history.json"
+COMMENTS_DIR = REPO_ROOT / "app" / "public" / "data" / "comments"
 
 # Distribution of events per restaurant: p99 = 30, max = 799. Capping at the
 # 30 most-recent inspections covers 99.6% of all events while bounding the
 # JSON payload (with no cap the full export is ~54MB).
 MAX_EVENTS_PER_LICENSE = 30
 HEADLINE_MAX_CHARS = 100
+
+
+def _shard_of(license_id: str) -> str:
+    # md5 first two hex chars → 256 even buckets. Must match the web app's
+    # shard() in scores-server.ts so it reads the right file at build time.
+    return hashlib.md5(license_id.encode()).hexdigest()[:2]
+
+
+def _comments(v: object) -> str:
+    # Full violation text for one inspection: the pipe-delimited entries
+    # rejoined as newlines so the UI can list each violation on its own line.
+    # Each entry is "<code>. <NAME> - Comments: <free text>".
+    if pd.isna(v):
+        return ""
+    return "\n".join(p.strip() for p in str(v).split("|") if p.strip())
 
 
 def main() -> None:
@@ -59,8 +88,14 @@ def main() -> None:
 
     df["headline"] = df["violations"].apply(_headline) if "violations" in df.columns else ""
 
+    df["comments"] = df["violations"].apply(_comments) if "violations" in df.columns else ""
+
     # Group into {license_id: [events]}, capped to most-recent N per license.
+    # In the same pass, accumulate the per-license comment arrays into shards.
+    # `comments[i]` lines up with `events[i]` because both come from `group`,
+    # which is the same sorted/capped slice.
     history: dict[str, list[dict]] = {}
+    shards: dict[str, dict[str, list[str]]] = {}
     truncated_licenses = 0
     for license_id, group in df.groupby("license_id", sort=False):
         if len(group) > MAX_EVENTS_PER_LICENSE:
@@ -76,6 +111,7 @@ def main() -> None:
             for _, row in group.iterrows()
         ]
         history[license_id] = events
+        shards.setdefault(_shard_of(license_id), {})[license_id] = list(group["comments"])
     print(
         f"  truncated to {MAX_EVENTS_PER_LICENSE} most-recent events for "
         f"{truncated_licenses:,} restaurants (rest are full history)"
@@ -91,6 +127,20 @@ def main() -> None:
 
     size_mb = OUT_PATH.stat().st_size / 1024 / 1024
     print(f"  {size_mb:.1f} MB")
+
+    # Comment shards. Gitignored + uploaded to S3 (web-app-data/comments/);
+    # the static build reads only the shards covering its pre-generated pages.
+    COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    total_bytes = 0
+    for shard, by_license in shards.items():
+        path = COMMENTS_DIR / f"{shard}.json"
+        with open(path, "w") as f:
+            json.dump(by_license, f, separators=(",", ":"))
+        total_bytes += path.stat().st_size
+    print(
+        f"writing {COMMENTS_DIR}/<xx>.json: {len(shards)} shards, "
+        f"{total_bytes / 1024 / 1024:.1f} MB total"
+    )
 
 
 if __name__ == "__main__":
