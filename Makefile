@@ -21,7 +21,7 @@ help:
 	@echo "Python pipeline (working today):"
 	@echo "  data       Pull raw SODA datasets → RAW_DIR"
 	@echo "  features   Build the feature set → processed/features/<name>.parquet"
-	@echo "  retrain    Retrain baseline w/ sigmoid calibration → scores.json"
+	@echo "  retrain    Retrain served model (XGBoost) w/ sigmoid calibration → scores.json"
 	@echo "  history    Export inspections_labeled.parquet → inspection_history.json"
 	@echo "  publish    Upload the built deploy artifacts to S3 (scripts/publish.py)"
 	@echo "  normalize  Rewrite notebooks so nbformat cell IDs are persisted"
@@ -43,7 +43,7 @@ features:
 	PYTHONPATH=src $(PYTHON) scripts/build_features.py
 
 retrain:
-	PYTHONPATH=src $(PYTHON) scripts/retrain_baseline_sigmoid.py
+	PYTHONPATH=src $(PYTHON) scripts/retrain_xgb_sigmoid.py
 
 history:
 	PYTHONPATH=src $(PYTHON) scripts/export_inspection_history.py
