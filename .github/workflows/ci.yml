@@ -170,3 +170,39 @@ jobs:
             curl -sf -o /dev/null http://localhost:3000/ && break || sleep 1
           done
           node e2e/smoke.mjs
+
+  agent:
+    name: Agent (deterministic checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen --extra dev
+
+      # Each agent tool dir is its own mini-package loaded via sys.path, and they
+      # share a `handler` module name — so one combined pytest run collides on the
+      # duplicate module names. Run each tool's tests as a SEPARATE invocation.
+      - name: Agent tool tests
+        run: |
+          for d in agents/tools/*/; do
+            if ls "$d"test_*.py >/dev/null 2>&1; then
+              echo "== $d ==" && uv run pytest "$d" -q
+            fi
+          done
+
+      # Deterministic eval gates only: the checker self-test, faithfulness vs the
+      # committed scores.json, and the citation allow-list. No Bedrock — the
+      # --judge guardrail suite stays a manual, paid run via the eval-agent skill
+      # — and no network (--links is opt-in; it hits external public-health sites).
+      - name: Agent eval (deterministic gates)
+        run: |
+          uv run python agents/eval/run_eval.py --self-test
+          uv run python agents/eval/run_eval.py --faithfulness
+          uv run python agents/eval/run_eval.py --citations
