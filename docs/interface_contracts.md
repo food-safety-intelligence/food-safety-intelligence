@@ -265,7 +265,7 @@ violation text. Only added if Phase 6 has slack.
 
 This tracks **contract version bumps** only. The full experiment history — including
 the experiments that came up flat and were reverted — is in
-[`docs/experiments.md`](experiments.md). Impact below is on the **served** basis (now the
+[`docs/model-experiments.md`](model-experiments.md). Impact below is on the **served** basis (now the
 depth-3 monotone **XGBoost** + sigmoid, review-time-filtered — see `0009`; rows through v36
 were measured when the served model was LogReg + sigmoid, so their deltas are against that
 baseline) unless noted; exact run metrics live in `reports/metrics/`.

@@ -67,7 +67,7 @@ METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 
-# Published v36 honest-test baseline (docs/experiments.md) — the gate reference.
+# Published v36 honest-test baseline (docs/model-experiments.md) — the gate reference.
 V36_BASELINE = {"logreg": (0.332, 0.370), "xgb": (0.338, 0.376)}
 VULNERABLE_GROUPS = {
     "Children's Services Facility",

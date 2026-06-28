@@ -92,7 +92,7 @@ def build_features(
     # Spatial 311 counts (BallTree 300m). Skipped if no complaints provided.
     # Venue-level + neighborhood 311 angles (address-exact counts/recency/trend,
     # ring excess) were tested in Run 2 and dropped — all flat vs prior_* history
-    # (see complaint_features.py + docs/experiments.md). The functions remain in
+    # (see complaint_features.py + docs/model-experiments.md). The functions remain in
     # complaint_features.py, just not wired into the contract.
     if complaints is not None:
         df = add_complaint_features(df, complaints)

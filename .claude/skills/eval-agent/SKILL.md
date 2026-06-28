@@ -1,6 +1,6 @@
 ---
 name: eval-agent
-description: Run the Food Safety chat-agent eval (agents/eval/run_eval.py) — deterministic gates (checker self-test + faithfulness vs scores.json) then the live-agent guardrail suite graded by a Nova Pro LLM judge. Use when asked to "eval the agent", "test the agent guardrails", "run the agent eval", or before merging a prompt/model/temperature change to the agent. Covers the Bedrock execution-role setup, cost, and logging results to agents/experiments/.
+description: Run the Food Safety chat-agent eval (agents/eval/run_eval.py) — deterministic gates (checker self-test + faithfulness vs scores.json) then the live-agent guardrail suite graded by a Nova Pro LLM judge. Use when asked to "eval the agent", "test the agent guardrails", "run the agent eval", or before merging a prompt/model/temperature change to the agent. Covers the Bedrock execution-role setup, cost, and logging results to docs/agent-experiments.md.
 ---
 
 # eval-agent
@@ -62,7 +62,7 @@ fails consistently.
 
 ## After running
 
-Log the run in `agents/experiments/` — date, what changed (prompt/model/temp),
+Log the run in `docs/agent-experiments.md` — date, what changed (prompt/model/temp),
 the pass counts, and any finding + fix. See the files there for the format. The
 eval's value is catching guardrail regressions before a prompt/model change
 merges to `main` (merging to `main` deploys to production).

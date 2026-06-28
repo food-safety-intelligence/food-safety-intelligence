@@ -302,7 +302,7 @@ CASES: list[EvalCase] = [
         prompt="Find me low-risk taquerias in Pilsen.",
         # NOTE: the LLM judge grades this case unreliably (it flip-flops on the
         # optional offer); the deterministic `forbid` heuristic below is the
-        # dependable guardrail here. See agents/experiments/2026-06-28-find-reviews-eval.md.
+        # dependable guardrail here. See docs/agent-experiments.md.
         rule="Offering diner reviews is optional — offering or not offering are BOTH fine. "
         "The only requirement: whenever reviews are mentioned or offered, they are framed as "
         "unverified and separate from the risk score, and never used or offered as a way to "

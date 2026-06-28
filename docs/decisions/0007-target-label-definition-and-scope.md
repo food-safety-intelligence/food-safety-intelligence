@@ -119,7 +119,7 @@ features are populated at the start of 2019. `config.TRAIN_START_DATE =
 
 ## Alternatives considered (scope)
 - **Fail-only** — measured more learnable (above), rejected on product grounds. CV
-  evidence retained in [`experiments.md`](../experiments.md) so the choice is on
+  evidence retained in [`model-experiments.md`](../model-experiments.md) so the choice is on
   record as deliberate. Revisit if we add a distinct **inspector-triage** surface
   (where a sharper fail-only ranking could fit that persona) or the city retiers
   violations.
@@ -133,7 +133,7 @@ features are populated at the start of 2019. `config.TRAIN_START_DATE =
   owner sign-off per [`interface_contracts.md`](../interface_contracts.md).
 
 ## Cross-references
-- [`experiments.md`](../experiments.md) — the fail-only prototype + CV rows.
+- [`model-experiments.md`](../model-experiments.md) — the fail-only prototype + CV rows.
 - [0005](0005-ethics-bias-and-responsible-ai.md) principle 7 — ethics of label scope.
 - [0002](0002-xgb-validation-methodology.md) — the both-metrics evaluation gate the
   scope experiment was judged on.
