@@ -292,21 +292,28 @@ A stub result carries a `stub_note` so the agent can flag it, for example:
 
 ---
 
-## Deploying to AgentCore (Phase 2b)
+## Deploying to AgentCore
 
-When ready to deploy:
+The agent runs as a single AgentCore **CodeZip** runtime, defined by
+`agentcore-deploy/agentcore/agentcore.json` (entrypoint `entrypoint.py`,
+codeLocation `agents/`) and shipped by the CDK in `agentcore-deploy/agentcore/cdk`.
+Deploy with the wrapper script (defaults: region `us-west-2`, the deploy account):
 
 ```bash
-# Install AgentCore CLI
-pip install amazon-bedrock-agentcore-cli
-
-# Set Lambda ARNs in harness.yaml (replace ${LAMBDA_ARN_*} placeholders)
-# Then deploy
-agentcore deploy --config agents/harness.yaml
+# from the repo root, with AWS creds for the deploy account
+./scripts/deploy_aws.sh [region] [account-id]
 ```
 
-The local `run_local.py` and the deployed harness use identical tool logic —
-the same four handler.py files run both locally (via Strands) and on Lambda.
+This zips `agents/` (entrypoint + the four `tools/` handlers + `system_prompt.txt`),
+deploys/updates the `foodsafetyagent` runtime, and points the
+`food-safety-agent-proxy` Lambda at it — the request path is CloudFront `/api/agent`
+→ ALB → that Lambda → the runtime. The runtime warms the precomputed `scores.json`
+from S3 at startup and reads it for scoring; it never calls the model for a score
+(the batch-score-to-JSON contract). `run_local.py` runs the same four `handler.py`
+files locally via Strands.
+
+`harness.yaml` describes a different, per-tool-Lambda harness and is **not** the
+wired deploy path.
 
 ---
 

@@ -11,12 +11,16 @@
     {
       "name": "foodsafetyagent",
       "build": "CodeZip",
-      "entrypoint": "main.py",
-      "codeLocation": "app/foodsafetyagent/",
+      "entrypoint": "entrypoint.py",
+      "codeLocation": "../agents/",
       "runtimeVersion": "PYTHON_3_14",
       "networkMode": "PUBLIC",
       "protocol": "HTTP",
       "envVars": [
+        {
+          "name": "AWS_REGION",
+          "value": "us-east-1"
+        },
         {
           "name": "DATA_BUCKET_REGION",
           "value": "us-east-1"
