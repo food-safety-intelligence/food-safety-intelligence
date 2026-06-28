@@ -252,6 +252,16 @@ source of truth.
   imports-after-markdown are normal); only the package, scripts, tests, and agents
   are. Suppress a genuinely-deliberate finding with a scoped `# noqa: <CODE>`
   (e.g. an import that must follow `sys.path` setup), not a bare `# noqa`.
+- **Coverage is measured, not gated.** CI runs `pytest --cov` and posts a per-PR
+  coverage comment (overall + per-file diff coverage). Two coverage checks run
+  **non-blocking** (`continue-on-error`): an 80% total floor and 85% on the lines
+  a PR changes (`diff-cover`). They're a regression backstop set below the current
+  level — a dip annotates, it doesn't block the merge. Tests themselves (the
+  `pytest` step) are the real gate and must pass. When you add code, add tests:
+  new untested lines show up as low diff coverage on your PR. Exclude only
+  genuinely-untestable code (e.g. a stdout-printing helper) via
+  `[tool.coverage] omit`, not inline `# pragma: no cover` (the patch-coverage
+  report counts a pragma'd line as an uncovered change).
 
 ### TypeScript (`app/`)
 
