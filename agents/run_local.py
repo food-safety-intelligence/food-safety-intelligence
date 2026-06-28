@@ -166,6 +166,24 @@ SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else "
 # ---------------------------------------------------------------------------
 
 
+def _guardrail_kwargs() -> dict[str, str]:
+    """Attach a Bedrock Guardrail to the model when one is configured.
+
+    Enforces denied topics + a contextual-grounding check at the platform layer,
+    so off-topic or low-grounding (fabricated) responses are blocked regardless
+    of whether the model follows the prompt. A guardrail only activates when
+    BOTH an id and a version are set, so we pass them only when present; absent
+    (local dev / tests) the agent runs with no guardrail. Create the guardrail
+    out-of-band with ``agents/create_guardrail.py`` and wire the printed id and
+    version through these env vars.
+    """
+    gid = os.environ.get("FSI_BEDROCK_GUARDRAIL_ID")
+    gver = os.environ.get("FSI_BEDROCK_GUARDRAIL_VERSION")
+    if gid and gver:
+        return {"guardrail_id": gid, "guardrail_version": gver, "guardrail_trace": "enabled"}
+    return {}
+
+
 def build_agent() -> Agent:
     region = os.environ.get("AWS_REGION", "us-east-1")
     # Nova 2 Lite — cost-effective AWS-native model with tool-use support.
@@ -179,6 +197,7 @@ def build_agent() -> Agent:
         # creative one. Sampling variance only adds room for fabricated
         # scores or names.
         temperature=0.2,
+        **_guardrail_kwargs(),
     )
     return Agent(
         model=model,
