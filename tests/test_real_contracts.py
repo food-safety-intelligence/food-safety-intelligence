@@ -181,7 +181,7 @@ SCORES_REQUIRED = {
     "risk_score",
     "risk_tier",
     "top_drivers",
-    "trend_slope_90d",
+    "trend_slope",
 }
 
 VALID_TIERS = {"Low", "Moderate", "Elevated", "High"}

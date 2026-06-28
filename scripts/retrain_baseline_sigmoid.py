@@ -265,7 +265,7 @@ def main() -> None:
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.4.0",
+        schema_version="0.5.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
     )

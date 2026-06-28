@@ -39,7 +39,12 @@ from foodsafety.config import (
 )
 from foodsafety.explain.shap_drivers import tree_contributions
 from foodsafety.io import storage
-from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
+from foodsafety.models.baseline import (
+    ALL_FEATURES,
+    CURRENT_OUTCOME_FEATURES,
+    FORECAST_FEATURES,
+    LABEL_COL,
+)
 from foodsafety.models.evaluate import evaluate
 from foodsafety.models.xgb import (
     build_production_xgb,
@@ -61,6 +66,9 @@ REPORTS_METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 MODEL_VERSION = "xgb_monotone_sigmoid"
+# Forecast-only model (Model 2) — same config, drops the current-outcome
+# features; used ONLY to compute the forward-looking trend slope (DR 0011).
+FORECAST_MODEL_VERSION = "xgb_forecast_sigmoid"
 
 
 class XGBServeModel:
@@ -178,6 +186,31 @@ def main() -> None:
         json.dump(report, f, indent=2)
     print(f"Saved metrics report → {report_path}")
 
+    # --- Forecast-only model (Model 2) — the forward-looking trend basis ----
+    # Same production recipe (depth-3, monotone, Platt-on-margin) but trained
+    # WITHOUT the current inspection's own outcome, so its per-inspection score
+    # does not encode today's verdict / the mandated fail->re-inspection swing.
+    # Used ONLY to compute trend_slope (DR 0011); risk_score stays Model 1.
+    print("Fitting forecast-only model (Model 2) for the trend basis")
+    Xtr_f = X_train.drop(columns=CURRENT_OUTCOME_FEATURES)
+    Xval_f = X_val.drop(columns=CURRENT_OUTCOME_FEATURES)
+    xgb_fore = build_production_xgb(scale_pos_weight=spw, features=FORECAST_FEATURES)
+    xgb_fore.fit(Xtr_f, y_train, verbose=False)
+    margin_val_f = xgb_fore.predict(Xval_f, output_margin=True)
+    platt_f = LogisticRegression(C=1e10, solver="lbfgs").fit(margin_val_f.reshape(-1, 1), y_val)
+    coef_f, inter_f = float(platt_f.coef_[0, 0]), float(platt_f.intercept_[0])
+    forecast = XGBServeModel(xgb_fore, cat_dtypes, coef_f, inter_f)
+    forecast_model_path = storage.join(str(MODELS_DIR), f"{FORECAST_MODEL_VERSION}_{run_id}.joblib")
+    storage.dump_joblib(forecast, forecast_model_path)
+    print(f"Saved forecast model → {forecast_model_path}")
+
+    # Score EVERY inspection with Model 2 — these are the trend trajectory points
+    # (history is scored, not just the latest anchor). Calibrated to a probability.
+    X_full_f = prepare_xgb_features(features[ALL_FEATURES], categorical_dtypes=cat_dtypes).drop(
+        columns=CURRENT_OUTCOME_FEATURES
+    )
+    forecast_scores = expit(coef_f * xgb_fore.predict(X_full_f, output_margin=True) + inter_f)
+
     # --- Score every restaurant + export JSON -----------------------------
     print("Building scores table (latest inspection per license; TreeSHAP drivers)")
     scores = build_scores_table(
@@ -186,6 +219,7 @@ def main() -> None:
         ALL_FEATURES,
         n_drivers=5,
         contributions_fn=lambda X: served.contributions(X)[0],
+        trend_scores=forecast_scores,
     )
     storage.write_parquet(scores, SCORES_PARQUET_PATH)
     print(f"Wrote {SCORES_PARQUET_PATH}: {len(scores):,} restaurants")
@@ -200,7 +234,7 @@ def main() -> None:
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.4.0",
+        schema_version="0.5.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
     )
