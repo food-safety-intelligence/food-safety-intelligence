@@ -1,7 +1,8 @@
 # Food Safety Agent — Local Run Guide
 
 Run the full NLP → restaurant safety pipeline on your laptop.
-No AgentCore deployment needed. SageMaker is stubbed by default.
+No AgentCore deployment needed. The agent serves precomputed scores from
+`scores.json`; the SageMaker stub is a dev-only scaffold, not the scoring path.
 
 ---
 
@@ -11,7 +12,7 @@ No AgentCore deployment needed. SageMaker is stubbed by default.
 Your query
   → Strands Agent (Nova 2 Lite via Bedrock)
       → find_restaurants   — Overpass/OSM, free, no key
-      → get_safety_score   — XGBoost stub (or real SageMaker when ready)
+      → get_safety_score   — precomputed batch scores from scores.json
       → explain_restaurant — scores.json + inspection_history.json
   → Plain-English ranked response
 ```
@@ -90,6 +91,7 @@ The agent calls the tools in order: `find_restaurants` → `get_safety_score` �
   | `matched_scores_json` | `bool` | `true` only for a batch-run match |
   | `status` | `str` | `"scored"` \| `"no_inspection_record"` *(new: #58)* |
   | `stub` | `bool` | `true` for the `-1.0` mock-data sentinel in `scores.json` |
+  | `stub_note` | `str \| null` | human-readable note explaining a preliminary/stub score; `null` for a real published score |
   | `license_id`, `percentile_rank`, `trend`, `neighborhood` | `… \| null` | from the matched record; `null` when no record |
 
   Matched venue → published batch score/tier/drivers directly. Unmatched venue →
@@ -133,12 +135,17 @@ rules (no yes/no verdict, no invented score, scope refusal, graceful failure).
 Run on demand; it needs Bedrock credentials, so it is excluded from the default
 CI run.
 
-### Note on the sections below
+### Note on the SageMaker stub
 
-The "Switching from stub to real SageMaker" and "What the stub scores look like"
-sections are **superseded by [0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)**
-once #58 lands: the agent does not score at request time, so `sagemaker_stub.py`
-becomes orphaned. They are kept until then and should be pruned with that merge.
+`get_safety_score` does **not** score at request time — it serves the precomputed
+batch scores in `scores.json` (see
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
+`sagemaker_stub.py` is a dev-only scaffold, not the scoring path. Several parts of
+this guide describe that scaffold for completeness — the pipeline diagram note,
+the `SAGEMAKER_*` environment variables, the "Run the stub unit tests" command,
+and the two stub sections near the end — and none of them is the live scoring
+mechanism. Widening score coverage is a batch/data task (re-run the Python
+pipeline so new venues land in `scores.json`), never a request-time endpoint call.
 
 ---
 
@@ -218,6 +225,9 @@ python agents/run_local.py "pizza wicker park low risk open now"
 
 ### Run the stub unit tests (no AWS needed)
 
+These cover the dev-only stub scaffold, not the scoring path (which serves
+precomputed `scores.json`).
+
 ```bash
 python -m pytest agents/tools/get_safety_score/test_sagemaker_stub.py -v
 ```
@@ -229,50 +239,41 @@ python -m pytest agents/tools/get_safety_score/test_sagemaker_stub.py -v
 | Variable | Default | Description |
 |---|---|---|
 | `AWS_REGION` | `us-east-1` | Bedrock region |
-| `SAGEMAKER_USE_STUB` | `true` | `false` to call real SageMaker endpoint |
-| `SAGEMAKER_ENDPOINT` | — | Required when `SAGEMAKER_USE_STUB=false` |
-| `SCORES_JSON_PATH` | `app/public/data/scores.json` | Pre-computed scores file |
+| `SCORES_JSON_PATH` | `app/public/data/scores.json` | Precomputed batch scores — the scoring path |
 | `HISTORY_JSON_PATH` | `app/public/data/inspection_history.json` | Inspection history file |
+| `SAGEMAKER_USE_STUB` | `true` | Dev-only stub-scaffold toggle; not the scoring path (scores come from `scores.json`) |
+| `SAGEMAKER_ENDPOINT` | — | Dev-only; unused by the precomputed-score path |
 
 Set them inline for a one-off test:
 ```bash
-SAGEMAKER_USE_STUB=false \
-SAGEMAKER_ENDPOINT=food-safety-xgboost-prod \
+SCORES_JSON_PATH=/path/to/scores.json \
 python agents/run_local.py "ramen near wicker park"
 ```
 
 ---
 
-## Switching from stub to real SageMaker
+## The SageMaker stub (dev-only scaffold)
 
-The stub and real paths live in `agents/tools/get_safety_score/sagemaker_stub.py`.
-The switch is one env var — no code change:
+The stub lives in `agents/tools/get_safety_score/sagemaker_stub.py`. It is a
+development scaffold only — **not** the scoring path. `get_safety_score` serves
+the precomputed batch scores in `scores.json`, and the agent never calls a model
+at request time (see
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
 
-```bash
-# 1. Deploy your XGBoost model to a SageMaker real-time endpoint
-#    (endpoint must accept CSV, 26 features in FEATURE_ORDER, return JSON)
-
-# 2. Set env vars
-export SAGEMAKER_USE_STUB=false
-export SAGEMAKER_ENDPOINT=food-safety-xgboost-prod
-
-# 3. Run — identical command, real model scores
-python agents/run_local.py "safe sushi near Wicker Park"
-```
-
-The response will include `"stub": false` in the score results.
+To widen score coverage, re-run the Python batch pipeline so the new venues land
+in `scores.json` — there is no live endpoint to switch on.
 
 ---
 
 ## What the stub scores look like
 
-Stub scores are derived from `md5(name + address)` → `Beta(1.5, 8)` distribution.
-This matches the real model's ~10% High-risk positive rate. The same restaurant
-always gets the same score across runs.
+These describe the dev-only stub scaffold, not the precomputed scores the agent
+serves. Stub scores are derived from `md5(name + address)` → `Beta(1.5, 8)`
+distribution, which roughly matches the batch model's ~10% High-risk positive
+rate; the same restaurant always gets the same stub score across runs.
 
-The agent will include a note like:
-> "Note: scores are preliminary estimates — the SageMaker endpoint is not yet
-> configured."
+A stub result carries a `stub_note` so the agent can flag it, for example:
+> "Score from stub — SageMaker endpoint not yet configured."
 
 ---
 
