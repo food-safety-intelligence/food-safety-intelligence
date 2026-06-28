@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "foodsafetyagent"
+version = "0.1.0"
+description = "AgentCore Runtime — Food Safety Intelligence agent (canonical entrypoint.py + tools/)"
+readme = "README.md"
+requires-python = ">=3.10"
+# Runtime dependencies for the AgentCore CodeZip build. entrypoint.py imports
+# boto3 (S3 warm-up), bedrock-agentcore (the runtime app), and strands-agents
+# (the Agent + Bedrock model). aws-opentelemetry-distro + botocore[crt] mirror
+# the deps the previous app/foodsafetyagent package shipped and deployed with.
+dependencies = [
+    "aws-opentelemetry-distro",
+    "bedrock-agentcore >= 1.9.1",
+    "boto3 >= 1.34",
+    "botocore[crt] >= 1.35.0",
+    "strands-agents >= 1.13.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
