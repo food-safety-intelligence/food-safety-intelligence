@@ -68,7 +68,7 @@ export function ScoreCard({
   const TrendIcon = trend.Icon;
 
   // Trend-chart points: the most-recent inspections that carry a forecast score
-  // (administrative inspections have none), oldest -> newest. See decision 0010.
+  // (administrative inspections have none), oldest -> newest. See decision 0011.
   const TREND_POINTS = 5;
   const trendPoints = history
     .filter((e): e is InspectionEvent & { score: number } => e.score != null)

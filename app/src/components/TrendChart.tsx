@@ -8,7 +8,7 @@ import { trendDirection } from "@/lib/scores";
  * (predictions — not inspection pass/fail results) at their real inspection dates:
  * the actual trajectory, not a synthetic line. Hovering or focusing a point shows
  * its date + predicted risk. A dashed line marks the citywide median for context.
- * See decision 0010. Client component for the hover tooltip.
+ * See decision 0011. Client component for the hover tooltip.
  */
 
 const COLOR_BY_DIRECTION = {

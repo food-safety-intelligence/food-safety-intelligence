@@ -93,7 +93,7 @@ export interface InspectionEvent {
   /**
    * Forecast-only model score (calibrated probability) for this inspection — the
    * trend-chart trajectory point. Null for inspections that predate the feature
-   * window (older / burn-in). See decision 0010.
+   * window (older / burn-in). See decision 0011.
    */
   score?: number | null;
   /**
@@ -250,7 +250,7 @@ export type TrendDirection = "improving" | "stable" | "worsening";
 
 /**
  * Minimum |slope| (forecast-score per day) to call a trend non-stable. Tuned to
- * Model 2's last-K-visits scale (decision 0010): the production slopes are tiny
+ * Model 2's last-K-visits scale (decision 0011): the production slopes are tiny
  * (most within ±0.001), and 0.0003 lines "worsening" up with the steeply-rising
  * watch-list threshold from the experiment. Below it the trajectory reads Stable.
  */
