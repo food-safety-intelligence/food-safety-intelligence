@@ -67,7 +67,7 @@ TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 MODEL_VERSION = "xgb_monotone_sigmoid"
 # Forecast-only model (Model 2) — same config, drops the current-outcome
-# features; used ONLY to compute the de-confounded trend slope (DR 0011).
+# features; used ONLY to compute the forward-looking trend slope (DR 0011).
 FORECAST_MODEL_VERSION = "xgb_forecast_sigmoid"
 
 
@@ -186,7 +186,7 @@ def main() -> None:
         json.dump(report, f, indent=2)
     print(f"Saved metrics report → {report_path}")
 
-    # --- Forecast-only model (Model 2) — the de-confounded trend basis -----
+    # --- Forecast-only model (Model 2) — the forward-looking trend basis ----
     # Same production recipe (depth-3, monotone, Platt-on-margin) but trained
     # WITHOUT the current inspection's own outcome, so its per-inspection score
     # does not encode today's verdict / the mandated fail->re-inspection swing.

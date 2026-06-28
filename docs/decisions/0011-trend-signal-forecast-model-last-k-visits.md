@@ -40,7 +40,7 @@ license's latest inspection. It fails two ways, both user-facing today:
 - **Coverage ~30%.** It needs ≥2 inspections inside a 90-day window, so it is null
   for ~70% of licenses; the UI then shows "Insufficient history" / "Stable". Most
   "Stable" really means "unknown".
-- **Re-inspection confound.** A Fail triggers a mandated ~30-day re-inspection that
+- **Re-inspection bounce.** A Fail triggers a mandated ~30-day re-inspection that
   usually passes. The production score (which sees the current outcome) swings
   high→low across that pair, so the slope reads "Improving" mechanically — an
   artifact of the inspection schedule, not the kitchen improving.
@@ -56,8 +56,9 @@ license's latest inspection. It fails two ways, both user-facing today:
 
 2. **Trend = last-K-visits slope of Model 2.** Replace the 90-day production-score
    slope with an OLS slope of Model 2's score over each license's **last K = 5
-   inspections** (≥2 points required). Window→visits fixes coverage; Model 2 fixes
-   the confound.
+   inspections** (≥2 points required). Window→visits fixes coverage; Model 2 makes
+   the trend forward-looking — it ignores each visit's own pass/fail, so the
+   re-inspection bounce no longer drives the slope.
 
 3. **Rename the field: `trend_slope_90d` → `trend_slope`.** The old name now lies
    (neither 90 days nor the production model). Use a neutral name so it can't go
@@ -97,9 +98,10 @@ currently-clean); XGBoost for both models.
   last K, so almost any place with a repeat inspection qualifies. K-independent.
   (On the full production population, including single-inspection licenses that
   can never have a slope, coverage is ~0.73; on test anchors it is 0.87.)
-- **De-confound partial:** corr(slope, `last_was_fail`) −0.31 → −0.19. The residual
-  is *legitimate* prior-history signal (Model 2 still uses `prior_*`), not the
-  mechanical swing — so we de-confound, we do not zero it out.
+- **Forward-looking, partially:** corr(slope, `last_was_fail`) −0.31 → −0.19. The
+  residual is *legitimate* prior-history signal (Model 2 still uses `prior_*`), not
+  the re-inspection bounce — the forecast-only model reduces that bounce, it does
+  not zero it out.
 - **Early-warning lift (clean slice, base 4.4%):** a **strict** steeply-rising
   slope (top decile) selects a slice with **2.26× @K=5** forward fail-rate (2.1–2.3×
   for K∈{3,4,5}, decaying to 1.74× at K=8). A **loose** `slope>0` signal is
@@ -107,7 +109,7 @@ currently-clean); XGBoost for both models.
 
 **The split that drives the framing:** the strict watch-list predicts (2.26×); the
 loose Improving/Worsening/Stable label does not (1.16×). So we ship the trend for
-**coverage + honesty** (a real, de-confounded trajectory) and the strict slice as
+**coverage + honesty** (a real, forward-looking trajectory) and the strict slice as
 an **additive watch-list**, but we do not present the loose direction as a
 prediction.
 
@@ -140,7 +142,7 @@ prediction.
 - **Bake K into the name (`trend_slope_last5`)** — rejected; K is tunable, the name
   would go stale on a retune.
 - **Use Model 1's score over last-K (skip Model 2)** — rejected; widening the window
-  without de-confounding surfaces *more* re-inspection artifacts (it gets worse).
+  without the forward-looking model surfaces *more* re-inspection artifacts (worse).
 - **Replace `risk_score` with the forecast model** — out of scope and contrary to the
   2026-06-22 product-pivot finding (segment the existing model, don't ship a
   separate forecast score). Model 2 is trend-only.
@@ -149,8 +151,8 @@ prediction.
 
 ## Residual risks
 
-- **Partial de-confound** (−0.19 residual). Monitored; treated as legitimate
-  prior-history signal, not removed.
+- **Re-inspection bounce only partly removed** (−0.19 residual). Monitored; treated
+  as legitimate prior-history signal, not removed.
 - **The descriptive trend is a weak predictor.** Managed by framing (decision 5),
   not by overclaiming in the UI.
 - **K = 5 is a tuned default**, not a truth; revisit if the inspection cadence

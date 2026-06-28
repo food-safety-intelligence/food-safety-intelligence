@@ -145,9 +145,9 @@ ALL_FEATURES: list[str] = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEAT
 
 # The current inspection's OWN outcome — the features that make a model a
 # "current-state" risk score rather than a forecast. The forecast-only model
-# (used to compute the de-confounded trend slope; see DR 0011) drops these so
+# (used to compute the forward-looking trend slope; see DR 0011) drops these so
 # its score does not see today's verdict; the mandated fail->re-inspection swing
-# they encode is exactly the re-inspection confound that breaks a trend built
+# they encode is exactly the re-inspection bounce that distorts a trend built
 # from the production score.
 CURRENT_OUTCOME_FEATURES: list[str] = [
     "was_fail",

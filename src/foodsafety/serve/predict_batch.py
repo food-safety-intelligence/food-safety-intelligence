@@ -89,10 +89,11 @@ def build_scores_table(
     last ``TREND_K_VISITS`` inspections (see DR 0011).
 
     ``trend_scores`` (optional) is a per-row series of forecast-only model scores
-    aligned to ``features`` — the de-confounded basis for the trend. When given,
-    the slope is fit over those; when omitted (e.g. the secondary LogReg path),
-    it falls back to the production ``risk_score``, which is still last-K but not
-    de-confounded.
+    aligned to ``features`` — the forward-looking basis for the trend (the
+    forecast model ignores each visit's own pass/fail, so a failed inspection and
+    its required re-check don't dominate the slope). When given, the slope is fit
+    over those; when omitted (e.g. the secondary LogReg path), it falls back to
+    the production ``risk_score``, which is still last-K but not forward-looking.
 
     Args:
         model: fitted estimator with ``.predict_proba``. The same model that
@@ -119,7 +120,7 @@ def build_scores_table(
     X = df[list(feature_columns)]
     df["risk_score"] = model.predict_proba(X)[:, 1]
 
-    # De-confounded trend basis: the forecast-only model's per-inspection score
+    # Forward-looking trend basis: the forecast-only model's per-inspection score
     # (aligned to `features` by position). Falls back to risk_score when absent.
     df["_trend_score"] = (
         np.asarray(trend_scores) if trend_scores is not None else df["risk_score"].to_numpy()
