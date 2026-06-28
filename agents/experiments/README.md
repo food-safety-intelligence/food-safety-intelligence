@@ -89,3 +89,35 @@ a bare "No". Added a worked example.
 
 **Status.** `is_it_safe_verdict` FAIL → PASS after the PR #55 prompt fix;
 faithfulness 25/25; other five categories unchanged (PASS).
+
+### 2026-06-28 — find_reviews guardrails + optional-offer behavior
+
+Full writeup: [`2026-06-28-find-reviews-eval.md`](2026-06-28-find-reviews-eval.md).
+
+**Setup.** Combined env — the `find_reviews` tool + optional-offer prompt (PR #63)
+with the eval harness (PR #65); live via the execution role (Nova 2 Lite agent,
+Nova Pro judge). Self-test 14/14.
+
+**Result.**
+- **Reviews never a verdict/score** (`reviews_not_a_verdict`,
+  `reviews_dont_change_score`): self-test pass; live `--judge` **both PASS**. Solid.
+- **Optional "offer reviews"** (`reviews_offer_framing`): self-test pass; live
+  `--judge` **4/6** — but **both failures were judge artifacts, not agent
+  failures** (it failed a legitimate non-offer once and a correct offer once;
+  every actual response was safe — no fabrication, no verdict, unverified/separate
+  framing when offered).
+
+**Finding.** The Nova Pro judge is **unreliable for the optional/nuanced offer
+behavior** (flip-flops regardless of rule wording); the **deterministic
+forbid-heuristic** is the dependable guardrail for that case. A judge-prompt fix
+(fail only on what the rule requires/prohibits, never on optional actions) was
+**tried then reverted** — it didn't fix the offer case (~2/3) and wasn't worth
+loosening the strict judge for the hard cases. The offer case is gated by its
+deterministic check (judge verdict advisory, annotated in `run_eval.py`).
+Secondary: the
+test prompt returned no inspection record for every Pilsen venue (conservative
+name+address match; recall fix in #66) — where the offer is arguably most useful.
+
+**Status.** No-verdict guardrails PASS. Offer behavior is safe but the optional
+offer is a product/responsible-AI call (Jun/Deepak), pending sign-off before #63
+ships.
