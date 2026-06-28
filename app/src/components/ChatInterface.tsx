@@ -118,7 +118,7 @@ function TypingIndicator() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatInterface() {
+export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -190,16 +190,22 @@ export function ChatInterface() {
       <div className="flex-1 overflow-y-auto px-4 md:px-8">
         <div className="max-w-2xl mx-auto py-6 flex flex-col gap-4">
 
-          {/* Empty state — welcome + suggestions */}
+          {/* Empty state — welcome + suggestions. In compact (floating-widget)
+              mode the big icon + heading are dropped: the panel header already
+              says "Ask about food safety", so repeating it here is redundant. */}
           {isEmpty && (
-            <div className="flex flex-col items-center text-center pt-8 pb-4">
-              <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
-                <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
-              </span>
-              <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                Ask about food safety
-              </h2>
-              <p className="text-base text-muted max-w-[42ch] leading-relaxed mb-8">
+            <div className={`flex flex-col items-center text-center pb-4 ${compact ? "pt-2" : "pt-8"}`}>
+              {!compact && (
+                <>
+                  <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
+                    <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
+                  </span>
+                  <h2 className="text-2xl font-semibold tracking-tight mb-2">
+                    Ask about food safety
+                  </h2>
+                </>
+              )}
+              <p className={`text-base text-muted max-w-[42ch] leading-relaxed ${compact ? "mb-5" : "mb-8"}`}>
                 Search by neighborhood, cuisine, or risk level. Ask follow-up
                 questions — the agent remembers your session.
               </p>
