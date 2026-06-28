@@ -1,0 +1,62 @@
+name: Deploy web app
+
+# Publishes the Next.js static export (app/out) to the CloudFront-fronted S3
+# site, restoring "merge to main = publish". This replaces the retired Amplify
+# auto-deploy. The build reads the committed app/public/data JSON, so whatever is
+# on main is exactly what goes live — no model call, no live data fetch.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/deploy-web.yml"
+  # Manual runs let us re-publish without an app/ change — e.g. after refreshing
+  # the data in S3 on its own.
+  workflow_dispatch: {}
+
+# One deploy at a time; never interrupt a half-finished S3 sync.
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # mint the OIDC token AWS exchanges for temporary creds
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      # No AWS creds are configured yet at this point, so the prebuild S3 pull
+      # fails fast and falls back to the committed data — which is what we want.
+      - name: Build static export
+        run: npm run build
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.WEB_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload to S3
+        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete
+
+      - name: Invalidate CloudFront cache
+        run: >
+          aws cloudfront create-invalidation
+          --distribution-id ${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}
+          --paths '/*'
