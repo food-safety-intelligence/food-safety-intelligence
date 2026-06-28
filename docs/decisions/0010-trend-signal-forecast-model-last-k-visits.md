@@ -10,6 +10,27 @@
 > broken; this record replaces how it is computed and how it is presented. The
 > production `risk_score` is **not** touched.
 
+## Terms
+
+- **Trend** — the *direction* of an establishment's predicted risk across its
+  recent inspections: drifting riskier, safer, or holding steady. It is a
+  descriptive read of the trajectory, **not** a separate prediction and **not** a
+  verdict (see decision 5).
+- **`trend_slope`** — the single number that encodes the trend: the OLS slope of a
+  model's score across the establishment's recent inspections, in score-per-day.
+  **Positive = risk rising (worsening); negative = risk falling (improving);
+  ≈0 = stable.** `null` when there are fewer than 2 inspections to fit a line. The
+  UI maps its sign to the Improving / Worsening / Stable label and the chart.
+- **Model 1 (production)** — the shipped risk model behind `risk_score`; uses all
+  features, including the current inspection's own outcome. Unchanged here.
+- **Model 2 (forecast-only)** — a second model that predicts the *same* 180-day
+  label but drops the current inspection's own outcome, so its score does not see
+  today's verdict. Used **only** as the basis for `trend_slope`.
+- **Anchor** — the single inspection a license is summarised at: its most recent
+  inspection (the row that becomes its `scores.json` record).
+- **Coverage** — the share of establishments that get a non-null `trend_slope`
+  (full definition under Evidence).
+
 ## Context — the shipped trend is broken
 
 `trend_slope_90d` (`foodsafety.serve.predict_batch._compute_trend_slopes`) is an
