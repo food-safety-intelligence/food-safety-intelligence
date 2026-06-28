@@ -68,7 +68,7 @@ TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 N_PCA = 32  # reduce the 256-dim Titan embeddings to 32 comps, fit on TRAIN only
 
-# Published v36 honest-test baseline (docs/experiments.md) — the gate reference.
+# Published v36 honest-test baseline (docs/model-experiments.md) — the gate reference.
 V36_BASELINE = {"logreg": (0.332, 0.370), "xgb": (0.338, 0.376)}
 # Vulnerable-population facility families the fairness gate watches (decision 0004/0005).
 VULNERABLE_GROUPS = {

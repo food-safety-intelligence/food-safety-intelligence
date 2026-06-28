@@ -561,7 +561,7 @@ def test_normalize_facility_type_collapses_vulnerable_families():
 
 # ---------------------------------------------------------------------------
 # Block-face building permits / violations (add_building_features). Unwired
-# (failed the both-metrics gate under CV — see docs/experiments.md), but the
+# (failed the both-metrics gate under CV — see docs/model-experiments.md), but the
 # leak guard and block-face radius still need coverage like every feature.
 # ---------------------------------------------------------------------------
 

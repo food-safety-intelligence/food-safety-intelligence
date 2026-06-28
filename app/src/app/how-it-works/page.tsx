@@ -193,7 +193,12 @@ export default async function HowItWorksPage() {
               means the number is honest about its own odds: across the
               establishments the model scores around 20%, about 1 in 5 actually
               has an event. The map and list summarise that number two ways: a
-              risk band and a 90-day trend.
+              risk band and a recent trend. Each score is anchored to the
+              establishment&apos;s{" "}
+              <span className="font-medium text-ink/80">most recent inspection on
+              file</span>{" "}(its date is shown on the detail page), so an
+              establishment that hasn&apos;t been inspected in a while shows older
+              data throughout — not a fresh reading.
             </p>
 
             <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
@@ -250,12 +255,15 @@ export default async function HowItWorksPage() {
               on.
             </p>
 
-            <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
-              The 90-day trend
+            <h3
+              id="recent-trend"
+              className="text-[1.05rem] font-medium tracking-tight mt-8 scroll-mt-24"
+            >
+              The recent trend
             </h3>
             <p className="text-[14px] text-muted leading-relaxed mt-1.5">
-              Next to each score, an arrow shows where risk has been heading over
-              the last 90 days:
+              Next to each score, an arrow shows which way risk has been heading
+              across the establishment&apos;s recent inspections:
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-[14px] text-ink/85">
               <span className="inline-flex items-center gap-2">
@@ -269,9 +277,24 @@ export default async function HowItWorksPage() {
               </span>
             </div>
             <p className="text-[12.5px] text-muted leading-relaxed mt-3">
-              We don&apos;t store a full score history, so the trendline is
-              reconstructed from a single slope — a quick read of direction and
-              size, not a day-by-day reproduction.
+              On the detail page this becomes a small chart. Each dot is a{" "}
+              <span className="font-medium text-ink/80">predicted</span>{" "}risk — the
+              model&apos;s 180-day-forward estimate{" "}
+              <span className="font-medium text-ink/80">as of that inspection&apos;s
+              date</span>{" "}(a score from 0 to 1, not the inspection&apos;s pass/fail
+              result, which is in the inspection list below) — placed at its real
+              date; hover a dot to see the date and value. So a 2019 dot is what the
+              model would have estimated in 2019, not a guess about the past.
+            </p>
+            <p className="text-[12.5px] text-muted leading-relaxed mt-2">
+              To keep the direction honest, those points come from a separate{" "}
+              <span className="font-medium text-ink/80">forecast model</span>{" "}— the
+              same 180-day prediction, but trained without the current
+              inspection&apos;s own result. A failed inspection triggers a required
+              re-inspection that usually passes, which would otherwise pull the main
+              score down and read as &quot;improving&quot; for purely procedural
+              reasons; the forecast model leaves that out. It is a read of direction
+              over time, not a separate prediction.
             </p>
           </article>
 

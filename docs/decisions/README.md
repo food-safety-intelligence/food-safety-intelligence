@@ -34,10 +34,14 @@ file per decision; the log is **append-only** — don't renumber existing record
 - [0010 — Agent: no request-time scoring; no-record for venues not in the batch run](0010-agent-no-request-time-scoring-and-no-record.md)
   — why the chat agent reports only precomputed batch scores and returns an
   explicit "no record" (not an estimate) for OSM venues the batch run doesn't cover.
+- [0011 — Trend signal: forecast-only model + last-K-visits slope](0011-trend-signal-forecast-model-last-k-visits.md)
+  — **Proposed** (contract change): replaces the broken `trend_slope_90d` with a
+  last-K-visits slope of a forecast-only model; descriptive trend + additive
+  early-warning watch-list, not a verdict.
 
 ---
 
 *Not a decision record?* Schema and **data cleaning** rules live in
 [`../interface_contracts.md`](../interface_contracts.md); experiment results in
-[`../experiments.md`](../experiments.md). See [`../README.md`](../README.md) for the
+[`../model-experiments.md`](../model-experiments.md). See [`../README.md`](../README.md) for the
 full docs map.

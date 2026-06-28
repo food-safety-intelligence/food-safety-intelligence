@@ -91,7 +91,7 @@ NUMERIC_FEATURES: list[str] = [
     # (LogReg/XGBoost/MLP), failing the both-metrics gate. The earlier "+0.020
     # PR-AUC" was an artifact of comparing against a stale control on a
     # different test set (lower base rate). Feature code stays unwired in
-    # features/building_features.py. See docs/experiments.md (2026-06-27 row).
+    # features/building_features.py. See docs/model-experiments.md (2026-06-27 row).
     # 311 features tested across several angles and ALL left OUT — the 311
     # signal is redundant with prior_* inspection history at every spatial scale:
     #   - Spatial RADIUS counts (BallTree 300m): served PR-AUC 0.3147->0.3152
@@ -103,7 +103,7 @@ NUMERIC_FEATURES: list[str] = [
     #   - Run 2 neighborhood-normalized excess (ring 100m-vs-500m): flat,
     #     orthogonal to prior_* but uninformative.
     # Feature code stays in complaint_features.py (tested) if revisited. See
-    # docs/experiments.md for the full numbers.
+    # docs/model-experiments.md for the full numbers.
 ]
 
 CATEGORICAL_FEATURES: list[str] = [
@@ -142,6 +142,21 @@ BOOLEAN_FEATURES: list[str] = [
 ]
 
 ALL_FEATURES: list[str] = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES
+
+# The current inspection's OWN outcome — the features that make a model a
+# "current-state" risk score rather than a forecast. The forecast-only model
+# (used to compute the forward-looking trend slope; see DR 0011) drops these so
+# its score does not see today's verdict; the mandated fail->re-inspection swing
+# they encode is exactly the re-inspection bounce that distorts a trend built
+# from the production score.
+CURRENT_OUTCOME_FEATURES: list[str] = [
+    "was_fail",
+    "n_priority_this_inspection",
+    "n_core_this_inspection",
+]
+
+# The forecast-only model's feature set: everything except the current outcome.
+FORECAST_FEATURES: list[str] = [f for f in ALL_FEATURES if f not in CURRENT_OUTCOME_FEATURES]
 
 LABEL_COL: str = "y_fail_or_critical_next_180d"
 

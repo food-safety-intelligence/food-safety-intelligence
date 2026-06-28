@@ -373,7 +373,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
                         <TierPill tier={r.risk_tier} size="sm" />
-                        <TrendIndicator slope={r.trend_slope_90d} />
+                        <TrendIndicator slope={r.trend_slope} />
                       </div>
                       {r.top_driver && (
                         <div className="mt-1.5">

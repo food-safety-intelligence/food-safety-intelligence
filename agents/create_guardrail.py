@@ -2,14 +2,21 @@
 Create the Food Safety agent's Bedrock Guardrail.
 
 Run once (by someone with `bedrock:CreateGuardrail` permission) to provision the
-platform-level guardrail the agent attaches to. It enforces, independently of
-whether the model follows the system prompt:
+platform-level guardrail the agent attaches to. Two of its policies apply to
+input/output text automatically, independently of whether the model follows the
+system prompt:
 
   - Denied topics — off-topic / non-Chicago-food requests, plus medical and
     legal advice (the agent gives a risk signal, not advice).
-  - Contextual grounding + relevance — each response is scored against the tool
-    outputs; low-grounding (fabricated) or irrelevant answers are blocked.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
+
+The contextual-grounding + relevance policy is configured below but is NOT active
+as the agent is wired: Strands' BedrockModel does not tag the tool outputs as
+grounding sources and per-message grounding is off, so this policy has no
+grounding source to score a response against and will not block fabricated
+scores. Anti-fabrication therefore relies on the system prompt's rules, not on
+this guardrail. The policy is kept so it starts working if a grounding source is
+wired in later.
 
 Then wire the printed id + version into the agent via env vars (see
 `entrypoint.py` / `run_local.py` `_guardrail_kwargs`):

@@ -213,7 +213,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
                 </div>
                 <div className="flex items-center gap-2 mt-2">
                   <TierPill tier={r.risk_tier} size="sm" />
-                  <TrendIndicator slope={r.trend_slope_90d} />
+                  <TrendIndicator slope={r.trend_slope} />
                 </div>
               </div>
             </Link>

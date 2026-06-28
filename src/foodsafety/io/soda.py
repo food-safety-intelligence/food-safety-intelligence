@@ -177,8 +177,17 @@ def fetch_soda_keyset(
         # doesn't lose it. Goes to local disk or S3 depending on shard_dir.
         if shard_dir is not None:
             shard_path = storage.join(str(shard_dir), f"page_{page:04d}.parquet")
+            # Cast string-like columns to a stable StringDtype so the parquet
+            # shard schema matches across pages. pandas now infers JSON strings
+            # as the new `str` dtype, and select_dtypes("object") is deprecated
+            # for picking those up, so select object/str columns explicitly.
+            string_cols = {
+                c: "string"
+                for c in chunk.columns
+                if chunk[c].dtype == "object" or chunk[c].dtype == "str"
+            }
             storage.write_parquet(
-                chunk.astype({c: "string" for c in chunk.select_dtypes("object").columns}),
+                chunk.astype(string_cols),
                 shard_path,
                 index=False,
             )

@@ -33,7 +33,7 @@
 - **An estimate for an unmatched venue carries no per-venue signal.** A venue
   absent from the batch run has no inspection history, so every
   prior-/recency-/current-inspection feature is zero. Those are exactly the
-  features the modeling work found carry the model (see `experiments.md`, the
+  features the modeling work found carry the model (see `model-experiments.md`, the
   current-inspection-outcome run). With them all zero, the model returns a
   **near-constant value for every unmatched venue** — it cannot tell them apart.
 
@@ -90,6 +90,6 @@
   on `main`)*: this record refines the scoring behaviour of that surface.
 - [0002](0002-xgb-validation-methodology.md) — calibrated scores on a temporal
   split (the calibration this estimate could not match).
-- [`../experiments.md`](../experiments.md) — current-inspection features carry
+- [`../model-experiments.md`](../model-experiments.md) — current-inspection features carry
   the model / cold-start is weak.
 - Implemented in PR #58 (`bella/agent-feature-builder-drift`).

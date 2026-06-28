@@ -39,6 +39,7 @@ for _tool_dir in [
     os.path.join(_AGENTS_DIR, "tools", "find_restaurants"),
     os.path.join(_AGENTS_DIR, "tools", "get_safety_score"),
     os.path.join(_AGENTS_DIR, "tools", "explain_restaurant"),
+    os.path.join(_AGENTS_DIR, "tools", "find_reviews"),
 ]:
     if _tool_dir not in sys.path:
         sys.path.insert(0, _tool_dir)
@@ -77,6 +78,7 @@ def _load_handler(tool_name: str) -> _types.ModuleType:
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_reviews_handler = _load_handler("find_reviews")
 
 
 # ---------------------------------------------------------------------------
@@ -93,7 +95,7 @@ def find_restaurants(
     radius_km: float = 1.0,
     cuisine: str = "",
     limit: int = 20,
-) -> list:
+) -> list | dict:
     """
     Find restaurants near a Chicago neighborhood or lat/lon coordinates using
     OpenStreetMap (free, no API key). Filters by cuisine when provided.
@@ -149,6 +151,29 @@ def explain_restaurant(license_id: str) -> dict:
     return _explain_handler.handler({"license_id": license_id}, None)
 
 
+@tool
+def find_reviews(name: str, address: str = "", topics: list | None = None) -> dict:
+    """
+    Find THIRD-PARTY diner reviews (Yelp, Google, web) for one restaurant,
+    focused on food-safety topics: cleanliness, pests, food_quality, illness.
+    Use ONLY when the user asks what reviewers say about a place. Returns
+    attributed "view reviews" deep links the user can click through to.
+
+    Reviews are unverified opinion and are NOT part of the risk score — present
+    them separately and always pass along the returned `disclaimer`. Never use a
+    review to change or justify a risk score or tier.
+
+    Args:
+        name: Restaurant name (from find_restaurants / get_safety_score)
+        address: Street address — improves link and match quality (optional)
+        topics: Subset of ["cleanliness", "pests", "food_quality", "illness"];
+                omit for all topics
+    """
+    return _reviews_handler.handler(
+        {"name": name, "address": address, "topics": topics or []}, None
+    )
+
+
 # ---------------------------------------------------------------------------
 # System prompt — single source of truth in system_prompt.txt (shared with
 # entrypoint.py, which reads the same file for the deployed agent).
@@ -166,13 +191,17 @@ SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else "
 def _guardrail_kwargs() -> dict[str, str]:
     """Attach a Bedrock Guardrail to the model when one is configured.
 
-    Enforces denied topics + a contextual-grounding check at the platform layer,
-    so off-topic or low-grounding (fabricated) responses are blocked regardless
-    of whether the model follows the prompt. A guardrail only activates when
-    BOTH an id and a version are set, so we pass them only when present; absent
-    (local dev / tests) the agent runs with no guardrail. Create the guardrail
-    out-of-band with ``agents/create_guardrail.py`` and wire the printed id and
-    version through these env vars.
+    The guardrail's denied-topic and prompt-attack filters apply to input/output
+    text automatically at the platform layer, so off-topic requests and prompt
+    injection are blocked regardless of whether the model follows the prompt. The
+    guardrail's contextual-grounding/relevance policy is NOT active as wired
+    (Strands' BedrockModel does not tag tool outputs as grounding sources), so
+    fabricated scores are not blocked here — anti-fabrication relies on the
+    system prompt's rules. A guardrail only activates when BOTH an id and a
+    version are set, so we pass them only when present; absent (local dev /
+    tests) the agent runs with no guardrail. Create the guardrail out-of-band
+    with ``agents/create_guardrail.py`` and wire the printed id and version
+    through these env vars.
     """
     gid = os.environ.get("FSI_BEDROCK_GUARDRAIL_ID")
     gver = os.environ.get("FSI_BEDROCK_GUARDRAIL_VERSION")
@@ -198,7 +227,7 @@ def build_agent() -> Agent:
     )
     return Agent(
         model=model,
-        tools=[find_restaurants, get_safety_score, explain_restaurant],
+        tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
         system_prompt=SYSTEM_PROMPT,
     )
 

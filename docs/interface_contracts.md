@@ -265,7 +265,7 @@ violation text. Only added if Phase 6 has slack.
 
 This tracks **contract version bumps** only. The full experiment history — including
 the experiments that came up flat and were reverted — is in
-[`docs/experiments.md`](experiments.md). Impact below is on the **served** basis (now the
+[`docs/model-experiments.md`](model-experiments.md). Impact below is on the **served** basis (now the
 depth-3 monotone **XGBoost** + sigmoid, review-time-filtered — see `0009`; rows through v36
 were measured when the served model was LogReg + sigmoid, so their deltas are against that
 baseline) unless noted; exact run metrics live in `reports/metrics/`.
@@ -308,9 +308,9 @@ model inference happens in the app** — predictions are precomputed and written
 | `risk_score` | `float64` | no | Model output in `[0, 1]`. The sentinel value `-1.0` means "stub / mock" — the app MUST detect this and show the yellow demo-data banner. |
 | `risk_tier` | `string` | no | `Low` / `Moderate` / `Elevated` / `High`. Discretized from `risk_score` via thresholds in `src/foodsafety/serve/predict_batch.py`. |
 | `top_drivers` | `list[struct]` | no | 3–5 top SHAP-style drivers. Each struct: `{feature: string, value: string, shap: float, label: string}` where `label` is the plain-English UI string. |
-| `trend_slope_90d` | `float64` | yes | OLS slope of `risk_score` over the last 90 days at this license. Positive = worsening. Null if <2 prior dates. |
+| `trend_slope` | `float64` | yes | OLS slope of the **forecast-only model's** score over this license's last `TREND_K_VISITS` (=5) inspections — *visits*, not a calendar window. Positive = worsening. Null if <2 scored points. Forward-looking basis: the forecast model ignores each visit's own pass/fail, so a failed inspection and its required re-check don't dominate the trend; see [decision 0011](decisions/0011-trend-signal-forecast-model-last-k-visits.md). **Renamed from `trend_slope_90d`** in `schema_version` 0.5.0. |
 
-**Top-level JSON envelope** (`scores.json`, `schema_version` `0.4.0`): alongside
+**Top-level JSON envelope** (`scores.json`, `schema_version` `0.5.0`): alongside
 `scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
 `label_window_days`, `totals`, and **`calibration`**. `calibration` is the
 Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page

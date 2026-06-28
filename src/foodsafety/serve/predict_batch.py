@@ -5,9 +5,9 @@ For each restaurant in ``features.parquet`` we generate:
   * ``risk_score`` — calibrated probability from the production model
   * ``risk_tier`` — discretised band (Low / Moderate / Elevated / High)
   * ``top_drivers`` — list of plain-English driver objects from SHAP attribution
-  * ``trend_slope_90d`` — OLS slope of risk_score over this restaurant's most
-    recent inspections in the 90-day window before ``as_of_date``. Null if
-    fewer than 2 prior scored points.
+  * ``trend_slope`` — OLS slope of the forecast-only model's score over this
+    restaurant's last ``TREND_K_VISITS`` inspections (visits, not a calendar
+    window). Null if fewer than 2 scored points. See DR 0011.
 
 Per CLAUDE.md, this is the **batch-score-to-JSON** pattern. The output
 parquet is the authoritative contract artifact; ``scores.json`` (web app
@@ -56,6 +56,13 @@ RISK_TIER_THRESHOLDS = [
     (1.01, "High"),  # 1.01 to include the rare 1.0 case
 ]
 
+# Trend slope is fit over each license's last K inspections (visits), not a fixed
+# calendar window. K=5 is the tuned default — see DR 0011 / docs/model-experiments.md
+# (2026-06-28): coverage is K-stable and the steeply-rising watch-list lift peaks
+# at K=4-5. The trend is computed from the forecast-only model's score (passed in
+# as ``trend_scores``), not the production risk score.
+TREND_K_VISITS = 5
+
 
 def score_to_tier(score: float) -> str:
     """Discretise a probability into Low / Moderate / Elevated / High."""
@@ -73,12 +80,20 @@ def build_scores_table(
     n_drivers: int = 4,
     keep_columns: tuple = ("license_id", "dba_name", "address", "lat", "lon"),
     contributions_fn=None,
+    trend_scores=None,
 ) -> pd.DataFrame:
     """Produce the scores table for every restaurant in ``features``.
 
     Aggregation strategy: one row per ``license_id``, anchored on the most
-    recent inspection. Trend is computed from any scoreable prior inspections
-    in the trailing 90 days.
+    recent inspection. The ``trend_slope`` is the OLS slope over the license's
+    last ``TREND_K_VISITS`` inspections (see DR 0011).
+
+    ``trend_scores`` (optional) is a per-row series of forecast-only model scores
+    aligned to ``features`` — the forward-looking basis for the trend (the
+    forecast model ignores each visit's own pass/fail, so a failed inspection and
+    its required re-check don't dominate the slope). When given, the slope is fit
+    over those; when omitted (e.g. the secondary LogReg path), it falls back to
+    the production ``risk_score``, which is still last-K but not forward-looking.
 
     Args:
         model: fitted estimator with ``.predict_proba``. The same model that
@@ -104,6 +119,12 @@ def build_scores_table(
     # Score every inspection — needed for trend computation.
     X = df[list(feature_columns)]
     df["risk_score"] = model.predict_proba(X)[:, 1]
+
+    # Forward-looking trend basis: the forecast-only model's per-inspection score
+    # (aligned to `features` by position). Falls back to risk_score when absent.
+    df["_trend_score"] = (
+        np.asarray(trend_scores) if trend_scores is not None else df["risk_score"].to_numpy()
+    )
 
     # Per-restaurant aggregation.
     latest_per_license = (
@@ -132,8 +153,10 @@ def build_scores_table(
         drivers_per_row.append([d.to_dict() for d in drivers])
     latest_per_license["top_drivers"] = drivers_per_row
 
-    # 90-day trend slope per license.
-    latest_per_license["trend_slope_90d"] = _compute_trend_slopes(df, latest_per_license)
+    # Trend slope over the last K visits, on the forecast-only score (DR 0011).
+    latest_per_license["trend_slope"] = _compute_trend_slopes(
+        df, latest_per_license, score_col="_trend_score"
+    )
 
     # Tier + as_of_date.
     latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(score_to_tier)
@@ -145,7 +168,7 @@ def build_scores_table(
         "risk_score",
         "risk_tier",
         "top_drivers",
-        "trend_slope_90d",
+        "trend_slope",
     ]
     return latest_per_license[output_cols].reset_index(drop=True)
 
@@ -154,17 +177,25 @@ def _compute_trend_slopes(
     full_scored: pd.DataFrame,
     latest_per_license: pd.DataFrame,
     *,
-    window_days: int = 90,
+    score_col: str = "risk_score",
+    k_visits: int = TREND_K_VISITS,
 ) -> pd.Series:
-    """OLS slope of ``risk_score`` over the last ``window_days`` per license.
+    """OLS slope of ``score_col`` over each license's last ``k_visits`` inspections.
 
-    For each license, find inspections within ``(latest - window_days, latest]``,
-    fit an OLS regression of ``risk_score`` on date offset (in days), and
-    return the slope coefficient. Returns NaN if fewer than 2 points.
+    For each license, take the ``k_visits`` most recent inspections up to and
+    including its anchor, fit an OLS regression of ``score_col`` on date offset
+    (in days), and return the slope coefficient. Returns NaN if fewer than 2
+    points or the points share a date.
+
+    Last-K *visits* (not a fixed calendar window) is what gives the trend broad
+    coverage — almost any license with >=2 inspections gets a slope — and
+    ``score_col`` is normally the forecast-only model's score, so the slope is
+    not driven by the mandated fail->re-inspection swing in the production score.
+    See DR 0011 and docs/model-experiments.md (2026-06-28).
     """
     slopes: list[float] = []
-    full_indexed = full_scored.set_index("license_id")
-    for license_id, latest_row in latest_per_license[["license_id", "inspection_date"]].itertuples(
+    full_indexed = full_scored.set_index("license_id").sort_values("inspection_date")
+    for license_id, anchor_date in latest_per_license[["license_id", "inspection_date"]].itertuples(
         index=False
     ):
         # All inspections at this license — pandas .loc lookup is fast.
@@ -174,20 +205,19 @@ def _compute_trend_slopes(
             slopes.append(np.nan)
             continue
 
-        # Right-inclusive on `latest`, left-exclusive on `latest - window_days`.
-        upper = latest_row
-        lower = upper - pd.Timedelta(days=window_days)
-        in_window = subset[
-            (subset["inspection_date"] > lower) & (subset["inspection_date"] <= upper)
-        ]
-        if len(in_window) < 2:
+        # The last k_visits inspections up to (and including) the anchor date.
+        upto = subset[subset["inspection_date"] <= anchor_date].tail(k_visits)
+        if len(upto) < 2:
             slopes.append(np.nan)
             continue
 
-        x_days = (
-            in_window["inspection_date"] - in_window["inspection_date"].min()
-        ).dt.days.to_numpy(dtype=float)
-        y = in_window["risk_score"].to_numpy(dtype=float)
+        x_days = (upto["inspection_date"] - upto["inspection_date"].min()).dt.days.to_numpy(
+            dtype=float
+        )
+        if np.ptp(x_days) == 0:  # all on the same day -> no slope
+            slopes.append(np.nan)
+            continue
+        y = upto[score_col].to_numpy(dtype=float)
         # np.polyfit returns highest-order coefficient first; degree 1 → [slope, intercept].
         try:
             slope = float(np.polyfit(x_days, y, deg=1)[0])
@@ -226,7 +256,7 @@ def write_scores_json(
     df = scores.copy()
     df["as_of_date"] = pd.to_datetime(df["as_of_date"]).dt.strftime("%Y-%m-%d")
     df["risk_score"] = df["risk_score"].round(4)
-    df["trend_slope_90d"] = df["trend_slope_90d"].astype(float).round(6)
+    df["trend_slope"] = df["trend_slope"].astype(float).round(6)
 
     if totals is None:
         tier_counts = df["risk_tier"].value_counts().to_dict()
@@ -238,8 +268,10 @@ def write_scores_json(
                 "Elevated": int(tier_counts.get("Elevated", 0)),
                 "High": int(tier_counts.get("High", 0)),
             },
-            "worsening_30d": int((df["trend_slope_90d"].fillna(0) > 0.001).sum()),
-            "improving_30d": int((df["trend_slope_90d"].fillna(0) < -0.001).sum()),
+            # Key names kept for app compatibility; the slope is now last-K-visits
+            # forecast (DR 0011), not a 30-day window. Threshold retune is PR-B.
+            "worsening_30d": int((df["trend_slope"].fillna(0) > 0.001).sum()),
+            "improving_30d": int((df["trend_slope"].fillna(0) < -0.001).sum()),
         }
 
     payload = {
@@ -271,7 +303,7 @@ def _row_to_json(row) -> dict:
         "as_of_date": str(row.as_of_date),
         "risk_score": float(row.risk_score),
         "risk_tier": str(row.risk_tier),
-        "trend_slope_90d": (None if pd.isna(row.trend_slope_90d) else float(row.trend_slope_90d)),
+        "trend_slope": (None if pd.isna(row.trend_slope) else float(row.trend_slope)),
         "trend_ci_low": None,
         "trend_ci_high": None,
         "top_drivers": list(row.top_drivers) if row.top_drivers is not None else [],
