@@ -1,7 +1,8 @@
 # Food Safety Agent — Local Run Guide
 
 Run the full NLP → restaurant safety pipeline on your laptop.
-No AgentCore deployment needed. SageMaker is stubbed by default.
+No AgentCore deployment needed. The agent serves precomputed scores from
+`scores.json`; the SageMaker stub is a dev-only scaffold, not the scoring path.
 
 ---
 
@@ -11,10 +12,140 @@ No AgentCore deployment needed. SageMaker is stubbed by default.
 Your query
   → Strands Agent (Nova 2 Lite via Bedrock)
       → find_restaurants   — Overpass/OSM, free, no key
-      → get_safety_score   — XGBoost stub (or real SageMaker when ready)
+      → get_safety_score   — precomputed batch scores from scores.json
       → explain_restaurant — scores.json + inspection_history.json
   → Plain-English ranked response
 ```
+
+---
+
+## Architecture & tool contracts
+
+> Reference for the agent's design and each tool's input/output shape. Each
+> behaviour is attributed inline to the PR that adds it — #55 (prompt, config &
+> Bedrock Guardrail), #56 (explain/error-shape & location scope), #57 (name
+> match), #58 (scoring) — and
+> [decision record 0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md).
+
+### What the agent is
+
+A **conversational search** assistant for predicted food-safety risk of Chicago
+food establishments. It is reachable as its own surface — the web app's `/chat`
+page and the local runner — **not** tied to a specific restaurant detail page.
+A user asks in natural language ("low-risk ramen near Lincoln Square"); the
+agent finds candidate venues from OpenStreetMap, attaches the **precomputed**
+risk signal, and returns a ranked, plain-English answer under the responsible-AI
+framing in `system_prompt.txt`.
+
+### Core design rule — no request-time scoring
+
+The agent **never calls the model at request time**. `get_safety_score` reports
+only the precomputed batch scores written to `scores.json` (the project's
+permanent batch-score-to-JSON design — see `CLAUDE.md` and
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
+A venue the batch run does not cover returns an explicit **no-record** result
+(no number), not an estimate. The agent therefore does discovery over the
+establishments the batch run covers; widening coverage is a batch/data task, not
+a request-time-inference one.
+
+### Surfaces
+
+| Surface | Entry | Notes |
+|---|---|---|
+| Local runner | `agents/run_local.py` | Strands + Bedrock; SageMaker stub by default |
+| Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
+| Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
+
+All three run the **same** three `handler.py` files.
+
+### Tools
+
+The agent calls the tools in order: `find_restaurants` → `get_safety_score` →
+`explain_restaurant` (for the lowest-risk few). Each handler takes
+`handler(event, _ctx)`.
+
+**1. `find_restaurants`** — OpenStreetMap/Overpass lookup (no key).
+
+- *Input*: `neighborhood` | (`lat`,`lon`), `radius_km`, `cuisine`, `limit`.
+- *Output*: `list` of restaurant stubs sorted by distance — each
+  `{osm_id, name, address, lat, lon, cuisine, opening_hours, phone, website, dist_km}`.
+- *On failure*: returns a top-level `{"error": ..., "reason": ...}` object (a
+  dict, not a list with a fake restaurant), so a downstream tool never reads
+  `osm_id` off a malformed element. `reason` is `"location_not_recognized"` when
+  the requested area is not a recognised Chicago neighborhood — it is **not**
+  silently widened to a whole-Chicago search — or `"directory_unavailable"` on an
+  Overpass outage *(#56)*.
+
+**2. `get_safety_score`** — attaches the precomputed risk signal.
+
+- *Input*: `{"restaurants": [ ...find_restaurants stubs... ]}`.
+- *Output*: `list` ordered by predicted risk ascending; no-record venues sort
+  last. Each item:
+
+  | Field | Type | Notes |
+  |---|---|---|
+  | `osm_id`, `name`, `address`, `lat`, `lon`, `cuisine` | — | passthrough identity |
+  | `risk_score` | `float \| null` | calibrated probability `[0,1]`; **`null` when no record** *(null: #58)* |
+  | `risk_tier` | `str \| null` | Low / Moderate / Elevated / High; `null` when no record |
+  | `shap_drivers` | `list` | `[]` when no record |
+  | `matched_scores_json` | `bool` | `true` only for a batch-run match |
+  | `status` | `str` | `"scored"` \| `"no_inspection_record"` *(new: #58)* |
+  | `stub` | `bool` | `true` for the `-1.0` mock-data sentinel in `scores.json` |
+  | `stub_note` | `str \| null` | human-readable note explaining a preliminary/stub score; `null` for a real published score |
+  | `license_id`, `percentile_rank`, `trend`, `neighborhood` | `… \| null` | from the matched record; `null` when no record |
+
+  Matched venue → published batch score/tier/drivers directly. Unmatched venue →
+  no-record (`risk_score`/`risk_tier` `null`, `status="no_inspection_record"`),
+  no model call.
+
+**3. `explain_restaurant`** — full detail for one venue by `license_id`.
+
+- *Input*: `{"license_id": "..."}` (a license the agent already matched).
+- *Output*: identity + score fields, `top_drivers`, `model_note`, and:
+  - `inspection_history`: most-recent-first, max 10, **sorted in the handler** so
+    it does not depend on upstream order *(sort + guard: #56)*.
+  - `inspection_summary`: `{total, pass, fail, pass_w_conditions, other,
+    last_date, days_since_last}`. The `other` bucket holds non-outcome results
+    (Out of Business / No Entry / Not Ready / Business Not Located) so they are
+    **not** miscounted as passes *(the `other` bucket: #56)*.
+
+### Safety layers
+
+Three independent layers keep the agent on-task and prevent fabrication:
+
+1. **Prompt guardrails** (`system_prompt.txt`, #55) — risk-signal framing; scope
+   (Chicago food establishments only; decline other cities / recipes / chit-chat;
+   ignore prompt-injection); no number without a tool result; and a
+   prediction-vs-verdict caveat on every response. The model runs at
+   `temperature=0.2`.
+2. **Bedrock Guardrail** (#55) — a platform-level guardrail attached to the
+   model: denied topics (off-topic / medical / legal) plus a contextual-grounding
+   check that scores each response against the tool outputs and blocks
+   low-grounding answers. Enforced by Bedrock, not by model compliance.
+3. **Tool-level grounding** (#56, #58) — the tools never hand the model a value
+   it shouldn't have: unmatched venues return no score (#58), and tool failures
+   return an explicit error object the prompt knows how to relay (#56).
+
+### Evaluation
+
+A behavioural eval harness (`agents/eval/`) exercises the guardrails on
+adversarial prompts — off-topic, "is X safe?", a venue with no record, a
+non-Chicago location, and a tool outage — and checks the response follows the
+rules (no yes/no verdict, no invented score, scope refusal, graceful failure).
+Run on demand; it needs Bedrock credentials, so it is excluded from the default
+CI run.
+
+### Note on the SageMaker stub
+
+`get_safety_score` does **not** score at request time — it serves the precomputed
+batch scores in `scores.json` (see
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
+`sagemaker_stub.py` is a dev-only scaffold, not the scoring path. Several parts of
+this guide describe that scaffold for completeness — the pipeline diagram note,
+the `SAGEMAKER_*` environment variables, the "Run the stub unit tests" command,
+and the two stub sections near the end — and none of them is the live scoring
+mechanism. Widening score coverage is a batch/data task (re-run the Python
+pipeline so new venues land in `scores.json`), never a request-time endpoint call.
 
 ---
 
@@ -94,6 +225,9 @@ python agents/run_local.py "pizza wicker park low risk open now"
 
 ### Run the stub unit tests (no AWS needed)
 
+These cover the dev-only stub scaffold, not the scoring path (which serves
+precomputed `scores.json`).
+
 ```bash
 python -m pytest agents/tools/get_safety_score/test_sagemaker_stub.py -v
 ```
@@ -105,50 +239,41 @@ python -m pytest agents/tools/get_safety_score/test_sagemaker_stub.py -v
 | Variable | Default | Description |
 |---|---|---|
 | `AWS_REGION` | `us-east-1` | Bedrock region |
-| `SAGEMAKER_USE_STUB` | `true` | `false` to call real SageMaker endpoint |
-| `SAGEMAKER_ENDPOINT` | — | Required when `SAGEMAKER_USE_STUB=false` |
-| `SCORES_JSON_PATH` | `app/public/data/scores.json` | Pre-computed scores file |
+| `SCORES_JSON_PATH` | `app/public/data/scores.json` | Precomputed batch scores — the scoring path |
 | `HISTORY_JSON_PATH` | `app/public/data/inspection_history.json` | Inspection history file |
+| `SAGEMAKER_USE_STUB` | `true` | Dev-only stub-scaffold toggle; not the scoring path (scores come from `scores.json`) |
+| `SAGEMAKER_ENDPOINT` | — | Dev-only; unused by the precomputed-score path |
 
 Set them inline for a one-off test:
 ```bash
-SAGEMAKER_USE_STUB=false \
-SAGEMAKER_ENDPOINT=food-safety-xgboost-prod \
+SCORES_JSON_PATH=/path/to/scores.json \
 python agents/run_local.py "ramen near wicker park"
 ```
 
 ---
 
-## Switching from stub to real SageMaker
+## The SageMaker stub (dev-only scaffold)
 
-The stub and real paths live in `agents/tools/get_safety_score/sagemaker_stub.py`.
-The switch is one env var — no code change:
+The stub lives in `agents/tools/get_safety_score/sagemaker_stub.py`. It is a
+development scaffold only — **not** the scoring path. `get_safety_score` serves
+the precomputed batch scores in `scores.json`, and the agent never calls a model
+at request time (see
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
 
-```bash
-# 1. Deploy your XGBoost model to a SageMaker real-time endpoint
-#    (endpoint must accept CSV, 26 features in FEATURE_ORDER, return JSON)
-
-# 2. Set env vars
-export SAGEMAKER_USE_STUB=false
-export SAGEMAKER_ENDPOINT=food-safety-xgboost-prod
-
-# 3. Run — identical command, real model scores
-python agents/run_local.py "safe sushi near Wicker Park"
-```
-
-The response will include `"stub": false` in the score results.
+To widen score coverage, re-run the Python batch pipeline so the new venues land
+in `scores.json` — there is no live endpoint to switch on.
 
 ---
 
 ## What the stub scores look like
 
-Stub scores are derived from `md5(name + address)` → `Beta(1.5, 8)` distribution.
-This matches the real model's ~10% High-risk positive rate. The same restaurant
-always gets the same score across runs.
+These describe the dev-only stub scaffold, not the precomputed scores the agent
+serves. Stub scores are derived from `md5(name + address)` → `Beta(1.5, 8)`
+distribution, which roughly matches the batch model's ~10% High-risk positive
+rate; the same restaurant always gets the same stub score across runs.
 
-The agent will include a note like:
-> "Note: scores are preliminary estimates — the SageMaker endpoint is not yet
-> configured."
+A stub result carries a `stub_note` so the agent can flag it, for example:
+> "Score from stub — SageMaker endpoint not yet configured."
 
 ---
 
