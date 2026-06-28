@@ -97,7 +97,7 @@ def find_restaurants(
     radius_km: float = 1.0,
     cuisine: str = "",
     limit: int = 20,
-) -> list:
+) -> list | dict:
     """
     Find restaurants near a Chicago neighborhood or lat/lon coordinates using
     OpenStreetMap (free, no API key). Filters by cuisine when provided.
