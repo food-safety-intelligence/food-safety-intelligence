@@ -17,7 +17,10 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
-const REGION = process.env.AWS_REGION ?? "us-east-1";
+// The data bucket is us-east-1. Pin it independently of AWS_REGION, which the
+// deploy workflow sets to the website-infra region (us-west-2) — a client in the
+// wrong region fails the read with a 301 region redirect.
+const REGION = process.env.FSI_S3_REGION ?? "us-east-1";
 const PREFIX = "web-app-data";
 const CACHE_DIR = "/tmp/fsi-build-cache";
 const KEYS = ["scores.json", "inspection_history.json"];
@@ -48,10 +51,59 @@ async function fetchAndCache(key) {
   console.log(`  ${key.padEnd(28)} ${mb} MB  ${Date.now() - t0} ms  → ${out}`);
 }
 
+// Comment shards (web-app-data/comments/<xx>.json) have NO committed fallback —
+// they're gitignored (266 MB). The static export reads the full comment text at
+// build time, so unless we warm the shards here, every pre-rendered detail page
+// would fetch its shard from S3 live (256 shards × N parallel build workers). We
+// pull all 256 once into the build cache; scores-server.ts then reads from there.
+// Iterating the fixed shard names (00..ff) instead of listing the prefix keeps
+// the IAM ask to s3:GetObject only — no s3:ListBucket needed.
+async function syncComments() {
+  const t0 = Date.now();
+  await mkdir(path.join(CACHE_DIR, "comments"), { recursive: true });
+  const shards = Array.from({ length: 256 }, (_, n) =>
+    n.toString(16).padStart(2, "0"),
+  );
+
+  let ok = 0;
+  let bytes = 0;
+  let next = 0;
+  async function worker() {
+    while (next < shards.length) {
+      const key = `comments/${shards[next++]}.json`;
+      try {
+        const res = await s3.send(
+          new GetObjectCommand({ Bucket: BUCKET, Key: `${PREFIX}/${key}` }),
+        );
+        if (!res.Body) continue;
+        const text = await res.Body.transformToString();
+        await writeFile(path.join(CACHE_DIR, key), text, "utf-8");
+        ok += 1;
+        bytes += text.length;
+      } catch {
+        // Missing shard or no creds — skip. With no creds none arrive and the
+        // timeline shows "No comments were recorded" (graceful, non-fatal).
+      }
+    }
+  }
+  // Bounded concurrency so we don't open 256 sockets at once.
+  await Promise.all(Array.from({ length: 16 }, worker));
+
+  if (ok === 0) {
+    console.warn(
+      "  comments/                    none fetched (no S3 creds?) — timeline will show no comments",
+    );
+    return;
+  }
+  const mb = (bytes / 1024 / 1024).toFixed(1);
+  console.log(`  comments/ (${ok}/256 shards)  ${mb} MB  ${Date.now() - t0} ms`);
+}
+
 async function main() {
   console.log(`[prebuild] syncing s3://${BUCKET}/${PREFIX}/ → ${CACHE_DIR}`);
   await mkdir(CACHE_DIR, { recursive: true });
   await Promise.all(KEYS.map(fetchAndCache));
+  await syncComments();
   console.log("[prebuild] done");
 }
 

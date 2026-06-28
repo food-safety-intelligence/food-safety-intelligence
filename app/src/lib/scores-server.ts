@@ -28,7 +28,10 @@ import { isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
 // AWS SDK's default chain: env vars → ~/.aws/credentials → the SSR runtime's
 // attached IAM role on Amplify. No keys live in this repo.
 const S3_BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
-const S3_REGION = process.env.AWS_REGION ?? "us-east-1";
+// The data bucket is us-east-1. Pin it independently of AWS_REGION — the deploy
+// workflow sets AWS_REGION to the website-infra region (us-west-2), and an
+// S3 client in the wrong region fails the read with a 301 region redirect.
+const S3_REGION = process.env.FSI_S3_REGION ?? "us-east-1";
 const S3_PREFIX = "web-app-data";
 // Shared with scripts/prebuild-sync-s3.mjs. During `next build --webpack`
 // the prebuild step downloads scores.json + inspection_history.json once
