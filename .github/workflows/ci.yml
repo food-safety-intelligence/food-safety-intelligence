@@ -25,8 +25,17 @@ jobs:
   python:
     name: Python (ruff + pytest)
     runs-on: ubuntu-latest
+    # pull-requests: write lets the coverage action post/update its PR comment;
+    # contents: write lets it store the coverage baseline on a data branch when
+    # this runs on a push to main, so PR comments can show the delta vs main.
+    permissions:
+      contents: write
+      pull-requests: write
     steps:
+      # fetch-depth: 0 so diff-cover can diff this PR against origin/main.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -47,8 +56,39 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
 
+      # Tests are the real gate (this step must pass). Coverage is recorded here
+      # (.coverage for the comment + threshold, coverage.xml for diff-cover) but
+      # NOT thresholded in this step — the floors live in their own non-blocking
+      # steps below so a coverage dip never blocks a green test run.
       - name: Pytest
-        run: uv run pytest
+        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+
+      # Post/update a sticky PR comment with overall coverage, the delta vs main,
+      # and per-file DIFF coverage (how well the lines changed in this PR are
+      # covered). On push to main it instead stores the baseline used for that
+      # delta. Not a gate — purely informational.
+      - name: Coverage PR comment
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+
+      # NON-BLOCKING floor: total coverage must stay >= 80%. continue-on-error
+      # means a dip shows as a step annotation but does NOT fail the job — it's a
+      # ratchet to catch regressions, not a merge gate (set below current ~84%).
+      # Promote to a real gate later by removing continue-on-error (needs Jun to
+      # mark the check required in branch protection).
+      - name: Coverage floor (non-blocking)
+        continue-on-error: true
+        run: uv run coverage report --fail-under=80
+
+      # NON-BLOCKING patch coverage: of the lines THIS PR changed, >= 85% should
+      # be covered. This is what actually prevents new untested code, fairly
+      # (you're only accountable for what you touched). PR-only; on a push there
+      # is no diff to measure.
+      - name: Diff coverage (non-blocking)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: uv run diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=85
 
   app:
     name: Web app (eslint + tsc + vitest)
@@ -77,3 +117,10 @@ jobs:
 
       - name: Vitest
         run: npm test
+
+      # `tsc --noEmit` typechecks but never exercises the production build, so a
+      # static-export / build-time data-loading regression would pass CI and only
+      # surface on deploy. The build reads the committed public/data JSON (no S3
+      # creds needed) — verified headless. This catches that class of break.
+      - name: Build
+        run: npm run build
