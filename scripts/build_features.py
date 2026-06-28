@@ -7,14 +7,17 @@ exploration artifact; this script is the automation entry point.
 Inputs (all must exist under data/):
     processed/inspections_labeled.parquet   built by notebook 02
     raw/licenses_historical.parquet         fetched by notebook 00 / 01
-    raw/building_violations.parquet         fetched by scripts/fetch_building_violations.py
 
 Output:
     processed/features.parquet             model-ready feature table
 
-The 311 complaints join is intentionally skipped: those features were tested
-and dropped from ALL_FEATURES (see baseline.py comments and docs/experiments.md).
-Including them would add ~5 min of BallTree runtime for zero model gain.
+The 311 complaints and block-face building-violation joins are intentionally
+skipped: both families were tested and dropped from ALL_FEATURES (see
+baseline.py comments and docs/experiments.md). Their feature code is kept
+in-tree but unwired (complaint_features.py / building_features.py); building
+violations can still be fetched via scripts/fetch_building_violations.py if the
+experiment is ever revisited. Wiring either back in adds BallTree runtime for
+zero model gain.
 
 Usage:
     PYTHONPATH=src uv run python scripts/build_features.py
@@ -35,7 +38,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 LABELED_PATH = PROCESSED_DIR / "inspections_labeled.parquet"
 LICENSES_HIST_PATH = RAW_DIR / "licenses_historical.parquet"
-BV_PATH = RAW_DIR / "building_violations.parquet"
 OUT_PATH = PROCESSED_DIR / "features.parquet"
 
 
@@ -47,14 +49,6 @@ def main() -> None:
             print(f"ERROR: missing required input: {p}", file=sys.stderr)
         raise SystemExit(1)
 
-    if not BV_PATH.exists():
-        print(
-            f"WARNING: {BV_PATH} not found.\n"
-            "  Run `make fetch_bldg_violations` first to include building violation features.\n"
-            "  Continuing without them — the output will be missing 9 features from ALL_FEATURES.",
-            file=sys.stderr,
-        )
-
     # --- Load inputs --------------------------------------------------------
     print(f"Loading {LABELED_PATH.name} ...", end=" ", flush=True)
     labeled = pd.read_parquet(LABELED_PATH)
@@ -64,19 +58,14 @@ def main() -> None:
     licenses_historical = pd.read_parquet(LICENSES_HIST_PATH)
     print(f"{len(licenses_historical):,} rows")
 
-    building_violations: pd.DataFrame | None = None
-    if BV_PATH.exists():
-        print(f"Loading {BV_PATH.name} ...", end=" ", flush=True)
-        building_violations = pd.read_parquet(BV_PATH)
-        print(f"{len(building_violations):,} rows")
-
     # --- Build features -----------------------------------------------------
+    # complaints and building violations are left unwired (None) — both feature
+    # families were dropped from ALL_FEATURES (see module docstring).
     print("\nBuilding features (this takes a few minutes)...")
     features = build_features(
         labeled,
         complaints=None,
         licenses_historical=licenses_historical,
-        building_violations=building_violations,
     )
     print(f"  → {features.shape[0]:,} rows × {features.shape[1]} cols")
 

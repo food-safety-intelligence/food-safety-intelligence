@@ -67,3 +67,44 @@ def test_count_label_formats_as_integer():
         k=1,
     )[0]
     assert d.label == "6 priority violations at this inspection"
+
+
+def test_tree_contributions_additivity():
+    """TreeSHAP contributions + base margin must reconstruct the raw margin.
+
+    This is the contract the served XGB calibration relies on: the app waterfall
+    ships ``calibration.intercept`` = base margin and per-driver ``shap`` = these
+    contributions, then reconstructs ``intercept + Σshap == margin`` client-side.
+    If pred_contribs ever drifts from the booster's margin output, the gauge and
+    the waterfall would silently disagree.
+    """
+    import numpy as np
+    import pandas as pd
+
+    from foodsafety.explain.shap_drivers import tree_contributions
+    from foodsafety.models.baseline import (
+        ALL_FEATURES,
+        BOOLEAN_FEATURES,
+        CATEGORICAL_FEATURES,
+        NUMERIC_FEATURES,
+    )
+    from foodsafety.models.xgb import build_production_xgb, prepare_xgb_features
+
+    rng = np.random.default_rng(0)
+    n = 400
+    data = {c: rng.integers(0, 5, n).astype("float64") for c in NUMERIC_FEATURES}
+    data.update({c: rng.integers(0, 2, n) for c in BOOLEAN_FEATURES})
+    for c in CATEGORICAL_FEATURES:
+        data[c] = rng.choice(["a", "b", "c"], n)
+    X_raw = pd.DataFrame(data)[ALL_FEATURES]
+    y = (rng.random(n) < 0.2).astype(int)
+
+    X = prepare_xgb_features(X_raw)
+    est = build_production_xgb(scale_pos_weight=1.0)
+    est.fit(X, y, verbose=False)
+
+    contrib, base_margin = tree_contributions(est, X, list(ALL_FEATURES))
+    margin = est.predict(X, output_margin=True)
+    recon = base_margin + contrib.sum(axis=1).to_numpy()
+    assert np.max(np.abs(recon - margin)) < 1e-4
+    assert list(contrib.columns) == list(ALL_FEATURES)
