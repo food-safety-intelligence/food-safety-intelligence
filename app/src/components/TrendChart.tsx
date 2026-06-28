@@ -1,57 +1,60 @@
+"use client";
+
+import { useState } from "react";
 import { trendDirection } from "@/lib/scores";
 
 /**
- * Minimal 90-day trend chart. We don't ship per-restaurant historical scores
- * in scores.json (would balloon the payload), so the line is reconstructed
- * from the linear slope: past_score = current - slope * days_ago. That makes
- * it a straight line by definition; the chart is a quick visual read of
- * direction + magnitude, not a precise historical reproduction.
+ * Detail-page trend chart. Plots the establishment's recent FORECAST-MODEL scores
+ * (predictions — not inspection pass/fail results) at their real inspection dates:
+ * the actual trajectory, not a synthetic line. Hovering or focusing a point shows
+ * its date + predicted risk.
  *
- * For slope = null (insufficient history) we render a flat dashed baseline.
+ * The line/area/dots are a NEUTRAL colour on purpose (decision 0011): the
+ * authoritative direction signal — the coloured Improving/Worsening/Stable arrow
+ * + label — lives in the ScoreCard header, driven by `trend_slope` (a regression
+ * over the points). Colouring the drawn line by first-vs-last would be noisier
+ * than that slope and could visibly disagree with it, so the chart stays neutral.
  *
- * Inline SVG, no chart library.
+ * Client component for the hover tooltip.
  */
 
-const COLOR_BY_DIRECTION = {
-  worsening: "#B8634A", // terra
-  improving: "#7A8F6A", // sage
-  stable: "#9CA3AF", // muted gray
-} as const;
+// Neutral ink-muted — the drawn trajectory carries no direction meaning of its own.
+const LINE = "#6B7280";
+
+export interface TrendPoint {
+  /** ISO yyyy-mm-dd inspection date. */
+  date: string;
+  /** Forecast-model score (calibrated probability, 0..1). */
+  score: number;
+}
 
 export function TrendChart({
-  score,
+  points,
   slope,
-  typicalScore = null,
-  days = 90,
   width = 320,
-  height = 96,
+  height = 116,
 }: {
-  score: number;
+  points: TrendPoint[];
+  /** Trend slope — only used for the chart's `aria-label` direction word. */
   slope: number | null;
-  /** Population median, used for the dashed reference midline. Pass null to
-   * hide the reference. */
-  typicalScore?: number | null;
-  days?: number;
   width?: number;
   height?: number;
 }) {
-  const padX = 4;
-  const padY = 10;
-  const w = width - padX * 2;
-  const h = height - padY * 2;
+  const [hover, setHover] = useState<number | null>(null);
+
+  const padL = 24; // y-axis label gutter
+  const padR = 10;
+  const padTop = 10;
+  const padBot = 20; // x-axis date label gutter
+  const w = width - padL - padR;
+  const h = height - padTop - padBot;
 
   const direction = trendDirection(slope);
-  const color = COLOR_BY_DIRECTION[direction];
 
-  // y: 0 at bottom (score=0), h at top (score=1). Flip in SVG (y grows down).
-  const yFor = (s: number) => padY + h * (1 - clamp01(s));
-  const xFor = (t: number) => padX + (w * t) / days; // t in [0, days]
+  // Oldest -> newest for left-to-right time.
+  const pts = [...points].sort((a, b) => a.date.localeCompare(b.date));
 
-  const midlineY = typicalScore !== null ? yFor(typicalScore) : null;
-
-  if (slope === null) {
-    // No chart at all when there's no trend to draw — a dashed line over
-    // empty space reads as a glitch. Caller renders any surrounding label.
+  if (pts.length < 2) {
     return (
       <div
         role="status"
@@ -59,97 +62,140 @@ export function TrendChart({
         className="text-[12px] text-muted text-center py-3"
         style={{ width, height }}
       >
-        Not enough scored inspections in the last 90 days.
+        Not enough scored inspections to show a trend.
       </div>
     );
   }
 
-  // Reconstruct past score from slope. clamp so visually the line stays inside
-  // the 0..1 plot area even when the linear extrapolation overshoots.
-  const pastScore = clamp01(score - slope * days);
+  const times = pts.map((p) => Date.parse(p.date));
+  const tMin = times[0];
+  const span = times[times.length - 1] - tMin || 1;
 
-  const x0 = xFor(0);
-  const xN = xFor(days);
-  const y0 = yFor(pastScore);
-  const yN = yFor(score);
+  const yFor = (s: number) => padTop + h * (1 - clamp01(s));
+  const xFor = (t: number) => padL + (w * (t - tMin)) / span;
 
-  // Build area-fill path: line + drop to baseline.
-  const areaPath = `M ${x0} ${y0} L ${xN} ${yN} L ${xN} ${padY + h} L ${x0} ${padY + h} Z`;
+  const xy = pts.map((p, i) => ({ x: xFor(times[i]), y: yFor(p.score) }));
+  const linePath = xy.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
+  const areaPath = `${linePath} L ${xy[xy.length - 1].x} ${padTop + h} L ${xy[0].x} ${padTop + h} Z`;
+
+  const fmtAxis = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  const fmtFull = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
 
   return (
-    <svg
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={`90-day score trajectory, ${direction}`}
-    >
-      {/* Typical-score reference midline — population median, passed in. */}
-      {midlineY !== null && typicalScore !== null && (
-        <>
-          <line
-            x1={padX}
-            x2={width - padX}
-            y1={midlineY}
-            y2={midlineY}
-            stroke="#EDE6D8"
-            strokeWidth={1}
-            strokeDasharray="2 4"
-          />
+    <div style={{ position: "relative", width, height }}>
+      <svg
+        width={width}
+        height={height}
+        viewBox={`0 0 ${width} ${height}`}
+        role="img"
+        aria-label={`Predicted-risk trajectory across ${pts.length} inspections, ${direction}`}
+      >
+        {/* y-axis: 0..1 risk scale (most establishments sit low). */}
+        {[0, 1].map((t) => (
           <text
-            x={width - padX}
-            y={midlineY - 4}
+            key={t}
+            x={padL - 5}
+            y={yFor(t) + 3}
             textAnchor="end"
-            fontSize={9}
-            fill="#9CA3AF"
+            fontSize={8}
+            fill="#6B7280"
             fontFamily="var(--font-manrope), 'Manrope', sans-serif"
           >
-            typical {typicalScore.toFixed(2)}
+            {t.toFixed(1)}
           </text>
-        </>
+        ))}
+        <text
+          x={9}
+          y={padTop + h / 2}
+          fontSize={8}
+          fill="#6B7280"
+          textAnchor="middle"
+          transform={`rotate(-90 9 ${padTop + h / 2})`}
+          fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+        >
+          risk
+        </text>
+
+        <path d={areaPath} fill={LINE} fillOpacity={0.08} />
+        <path
+          d={linePath}
+          fill="none"
+          stroke={LINE}
+          strokeWidth={2}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {/* Inspection dots — latest emphasised; hover/focus reveals the tooltip. */}
+        {xy.map((q, i) => {
+          const isLast = i === xy.length - 1;
+          const active = hover === i;
+          return (
+            <circle
+              key={i}
+              cx={q.x}
+              cy={q.y}
+              r={isLast || active ? 5 : 3}
+              fill={isLast ? "#FFFFFF" : LINE}
+              fillOpacity={isLast ? 1 : active ? 0.9 : 0.5}
+              stroke={isLast || active ? LINE : "none"}
+              strokeWidth={2.5}
+              tabIndex={0}
+              role="button"
+              aria-label={`${fmtFull(pts[i].date)}, predicted risk ${pts[i].score.toFixed(2)}`}
+              style={{ cursor: "pointer", outline: "none" }}
+              onMouseEnter={() => setHover(i)}
+              onMouseLeave={() => setHover(null)}
+              onFocus={() => setHover(i)}
+              onBlur={() => setHover(null)}
+            />
+          );
+        })}
+
+        {/* x-axis — real first/last inspection dates (month + full year). */}
+        <text
+          x={padL}
+          y={height - 5}
+          fontSize={8.5}
+          fill="#6B7280"
+          fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+        >
+          {fmtAxis(pts[0].date)}
+        </text>
+        <text
+          x={width - padR}
+          y={height - 5}
+          textAnchor="end"
+          fontSize={8.5}
+          fill="#6B7280"
+          fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+        >
+          {fmtAxis(pts[pts.length - 1].date)}
+        </text>
+      </svg>
+
+      {/* Hover/focus tooltip — makes clear the value is a model prediction. */}
+      {hover !== null && (
+        <div
+          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium shadow-lg"
+          style={{
+            background: "#2A2724",
+            color: "#FBF8F1",
+            left: Math.min(Math.max(xy[hover].x, 60), width - 60),
+            top: xy[hover].y - 10,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          {fmtFull(pts[hover].date)} · predicted risk {pts[hover].score.toFixed(2)}
+        </div>
       )}
-
-      {/* Area fill — soft tint of the direction colour */}
-      <path d={areaPath} fill={color} fillOpacity={0.1} />
-
-      {/* The line itself */}
-      <line
-        x1={x0}
-        x2={xN}
-        y1={y0}
-        y2={yN}
-        stroke={color}
-        strokeWidth={2}
-        strokeLinecap="round"
-      />
-
-      {/* Past-score dot — smaller, faded */}
-      <circle cx={x0} cy={y0} r={3} fill={color} fillOpacity={0.45} />
-
-      {/* Current-score dot — emphasised */}
-      <circle cx={xN} cy={yN} r={5} fill="#FFFFFF" stroke={color} strokeWidth={2.5} />
-
-      {/* x-axis labels */}
-      <text
-        x={padX}
-        y={height - 1}
-        fontSize={9}
-        fill="#9CA3AF"
-        fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-      >
-        −{days}d
-      </text>
-      <text
-        x={width - padX}
-        y={height - 1}
-        textAnchor="end"
-        fontSize={9}
-        fill="#9CA3AF"
-        fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-      >
-        today
-      </text>
-    </svg>
+    </div>
   );
 }
 

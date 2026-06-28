@@ -67,7 +67,7 @@ describe("computeWaterfall", () => {
     lon: -87,
     risk_score: p,
     risk_tier: "High",
-    trend_slope_90d: null,
+    trend_slope: null,
     top_drivers: shaps.map((s, i) => ({
       feature: `f${i}`,
       value: "",
@@ -107,23 +107,23 @@ describe("trendDirection", () => {
 
   it("reports 'worsening' for a clearly rising slope", () => {
     expect(trendDirection(0.01)).toBe("worsening");
-    expect(trendDirection(0.0011)).toBe("worsening");
+    expect(trendDirection(0.0004)).toBe("worsening");
   });
 
   it("reports 'improving' for a clearly falling slope", () => {
     expect(trendDirection(-0.01)).toBe("improving");
-    expect(trendDirection(-0.0011)).toBe("improving");
+    expect(trendDirection(-0.0004)).toBe("improving");
   });
 
-  it("treats slopes inside the ±0.001 dead band as 'stable'", () => {
+  it("treats slopes inside the ±0.0003 dead band as 'stable'", () => {
     expect(trendDirection(0)).toBe("stable");
-    expect(trendDirection(0.0009)).toBe("stable");
-    expect(trendDirection(-0.0009)).toBe("stable");
+    expect(trendDirection(0.0002)).toBe("stable");
+    expect(trendDirection(-0.0002)).toBe("stable");
   });
 
-  it("treats the exact ±0.001 boundary as 'stable' (strict comparison)", () => {
-    expect(trendDirection(0.001)).toBe("stable");
-    expect(trendDirection(-0.001)).toBe("stable");
+  it("treats the exact ±0.0003 boundary as 'stable' (strict comparison)", () => {
+    expect(trendDirection(0.0003)).toBe("stable");
+    expect(trendDirection(-0.0003)).toBe("stable");
   });
 
   it("falls back to 'stable' for a NaN slope", () => {
@@ -227,7 +227,7 @@ describe("computeHomeView", () => {
     lon: coords ? -87.6 : null,
     risk_score,
     risk_tier,
-    trend_slope_90d: null,
+    trend_slope: null,
     top_driver: null,
   });
 

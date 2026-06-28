@@ -143,6 +143,21 @@ BOOLEAN_FEATURES: list[str] = [
 
 ALL_FEATURES: list[str] = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES
 
+# The current inspection's OWN outcome — the features that make a model a
+# "current-state" risk score rather than a forecast. The forecast-only model
+# (used to compute the forward-looking trend slope; see DR 0011) drops these so
+# its score does not see today's verdict; the mandated fail->re-inspection swing
+# they encode is exactly the re-inspection bounce that distorts a trend built
+# from the production score.
+CURRENT_OUTCOME_FEATURES: list[str] = [
+    "was_fail",
+    "n_priority_this_inspection",
+    "n_core_this_inspection",
+]
+
+# The forecast-only model's feature set: everything except the current outcome.
+FORECAST_FEATURES: list[str] = [f for f in ALL_FEATURES if f not in CURRENT_OUTCOME_FEATURES]
+
 LABEL_COL: str = "y_fail_or_critical_next_180d"
 
 

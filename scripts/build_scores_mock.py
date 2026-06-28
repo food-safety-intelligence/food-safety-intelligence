@@ -143,7 +143,7 @@ def build_fixture() -> pd.DataFrame:
             "top_drivers": [_sample_drivers(s) for s in scores],
             # Trend: small slope (positive or negative) so the UI's
             # improving/stable/worsening logic gets all three states.
-            "trend_slope_90d": RNG.normal(0, 0.003, size=len(sampled)).round(5),
+            "trend_slope": RNG.normal(0, 0.003, size=len(sampled)).round(5),
             # Mock marker — the real production scores.parquet will NOT have
             # this column. UI: `if "_is_mock" in df.columns: show_banner()`.
             "_is_mock": True,
@@ -165,9 +165,7 @@ def main() -> None:
     print(df["risk_tier"].value_counts().to_string())
     print("\n-- head(3) --")
     print(
-        df[["license_id", "dba_name", "risk_score", "risk_tier", "trend_slope_90d"]]
-        .head(3)
-        .to_string()
+        df[["license_id", "dba_name", "risk_score", "risk_tier", "trend_slope"]].head(3).to_string()
     )
 
 

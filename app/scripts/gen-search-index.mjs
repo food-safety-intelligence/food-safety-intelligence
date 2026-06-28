@@ -39,7 +39,7 @@ async function main() {
       // without changing any displayed score.
       risk_score: Math.round(r.risk_score * 1000) / 1000,
       risk_tier: r.risk_tier,
-      trend_slope_90d: r.trend_slope_90d,
+      trend_slope: r.trend_slope,
       // top_drivers[0] reduced to the PinDriver the list/pin renders.
       top_driver: d ? { feature: d.feature, label: d.label, up: d.shap > 0 } : null,
     };

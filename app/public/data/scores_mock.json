@@ -23,7 +23,7 @@
       "lon": -87.6418,
       "risk_score": 0.82,
       "risk_tier": "High",
-      "trend_slope_90d": 0.0048,
+      "trend_slope": 0.0048,
       "trend_ci_low": 0.0021,
       "trend_ci_high": 0.0079,
       "top_drivers": [
@@ -75,7 +75,7 @@
       "lon": -87.6157,
       "risk_score": 0.68,
       "risk_tier": "High",
-      "trend_slope_90d": 0.0021,
+      "trend_slope": 0.0021,
       "trend_ci_low": 0.0005,
       "trend_ci_high": 0.0042,
       "top_drivers": [
@@ -113,7 +113,7 @@
       "lon": -87.6311,
       "risk_score": 0.64,
       "risk_tier": "Elevated",
-      "trend_slope_90d": -0.0005,
+      "trend_slope": -0.0005,
       "trend_ci_low": -0.0021,
       "trend_ci_high": 0.0011,
       "top_drivers": [
@@ -151,7 +151,7 @@
       "lon": -87.7165,
       "risk_score": 0.60,
       "risk_tier": "Elevated",
-      "trend_slope_90d": 0.0011,
+      "trend_slope": 0.0011,
       "trend_ci_low": -0.0002,
       "trend_ci_high": 0.0024,
       "top_drivers": [
@@ -182,7 +182,7 @@
       "lon": -87.7188,
       "risk_score": 0.56,
       "risk_tier": "Elevated",
-      "trend_slope_90d": 0.0004,
+      "trend_slope": 0.0004,
       "trend_ci_low": -0.0008,
       "trend_ci_high": 0.0017,
       "top_drivers": [
@@ -213,7 +213,7 @@
       "lon": -87.6592,
       "risk_score": 0.24,
       "risk_tier": "Moderate",
-      "trend_slope_90d": -0.0019,
+      "trend_slope": -0.0019,
       "trend_ci_low": -0.0033,
       "trend_ci_high": -0.0006,
       "top_drivers": [
@@ -237,7 +237,7 @@
       "lon": -87.6492,
       "risk_score": 0.18,
       "risk_tier": "Low",
-      "trend_slope_90d": -0.0008,
+      "trend_slope": -0.0008,
       "trend_ci_low": -0.0018,
       "trend_ci_high": 0.0002,
       "top_drivers": [
@@ -261,7 +261,7 @@
       "lon": -87.6678,
       "risk_score": 0.14,
       "risk_tier": "Low",
-      "trend_slope_90d": -0.0012,
+      "trend_slope": -0.0012,
       "trend_ci_low": -0.0024,
       "trend_ci_high": -0.0001,
       "top_drivers": [
