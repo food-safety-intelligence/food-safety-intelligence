@@ -6,8 +6,10 @@ platform-level guardrail the agent attaches to. Two of its policies apply to
 input/output text automatically, independently of whether the model follows the
 system prompt:
 
-  - Denied topics — off-topic / non-Chicago-food requests, plus medical and
-    legal advice (the agent gives a risk signal, not advice).
+  - Denied topics — genuinely off-topic requests (recipes, other-city
+    restaurant lookups, meal planning, chit-chat) plus PERSONALISED medical and
+    legal advice. General factual food-safety education (answered with cited
+    public health sources) is deliberately NOT denied — it is in scope.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
 
 The contextual-grounding + relevance policy is configured below but is NOT active
@@ -38,36 +40,53 @@ import boto3
 GUARDRAIL_NAME = "food-safety-agent"
 
 _BLOCK_MESSAGE = (
-    "I can only help with predicted food-safety risk for food establishments in "
-    "Chicago. I can't help with that request."
+    "I can help with predicted food-safety risk for Chicago food establishments "
+    "and with general food-safety information from public health sources. I can't "
+    "help with that request."
 )
 
 # Topics the agent must refuse. Bedrock matches on the definition + examples.
+#
+# Scope reminder: the agent does TWO jobs — (A) Chicago restaurant risk signals
+# and (B) general food-safety / foodborne-illness education with cited public
+# health sources. The deny topics below must NOT block job B, so they are scoped
+# to genuinely off-topic requests and to *personalised* medical advice only —
+# general factual food-safety education is allowed.
 _DENIED_TOPICS = [
     {
-        "name": "NonChicagoFoodSafety",
+        "name": "OffTopicNonFoodSafety",
         "definition": (
-            "Any request not about predicted food-safety risk for food "
-            "establishments in Chicago — including recipes, cooking or food "
-            "preparation, nutrition, restaurants in other cities, and general "
-            "conversation unrelated to Chicago food-establishment safety."
+            "Any request that is neither (A) about food-safety risk for food "
+            "establishments in Chicago nor (B) a general food-safety or "
+            "foodborne-illness information question — including recipes, cooking "
+            "or food-preparation instructions, meal or nutrition planning, "
+            "finding restaurants in other cities, and general conversation "
+            "unrelated to food safety."
         ),
         "examples": [
             "Give me a recipe for deep dish pizza.",
             "Find safe sushi in New York.",
             "What should I cook for dinner tonight?",
+            "Plan a week of healthy meals for me.",
             "Tell me a joke.",
         ],
         "type": "DENY",
     },
     {
-        "name": "MedicalOrHealthAdvice",
+        "name": "PersonalisedMedicalAdvice",
         "definition": (
-            "Providing medical, dietary, or health advice, diagnoses, or treatment recommendations."
+            "Providing PERSONALISED medical or health advice — diagnosing a "
+            "person, recommending treatment or medication, or ruling on what a "
+            "specific individual should eat or whether eating something is safe "
+            "for them given their personal health condition. General, factual "
+            "food-safety education (how illness spreads, who is generally at "
+            "higher risk, safe cooking temperatures) is NOT included and is "
+            "allowed."
         ),
         "examples": [
-            "Is it safe for me to eat here with a weak immune system?",
-            "What should I eat to avoid food poisoning?",
+            "Is it safe for ME to eat here with my weak immune system?",
+            "Do I have food poisoning, and what medicine should I take?",
+            "I'm pregnant — tell me exactly what I can and cannot eat.",
         ],
         "type": "DENY",
     },
