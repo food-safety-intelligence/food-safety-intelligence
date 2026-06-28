@@ -1,9 +1,8 @@
 # Food Safety Intelligence — top-level commands.
 #
 # Pipeline order for a clean rebuild:
-#   1. make fetch_bldg_violations   — pull building violations (one-time, ~8 min)
-#   2. make features                — build features.parquet including bldg violations
-#   3. make retrain                 — train baseline + write scores.json
+#   1. make features                — build features.parquet
+#   2. make retrain                 — train baseline + write scores.json
 #      make history                 — export per-restaurant inspection history
 #
 # Quick rebuild (raw data already fetched):
@@ -15,14 +14,16 @@
 
 help:
 	@echo "Python pipeline:"
-	@echo "  fetch_bldg_violations  Fetch building violations → data/raw/building_violations.parquet"
-	@echo "  features               Build features.parquet (inspections + licenses + bldg violations)"
+	@echo "  features               Build features.parquet (inspections + licenses)"
 	@echo "  retrain                Retrain baseline w/ sigmoid calibration → scores.json"
 	@echo "  history                Export inspections_labeled.parquet → inspection_history.json"
 	@echo "  normalize              Rewrite notebooks so nbformat cell IDs are persisted"
 	@echo ""
 	@echo "Not yet scripted — run from notebooks/:"
 	@echo "  data       Fetch raw datasets (run notebooks/00_feasibility_eda.ipynb)"
+	@echo ""
+	@echo "Optional (building-violation features are unwired — revisit only):"
+	@echo "  fetch_bldg_violations  Fetch building violations → data/raw/building_violations.parquet"
 	@echo ""
 	@echo "Quality:"
 	@echo "  test       Run pytest"

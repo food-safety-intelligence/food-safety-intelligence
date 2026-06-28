@@ -75,9 +75,12 @@ experiment per commit boundary.
 - LogReg: `notebooks/04_baseline_logreg.ipynb`; XGBoost: `notebooks/05_xgboost_model.ipynb`.
   Each writes `reports/metrics/<model>_<run>.json` with provenance.
 - **Judge on lift over base rate**, not raw PR-AUC (a rarer label mechanically
-  lowers raw PR-AUC). The **promotion gate is BOTH PR-AUC AND precision@10%**, on
-  **both models** (`docs/decisions/0002`). Baseline stays the production estimator
-  unless both clear.
+  lowers raw PR-AUC). The **promotion gate is BOTH PR-AUC AND precision@10%**
+  (both metrics), and a feature clears if **at least one model** — LogReg or
+  XGBoost — improves on both. Evaluate **both arms on the same temporal split**
+  (control vs candidate, identical rows). Ship the model the feature improves;
+  if that isn't the current production estimator, switching the served model is
+  part of promoting it (`docs/decisions/0002`, `0009`).
 - For a clean attribution, run a **controlled A/B on the same split**: train
   full-feature vs feature-removed using `temporal_split(train_end='2024-07-01',
   val_end='2025-07-01')` and `foodsafety.models.evaluate.evaluate`. Ranking metrics

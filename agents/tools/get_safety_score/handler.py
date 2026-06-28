@@ -253,7 +253,15 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
         ...
     ]
     """
-    restaurants: list[dict[str, Any]] = event.get("restaurants", [])
+    restaurants: Any = event.get("restaurants", [])
+    # A non-list input (e.g. an upstream {"error": ...} from find_restaurants
+    # when Overpass is down) means there is nothing to score — degrade
+    # gracefully instead of crashing.
+    if not isinstance(restaurants, list):
+        return []
+    # Drop any malformed element (no osm_id) so one bad input can never crash
+    # the batch on a missing key downstream.
+    restaurants = [r for r in restaurants if isinstance(r, dict) and r.get("osm_id")]
     if not restaurants:
         return []
 
@@ -282,7 +290,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
             {
                 # Identity
                 "osm_id": r["osm_id"],
-                "name": r["name"],
+                "name": r.get("name", ""),
                 "address": r.get("address", ""),
                 "lat": r.get("lat"),
                 "lon": r.get("lon"),

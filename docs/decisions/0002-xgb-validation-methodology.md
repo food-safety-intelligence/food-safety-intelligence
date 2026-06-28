@@ -1,7 +1,7 @@
 # 0002 — XGBoost validation methodology: no val double-dip, expanding-window CV
 
 - **Status**: Accepted
-- **Date**: 2026-06-14
+- **Date**: 2026-06-14 (amended 2026-06-27 — feature-promotion gate relaxed to one model)
 - **Owners to ack**: Bella, Deepak, Jun (modeling); Arun, Aurelia (consumers)
 
 ## Context
@@ -79,6 +79,41 @@ train/val/test boundary — see `utils/time.py:temporal_split`).
   (Phase 2), which is out of scope now.
 - The both-metrics promotion gate is the explicit, recorded rule for swapping
   the production estimator — future challengers are judged the same way.
+
+## Amendment (2026-06-27) — feature-promotion gate needs only one model
+
+Point 4 above is the **production-estimator** gate: it decides which single
+model (baseline LogReg vs XGBoost challenger) is *served*, and a challenger must
+clear the baseline on **both** PR-AUC and precision@10%. That is unchanged.
+
+This amendment governs **feature promotion** — whether a new feature stays in
+`ALL_FEATURES`. The rule was previously read as "the feature must improve
+**both** models." It is relaxed to:
+
+> A feature clears if it improves **at least one model** (LogReg or XGBoost) on
+> **both** PR-AUC and precision@10%, with both arms evaluated on the **same
+> temporal split** (control vs candidate, identical rows), judged on lift over
+> base rate, and stable under expanding-window CV (a single-split move of
+> ~±0.002 is noise, not a pass). Ship the model the feature improves; if that is
+> not the current production estimator, switching the served model is part of
+> promoting the feature.
+
+**Why relax it.** We serve the better model, so a feature that helps the model
+we ship is worth keeping even if it does not help the other family. Requiring
+both families to agree was stricter than the decision we actually make (which
+single model to serve) and would reject features that genuinely improve the
+served model.
+
+**Same-split requirement is now explicit.** A candidate and its control must be
+graded on the *identical* test rows. Comparing a fresh candidate against a
+stored control from a different split — different row count or base rate — is
+not a valid read; base-rate differences alone move PR-AUC. (Surfaced by the
+building-violations feature review: a stale control on a wider,
+right-truncation-kept test set, base rate 8.85%, was compared against a
+candidate on the correct fully-observed test set, base rate 10.5% — manufacturing
+a +0.0198 PR-AUC "gain" that shrank to +0.0015 on the same test set and went
+negative under expanding-window CV. The feature failed even this relaxed gate
+on all three model families — LogReg, XGBoost, and the nb07 MLP — and was reverted.)
 
 ## References
 

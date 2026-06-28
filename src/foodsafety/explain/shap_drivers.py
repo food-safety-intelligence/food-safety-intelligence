@@ -7,9 +7,9 @@ log-odds space. This is the exact local additive explanation (same as
 in ~30 lines rather than pull the ``shap`` package — fewer dependencies, and
 the math is uncomplicated.
 
-For the XGBoost model we'd use ``shap.TreeExplainer`` (different code path);
-since we shipped baseline as production, that path stays in the Phase-6
-backlog.
+For the served XGBoost model, ``tree_contributions`` (below) uses XGBoost's
+native TreeSHAP (``Booster.predict(pred_contribs=True)``) — same additive
+log-odds decomposition, no ``shap`` package dependency.
 
 Two product surfaces depend on this module:
 
@@ -126,6 +126,43 @@ def linear_contributions(
         contrib_df[orig] += expanded_contributions[:, j]
 
     return contrib_df
+
+
+def tree_contributions(
+    xgb_estimator,
+    X: pd.DataFrame,
+    original_features: list[str],
+) -> tuple[pd.DataFrame, float]:
+    """Per-feature contributions in margin (log-odds) space for an XGB model.
+
+    Uses XGBoost's native TreeSHAP (``Booster.predict(pred_contribs=True)``) —
+    the exact local additive explanation for the tree ensemble — so we avoid
+    pulling the heavy ``shap`` package. The booster reports one contribution per
+    input column plus a trailing bias term; for our XGB model each ORIGINAL
+    feature is a single column (categoricals use native partition splits, not
+    one-hot), so the contribution columns map 1:1 to ``original_features`` with
+    no expansion to sum back.
+
+    The additive identity holds exactly: ``base_margin + Σ contributions ==
+    raw margin`` for every row, and the served Platt map turns that margin into
+    the calibrated risk score. Returns ``(contrib_df, base_margin)`` where
+    ``contrib_df`` is ``(len(X), len(original_features))`` and ``base_margin``
+    is the constant bias term (the model's expected margin) — shipped as the
+    ``calibration.intercept`` so the app waterfall reconciles to the gauge.
+
+    ``X`` must already carry the dtypes the model trained on (categorical
+    columns as ``category``); pass the prepared frame from the serve wrapper.
+    """
+    import xgboost as xgb_lib
+
+    booster = xgb_estimator.get_booster()
+    dmat = xgb_lib.DMatrix(X[original_features], enable_categorical=True)
+    raw = booster.predict(dmat, pred_contribs=True)  # (n, n_features + 1); last col = bias
+    contrib_df = pd.DataFrame(
+        raw[:, :-1], index=X.index, columns=list(original_features), dtype="float64"
+    )
+    base_margin = float(raw[0, -1])  # constant across rows
+    return contrib_df, base_margin
 
 
 def _map_expanded_to_original(

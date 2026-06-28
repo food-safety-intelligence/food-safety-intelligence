@@ -148,10 +148,10 @@ export default async function HowItWorksPage() {
             How this works
           </h1>
           <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
-            A logistic-regression model fit on six years of Chicago inspection
-            history. The score is a calibrated probability that a food
-            establishment will fail an inspection or be cited for a priority
-            violation in the next 180 days.
+            A gradient-boosted decision-tree model (XGBoost) fit on six years of
+            Chicago inspection history. The score is a calibrated probability
+            that a food establishment will fail an inspection or be cited for a
+            priority violation in the next 180 days.
           </p>
         </header>
 
@@ -342,12 +342,13 @@ export default async function HowItWorksPage() {
               The model
             </h2>
             <p className="text-[15.5px] text-muted leading-relaxed mt-2">
-              Logistic regression with{" "}
+              Gradient-boosted decision trees (XGBoost), shallow (depth-3) with{" "}
               <code className="num text-[13.5px] bg-tint px-1.5 py-0.5 rounded">
-                class_weight=&quot;balanced&quot;
+                monotone constraints
               </code>{" "}
-              to handle the ~11% positive rate, calibrated with Platt (sigmoid)
-              scaling. On the time-held-out test split: PR-AUC{" "}
+              on the risk-count features, weighted for the ~11% positive rate and
+              calibrated with Platt (sigmoid) scaling. On the time-held-out test
+              split: PR-AUC{" "}
               {methodology.headline.pr_auc.toFixed(2)}, ROC-AUC{" "}
               {methodology.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
               {methodology.headline.top_decile_lift.toFixed(1)}×.

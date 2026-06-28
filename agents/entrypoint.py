@@ -129,7 +129,7 @@ def get_safety_score(restaurants: list) -> list:
 def explain_restaurant(license_id: str) -> dict:
     """
     Get full SHAP driver breakdown and inspection history for one restaurant.
-    Call for the top 2-3 safest results.
+    Call for the 2-3 lowest predicted-risk results.
     """
     return _explain_handler.handler({"license_id": license_id}, None)
 
@@ -141,6 +141,29 @@ _PROMPT_FILE = os.path.join(_HERE, "system_prompt.txt")
 SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else ""
 
 # ---------------------------------------------------------------------------
+# Bedrock Guardrail (platform-level safety, independent of model compliance)
+# ---------------------------------------------------------------------------
+
+
+def _guardrail_kwargs() -> dict[str, str]:
+    """Attach a Bedrock Guardrail to the model when one is configured.
+
+    Enforces denied topics + a contextual-grounding check at the platform layer,
+    so off-topic or low-grounding (fabricated) responses are blocked regardless
+    of whether the model follows the prompt. A guardrail only activates when
+    BOTH an id and a version are set, so we pass them only when present; absent
+    (local dev / tests) the agent runs with no guardrail. Create the guardrail
+    out-of-band with ``agents/create_guardrail.py`` and wire the printed id and
+    version through these env vars.
+    """
+    gid = os.environ.get("FSI_BEDROCK_GUARDRAIL_ID")
+    gver = os.environ.get("FSI_BEDROCK_GUARDRAIL_VERSION")
+    if gid and gver:
+        return {"guardrail_id": gid, "guardrail_version": gver, "guardrail_trace": "enabled"}
+    return {}
+
+
+# ---------------------------------------------------------------------------
 # Agent + AgentCore app.
 # ---------------------------------------------------------------------------
 app = BedrockAgentCoreApp()
@@ -148,6 +171,10 @@ model = BedrockModel(
     model_id="us.amazon.nova-2-lite-v1:0",
     region_name=os.environ["AWS_REGION"],
     max_tokens=4096,
+    # Low temperature: this is a factual lookup-and-report task, not a creative
+    # one. Sampling variance only adds room for fabricated scores or names.
+    temperature=0.2,
+    **_guardrail_kwargs(),
 )
 agent = Agent(
     model=model,

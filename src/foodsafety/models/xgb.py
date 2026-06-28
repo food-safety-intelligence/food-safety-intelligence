@@ -134,6 +134,49 @@ def extract_categorical_dtypes(df: pd.DataFrame) -> dict:
     return {c: df[c].dtype for c in CATEGORICAL_FEATURES if c in df.columns}
 
 
+# Features whose risk reading is monotone non-decreasing in their value: counts
+# of prior bad events, the current inspection's own outcome/violation counts, and
+# the fired keyword-hazard flags. Recency (``days_since_*``), calendar, license
+# age, and categoricals are left unconstrained (0).
+def monotone_constraints_for(features: list[str]) -> dict[str, int]:
+    """Map risk-increasing features to a ``+1`` monotone constraint.
+
+    On a forward-time split the ``prior_*`` counts grow over calendar time, so
+    test rows carry values above the training range; unconstrained axis-aligned
+    trees saturate at the top training threshold and lose rank resolution at the
+    top of the list (where precision@10% lives). Forcing monotonicity in the
+    risk counts preserves that top-decile ordering and yields a cleaner SHAP
+    story. Empirically this is what lifts XGB past the LogReg baseline (DR 0002).
+    """
+    return {
+        f: 1
+        for f in features
+        if (f.startswith("prior_") and "days_since" not in f)
+        or f.startswith("flag_kw_")
+        or f in {"was_fail", "n_priority_this_inspection", "n_core_this_inspection"}
+    }
+
+
+def build_production_xgb(*, scale_pos_weight: float) -> XGBClassifier:
+    """The promoted production XGB: shallow (depth-3) + monotone risk constraints.
+
+    The CV-validated winner over the LogReg baseline (beats it on both PR-AUC and
+    precision@10% in 5/6 expanding-window folds — see DR 0002/0009 and
+    docs/experiments.md). Fixed ``n_estimators`` with early stopping off so the
+    served run is deterministic. ``max_depth=3`` (vs the experiment default 6):
+    the signal is low-order, so deep trees over-fragment it and lose the forward-
+    time top decile.
+    """
+    return build_xgb_estimator(
+        n_estimators=300,
+        max_depth=3,
+        learning_rate=0.05,
+        scale_pos_weight=scale_pos_weight,
+        early_stopping_rounds=None,
+        monotone_constraints=monotone_constraints_for(list(ALL_FEATURES)),
+    )
+
+
 def compute_scale_pos_weight(y) -> float:
     """``n_negative / n_positive`` — the CLAUDE.md-mandated imbalance handle.
 
