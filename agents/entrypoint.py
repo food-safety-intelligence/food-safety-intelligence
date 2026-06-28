@@ -138,10 +138,17 @@ def explain_restaurant(license_id: str) -> dict:
 @tool
 def find_reviews(name: str, address: str = "", topics: list | None = None) -> dict:
     """
-    Find THIRD-PARTY diner reviews (Yelp/Google/web) for one restaurant. Use only
-    when the user asks what reviewers say. Returns attributed deep links; reviews
-    are unverified opinion and NOT part of the risk score — pass the disclaimer
-    and never use a review to set or change a risk score or tier.
+    Find THIRD-PARTY diner reviews (Yelp/Google/web) for one restaurant, focused on
+    food-safety topics: cleanliness, pests, food_quality, illness. Use only when the
+    user asks what reviewers say. Returns attributed deep links; reviews are
+    unverified opinion and NOT part of the risk score — pass the disclaimer and
+    never use a review to set or change a risk score or tier.
+
+    Args:
+        name: Restaurant name (from find_restaurants / get_safety_score)
+        address: Street address — improves match quality (optional)
+        topics: Subset of ["cleanliness", "pests", "food_quality", "illness"];
+                omit for all topics
     """
     return _reviews_handler.handler(
         {"name": name, "address": address, "topics": topics or []}, None

@@ -41,7 +41,7 @@ DISCLAIMER = (
 # This dict is also the registry of valid topic keys.
 TOPIC_LABELS: dict[str, str] = {
     "cleanliness": "cleanliness",
-    "pests": "rodents / pests",
+    "pests": "rodents / pests / droppings",
     "food_quality": "food quality",
     "illness": "illness reports",
 }
