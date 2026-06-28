@@ -210,7 +210,7 @@ def add_inspection_features(
     # Fail triggers a mandated ~30-day re-inspection that often lands inside
     # the 180-day window. That's legitimate forward signal, but it means
     # was_fail correlates with the label partly via that mechanism — see
-    # docs/experiments.md for the circularity check.
+    # docs/model-experiments.md for the circularity check.
     out["was_fail"] = out["_is_fail_int"].astype("int8")
     out["n_priority_this_inspection"] = out["_priority_int"].astype("int32")
     out["n_core_this_inspection"] = out["_core_int"].astype("int32")

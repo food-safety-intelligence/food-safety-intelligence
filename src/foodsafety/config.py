@@ -75,7 +75,7 @@ DATASETS: dict[str, str] = {
     "licenses_historical": "vgg9-bn8p",  # Business Licenses — historical
     # Physical-plant condition, joined to food establishments by block-face
     # (lat/lon proximity). Genuinely orthogonal to inspection history — see
-    # docs/experiments.md / the building-features run.
+    # docs/model-experiments.md / the building-features run.
     "building_permits": "ydr8-5enu",  # Building Permits (2006-present)
     "building_violations": "22u3-xenr",  # Building Violations (2006-present)
 }
