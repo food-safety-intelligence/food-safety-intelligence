@@ -24,22 +24,36 @@ export interface AgentResponse {
   result: string;
 }
 
+/** One prior turn replayed to the agent for multi-turn context. */
+export interface AgentHistoryTurn {
+  role: "user" | "agent";
+  content: string;
+}
+
 /**
  * Send a conversational query to the Food Safety Agent.
  *
+ * The deployed agent is stateless (a fresh, isolated agent per request), so
+ * multi-turn context is replayed by the caller: pass the prior turns as
+ * `history` and the agent answers follow-ups ("is the second one safe too?")
+ * with that context. The backend validates and length-caps the history.
+ *
  * @param query     Natural-language query (max 500 chars).
- * @param sessionId Caller-managed UUID that preserves conversation state
- *                  across multiple turns. Must be ≥33 chars.
+ * @param sessionId Caller-managed UUID that scopes the conversation. Must be
+ *                  ≥33 chars.
+ * @param history   Prior turns of THIS conversation (oldest first), excluding
+ *                  the current query. Empty/omitted for the first turn.
  * @returns         The agent's plain-text response.
  */
 export async function queryAgent(
   query: string,
   sessionId: string,
+  history: AgentHistoryTurn[] = [],
 ): Promise<string> {
   const res = await fetch(AGENT_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, session_id: sessionId }),
+    body: JSON.stringify({ query, session_id: sessionId, history }),
   });
 
   let data: Record<string, string> = {};
