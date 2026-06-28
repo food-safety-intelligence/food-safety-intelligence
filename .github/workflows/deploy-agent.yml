@@ -1,0 +1,82 @@
+name: Deploy agent
+
+# Manual deploy of the AgentCore runtime (agents/entrypoint.py) + the proxy Lambda
+# via scripts/deploy_aws.sh. Unlike the web app (deploy-web.yml), this is NOT
+# auto-on-merge: redeploying the live agent runtime is higher-stakes than a static
+# S3 sync, so it runs only when someone clicks "Run workflow". Once deploy_aws.sh is
+# proven idempotent in CI, a `push` trigger on agents/** + agentcore-deploy/** can be
+# added here.
+#
+# Prerequisite (one-time, owner of AWS account 991500268971):
+#   - A GitHub repo variable AGENT_DEPLOY_ROLE_ARN: an OIDC role in that account
+#     trusting this repo, with permissions for CloudFormation, Bedrock AgentCore,
+#     Lambda, IAM (the CDK creates roles + the S3 grant), and S3.
+#   - CDK already bootstrapped in the account.
+
+on:
+  workflow_dispatch:
+    inputs:
+      region:
+        description: AWS region to deploy into
+        default: us-west-2
+        required: false
+      account:
+        description: AWS account id (must match the assumed role's account)
+        default: "991500268971"
+        required: false
+
+# One deploy at a time; never interrupt a half-finished CDK/Lambda update.
+concurrency:
+  group: deploy-agent
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # mint the OIDC token AWS exchanges for temporary creds
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: agentcore-deploy/agentcore/cdk/package-lock.json
+
+      # deploy_aws.sh runs `npm run build` + `npm run cdk` in the cdk dir but does
+      # not install deps itself.
+      - name: Install CDK deps
+        working-directory: agentcore-deploy/agentcore/cdk
+        run: npm ci
+
+      # Python 3.11 = the proxy Lambda runtime; deploy_aws.sh pip-installs the
+      # proxy's deps into its package before zipping.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AGENT_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ inputs.region }}
+
+      - name: Deploy agent (CDK runtime + proxy Lambda)
+        run: bash scripts/deploy_aws.sh "${{ inputs.region }}" "${{ inputs.account }}"
+
+      # Best-effort: the agent should now return a real score, not the S3-permissions
+      # apology. Informational only — CloudFront caching can make this lag, so it
+      # warns rather than fails the deploy.
+      - name: Smoke-test scoring
+        continue-on-error: true
+        run: |
+          resp=$(curl -s -X POST https://d1uefdb2te19wk.cloudfront.net/api/agent \
+            -H 'Content-Type: application/json' \
+            -d '{"query":"safe sushi near Wicker Park","session_id":"sess-ci-smoke-0001-0001-000000000001"}')
+          echo "$resp"
+          if echo "$resp" | grep -qi "permissions error"; then
+            echo "::warning::Scoring still returns a permissions error — check the runtime role's S3 access."
+          fi
