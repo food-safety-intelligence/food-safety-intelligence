@@ -83,6 +83,14 @@ body {
  * rounded, soft-shadowed, ink-toned border. Default maplibre popups look
  * generic; this pulls them into the design system.
  */
+/* Lift the popup above the floating search/filter overlay (Tailwind z-10 in
+ * MapExplorer). `.maplibregl-map` isn't a stacking context, so this z-index
+ * resolves against that overlay — clicking a pin near the top of the map now
+ * shows the popup over the search bar instead of behind it. Markers stay at
+ * their default (below the overlay), which is intended. */
+.maplibregl-popup.fsi-popup {
+  z-index: 20;
+}
 .maplibregl-popup.fsi-popup .maplibregl-popup-content {
   padding: 14px 16px 14px 16px;
   border-radius: 16px;
