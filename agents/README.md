@@ -18,6 +18,101 @@ Your query
 
 ---
 
+## Architecture & tool contracts
+
+> Reference for the agent's design and each tool's input/output shape. The
+> behaviour described here reflects the agent-tool PRs in flight (#55 prompt &
+> config, #56 explain/error-shape, #57 name match, #58 scoring) and
+> [decision record 0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md).
+> Where a field is added by an unmerged PR it is marked *(pending)*.
+
+### What the agent is
+
+A **conversational search** assistant for predicted food-safety risk of Chicago
+food establishments. It is reachable as its own surface — the web app's `/chat`
+page and the local runner — **not** tied to a specific restaurant detail page.
+A user asks in natural language ("low-risk ramen near Lincoln Square"); the
+agent finds candidate venues from OpenStreetMap, attaches the **precomputed**
+risk signal, and returns a ranked, plain-English answer under the responsible-AI
+framing in `system_prompt.txt`.
+
+### Core design rule — no request-time scoring
+
+The agent **never calls the model at request time**. `get_safety_score` reports
+only the precomputed batch scores written to `scores.json` (the project's
+permanent batch-score-to-JSON design — see `CLAUDE.md` and
+[0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)).
+A venue the batch run does not cover returns an explicit **no-record** result
+(no number), not an estimate. The agent therefore does discovery over the
+establishments the batch run covers; widening coverage is a batch/data task, not
+a request-time-inference one.
+
+### Surfaces
+
+| Surface | Entry | Notes |
+|---|---|---|
+| Local runner | `agents/run_local.py` | Strands + Bedrock; SageMaker stub by default |
+| Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
+| Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
+
+All three run the **same** three `handler.py` files.
+
+### Tools
+
+The agent calls the tools in order: `find_restaurants` → `get_safety_score` →
+`explain_restaurant` (for the lowest-risk few). Each handler takes
+`handler(event, _ctx)`.
+
+**1. `find_restaurants`** — OpenStreetMap/Overpass lookup (no key).
+
+- *Input*: `neighborhood` | (`lat`,`lon`), `radius_km`, `cuisine`, `limit`.
+- *Output*: `list` of restaurant stubs sorted by distance — each
+  `{osm_id, name, address, lat, lon, cuisine, opening_hours, phone, website, dist_km}`.
+- *On Overpass outage*: returns a top-level `{"error": "..."}` object (a dict,
+  not a list with a fake restaurant), so a downstream tool never reads `osm_id`
+  off a malformed element *(error-object shape: #56)*.
+
+**2. `get_safety_score`** — attaches the precomputed risk signal.
+
+- *Input*: `{"restaurants": [ ...find_restaurants stubs... ]}`.
+- *Output*: `list` ordered by predicted risk ascending; no-record venues sort
+  last. Each item:
+
+  | Field | Type | Notes |
+  |---|---|---|
+  | `osm_id`, `name`, `address`, `lat`, `lon`, `cuisine` | — | passthrough identity |
+  | `risk_score` | `float \| null` | calibrated probability `[0,1]`; **`null` when no record** *(null: #58)* |
+  | `risk_tier` | `str \| null` | Low / Moderate / Elevated / High; `null` when no record |
+  | `shap_drivers` | `list` | `[]` when no record |
+  | `matched_scores_json` | `bool` | `true` only for a batch-run match |
+  | `status` | `str` | `"scored"` \| `"no_inspection_record"` *(new: #58)* |
+  | `stub` | `bool` | `true` for the `-1.0` mock-data sentinel in `scores.json` |
+  | `license_id`, `percentile_rank`, `trend`, `neighborhood` | `… \| null` | from the matched record; `null` when no record |
+
+  Matched venue → published batch score/tier/drivers directly. Unmatched venue →
+  no-record (`risk_score`/`risk_tier` `null`, `status="no_inspection_record"`),
+  no model call.
+
+**3. `explain_restaurant`** — full detail for one venue by `license_id`.
+
+- *Input*: `{"license_id": "..."}` (a license the agent already matched).
+- *Output*: identity + score fields, `top_drivers`, `model_note`, and:
+  - `inspection_history`: most-recent-first, max 10, **sorted in the handler** so
+    it does not depend on upstream order *(sort + guard: #56)*.
+  - `inspection_summary`: `{total, pass, fail, pass_w_conditions, other,
+    last_date, days_since_last}`. The `other` bucket holds non-outcome results
+    (Out of Business / No Entry / Not Ready / Business Not Located) so they are
+    **not** miscounted as passes *(the `other` bucket: #56)*.
+
+### Note on the sections below
+
+The "Switching from stub to real SageMaker" and "What the stub scores look like"
+sections are **superseded by [0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md)**
+once #58 lands: the agent does not score at request time, so `sagemaker_stub.py`
+becomes orphaned. They are kept until then and should be pruned with that merge.
+
+---
+
 ## Prerequisites
 
 ### 1. AWS credentials
