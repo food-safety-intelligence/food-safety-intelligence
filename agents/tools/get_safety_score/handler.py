@@ -141,6 +141,10 @@ def _fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict
         ratio = difflib.SequenceMatcher(
             None, target, _normalise_name(record.get("dba_name", ""))
         ).ratio()
+        # Strict `>` keeps the first record on an exact tie, so a tie resolves to
+        # scores.json order. This only bites when two venues share both an
+        # address and an identical name (near-indistinguishable), and we have no
+        # better signal (no license_id) to break it — so first-in-order is fine.
         if ratio > best_ratio:
             best_ratio = ratio
             best = record
