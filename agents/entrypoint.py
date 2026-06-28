@@ -203,17 +203,73 @@ model = BedrockModel(
 )
 
 
-def _build_agent() -> Agent:
+# Cap how many prior turns the client may replay. Bounds payload size, Bedrock
+# token cost, and how far a malicious client could pad the context window. 20
+# messages = 10 user/assistant exchanges, plenty for a follow-up conversation.
+_MAX_HISTORY_MESSAGES = 20
+# Per-message character cap — a backstop against an oversized single turn.
+_MAX_MESSAGE_CHARS = 8000
+
+
+def _coerce_history(raw: object) -> list[dict]:
+    """Turn the client's prior turns into Strands ``Message`` dicts.
+
+    The deployed agent is stateless (one fresh Agent per request, see
+    ``_build_agent``), so multi-turn context has to be replayed by the caller.
+    The client sends the prior turns; we rebuild them as the new agent's starting
+    conversation.
+
+    This history is UNTRUSTED client input — same trust level as ``query`` — so we
+    validate hard: only ``user``/``assistant`` roles (``agent`` is accepted as a
+    synonym for the UI's vocabulary), text coerced to a string and length-capped,
+    empties dropped. We replay only TEXT turns, never tool-use/tool-result blocks:
+    a follow-up re-runs the tools, so the model never treats a client-supplied
+    prior score as ground truth (anti-fabrication still rests on live tool output
+    + the system prompt). Bedrock requires the conversation to start with ``user``
+    and strictly alternate, so we drop any turn whose role repeats the previous
+    kept turn, trim a leading assistant turn, and trim a trailing user turn (which
+    would collide with the new query appended by ``agent(query)``).
+    """
+    if not isinstance(raw, list):
+        return []
+
+    role_map = {"user": "user", "assistant": "assistant", "agent": "assistant"}
+    cleaned: list[dict] = []
+    for turn in raw[-_MAX_HISTORY_MESSAGES:]:
+        if not isinstance(turn, dict):
+            continue
+        role = role_map.get(str(turn.get("role", "")).lower())
+        text = turn.get("content")
+        if role is None or not isinstance(text, str) or not text.strip():
+            continue
+        # Drop a turn that repeats the previous role — keeps strict alternation.
+        if cleaned and cleaned[-1]["role"] == role:
+            continue
+        cleaned.append({"role": role, "content": [{"text": text[:_MAX_MESSAGE_CHARS]}]})
+
+    # Must start with user and end with assistant for a valid replay.
+    if cleaned and cleaned[0]["role"] == "assistant":
+        cleaned.pop(0)
+    if cleaned and cleaned[-1]["role"] == "user":
+        cleaned.pop()
+    return cleaned
+
+
+def _build_agent(messages: list[dict] | None = None) -> Agent:
     """Build a fresh agent for ONE request.
 
     The model is shared (stateless), but each invocation gets its OWN Agent so its
     conversation history is never shared across sessions. A module-level singleton
     Agent accumulates one growing message history across every caller on a warm
     container, so one user's context could leak into another's. One agent per
-    request keeps sessions isolated. (Multi-turn memory is added on top of this.)
+    request keeps sessions isolated.
+
+    ``messages`` seeds the new agent with the caller's prior turns so a follow-up
+    question has context. It stays scoped to this one request, so isolation holds.
     """
     return Agent(
         model=model,
+        messages=messages or [],
         tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
         system_prompt=SYSTEM_PROMPT,
     )
@@ -224,16 +280,20 @@ def invoke(payload: dict) -> dict:
     """
     AgentCore Runtime invocation handler.
 
-    Expected payload: { "query": "safe sushi near Wicker Park", "session_id": "..." }
+    Expected payload: {
+        "query":      "is the second one safe too?",
+        "session_id": "...",
+        "history":    [{"role": "user"|"agent", "content": "..."}, ...]  # optional
+    }
     Returns:          { "result": "1. Mirai Sushi ..." }
     """
     query = payload.get("query") or payload.get("prompt", "")
     if not query:
         return {"error": "query is required"}
 
-    # Fresh, isolated agent per request — no conversation state shared across
-    # sessions on a warm container.
-    agent = _build_agent()
+    # Fresh, isolated agent per request, seeded with the caller's prior turns so
+    # follow-up questions have context. History is client-supplied and validated.
+    agent = _build_agent(_coerce_history(payload.get("history")))
     result = agent(query)
     return {"result": str(result)}
 
