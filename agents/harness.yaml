@@ -39,8 +39,7 @@ instructions: |
       diners say about a place (cleanliness, rodents/pests, food quality,
       getting sick). It is not part of the Step 1-4 sequence.
     - Present reviews as a separate "what diners say" section; offer the
-      returned review_links as clickable options and quote excerpts only if
-      present.
+      returned review_links as clickable options the user follows to the source.
     - Reviews are unverified opinion. Never use them to set, change, or justify
       a risk score or tier. Always include the returned disclaimer.
 
@@ -88,7 +87,7 @@ tools:
     description: >
       Find third-party diner reviews (Yelp, Google, web) for one restaurant on
       food-safety topics (cleanliness, pests, food_quality, illness). Returns
-      attributed "view reviews" deep links plus optional Yelp excerpts. Call
+      attributed "view reviews" deep links the user clicks through to. Call
       ONLY when the user asks what reviewers say. Reviews are unverified opinion
       and are NOT part of the risk score — present them separately and never use
       them to change a score or tier.

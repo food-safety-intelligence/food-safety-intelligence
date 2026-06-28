@@ -157,8 +157,7 @@ def find_reviews(name: str, address: str = "", topics: list | None = None) -> di
     Find THIRD-PARTY diner reviews (Yelp, Google, web) for one restaurant,
     focused on food-safety topics: cleanliness, pests, food_quality, illness.
     Use ONLY when the user asks what reviewers say about a place. Returns
-    attributed "view reviews" deep links the user can click, plus a few Yelp
-    review excerpts if a review API is configured.
+    attributed "view reviews" deep links the user can click through to.
 
     Reviews are unverified opinion and are NOT part of the risk score — present
     them separately and always pass along the returned `disclaimer`. Never use a

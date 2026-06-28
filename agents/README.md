@@ -115,14 +115,11 @@ Each handler takes `handler(event, _ctx)`.
 
 - *Input*: `{"name": "...", "address": "...", "topics": [...]}` — `topics` is a
   subset of `cleanliness`, `pests`, `food_quality`, `illness` (empty = all).
-- *Output*: `{name, topics, review_links, excerpts, excerpts_available,
-  disclaimer}`. `review_links` are attributed Yelp / Google / web deep links the
-  **user** clicks through to. `excerpts` holds a few official Yelp Fusion review
-  snippets (with attribution) **only** when `YELP_API_KEY` is set — otherwise
-  `[]` and `excerpts_available` is `false`.
+- *Output*: `{name, topics, review_links, disclaimer}`. `review_links` are
+  attributed Yelp / Google / web deep links the **user** clicks through to.
 - *Boundary — reviews are not a model feature*: the tool **never scrapes or
   stores** Yelp / Google pages (their Terms of Service forbid automated page
-  access); by default it only builds links the user follows. Reviews are
+  access); it only builds links the user follows. Reviews are
   unverified opinion and are **NOT** an input to the risk score — every response
   carries `disclaimer`, and the prompt forbids using a review to set or change a
   score or tier.
