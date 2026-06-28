@@ -69,7 +69,13 @@ Reconstruction of the 2026-06-22 prototype on real data + a K sweep (full run:
 license's latest non-right-truncated test inspection (n=5,226, base 4.4%, 97.5%
 currently-clean); XGBoost for both models.
 
-- **Coverage 0.29 → 0.87** (K-independent — only needs 2 of the last K visits).
+- **Coverage 0.29 → 0.87.** *Coverage* = the share of establishments that get a
+  non-null `trend_slope` — i.e. that have ≥2 inspections to fit a line through
+  (the rest show "no trend / insufficient history" in the UI). The old 90-day
+  window needed 2 inspections *within 90 days*; last-K-visits needs only 2 of the
+  last K, so almost any place with a repeat inspection qualifies. K-independent.
+  (On the full production population, including single-inspection licenses that
+  can never have a slope, coverage is ~0.73; on test anchors it is 0.87.)
 - **De-confound partial:** corr(slope, `last_was_fail`) −0.31 → −0.19. The residual
   is *legitimate* prior-history signal (Model 2 still uses `prior_*`), not the
   mechanical swing — so we de-confound, we do not zero it out.
