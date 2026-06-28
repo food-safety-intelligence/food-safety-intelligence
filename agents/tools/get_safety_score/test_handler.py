@@ -108,8 +108,10 @@ def test_store_number_does_not_block_match():
 
 def test_fuzzy_address_then_name():
     index = _index(RECORD_A, RECORD_B)
-    # Slightly different address string (expanded "AVENUE") should still resolve.
-    match = _fuzzy_lookup("11601 W TOUHY AVENUE", "McDonald's", index)
+    # A typo that survives normalisation ("TUOHY" vs "TOUHY") is NOT an exact
+    # key, so it must fall through to get_close_matches; the shared bucket then
+    # holds 2 records, so name disambiguation picks McDonald's.
+    match = _fuzzy_lookup("11601 W TUOHY AVE", "McDonald's", index)
     assert match is not None and match["license_id"] == "LIC_B"
 
 

@@ -95,7 +95,9 @@ def _normalise_name(name: str) -> str:
     "#1234"-style store numbers, turn any run of non-alphanumerics into a
     single space, and trim.
     """
-    name = name.upper()
+    # A scores.json record may carry an explicit null name; coerce so .upper()
+    # never crashes on None.
+    name = (name or "").upper()
     name = re.sub(r"#\s*\d+", " ", name)  # store / franchise numbers
     name = name.replace("'", "").replace("’", "")  # join contractions ("McDonald's")
     name = re.sub(r"[^A-Z0-9]+", " ", name)  # remaining punctuation -> space
@@ -121,6 +123,13 @@ def _fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict
         if not matches:
             return None
         bucket = index[matches[0]]
+
+    # A single-occupancy address already uniquely identifies the establishment,
+    # so skip the name gate here — applying it would regress recall when OSM
+    # `name` and city `dba_name` disagree. Name disambiguation is only needed
+    # when 2+ records share the address.
+    if len(bucket) == 1:
+        return bucket[0]
 
     target = _normalise_name(name)
     if not target:
