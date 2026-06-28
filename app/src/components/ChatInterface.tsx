@@ -41,7 +41,15 @@ function loadMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
     const parsed = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    // Validate shape before these reach render and the agent-history payload —
+    // sessionStorage is user-writable and the stored schema could drift.
+    return parsed.filter(
+      (m): m is Message =>
+        !!m &&
+        (m.role === "user" || m.role === "agent") &&
+        typeof m.content === "string",
+    );
   } catch {
     return [];
   }
