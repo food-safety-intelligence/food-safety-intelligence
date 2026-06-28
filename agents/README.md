@@ -178,9 +178,15 @@ outage — and checks the response follows the rules (no yes/no verdict, no
 invented score, scope refusal, cited general facts, graceful failure). It also
 runs deterministic gates with no Bedrock: a citation **allow-list** check (every
 citable URL is https + on the allow-list) and, opt-in via `--links`, a **live
-link-resolution** check that fetches every citation URL to catch dead links. Run
-on demand; the guardrail layer needs Bedrock credentials, so it is excluded from
-the default CI run.
+link-resolution** check that fetches every citation URL to catch dead links.
+
+**In CI:** the **Agent (deterministic checks)** job (`.github/workflows/ci.yml`)
+runs the no-Bedrock, no-network parts on every PR — each tool's pytest suite (as
+separate invocations, since the tool dirs share a `handler` module name and
+collide in one run) plus `run_eval.py --self-test`, `--faithfulness` (vs the
+committed `scores.json`), and `--citations`. The Bedrock-graded `--judge`
+guardrail suite and the network `--links` check stay **manual** (paid; run from
+the SageMaker execution role via the `eval-agent` skill).
 
 ### Note on the SageMaker stub
 
