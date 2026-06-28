@@ -76,5 +76,5 @@ Model performance on a time-held-out test set, plus a demoable Next.js web app
 
 - Scope source of truth: `CLAUDE.md`
 - Data contracts: [interface_contracts.md](interface_contracts.md)
-- Experiment ledger: [experiments.md](experiments.md)
+- Experiment ledger: [model-experiments.md](model-experiments.md)
 - Decision records: [decisions/README.md](decisions/README.md)

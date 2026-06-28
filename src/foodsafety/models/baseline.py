@@ -91,7 +91,7 @@ NUMERIC_FEATURES: list[str] = [
     # (LogReg/XGBoost/MLP), failing the both-metrics gate. The earlier "+0.020
     # PR-AUC" was an artifact of comparing against a stale control on a
     # different test set (lower base rate). Feature code stays unwired in
-    # features/building_features.py. See docs/experiments.md (2026-06-27 row).
+    # features/building_features.py. See docs/model-experiments.md (2026-06-27 row).
     # 311 features tested across several angles and ALL left OUT — the 311
     # signal is redundant with prior_* inspection history at every spatial scale:
     #   - Spatial RADIUS counts (BallTree 300m): served PR-AUC 0.3147->0.3152
@@ -103,7 +103,7 @@ NUMERIC_FEATURES: list[str] = [
     #   - Run 2 neighborhood-normalized excess (ring 100m-vs-500m): flat,
     #     orthogonal to prior_* but uninformative.
     # Feature code stays in complaint_features.py (tested) if revisited. See
-    # docs/experiments.md for the full numbers.
+    # docs/model-experiments.md for the full numbers.
 ]
 
 CATEGORICAL_FEATURES: list[str] = [

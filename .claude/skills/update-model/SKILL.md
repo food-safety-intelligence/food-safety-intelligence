@@ -103,7 +103,7 @@ a residual-risk bullet + revision date) rather than spawning a new record.
 - **Feature contract** `docs/interface_contracts.md`: add the column(s) to the
   section-2 table, bump the contract version, add a changelog row. Schema changes
   **need a PR tagging every owner** (Arun, Bella, Deepak, Aurelia, Jun).
-- **`docs/experiments.md`**: one row — change+hypothesis / result (with caveats) /
+- **`docs/model-experiments.md`**: one row — change+hypothesis / result (with caveats) /
   verdict / refs. Log negative results too.
 - **Decision records**: update `0005` (ethics) if Step 5 found something; add a new
   `docs/decisions/NNNN-*.md` only for a genuine decision (confirm before creating).
@@ -172,7 +172,7 @@ a residual-risk bullet + revision date) rather than spawning a new record.
 
 ## Step 7 — If FLAT (missed the gate)
 Remove the column(s) from `ALL_FEATURES`, add a "Reverted" row to
-`docs/experiments.md` (the negative result is the point), and drop the branch.
+`docs/model-experiments.md` (the negative result is the point), and drop the branch.
 Feature *code* may stay if cheap and self-contained (note it's unwired).
 
 ## Before committing / PR
