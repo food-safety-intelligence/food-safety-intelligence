@@ -60,6 +60,21 @@ export default async function RestaurantDetailPage({
 
   const lastInspection = history[0]?.date;
 
+  // Location line — join only the parts we actually have so a missing
+  // neighborhood or zip doesn't leave orphaned "·" separators (these fields
+  // ship empty for every establishment in the current data). "Chicago, IL" is
+  // always shown; the zip rides along with it when present.
+  const cityLine = `Chicago, IL${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
+  const locationLine = [
+    restaurant.address.trim(),
+    restaurant.neighborhood.trim(),
+    cityLine,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const facilityType = restaurant.facility_type.trim();
+
   return (
     <>
       <SiteHeader activeNav="search" />
@@ -91,16 +106,17 @@ export default async function RestaurantDetailPage({
               {restaurant.dba_name}
             </h1>
             <p className="text-[16px] text-muted mt-4 leading-relaxed">
-              {restaurant.address} &nbsp;·&nbsp; {restaurant.neighborhood}{" "}
-              &nbsp;·&nbsp; Chicago, IL {restaurant.zip}
+              {locationLine}
             </p>
             <div className="flex flex-wrap gap-2 mt-4 items-center text-[12px] text-muted">
               <span className="px-2.5 py-1 rounded-full bg-tint">
                 License #{restaurant.license_id}
               </span>
-              <span className="px-2.5 py-1 rounded-full bg-tint">
-                {restaurant.facility_type}
-              </span>
+              {facilityType && (
+                <span className="px-2.5 py-1 rounded-full bg-tint">
+                  {facilityType}
+                </span>
+              )}
               {lastInspection && (
                 <span className="px-2.5 py-1 rounded-full bg-tint">
                   Last inspected · {formatInspectionDate(lastInspection)}
