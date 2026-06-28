@@ -1,6 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
+  Info,
   Minus,
   TrendingDown,
   TrendingUp,
@@ -143,7 +144,17 @@ export function ScoreCard({
   const trendInner = (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] tracking-widest uppercase text-muted">Recent trend</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] tracking-widest uppercase text-muted">Recent trend</span>
+          <a
+            href="/how-it-works#recent-trend"
+            aria-label="How the recent trend is calculated"
+            title="How the recent trend is calculated"
+            className="text-muted/70 hover:text-ink transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" strokeWidth={2} />
+          </a>
+        </div>
         <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${trend.fg}`}>
           <TrendIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
           {slope === null ? "Insufficient history" : trend.label}

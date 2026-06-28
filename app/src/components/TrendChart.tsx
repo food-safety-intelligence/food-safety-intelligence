@@ -72,11 +72,16 @@ export function TrendChart({
   const xy = pts.map((p, i) => ({ x: xFor(times[i]), y: yFor(p.score) }));
   const linePath = xy.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
   const areaPath = `${linePath} L ${xy[xy.length - 1].x} ${padY + h} L ${xy[0].x} ${padY + h} Z`;
-  const last = xy[xy.length - 1];
 
   const midlineY = typicalScore !== null ? yFor(typicalScore) : null;
   const fmt = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "2-digit" });
+  const fmtFull = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
 
   return (
     <svg
@@ -124,13 +129,25 @@ export function TrendChart({
         strokeLinejoin="round"
       />
 
-      {/* Earlier inspection dots — smaller, faded */}
-      {xy.slice(0, -1).map((q, i) => (
-        <circle key={i} cx={q.x} cy={q.y} r={3} fill={color} fillOpacity={0.45} />
-      ))}
-
-      {/* Latest inspection dot — emphasised */}
-      <circle cx={last.x} cy={last.y} r={5} fill="#FFFFFF" stroke={color} strokeWidth={2.5} />
+      {/* Inspection dots — latest emphasised. Each carries a native tooltip
+          (inspection date + forecast score) revealed on hover. */}
+      {xy.map((q, i) => {
+        const isLast = i === xy.length - 1;
+        return (
+          <circle
+            key={i}
+            cx={q.x}
+            cy={q.y}
+            r={isLast ? 5 : 3}
+            fill={isLast ? "#FFFFFF" : color}
+            fillOpacity={isLast ? 1 : 0.45}
+            stroke={isLast ? color : undefined}
+            strokeWidth={isLast ? 2.5 : undefined}
+          >
+            <title>{`${fmtFull(pts[i].date)} · risk ${pts[i].score.toFixed(2)}`}</title>
+          </circle>
+        );
+      })}
 
       {/* x-axis labels — real first/last inspection dates */}
       <text

@@ -250,12 +250,15 @@ export default async function HowItWorksPage() {
               on.
             </p>
 
-            <h3 className="text-[1.05rem] font-medium tracking-tight mt-8">
-              The 90-day trend
+            <h3
+              id="recent-trend"
+              className="text-[1.05rem] font-medium tracking-tight mt-8 scroll-mt-24"
+            >
+              The recent trend
             </h3>
             <p className="text-[14px] text-muted leading-relaxed mt-1.5">
-              Next to each score, an arrow shows where risk has been heading over
-              the last 90 days:
+              Next to each score, an arrow shows which way risk has been heading
+              across the establishment&apos;s recent inspections:
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-[14px] text-ink/85">
               <span className="inline-flex items-center gap-2">
@@ -269,9 +272,16 @@ export default async function HowItWorksPage() {
               </span>
             </div>
             <p className="text-[12.5px] text-muted leading-relaxed mt-3">
-              We don&apos;t store a full score history, so the trendline is
-              reconstructed from a single slope — a quick read of direction and
-              size, not a day-by-day reproduction.
+              The trendline on the detail page plots the establishment&apos;s last
+              few inspections at their real dates. To keep the direction honest, the
+              points come from a separate{" "}
+              <span className="font-medium text-ink/80">forecast model</span> — the
+              same 180-day prediction, but trained without the current
+              inspection&apos;s own result. A failed inspection triggers a required
+              re-inspection that usually passes, which would otherwise pull the main
+              score down and read as &quot;improving&quot; for purely procedural
+              reasons; the forecast model leaves that out. It is a read of direction
+              over time, not a separate prediction.
             </p>
           </article>
 
