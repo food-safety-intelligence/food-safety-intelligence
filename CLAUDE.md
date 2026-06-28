@@ -278,6 +278,12 @@ source of truth.
 - Use `shadcn/ui` components from `app/src/components/ui/` rather than
   rolling new primitives. If a needed component doesn't exist, add it via
   `pnpm dlx shadcn add <name>` (or `npx`).
+- **Font sizes come from the type scale.** Use the named `@theme` rungs
+  (`text-2xs` … `text-6xl`, defined in `app/src/app/globals.css`) — do **not**
+  add new arbitrary `text-[Npx]` / `text-[Nrem]` values. The rungs carry a
+  paired line-height; override per-element with `leading-*` when needed. (Note:
+  Tailwind reserves the `base` keyword, so `text-base` has no paired
+  line-height and inherits the 1.5 body default — that's expected.)
 - No emoji in committed code or UI unless explicitly asked.
 - Accessibility is default: keyboard nav, ARIA labels on icon-only buttons,
   ≥44px tap targets, sufficient contrast.

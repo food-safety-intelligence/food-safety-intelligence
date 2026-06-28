@@ -115,6 +115,18 @@ Surfaces to confirm:
 
 Other routes worth a glance: `/` (map + list), `/how-it-works` (methodology).
 
+## Route-conditional / global UI
+
+For a component that shows or hides itself per route (e.g. something mounted in
+the root layout that should be absent on one page), verify it on **both** a
+**direct load** of the route AND **after client-side navigation** to it — a
+component that stays mounted across nav can keep stale state and only the
+direct-load path exercises the first render. Also account for **`trailingSlash`**
+(on in `next.config`): `usePathname()` returns the trailing-slash form (e.g.
+`/chat/`, not `/chat`), so a `pathname === "/route"` guard silently fails — test
+that the show/hide actually holds, don't trust the code reading correct. None of
+this is caught by `tsc`/lint/`next build`; it only shows up in the running app.
+
 ## Put the screenshots in the PR (this repo is private)
 
 Capture **every state and viewport** the change affects (desktop + mobile 390px,

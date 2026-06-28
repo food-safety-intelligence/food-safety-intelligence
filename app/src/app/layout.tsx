@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans, Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
+import { FloatingChat } from "@/components/FloatingChat";
 
 // Body — distinctive sans, full weight range.
 const manrope = Manrope({
@@ -43,7 +44,10 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${instrument.variable} ${plexSans.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <FloatingChat />
+      </body>
     </html>
   );
 }
