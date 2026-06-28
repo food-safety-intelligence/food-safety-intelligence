@@ -41,7 +41,7 @@ function WaterfallRow({
         strong && "bg-tint/50",
       )}
     >
-      <span className={cn("text-[14px]", strong ? "text-ink font-medium" : "text-ink/85")}>
+      <span className={cn("text-sm", strong ? "text-ink font-medium" : "text-ink/85")}>
         {label}
       </span>
       <span
@@ -66,7 +66,7 @@ function SectionLabel({ children, id }: { children: string; id?: string }) {
   return (
     <p
       id={id}
-      className="scroll-mt-20 text-sage text-[12px] tracking-[0.18em] uppercase pt-8 border-t border-line"
+      className="scroll-mt-20 text-sage text-xs tracking-[0.18em] uppercase pt-8 border-t border-line"
     >
       {children}
     </p>
@@ -134,20 +134,20 @@ export default async function HowItWorksPage() {
       <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
+          className="inline-flex items-center gap-2 text-xs text-teal hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
           Back to search
         </Link>
 
         <header className="mt-6">
-          <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
             Methodology
           </p>
-          <h1 className="text-[3rem] font-light leading-[1.05] tracking-tight">
+          <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
             How this works
           </h1>
-          <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
+          <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
             A gradient-boosted decision-tree model (XGBoost) fit on six years of
             Chicago inspection history. The score is a calibrated probability
             that a food establishment will fail an inspection or be cited for a
@@ -161,7 +161,7 @@ export default async function HowItWorksPage() {
             cleanly underneath. */}
         <nav
           aria-label="Sections"
-          className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-3 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-5 gap-y-1.5 text-[12.5px]"
+          className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-3 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-5 gap-y-1.5 text-xs"
         >
           <a href="#reading-the-score" className="text-muted hover:text-ink transition-colors">
             Reading the score
@@ -183,10 +183,10 @@ export default async function HowItWorksPage() {
         <section className="mt-10 space-y-8">
           <SectionLabel id="reading-the-score">Reading the score</SectionLabel>
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               How to read a score
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Every establishment gets one number — a calibrated probability,
               shown as a percentage, that it fails an inspection or draws a
               priority violation in the next 180 days. &ldquo;Calibrated&rdquo;
@@ -201,10 +201,10 @@ export default async function HowItWorksPage() {
               data throughout — not a fresh reading.
             </p>
 
-            <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
+            <h3 className="text-lg font-medium tracking-tight mt-6">
               Risk bands
             </h3>
-            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
               The percentage is bucketed into four bands — the coloured badges on
               the map, list, and detail pages. These are the model&apos;s{" "}
               <span className="font-medium text-ink/80">output</span>{" "}bands;
@@ -215,7 +215,7 @@ export default async function HowItWorksPage() {
             </p>
             {tiers.length > 0 ? (
               <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
-                <div className="flex items-center justify-between gap-4 px-4 py-2 border-b border-line text-[11px] uppercase tracking-[0.08em] text-sage">
+                <div className="flex items-center justify-between gap-4 px-4 py-2 border-b border-line text-xs uppercase tracking-[0.08em] text-sage">
                   <span>Tier</span>
                   <span className="flex items-center gap-4">
                     <span className="w-24 text-right">Score</span>
@@ -229,11 +229,11 @@ export default async function HowItWorksPage() {
                   >
                     <TierPill tier={t.label as RiskTier} />
                     <span className="flex items-center gap-4 num tabular-nums">
-                      <span className="w-24 text-right text-[14px] text-ink/85">
+                      <span className="w-24 text-right text-sm text-ink/85">
                         {tierRange(t)}
                       </span>
                       {tierShare(t) && (
-                        <span className="w-14 text-right text-[13px] text-muted">
+                        <span className="w-14 text-right text-xs text-muted">
                           {tierShare(t)}
                         </span>
                       )}
@@ -242,11 +242,11 @@ export default async function HowItWorksPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-[13.5px] text-muted mt-3">
+              <p className="text-xs text-muted mt-3">
                 Run the metrics pipeline to populate the tier bands.
               </p>
             )}
-            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+            <p className="text-xs text-muted leading-relaxed mt-3">
               Bands are fixed cutoffs on the predicted probability, set once
               (decision record 0008) — they don&apos;t shift per establishment.
               &ldquo;Share&rdquo; is the portion of all scored establishments in
@@ -257,15 +257,15 @@ export default async function HowItWorksPage() {
 
             <h3
               id="recent-trend"
-              className="text-[1.05rem] font-medium tracking-tight mt-8 scroll-mt-24"
+              className="text-lg font-medium tracking-tight mt-8 scroll-mt-24"
             >
               The recent trend
             </h3>
-            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
               Next to each score, an arrow shows which way risk has been heading
               across the establishment&apos;s recent inspections:
             </p>
-            <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-[14px] text-ink/85">
+            <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-sm text-ink/85">
               <span className="inline-flex items-center gap-2">
                 <TrendIndicator slope={-0.01} /> — risk falling
               </span>
@@ -276,7 +276,7 @@ export default async function HowItWorksPage() {
                 <TrendIndicator slope={0} /> — little change
               </span>
             </div>
-            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+            <p className="text-xs text-muted leading-relaxed mt-3">
               On the detail page this becomes a small chart. Each dot is a{" "}
               <span className="font-medium text-ink/80">predicted</span>{" "}risk — the
               model&apos;s 180-day-forward estimate{" "}
@@ -286,7 +286,7 @@ export default async function HowItWorksPage() {
               date; hover a dot to see the date and value. So a 2019 dot is what the
               model would have estimated in 2019, not a guess about the past.
             </p>
-            <p className="text-[12.5px] text-muted leading-relaxed mt-2">
+            <p className="text-xs text-muted leading-relaxed mt-2">
               To keep the direction honest, those points come from a separate{" "}
               <span className="font-medium text-ink/80">forecast model</span>{" "}— the
               same 180-day prediction, but trained without the current
@@ -300,10 +300,10 @@ export default async function HowItWorksPage() {
 
           <SectionLabel id="how-its-built">How it&apos;s built</SectionLabel>
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               What the score predicts
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               For each inspection, we ask: in the 180 days that follow, does
               the same food establishment have either a Fail result OR a priority
               violation (Chicago codes 1–29)? Priority violations are the
@@ -316,13 +316,13 @@ export default async function HowItWorksPage() {
           </article>
 
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               What the model looks at
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Thirty-six features, all built leak-free from the public record:
             </p>
-            <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
+            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>
                 <span className="font-medium">Prior history</span> — counts of
                 inspections, failures, priority and core violations across the
@@ -361,12 +361,12 @@ export default async function HowItWorksPage() {
           </article>
 
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               The model
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Gradient-boosted decision trees (XGBoost), shallow (depth-3) with{" "}
-              <code className="num text-[13.5px] bg-tint px-1.5 py-0.5 rounded">
+              <code className="num text-sm bg-tint px-1.5 py-0.5 rounded">
                 monotone constraints
               </code>{" "}
               on the risk-count features, weighted for the ~11% positive rate and
@@ -379,10 +379,10 @@ export default async function HowItWorksPage() {
           </article>
 
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Tested on the future, not the past
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Train, validation, and test are carved by date, not shuffled. We{" "}
               <span className="font-medium">train</span> on inspections before
               2024-07, <span className="font-medium">calibrate</span> on
@@ -399,19 +399,19 @@ export default async function HowItWorksPage() {
 
           <SectionLabel id="how-well-it-works">How well it works</SectionLabel>
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               What it catches
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Inspectors are capacity-limited, so the score is really a ranked
               work-list. The honest read isn&apos;t a single number — it&apos;s
               how much of the real risk you catch at the slice you can actually
               staff:
             </p>
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-[14px] border-collapse">
+              <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="text-left text-sage text-[12px] tracking-[0.08em] uppercase border-b border-ink/15">
+                  <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-ink/15">
                     <th className="py-2 pr-4 font-medium">Inspect top</th>
                     <th className="py-2 pr-4 font-medium">Establishments</th>
                     <th className="py-2 pr-4 font-medium">Precision</th>
@@ -438,7 +438,7 @@ export default async function HowItWorksPage() {
                 </tbody>
               </table>
             </div>
-            <p className="text-[13.5px] text-muted leading-relaxed mt-3">
+            <p className="text-xs text-muted leading-relaxed mt-3">
               Working the top 20% by risk surfaces{" "}
               {top20 ? Math.round(top20.recall * 100) : 54}% of the next-180-day
               events — {top20 ? top20.lift.toFixed(1) : "2.7"}× better than
@@ -452,7 +452,7 @@ export default async function HowItWorksPage() {
               base rate.
             </p>
 
-            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-[14px] leading-relaxed text-ink/85">
+            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
               <p className="font-medium mb-1.5">
                 Reading the two tightest slices
               </p>
@@ -482,7 +482,7 @@ export default async function HowItWorksPage() {
                     : ""}
                 </li>
               </ul>
-              <p className="mt-2 text-[13px] text-muted">
+              <p className="mt-2 text-xs text-muted">
                 The tighter the slice, the higher the hit-rate but the fewer
                 problems you cover — that&apos;s the precision/recall trade an
                 inspection team tunes to its capacity.
@@ -491,10 +491,10 @@ export default async function HowItWorksPage() {
           </article>
 
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Why a score is what it is
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               Per-establishment SHAP attribution — log-odds contributions from
               each feature, summed to recover the model&apos;s logit. The detail
               page surfaces the top drivers, signed so positive contributions
@@ -504,10 +504,10 @@ export default async function HowItWorksPage() {
             {/* Global feature impact — which features move the score most,
                 averaged over the whole test set. Magnitude only (mean |log-odds|),
                 so all bars read the same direction. */}
-            <h3 className="text-[1.05rem] font-medium tracking-tight mt-6">
+            <h3 className="text-lg font-medium tracking-tight mt-6">
               Which features matter most, overall
             </h3>
-            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
               Averaged across every establishment in the test set, this is how
               much each feature moves the prediction — the mean size of its
               log-odds contribution. It says nothing about direction; that&apos;s
@@ -520,8 +520,8 @@ export default async function HowItWorksPage() {
                     {/* Label above its bar so the full feature name always shows
                         — these run long and a fixed column would truncate them. */}
                     <div className="flex items-baseline justify-between gap-3">
-                      <span className="text-[13.5px] text-ink/85">{d.label}</span>
-                      <span className="num text-[12px] text-muted tabular-nums shrink-0">
+                      <span className="text-sm text-ink/85">{d.label}</span>
+                      <span className="num text-xs text-muted tabular-nums shrink-0">
                         {d.mean_abs_logodds.toFixed(2)}
                       </span>
                     </div>
@@ -537,11 +537,11 @@ export default async function HowItWorksPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-[13.5px] text-muted mt-3">
+              <p className="text-xs text-muted mt-3">
                 Run the metrics pipeline to populate the feature-impact chart.
               </p>
             )}
-            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+            <p className="text-xs text-muted leading-relaxed mt-3">
               Each number is the <span className="font-medium">mean |log-odds|</span>{" "}
               — the feature&apos;s average influence on the model&apos;s internal
               score, counted in either direction. It&apos;s a relative scale
@@ -553,11 +553,11 @@ export default async function HowItWorksPage() {
                 the parts sum exactly to the score on the gauge. */}
             <h3
               id="calibrated-log-odds"
-              className="scroll-mt-24 text-[1.05rem] font-medium tracking-tight mt-8"
+              className="scroll-mt-24 text-lg font-medium tracking-tight mt-8"
             >
               A worked example
             </h3>
-            <p className="text-[14px] text-muted leading-relaxed mt-1.5">
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
               For one (anonymised) establishment, here is how the score is built.
               The rows are in{" "}
               <span className="font-medium text-ink/80">calibrated log-odds</span>{" "}
@@ -567,7 +567,7 @@ export default async function HowItWorksPage() {
               one number, which a sigmoid then turns into the % on the gauge.
             </p>
             {waterfall ? (
-              <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-[14px]">
+              <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-sm">
                 <WaterfallRow
                   label="Base (model intercept)"
                   value={waterfall.base}
@@ -590,17 +590,17 @@ export default async function HowItWorksPage() {
                   <span className="font-medium">
                     Squashed to a probability (the gauge)
                   </span>
-                  <span className="num font-semibold text-terra-strong text-[16px]">
+                  <span className="num font-semibold text-terra-strong text-lg">
                     {(waterfall.probability * 100).toFixed(1)}%
                   </span>
                 </div>
               </div>
             ) : (
-              <p className="text-[13.5px] text-muted mt-3">
+              <p className="text-xs text-muted mt-3">
                 Run the metrics pipeline to populate the worked example.
               </p>
             )}
-            <p className="text-[12.5px] text-muted leading-relaxed mt-3">
+            <p className="text-xs text-muted leading-relaxed mt-3">
               A positive number pushes risk up; a negative number pulls it down.
               The detail page shows the same drivers as bars — this page shows
               the arithmetic behind a single score.
@@ -609,10 +609,10 @@ export default async function HowItWorksPage() {
 
           <SectionLabel id="limits">Limits</SectionLabel>
           <article>
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               What it doesn&apos;t do
             </h2>
-            <ul className="text-[15px] leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
+            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
               <li>
                 Only six years of training data. The model can&apos;t recognise
                 patterns that pre-date 2019.
@@ -640,10 +640,10 @@ export default async function HowItWorksPage() {
 
           <SectionLabel id="reference">Reference</SectionLabel>
           <article id="definitions">
-            <h2 className="text-[1.5rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Definitions
             </h2>
-            <p className="text-[15.5px] text-muted leading-relaxed mt-2">
+            <p className="text-md text-muted leading-relaxed mt-2">
               The recurring terms used across the score, the drivers, and the
               inspection history.
             </p>
@@ -657,7 +657,7 @@ export default async function HowItWorksPage() {
                     className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
                   >
                     <dt className="font-medium text-ink">{entry.term}</dt>
-                    <dd className="text-[14.5px] text-muted leading-relaxed mt-1">
+                    <dd className="text-sm text-muted leading-relaxed mt-1">
                       {entry.short}
                     </dd>
                   </div>

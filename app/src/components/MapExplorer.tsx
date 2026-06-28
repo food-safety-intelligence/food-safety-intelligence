@@ -200,7 +200,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
         <div
           role="group"
           aria-label="View"
-          className="inline-flex rounded-lg border border-line overflow-hidden text-[13px]"
+          className="inline-flex rounded-lg border border-line overflow-hidden text-sm"
         >
           {(["map", "list"] as const).map((v) => (
             <button
@@ -242,7 +242,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   value={input}
                   onChange={(e) => onSearchChange(e.target.value)}
                   placeholder="Search food establishments or addresses"
-                  className="bg-transparent flex-1 text-[16px] placeholder:text-muted/70 focus:outline-none"
+                  className="bg-transparent flex-1 text-lg placeholder:text-muted/70 focus:outline-none"
                   aria-label="Search food establishments or addresses"
                   title={`Searches all ${total.toLocaleString()} indexed food establishments, across every risk tier.`}
                 />
@@ -268,7 +268,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
           </div>
 
           {/* Bottom-left attribution-ish chip */}
-          <div className="absolute bottom-3 left-3 z-10 text-[10px] text-muted/80 bg-card/80 backdrop-blur rounded px-2 py-1 pointer-events-none">
+          <div className="absolute bottom-3 left-3 z-10 text-2xs text-muted/80 bg-card/80 backdrop-blur rounded px-2 py-1 pointer-events-none">
             Chicago · 41.88, −87.63
           </div>
         </div>
@@ -283,7 +283,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
           <div className="rounded-3xl bg-card border border-line soft-shadow flex flex-col h-full overflow-hidden">
             <div className="px-5 py-4 border-b border-line bg-cream/40">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="font-semibold tracking-tight text-[15px]">
+                <h2 className="font-semibold tracking-tight text-md">
                   {hasQuery
                     ? `Matching "${query}"`
                     : sort === "name"
@@ -295,7 +295,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                 {/* Sort toggle — High/Low risk or A–Z (alphabetical surfaces
                     every tier, so the list isn't just the highest-risk slice). */}
                 <div
-                  className="flex items-center rounded-lg border border-line overflow-hidden text-[11px]"
+                  className="flex items-center rounded-lg border border-line overflow-hidden text-2xs"
                   role="group"
                   aria-label="Sort order"
                 >
@@ -323,7 +323,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   ))}
                 </div>
               </div>
-              <p className="text-[11px] text-muted mt-0.5">
+              <p className="text-2xs text-muted mt-0.5">
                 {indexLoading && hasQuery ? (
                   "Searching all establishments…"
                 ) : hasQuery ? (
@@ -350,7 +350,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
 
             <ul className="flex-1 overflow-y-auto divide-y divide-line">
               {listRows.length === 0 && (
-                <li className="px-5 py-8 text-[13px] text-muted text-center">
+                <li className="px-5 py-8 text-sm text-muted text-center">
                   No food establishments match these filters.
                 </li>
               )}
@@ -365,10 +365,10 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                       style={{ background: TIER_HEX[r.risk_tier] }}
                     />
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-[13.5px] leading-tight truncate">
+                      <div className="font-semibold text-sm leading-tight truncate">
                         {r.dba_name}
                       </div>
-                      <div className="text-[11.5px] text-muted truncate mt-0.5">
+                      <div className="text-xs text-muted truncate mt-0.5">
                         {r.address}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
@@ -383,7 +383,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                     </div>
                     <div
                       className={cn(
-                        "num text-[18px] font-medium tabular-nums leading-none",
+                        "num text-lg font-medium tabular-nums leading-none",
                         TIER_TEXT_CLASS[r.risk_tier],
                       )}
                     >
@@ -398,7 +398,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                     onClick={() =>
                       setVisibleCount((c) => c + LIST_PAGE)
                     }
-                    className="w-full rounded-xl border border-line py-2 text-[13px] text-teal hover:bg-cream/50 transition-colors"
+                    className="w-full rounded-xl border border-line py-2 text-sm text-teal hover:bg-cream/50 transition-colors"
                   >
                     Show {Math.min(LIST_PAGE, moreInList)} more
                     <span className="text-muted">

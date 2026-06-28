@@ -38,7 +38,7 @@ export function ResultTally({ events }: { events: InspectionEvent[] }) {
 
   return (
     <div className="rounded-3xl bg-card border border-line soft-shadow p-6">
-      <div className="text-[11px] tracking-widest uppercase text-muted mb-3">
+      <div className="text-2xs tracking-widest uppercase text-muted mb-3">
         Result tally
       </div>
       <div className="space-y-1.5">
@@ -63,11 +63,11 @@ export function ResultTally({ events }: { events: InspectionEvent[] }) {
                 )}
               >
                 <span
-                  className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-[10px] font-semibold text-white ${s.bg}`}
+                  className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${s.bg}`}
                 >
                   {s.label}
                 </span>
-                <span className="flex-1 text-[14.5px]">{r}</span>
+                <span className="flex-1 text-base">{r}</span>
                 <span className="num font-medium">{count}</span>
                 {!disabled && (
                   <ChevronDown
@@ -83,10 +83,10 @@ export function ResultTally({ events }: { events: InspectionEvent[] }) {
               {isOpen && (
                 <ul className="mt-1 mb-2 ml-9 pl-3 border-l border-line space-y-2 max-h-64 overflow-y-auto">
                   {list.map((e, i) => (
-                    <li key={`${e.date}-${i}`} className="text-[12.5px]">
+                    <li key={`${e.date}-${i}`} className="text-xs">
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="text-ink/90">{e.type || "Inspection"}</span>
-                        <span className="num text-[11.5px] text-muted shrink-0">
+                        <span className="num text-xs text-muted shrink-0">
                           {formatInspectionDate(e.date)}
                         </span>
                       </div>

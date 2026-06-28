@@ -64,7 +64,7 @@ const SUGGESTIONS = [
 function UserBubble({ content }: { content: string }) {
   return (
     <div className="flex justify-end">
-      <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-ink text-cream text-[14px] leading-relaxed">
+      <div className="max-w-[75%] px-4 py-2.5 rounded-2xl rounded-br-sm bg-ink text-cream text-base leading-relaxed">
         {content}
       </div>
     </div>
@@ -83,7 +83,7 @@ function AgentBubble({ content, error }: { content: string; error?: boolean }) {
         )}
       </span>
       <div
-        className={`max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm text-[14px] leading-relaxed soft-shadow border ${
+        className={`max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm text-base leading-relaxed soft-shadow border ${
           error
             ? "bg-card border-terra/20 text-terra"
             : "bg-card border-line text-ink"
@@ -196,10 +196,10 @@ export function ChatInterface() {
               <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                 <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
               </span>
-              <h2 className="text-[1.4rem] font-semibold tracking-tight mb-2">
+              <h2 className="text-2xl font-semibold tracking-tight mb-2">
                 Ask about food safety
               </h2>
-              <p className="text-[14px] text-muted max-w-[42ch] leading-relaxed mb-8">
+              <p className="text-base text-muted max-w-[42ch] leading-relaxed mb-8">
                 Search by neighborhood, cuisine, or risk level. Ask follow-up
                 questions — the agent remembers your session.
               </p>
@@ -208,7 +208,7 @@ export function ChatInterface() {
                   <button
                     key={s}
                     onClick={() => void send(s)}
-                    className="px-3.5 py-1.5 rounded-full bg-card border border-line text-[13px] hover:border-teal hover:text-teal transition-colors soft-shadow"
+                    className="px-3.5 py-1.5 rounded-full bg-card border border-line text-sm hover:border-teal hover:text-teal transition-colors soft-shadow"
                   >
                     {s}
                   </button>
@@ -244,7 +244,7 @@ export function ChatInterface() {
               placeholder="Ask about a neighborhood, cuisine, or risk level…"
               disabled={loading}
               aria-label="Chat input"
-              className="flex-1 resize-none bg-transparent text-[14px] placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto disabled:opacity-50"
+              className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto disabled:opacity-50"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
@@ -267,7 +267,7 @@ export function ChatInterface() {
               </button>
             </div>
           </div>
-          <p className="text-[11px] text-muted/70 text-center mt-2">
+          <p className="text-2xs text-muted/70 text-center mt-2">
             Scores are 180-day predictions from public Chicago data · Not a
             health department inspection
           </p>

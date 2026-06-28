@@ -46,7 +46,7 @@ export function driverBarGeometry(
 export function DriverList({ drivers }: { drivers: Driver[] }) {
   if (drivers.length === 0) {
     return (
-      <div className="rounded-3xl bg-card border border-line p-6 text-muted text-[14px]">
+      <div className="rounded-3xl bg-card border border-line p-6 text-muted text-base">
         No driver data available for this prediction.
       </div>
     );
@@ -59,7 +59,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
       {/* Axis legend — full width on mobile (bars stack full width below each
           label); aligned over the bar column on desktop. */}
       <div className="px-5 sm:px-6 pt-5 pb-2 border-b border-line">
-        <div className="flex justify-center gap-8 text-[11px] uppercase tracking-[0.12em] sm:grid sm:grid-cols-12 sm:gap-4">
+        <div className="flex justify-center gap-8 text-2xs uppercase tracking-[0.12em] sm:grid sm:grid-cols-12 sm:gap-4">
           <span className="text-sage-strong sm:col-start-7 sm:col-span-3 sm:text-right">
             &larr; lowers risk
           </span>
@@ -106,14 +106,14 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
 
               <div className="min-w-0 sm:col-span-5">
                 <div className="flex items-center gap-2">
-                  <span className="num text-muted text-[11.5px] tabular-nums">
+                  <span className="num text-muted text-xs tabular-nums">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <div className="font-semibold">{d.label}</div>
                   {termKey && <DefineTerm termKey={termKey} />}
                 </div>
                 {description && (
-                  <div className="text-[12.5px] text-muted mt-0.5 leading-snug">
+                  <div className="text-xs text-muted mt-0.5 leading-snug">
                     {description}
                   </div>
                 )}
@@ -146,7 +146,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
           );
         })}
       </ol>
-      <p className="px-5 sm:px-6 py-4 text-[12px] text-muted leading-relaxed border-t border-line">
+      <p className="px-5 sm:px-6 py-4 text-xs text-muted leading-relaxed border-t border-line">
         Bar length shows each factor&apos;s relative influence; the number is its
         log-odds contribution to this food establishment&apos;s risk (larger
         magnitude = more influence). These show what moves the score up or down,

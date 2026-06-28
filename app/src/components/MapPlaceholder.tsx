@@ -52,7 +52,7 @@ export function MapPlaceholder({
         }}
       >
         {/* compass card */}
-        <div className="absolute top-4 left-4 rounded-xl bg-white/85 backdrop-blur px-3 py-2 text-[11px] text-muted soft-shadow">
+        <div className="absolute top-4 left-4 rounded-xl bg-white/85 backdrop-blur px-3 py-2 text-2xs text-muted soft-shadow">
           <div className="font-medium text-ink">Chicago</div>
           <div className="num">41.88, −87.63</div>
         </div>
@@ -123,19 +123,19 @@ export function MapPlaceholder({
             <div className="rounded-2xl bg-card soft-shadow-lg px-4 py-3 -translate-x-1/2 translate-y-3 w-[240px] border border-line">
               <div className="flex items-center gap-2 mb-1">
                 <TierPill tier={featured.risk_tier} size="sm" />
-                <span className="num text-[14px] font-medium">
+                <span className="num text-base font-medium">
                   {featured.risk_score.toFixed(2)}
                 </span>
               </div>
-              <div className="font-semibold text-[14px] leading-tight">
+              <div className="font-semibold text-base leading-tight">
                 {featured.dba_name}
               </div>
-              <div className="text-[11.5px] text-muted">
+              <div className="text-xs text-muted">
                 {featured.address}
               </div>
               <Link
                 href={`/restaurant/${featured.license_id}`}
-                className="text-[12px] text-teal underline mt-1.5 inline-block"
+                className="text-xs text-teal underline mt-1.5 inline-block"
               >
                 Open profile →
               </Link>
@@ -144,8 +144,8 @@ export function MapPlaceholder({
         )}
 
         {/* legend */}
-        <div className="absolute bottom-4 right-4 rounded-xl bg-white/85 backdrop-blur px-3 py-2 text-[11px] soft-shadow space-y-1">
-          <div className="text-muted text-[10px] tracking-widest uppercase mb-1">
+        <div className="absolute bottom-4 right-4 rounded-xl bg-white/85 backdrop-blur px-3 py-2 text-2xs soft-shadow space-y-1">
+          <div className="text-muted text-2xs tracking-widest uppercase mb-1">
             Tier
           </div>
           {(
@@ -185,7 +185,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
     <aside className="rounded-3xl bg-card border border-line soft-shadow p-5 h-full">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold tracking-tight">Nearby &amp; noteworthy</h2>
-        <span className="text-[11px] text-muted">
+        <span className="text-2xs text-muted">
           {top.length} of 28,047
         </span>
       </div>
@@ -200,7 +200,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
               className="flex items-start gap-3 p-3"
             >
               <div
-                className={`num text-[24px] font-medium leading-none mt-0.5 ${TIER_TEXT_CLASS[r.risk_tier]}`}
+                className={`num text-2xl font-medium leading-none mt-0.5 ${TIER_TEXT_CLASS[r.risk_tier]}`}
               >
                 {r.risk_score.toFixed(2)}
               </div>
@@ -208,7 +208,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
                 <div className="font-semibold leading-tight truncate">
                   {r.dba_name}
                 </div>
-                <div className="text-[12px] text-muted mt-0.5 truncate">
+                <div className="text-xs text-muted mt-0.5 truncate">
                   {r.address}
                 </div>
                 <div className="flex items-center gap-2 mt-2">
@@ -222,7 +222,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
       </ul>
       <Link
         href="/all"
-        className="block text-center text-[13px] mt-4 text-teal hover:underline"
+        className="block text-center text-sm mt-4 text-teal hover:underline"
       >
         See all food establishments →
       </Link>

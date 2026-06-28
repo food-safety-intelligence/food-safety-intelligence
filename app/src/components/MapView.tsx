@@ -39,7 +39,7 @@ export function PinDriverLine({ driver }: { driver: PinDriver }) {
       // so it isn't a colour-only signal (matches DriverList's row title).
       title={`${driver.label} — ${driver.up ? "raises" : "lowers"} risk`}
       className={cn(
-        "flex items-center gap-1 text-[11px]",
+        "flex items-center gap-1 text-2xs",
         driver.up ? "text-terra-strong" : "text-sage-strong",
       )}
     >
@@ -156,7 +156,7 @@ export function MapView({
                 type="button"
                 onClick={() => setSelected(null)}
                 aria-label="Close"
-                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-tint hover:bg-line text-muted text-[14px] leading-none flex items-center justify-center"
+                className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-tint hover:bg-line text-muted text-base leading-none flex items-center justify-center"
               >
                 ×
               </button>
@@ -165,17 +165,17 @@ export function MapView({
                   className="inline-block w-2 h-2 rounded-full"
                   style={{ background: TIER_HEX[selected.risk_tier] }}
                 />
-                <span className="text-[10.5px] uppercase tracking-[0.14em] text-muted font-medium">
+                <span className="text-2xs uppercase tracking-[0.14em] text-muted font-medium">
                   {selected.risk_tier}
                 </span>
-                <span className="num text-[14px] font-medium ml-auto">
+                <span className="num text-base font-medium ml-auto">
                   {selected.risk_score.toFixed(2)}
                 </span>
               </div>
-              <div className="font-semibold text-[14px] leading-tight">
+              <div className="font-semibold text-base leading-tight">
                 {selected.dba_name}
               </div>
-              <div className="text-[11.5px] text-muted mt-0.5">
+              <div className="text-xs text-muted mt-0.5">
                 {selected.address}
               </div>
               {selected.top_driver && (
@@ -185,7 +185,7 @@ export function MapView({
               )}
               <Link
                 href={`/restaurant/${selected.license_id}`}
-                className="text-[12px] text-teal underline mt-2 inline-block"
+                className="text-xs text-teal underline mt-2 inline-block"
               >
                 Open profile →
               </Link>

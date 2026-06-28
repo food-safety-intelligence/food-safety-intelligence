@@ -96,13 +96,13 @@ export function ScoreCard({
   const topFactor =
     topDriver ? (
       <div className="flex flex-col gap-1">
-        <span className="text-[10.5px] tracking-widest uppercase text-muted">
+        <span className="text-2xs tracking-widest uppercase text-muted">
           Top factor
         </span>
         <span
           title={topDriver.label}
           className={cn(
-            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-w-full text-[12.5px] font-medium w-fit",
+            "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 max-w-full text-xs font-medium w-fit",
             topRaises ? "bg-terra/10 text-terra-strong" : "bg-sage/15 text-sage-strong",
           )}
         >
@@ -121,7 +121,7 @@ export function ScoreCard({
     ) : null;
 
   const percentileText = (
-    <p className="text-[14px] text-muted leading-relaxed">
+    <p className="text-base text-muted leading-relaxed">
       {medianScore !== null ? (
         <>
           A typical Chicago food establishment scores{" "}
@@ -149,7 +149,7 @@ export function ScoreCard({
     <div>
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] tracking-widest uppercase text-muted">Recent trend</span>
+          <span className="text-2xs tracking-widest uppercase text-muted">Recent trend</span>
           <a
             href="/how-it-works#recent-trend"
             aria-label="How the recent trend is calculated"
@@ -159,7 +159,7 @@ export function ScoreCard({
             <Info className="w-3.5 h-3.5" strokeWidth={2} />
           </a>
         </div>
-        <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${trend.fg}`}>
+        <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${trend.fg}`}>
           <TrendIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
           {hasTrend ? trend.label : "Insufficient history"}
         </span>
@@ -167,7 +167,7 @@ export function ScoreCard({
       <div className="flex justify-center">
         <TrendChart points={hasTrend ? trendPoints : []} slope={slope} />
       </div>
-      <p className="text-[11px] text-muted mt-2 text-center leading-snug">
+      <p className="text-2xs text-muted mt-2 text-center leading-snug">
         Predicted risk over recent inspections — which way it&apos;s trending.
       </p>
     </div>
@@ -175,7 +175,7 @@ export function ScoreCard({
 
   return (
     <div className="rounded-3xl bg-card border border-line soft-shadow-lg p-7 lg:p-8">
-      <div className="text-[11px] tracking-widest uppercase text-muted">
+      <div className="text-2xs tracking-widest uppercase text-muted">
         Predicted 180-day risk
       </div>
 

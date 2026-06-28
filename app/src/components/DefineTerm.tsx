@@ -105,15 +105,15 @@ export function DefineTerm({
           style={{ position: "fixed", top: pos.top, left: pos.left, width: pos.width }}
           className="z-50 rounded-xl border border-line bg-card p-3 text-left soft-shadow"
         >
-          <span className="block font-semibold text-[13px] text-ink">
+          <span className="block font-semibold text-sm text-ink">
             {entry.term}
           </span>
-          <span className="block text-[12.5px] text-muted leading-snug mt-1">
+          <span className="block text-xs text-muted leading-snug mt-1">
             {entry.short}
           </span>
           <Link
             href={`/how-it-works#${entry.id}`}
-            className="inline-block text-[12px] text-teal hover:underline mt-2"
+            className="inline-block text-xs text-teal hover:underline mt-2"
           >
             Full definition →
           </Link>
