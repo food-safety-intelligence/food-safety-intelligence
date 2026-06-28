@@ -4,7 +4,7 @@ The target ``y_fail_or_critical_next_180d`` is only *observable through an
 inspection*: an event is recorded only if the city visits within the 180-day
 window. So the label conflates "risky" with "frequently inspected" — a
 heavily-visited place gets more chances to record a Fail/priority. This is the
-last untried lever in docs/experiments.md (the modeling ceiling is INFORMATION,
+last untried lever in docs/model-experiments.md (the modeling ceiling is INFORMATION,
 not capacity): instead of adding features, we sharpen what the existing model
 is trained to predict.
 
@@ -72,7 +72,7 @@ TRAIN_END = "2024-07-01"
 VAL_END = "2025-07-01"
 WINDOW_DAYS = 180  # same forward window as the label
 
-# Published v36 honest-test baseline (docs/experiments.md) — the gate reference.
+# Published v36 honest-test baseline (docs/model-experiments.md) — the gate reference.
 V36_BASELINE = {"logreg": (0.332, 0.370), "xgb": (0.338, 0.376)}
 VULNERABLE_GROUPS = {
     "Children's Services Facility",

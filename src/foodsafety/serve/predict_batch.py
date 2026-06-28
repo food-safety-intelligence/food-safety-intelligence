@@ -57,7 +57,7 @@ RISK_TIER_THRESHOLDS = [
 ]
 
 # Trend slope is fit over each license's last K inspections (visits), not a fixed
-# calendar window. K=5 is the tuned default — see DR 0011 / docs/experiments.md
+# calendar window. K=5 is the tuned default — see DR 0011 / docs/model-experiments.md
 # (2026-06-28): coverage is K-stable and the steeply-rising watch-list lift peaks
 # at K=4-5. The trend is computed from the forecast-only model's score (passed in
 # as ``trend_scores``), not the production risk score.
@@ -191,7 +191,7 @@ def _compute_trend_slopes(
     coverage — almost any license with >=2 inspections gets a slope — and
     ``score_col`` is normally the forecast-only model's score, so the slope is
     not driven by the mandated fail->re-inspection swing in the production score.
-    See DR 0011 and docs/experiments.md (2026-06-28).
+    See DR 0011 and docs/model-experiments.md (2026-06-28).
     """
     slopes: list[float] = []
     full_indexed = full_scored.set_index("license_id").sort_values("inspection_date")

@@ -13,8 +13,10 @@ Map of this folder. Short markdown only (per `CLAUDE.md` — no auto-generated A
   temporal split, and **data cleaning** (dedup, modelable-results / burn-in /
   right-truncation filters, structural-null handling, the lat/lon geo guard). Schema
   changes need owner sign-off.
-- **[experiments.md](experiments.md)** — the human experiment ledger: every modeling
+- **[model-experiments.md](model-experiments.md)** — the human experiment ledger: every modeling
   run with its hypothesis, result, and verdict (negative results included).
+- **[agent-experiments.md](agent-experiments.md)** — the same ledger for the chat-agent
+  eval runs (faithfulness + guardrails), the findings and prompt/judge changes they drove.
 - **[fairness_audit.md](fairness_audit.md)** — living record of the group-performance
   fairness audit (per-facility-type / per-ZIP verdict + interpretation). *(lands with
   the fairness-audit PR.)*

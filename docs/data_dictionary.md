@@ -34,14 +34,14 @@ pulled (`RELEVANT_SR_TYPES` in `config.py`) — the full feed is ~14 M rows acro
   `longitude`.
 - **Used for:** 311 spatial-count features (BallTree, 300 m radius). **Tested
   and flat at every spatial scale, so unwired** — redundant with `prior_*` and
-  the rodent/pest/sewage keyword flags (see `experiments.md`). Code retained.
+  the rodent/pest/sewage keyword flags (see `model-experiments.md`). Code retained.
 
 ### Business Licenses — current `uupf-x98q`, historical `vgg9-bn8p`
 - **Key columns:** `license_id`, `account_number` (operator, links a chain's
   locations), `license_status`, license start / expiry dates.
 - **Used for:** license age + history features. (`license_status` is uniformly
   "AAI" on the current snapshot, so the planned revocation/condition counts were
-  impossible; the cross-license operator-prior came back flat — `experiments.md`.)
+  impossible; the cross-license operator-prior came back flat — `model-experiments.md`.)
 
 ### Building Permits — `ydr8-5enu`, Building Violations — `22u3-xenr`
 Physical-plant condition (permits issued, building-code violations), joined to
@@ -56,7 +56,7 @@ adjacent numbers).
   `inspector_id`.
 - **Used for:** the block-face building-features experiment. **Ran NULL —
   unwired** (a single-split bump that expanding-window CV killed; see
-  `experiments.md`). `src/foodsafety/features/building_features.py` + the dataset
+  `model-experiments.md`). `src/foodsafety/features/building_features.py` + the dataset
   IDs are kept for resumability if a parcel-level (building-footprint) join ever
   becomes available.
 

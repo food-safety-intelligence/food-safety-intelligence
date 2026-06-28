@@ -116,7 +116,9 @@ def prepare_xgb_features(
     for c in CATEGORICAL_FEATURES:
         if categorical_dtypes is not None and c in categorical_dtypes:
             # Reuse train's categories so codes align across splits.
-            out[c] = pd.Categorical(out[c], categories=categorical_dtypes[c].categories)
+            # set_categories restricts to the train universe — levels absent from
+            # train become NaN ("missing" to XGBoost), never a colliding code.
+            out[c] = out[c].astype("category").cat.set_categories(categorical_dtypes[c].categories)
         else:
             out[c] = out[c].astype("category")
 
@@ -164,7 +166,7 @@ def build_production_xgb(
 
     The CV-validated winner over the LogReg baseline (beats it on both PR-AUC and
     precision@10% in 5/6 expanding-window folds — see DR 0002/0009 and
-    docs/experiments.md). Fixed ``n_estimators`` with early stopping off so the
+    docs/model-experiments.md). Fixed ``n_estimators`` with early stopping off so the
     served run is deterministic. ``max_depth=3`` (vs the experiment default 6):
     the signal is low-order, so deep trees over-fragment it and lose the forward-
     time top decile.

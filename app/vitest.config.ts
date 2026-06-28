@@ -15,6 +15,10 @@ export default defineConfig({
   esbuild: { jsx: "automatic" },
   test: {
     environment: "node",
-    include: ["src/**/*.test.ts"],
+    // Match both .test.ts and .test.tsx so a .tsx test is actually picked up —
+    // the .ts-only glob silently skipped them. (A test that renders a component
+    // into the DOM would also need environment: "jsdom"; the node env here still
+    // runs .tsx files that only exercise pure logic.)
+    include: ["src/**/*.test.{ts,tsx}"],
   },
 });

@@ -1,4 +1,4 @@
-# Experiments Log
+# Model Experiments Log
 
 - **Owner**: Bella · **Last updated**: 2026-06-21
 - One row per modeling experiment: the change + hypothesis, the measured result, and the

@@ -18,7 +18,7 @@
 - **But the comparison is not apples-to-apples.** Served LogReg (production) is
   measured on the **served RT-filtered basis** (n≈7,008: PR-AUC 0.372, P@10 0.415);
   the XGB lead is **honest-basis + isotonic-calibrated** only. **No served-basis XGB
-  run exists.** (See [`experiments.md`](../experiments.md) "Model comparison" + the
+  run exists.** (See [`model-experiments.md`](../model-experiments.md) "Model comparison" + the
   v36 note.)
 
 ## Decision (for now)
@@ -73,5 +73,5 @@ change.
 
 ## Cross-references
 - [0002](0002-xgb-validation-methodology.md) — the methodology + the gate this inherits.
-- [`experiments.md`](../experiments.md) — the LogReg-vs-XGB comparison + v36 note.
+- [`model-experiments.md`](../model-experiments.md) — the LogReg-vs-XGB comparison + v36 note.
 - [0007](0007-target-label-definition-and-scope.md) — the label both models predict.
