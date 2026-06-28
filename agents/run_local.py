@@ -14,13 +14,12 @@ Usage:
 Prerequisites (see README below):
     1. AWS credentials configured  (aws configure  OR  env vars)
     2. Nova 2 Lite enabled in your Bedrock console (us-east-1)
-    3. SAGEMAKER_USE_STUB=true  (default — no SageMaker endpoint needed yet)
+    3. scores.json present (scoring reads precomputed batch scores; no model is
+       called at request time)
 
 Environment variables:
     AWS_REGION              default: us-east-1
-    SAGEMAKER_USE_STUB      default: true  (set false + SAGEMAKER_ENDPOINT to use real model)
-    SAGEMAKER_ENDPOINT      required only when SAGEMAKER_USE_STUB=false
-    SCORES_JSON_PATH        default: app/public/data/scores.json (falls back to mock)
+    SCORES_JSON_PATH        default: app/public/data/scores.json (no-record if absent)
     HISTORY_JSON_PATH       default: app/public/data/inspection_history.json
 """
 
@@ -53,9 +52,6 @@ os.environ.setdefault(
     "HISTORY_JSON_PATH",
     os.path.join(_REPO_ROOT, "app", "public", "data", "inspection_history.json"),
 )
-
-# Stub mode on by default — no SageMaker endpoint needed.
-os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 
 # ---------------------------------------------------------------------------
 # Strands imports (after path setup)
@@ -126,11 +122,12 @@ def find_restaurants(
 @tool
 def get_safety_score(restaurants: list) -> list:
     """
-    Look up Chicago food inspection risk scores for a list of restaurants.
-    Calls the XGBoost model (stub during development — set SAGEMAKER_USE_STUB=false
-    and SAGEMAKER_ENDPOINT to use the real SageMaker endpoint).
-    Returns risk_score (0-1), risk_tier, trend, SHAP drivers, and whether a
-    Chicago inspection record was found.
+    Look up the precomputed Chicago batch risk score for each restaurant from
+    scores.json. Does not call any model — a venue that matches the published
+    batch run returns that calibrated score, tier and drivers directly, and a
+    venue not in the batch run returns no score (no inspection record found).
+    Returns risk_score (0-1 or null), risk_tier, trend, SHAP drivers, and
+    whether a Chicago inspection record was found (matched_scores_json).
     Call after find_restaurants. Pass the full restaurant list from that call.
 
     Args:
@@ -212,8 +209,8 @@ def build_agent() -> Agent:
 
 
 def _banner():
-    stub_mode = os.environ.get("SAGEMAKER_USE_STUB", "true").lower() != "false"
-    endpoint = os.environ.get("SAGEMAKER_ENDPOINT", "not set")
+    # Scoring reads precomputed batch scores from scores.json; the agent never
+    # calls a model at request time, so the score source shown is the JSON file.
     scores_path = os.environ.get("SCORES_JSON_PATH", "")
     scores_exists = os.path.exists(scores_path)
 
@@ -222,9 +219,8 @@ def _banner():
     print("╠══════════════════════════════════════════════════════════╣")
     print("║  Model        : Nova 2 Lite (us.amazon.nova-2-lite-v1:0)        ║")
     print(
-        f"║  SageMaker    : {'STUB (deterministic hash)' if stub_mode else f'REAL → {endpoint}':<34}║"
+        f"║  Scores       : {'scores.json FOUND' if scores_exists else 'scores.json NOT FOUND':<34}║"
     )
-    print(f"║  scores.json  : {'FOUND ✓' if scores_exists else 'NOT FOUND — using mock':<34}║")
     print("╠══════════════════════════════════════════════════════════╣")
     print("║  Try: 'safe sushi near Wicker Park'                      ║")
     print("║       'low risk ramen Lincoln Square immunocompromised'  ║")
