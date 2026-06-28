@@ -59,7 +59,7 @@ export function TrendChart({
       <div
         role="status"
         aria-label="Insufficient history to compute trend"
-        className="text-[12px] text-muted text-center py-3"
+        className="text-xs text-muted text-center py-3"
         style={{ width, height }}
       >
         Not enough scored inspections to show a trend.
@@ -183,7 +183,7 @@ export function TrendChart({
       {/* Hover/focus tooltip — makes clear the value is a model prediction. */}
       {hover !== null && (
         <div
-          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-medium shadow-lg"
+          className="pointer-events-none absolute z-10 whitespace-nowrap rounded-md px-2 py-1 text-2xs font-medium shadow-lg"
           style={{
             background: "#2A2724",
             color: "#FBF8F1",

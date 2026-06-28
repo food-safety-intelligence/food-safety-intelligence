@@ -82,7 +82,7 @@ export default async function RestaurantDetailPage({
       <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
+          className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
           Back to search
@@ -99,16 +99,16 @@ export default async function RestaurantDetailPage({
         {/* Hero */}
         <section className="mb-10">
           <div className="mb-6">
-            <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
               Food establishment profile
             </p>
-            <h1 className="text-[3.4rem] font-light leading-[1.04] tracking-tight">
+            <h1 className="text-6xl font-light leading-[1.04] tracking-tight">
               {restaurant.dba_name}
             </h1>
-            <p className="text-[16px] text-muted mt-4 leading-relaxed">
+            <p className="text-lg text-muted mt-4 leading-relaxed">
               {locationLine}
             </p>
-            <div className="flex flex-wrap gap-2 mt-4 items-center text-[12px] text-muted">
+            <div className="flex flex-wrap gap-2 mt-4 items-center text-xs text-muted">
               <span className="px-2.5 py-1 rounded-full bg-tint">
                 License #{restaurant.license_id}
               </span>
@@ -132,17 +132,17 @@ export default async function RestaurantDetailPage({
         <section className="mb-12">
           <div className="grid grid-cols-12 gap-8 items-end mb-6">
             <div className="col-span-12 lg:col-span-7">
-              <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
                 What&apos;s driving the score
               </p>
-              <h2 className="text-[2rem] font-light leading-tight tracking-tight">
+              <h2 className="text-3xl font-light leading-tight tracking-tight">
                 {restaurant.top_drivers.length === 1
                   ? "One factor is doing most of the work."
                   : `${
                       restaurant.top_drivers.length
                     } factors are doing most of the work.`}
               </h2>
-              <p className="text-[15px] text-muted leading-relaxed mt-3 max-w-[60ch]">
+              <p className="text-md text-muted leading-relaxed mt-3 max-w-[60ch]">
                 The model attributes the score to the items below, sorted from
                 most to least influential. Positive contributions push the
                 score up; negative contributions push it down.
@@ -151,7 +151,7 @@ export default async function RestaurantDetailPage({
             <div className="col-span-12 lg:col-span-5 lg:text-right">
               <Link
                 href="/how-it-works#definitions"
-                className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
+                className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
               >
                 Term definitions →
               </Link>
@@ -166,17 +166,17 @@ export default async function RestaurantDetailPage({
           {payload.calibration && (
             <div className="mt-8">
               <div className="flex items-baseline justify-between gap-4 flex-wrap mb-3">
-                <h3 className="text-[1.2rem] font-medium tracking-tight">
+                <h3 className="text-xl font-medium tracking-tight">
                   How the score adds up
                 </h3>
                 <Link
                   href="/how-it-works#calibrated-log-odds"
-                  className="text-[13px] text-teal hover:underline"
+                  className="text-sm text-teal hover:underline"
                 >
                   What is calibrated log-odds?
                 </Link>
               </div>
-              <p className="text-[14px] text-muted leading-relaxed mb-4 max-w-[60ch]">
+              <p className="text-base text-muted leading-relaxed mb-4 max-w-[60ch]">
                 The same drivers as the bars above, rescaled to the model&apos;s
                 calibrated scale so they add up — so the numbers here are smaller
                 than the bars (which show raw influence and don&apos;t sum). The
@@ -198,10 +198,10 @@ export default async function RestaurantDetailPage({
               </span>
             </div>
             <div className="col-span-12 md:col-span-10">
-              <p className="text-teal text-[12.5px] tracking-[0.18em] uppercase mb-2">
+              <p className="text-teal text-xs tracking-[0.18em] uppercase mb-2">
                 A note for immunocompromised diners
               </p>
-              <p className="text-[16.5px] leading-relaxed text-ink/90">
+              <p className="text-lg leading-relaxed text-ink/90">
                 Drivers tied to recurring violations or nearby pest complaints
                 are the patterns your care team would most want you to
                 consider. Administrative drivers like &quot;long since last
@@ -214,10 +214,10 @@ export default async function RestaurantDetailPage({
         {/* History + sidebars */}
         <section className="mb-12">
           <div className="mb-6">
-            <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
               Inspection history
             </p>
-            <h2 className="text-[2rem] font-light leading-tight tracking-tight">
+            <h2 className="text-3xl font-light leading-tight tracking-tight">
               {history.length} inspection{history.length === 1 ? "" : "s"} on
               record.{" "}
               <span
@@ -231,7 +231,7 @@ export default async function RestaurantDetailPage({
                 .
               </span>
             </h2>
-            <p className="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
+            <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
               Real Chicago Department of Public Health records, independent of
               the predicted risk score above.
             </p>
@@ -250,10 +250,10 @@ export default async function RestaurantDetailPage({
 
         {/* Caveat */}
         <section className="rounded-3xl bg-card border border-line soft-shadow p-8 mb-8">
-          <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
             A note on this score
           </p>
-          <h3 className="text-[1.6rem] font-light leading-snug tracking-tight max-w-[40ch]">
+          <h3 className="text-2xl font-light leading-snug tracking-tight max-w-[40ch]">
             What this number is, and what it{" "}
             <span
               className="serif italic text-terra"
@@ -262,7 +262,7 @@ export default async function RestaurantDetailPage({
               isn&apos;t.
             </span>
           </h3>
-          <div className="grid grid-cols-12 gap-6 mt-5 text-[15px] text-ink/85 leading-[1.7]">
+          <div className="grid grid-cols-12 gap-6 mt-5 text-md text-ink/85 leading-[1.7]">
             <div className="col-span-12 md:col-span-6">
               <p className="font-medium mb-2">It is a prediction.</p>
               <p>
@@ -286,7 +286,7 @@ export default async function RestaurantDetailPage({
         <div className="text-center mt-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
             Back to search

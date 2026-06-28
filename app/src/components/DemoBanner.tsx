@@ -12,10 +12,10 @@ export function DemoBanner() {
         <span className="inline-flex w-7 h-7 rounded-full bg-amber/20 items-center justify-center shrink-0 mt-0.5">
           <Info className="w-3.5 h-3.5 text-tier-mod-fg" strokeWidth={2.2} />
         </span>
-        <p className="text-[13.5px] leading-relaxed">
+        <p className="text-sm leading-relaxed">
           <span className="font-semibold">This is a research preview.</span>{" "}
           Risk scores shown here are{" "}
-          <em className="serif italic text-[17px] mx-0.5">synthetic</em> —
+          <em className="serif italic text-lg mx-0.5">synthetic</em> —
           randomly generated for design review. The model is not yet trained.
           Don&apos;t make dining decisions on this page yet.
         </p>

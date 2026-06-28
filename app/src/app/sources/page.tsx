@@ -43,20 +43,20 @@ export default function SourcesPage() {
       <main className="max-w-[820px] mx-auto px-8 pt-10 pb-24 flex-1">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
+          className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
           Back to search
         </Link>
 
         <header className="mt-6">
-          <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
             Sources
           </p>
-          <h1 className="text-[3rem] font-light leading-[1.05] tracking-tight">
+          <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
             Public data, attributed.
           </h1>
-          <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
+          <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
             Every score on this site is computed from datasets published by
             the City of Chicago on its Open Data Portal. We don&apos;t scrape,
             buy, or combine private data.
@@ -73,7 +73,7 @@ export default function SourcesPage() {
               className="block rounded-3xl bg-card border border-line p-6 soft-shadow hover:border-teal/40 transition-colors"
             >
               <div className="flex items-start justify-between gap-4">
-                <h2 className="text-[1.25rem] font-medium tracking-tight">
+                <h2 className="text-xl font-medium tracking-tight">
                   {s.name}
                 </h2>
                 <ExternalLink
@@ -81,7 +81,7 @@ export default function SourcesPage() {
                   strokeWidth={2}
                 />
               </div>
-              <p className="text-[14.5px] text-muted leading-relaxed mt-2">
+              <p className="text-base text-muted leading-relaxed mt-2">
                 {s.summary}
               </p>
             </a>
@@ -89,10 +89,10 @@ export default function SourcesPage() {
         </section>
 
         <section className="mt-10 rounded-3xl bg-tint border border-line p-6">
-          <p className="text-teal text-[12.5px] tracking-[0.18em] uppercase mb-2">
+          <p className="text-teal text-xs tracking-[0.18em] uppercase mb-2">
             Refresh cadence
           </p>
-          <p className="text-[15px] text-ink/85 leading-relaxed">
+          <p className="text-md text-ink/85 leading-relaxed">
             The model is currently scored on a fixed snapshot of the data. A
             scheduled incremental refresh (daily pulls of new inspection /
             complaint / license records) is on the roadmap; the SODA loader

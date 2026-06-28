@@ -17,21 +17,21 @@ export default function CaregiversPage() {
       <main className="max-w-[820px] mx-auto px-8 pt-10 pb-24 flex-1">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 text-[13px] text-teal hover:underline"
+          className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
         >
           <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
           Back to search
         </Link>
 
         <header className="mt-6">
-          <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3 inline-flex items-center gap-2">
+          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3 inline-flex items-center gap-2">
             <Heart className="w-3.5 h-3.5" strokeWidth={2} />
             For caregivers
           </p>
-          <h1 className="text-[3rem] font-light leading-[1.05] tracking-tight">
+          <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
             The drivers matter more than the score.
           </h1>
-          <p className="text-[17px] text-muted leading-[1.65] mt-5 max-w-[58ch]">
+          <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
             Two food establishments can share the same predicted risk score for
             very
             different reasons. If you&apos;re ordering for someone with
@@ -43,13 +43,13 @@ export default function CaregiversPage() {
 
         <section className="mt-12 grid gap-5">
           <div className="rounded-3xl bg-card border border-line p-6 soft-shadow">
-            <p className="text-[11px] tracking-widest uppercase text-terra mb-2">
+            <p className="text-2xs tracking-widest uppercase text-terra mb-2">
               Patterns worth weighing
             </p>
-            <h2 className="text-[1.4rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Recurring violations
             </h2>
-            <p className="text-[14.5px] text-muted leading-relaxed mt-2">
+            <p className="text-base text-muted leading-relaxed mt-2">
               Multiple priority violations in prior history — especially
               temperature, handwashing, or cross-contamination — describe how
               the kitchen actually operates. These are the drivers your care
@@ -58,13 +58,13 @@ export default function CaregiversPage() {
           </div>
 
           <div className="rounded-3xl bg-card border border-line p-6 soft-shadow">
-            <p className="text-[11px] tracking-widest uppercase text-terra mb-2">
+            <p className="text-2xs tracking-widest uppercase text-terra mb-2">
               Patterns worth weighing
             </p>
-            <h2 className="text-[1.4rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Nearby pest complaints
             </h2>
-            <p className="text-[14.5px] text-muted leading-relaxed mt-2">
+            <p className="text-base text-muted leading-relaxed mt-2">
               Rodent or vermin complaints filed near the establishment in the
               last 90 days. A cluster suggests neighborhood pest pressure that
               spills into nearby kitchens.
@@ -72,13 +72,13 @@ export default function CaregiversPage() {
           </div>
 
           <div className="rounded-3xl bg-tint border border-line p-6">
-            <p className="text-[11px] tracking-widest uppercase text-muted mb-2">
+            <p className="text-2xs tracking-widest uppercase text-muted mb-2">
               Patterns worth weighing less
             </p>
-            <h2 className="text-[1.4rem] font-medium tracking-tight">
+            <h2 className="text-2xl font-medium tracking-tight">
               Long since last inspection
             </h2>
-            <p className="text-[14.5px] text-muted leading-relaxed mt-2">
+            <p className="text-base text-muted leading-relaxed mt-2">
               An administrative gap, not evidence of a problem. The score
               treats it as a risk signal because inspection cadence correlates
               with risk in Chicago&apos;s data — but it doesn&apos;t tell you
@@ -88,10 +88,10 @@ export default function CaregiversPage() {
         </section>
 
         <section className="mt-12 rounded-3xl bg-card border border-line p-7 soft-shadow">
-          <p className="text-teal text-[12.5px] tracking-[0.18em] uppercase mb-2">
+          <p className="text-teal text-xs tracking-[0.18em] uppercase mb-2">
             What this is not
           </p>
-          <p className="text-[16px] leading-relaxed text-ink/90">
+          <p className="text-lg leading-relaxed text-ink/90">
             A &quot;High&quot; prediction does not mean a food establishment is
             unsafe to eat at today. It means the patterns in the public record
             resemble those that historically precede a failed inspection. Use
