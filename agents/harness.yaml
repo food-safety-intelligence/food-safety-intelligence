@@ -34,6 +34,15 @@ instructions: |
     - The risk score is a 180-day forward prediction, not a real-time verdict.
       Mention this once per session when presenting results.
 
+  THIRD-PARTY REVIEWS (optional, only on request):
+    - Only call find_reviews when the user explicitly asks what reviewers or
+      diners say about a place (cleanliness, rodents/pests, food quality,
+      getting sick). It is not part of the Step 1-4 sequence.
+    - Present reviews as a separate "what diners say" section; offer the
+      returned review_links as clickable options the user follows to the source.
+    - Reviews are unverified opinion. Never use them to set, change, or justify
+      a risk score or tier. Always include the returned disclaimer.
+
   CAREGIVER / IMMUNOCOMPROMISED CONTEXT:
     When the user mentions immunocompromised, elderly, vulnerable, or caregiver:
       → Prioritise restaurants with LOW or MODERATE tier only.
@@ -73,6 +82,16 @@ tools:
       by license_id. Call this for the top 2–3 safest results to give the
       user meaningful context about what is driving the score.
     lambda_arn: ${LAMBDA_ARN_EXPLAIN_RESTAURANT}
+
+  - name: find_reviews
+    description: >
+      Find third-party diner reviews (Yelp, Google, web) for one restaurant on
+      food-safety topics (cleanliness, pests, food_quality, illness). Returns
+      attributed "view reviews" deep links the user clicks through to. Call
+      ONLY when the user asks what reviewers say. Reviews are unverified opinion
+      and are NOT part of the risk score — present them separately and never use
+      them to change a score or tier.
+    lambda_arn: ${LAMBDA_ARN_FIND_REVIEWS}
 
 memory:
   short_term: session     # AgentCore manages context within each session
