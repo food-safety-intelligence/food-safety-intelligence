@@ -7,15 +7,19 @@ import { trendDirection } from "@/lib/scores";
  * Detail-page trend chart. Plots the establishment's recent FORECAST-MODEL scores
  * (predictions — not inspection pass/fail results) at their real inspection dates:
  * the actual trajectory, not a synthetic line. Hovering or focusing a point shows
- * its date + predicted risk. A dashed line marks the citywide median for context.
- * See decision 0011. Client component for the hover tooltip.
+ * its date + predicted risk.
+ *
+ * The line/area/dots are a NEUTRAL colour on purpose (decision 0011): the
+ * authoritative direction signal — the coloured Improving/Worsening/Stable arrow
+ * + label — lives in the ScoreCard header, driven by `trend_slope` (a regression
+ * over the points). Colouring the drawn line by first-vs-last would be noisier
+ * than that slope and could visibly disagree with it, so the chart stays neutral.
+ *
+ * Client component for the hover tooltip.
  */
 
-const COLOR_BY_DIRECTION = {
-  worsening: "#B8634A", // terra
-  improving: "#7A8F6A", // sage
-  stable: "#9CA3AF", // muted gray
-} as const;
+// Neutral ink-muted — the drawn trajectory carries no direction meaning of its own.
+const LINE = "#6B7280";
 
 export interface TrendPoint {
   /** ISO yyyy-mm-dd inspection date. */
@@ -27,15 +31,12 @@ export interface TrendPoint {
 export function TrendChart({
   points,
   slope,
-  typicalScore = null,
   width = 320,
   height = 116,
 }: {
   points: TrendPoint[];
-  /** Trend slope — only used to pick the direction colour (matches the indicator). */
+  /** Trend slope — only used for the chart's `aria-label` direction word. */
   slope: number | null;
-  /** Citywide median risk, drawn as a dashed reference line. Null hides it. */
-  typicalScore?: number | null;
   width?: number;
   height?: number;
 }) {
@@ -49,7 +50,6 @@ export function TrendChart({
   const h = height - padTop - padBot;
 
   const direction = trendDirection(slope);
-  const color = COLOR_BY_DIRECTION[direction];
 
   // Oldest -> newest for left-to-right time.
   const pts = [...points].sort((a, b) => a.date.localeCompare(b.date));
@@ -78,7 +78,6 @@ export function TrendChart({
   const linePath = xy.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
   const areaPath = `${linePath} L ${xy[xy.length - 1].x} ${padTop + h} L ${xy[0].x} ${padTop + h} Z`;
 
-  const midlineY = typicalScore !== null ? yFor(typicalScore) : null;
   const fmtAxis = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   const fmtFull = (iso: string) =>
@@ -123,36 +122,11 @@ export function TrendChart({
           risk
         </text>
 
-        {/* Citywide-median reference line. */}
-        {midlineY !== null && typicalScore !== null && (
-          <>
-            <line
-              x1={padL}
-              x2={width - padR}
-              y1={midlineY}
-              y2={midlineY}
-              stroke="#9AA1A9"
-              strokeWidth={1}
-              strokeDasharray="2 3"
-            />
-            <text
-              x={width - padR}
-              y={midlineY - 3}
-              textAnchor="end"
-              fontSize={8.5}
-              fill="#6B7280"
-              fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-            >
-              city median {typicalScore.toFixed(2)}
-            </text>
-          </>
-        )}
-
-        <path d={areaPath} fill={color} fillOpacity={0.1} />
+        <path d={areaPath} fill={LINE} fillOpacity={0.08} />
         <path
           d={linePath}
           fill="none"
-          stroke={color}
+          stroke={LINE}
           strokeWidth={2}
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -168,9 +142,9 @@ export function TrendChart({
               cx={q.x}
               cy={q.y}
               r={isLast || active ? 5 : 3}
-              fill={isLast ? "#FFFFFF" : color}
-              fillOpacity={isLast ? 1 : active ? 0.9 : 0.45}
-              stroke={isLast || active ? color : "none"}
+              fill={isLast ? "#FFFFFF" : LINE}
+              fillOpacity={isLast ? 1 : active ? 0.9 : 0.5}
+              stroke={isLast || active ? LINE : "none"}
               strokeWidth={2.5}
               tabIndex={0}
               role="button"

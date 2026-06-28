@@ -284,11 +284,7 @@ export default async function HowItWorksPage() {
               date</span>{" "}(a score from 0 to 1, not the inspection&apos;s pass/fail
               result, which is in the inspection list below) — placed at its real
               date; hover a dot to see the date and value. So a 2019 dot is what the
-              model would have estimated in 2019, not a guess about the past. The
-              dashed line is the{" "}
-              <span className="font-medium text-ink/80">citywide median</span>{" "}risk,
-              so you can see whether this establishment sits above or below a
-              typical one.
+              model would have estimated in 2019, not a guess about the past.
             </p>
             <p className="text-[12.5px] text-muted leading-relaxed mt-2">
               To keep the direction honest, those points come from a separate{" "}

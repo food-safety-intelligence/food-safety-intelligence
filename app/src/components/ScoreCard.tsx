@@ -165,7 +165,7 @@ export function ScoreCard({
         </span>
       </div>
       <div className="flex justify-center">
-        <TrendChart points={hasTrend ? trendPoints : []} slope={slope} typicalScore={medianScore} />
+        <TrendChart points={hasTrend ? trendPoints : []} slope={slope} />
       </div>
       <p className="text-[11px] text-muted mt-2 text-center leading-snug">
         Predicted risk over recent inspections — which way it&apos;s trending.
