@@ -1,13 +1,15 @@
 """Generate ``app/public/data/methodology.json`` for the "How this works" page.
 
-Computes the operating-point table + headline metrics for the served baseline
-on the time-held-out test split and writes them as JSON for the Next.js
-methodology page to read. This is the batch-to-JSON contract — the web app
-never runs the model; it renders precomputed numbers from this file.
+Computes the operating-point table + headline metrics for the served model
+(production XGBoost, depth-3 + monotone constraints) on the time-held-out test
+split and writes them as JSON for the Next.js methodology page to read. This is
+the batch-to-JSON contract — the web app never runs the model; it renders
+precomputed numbers from this file.
 
 Operating points are rank-based (precision / recall / lift at top-k), so they
-are identical for the uncalibrated baseline and its sigmoid-calibrated served
-form. We fit the baseline here for a fast, self-contained run.
+are identical for the uncalibrated model and its Platt-calibrated served form.
+We fit the model here for a fast, self-contained run, mirroring
+``retrain_xgb_sigmoid.py`` (same split, same config, same Platt-on-margin).
 
 Run: ``PYTHONPATH=src uv run python scripts/build_methodology_json.py``
 """
@@ -20,16 +22,19 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.frozen import FrozenEstimator
+from scipy.special import expit
+from sklearn.linear_model import LogisticRegression
 
 from foodsafety.explain.feature_labels import display_name
-from foodsafety.explain.shap_drivers import (
-    linear_contributions,
-    top_drivers_for_row,
-)
-from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
+from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
+from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
 from foodsafety.models.evaluate import evaluate, operating_point_table
+from foodsafety.models.xgb import (
+    build_production_xgb,
+    compute_scale_pos_weight,
+    extract_categorical_dtypes,
+    prepare_xgb_features,
+)
 from foodsafety.serve.predict_batch import RISK_TIER_THRESHOLDS
 from foodsafety.tracking import provenance
 
@@ -44,20 +49,45 @@ TRAIN_END = pd.Timestamp("2024-07-01")
 TEST_START = pd.Timestamp("2025-07-01")
 K_FRACS = (0.05, 0.10, 0.20, 0.30, 0.50)
 
-# How many features to show in the global-impact bar chart, and how many
-# drivers to itemise in the worked waterfall (rest roll into "other").
 N_GLOBAL_FEATURES = 12
 N_WATERFALL_DRIVERS = 4
 
 
-def _sigmoid(x: float) -> float:
-    return float(1.0 / (1.0 + np.exp(-x)))
+class _ServedXGB:
+    """The served XGB + Platt-on-margin, fit here for a self-contained run.
+
+    Mirrors ``retrain_xgb_sigmoid.XGBServeModel`` (same config + calibration) so
+    the methodology numbers describe the model that feeds ``scores.json``.
+    """
+
+    def __init__(self, train: pd.DataFrame, val: pd.DataFrame):
+        y_train = train[LABEL_COL].astype(int).to_numpy()
+        X_train = prepare_xgb_features(train[ALL_FEATURES])
+        self.cat_dtypes = extract_categorical_dtypes(X_train)
+        self.est = build_production_xgb(scale_pos_weight=compute_scale_pos_weight(y_train))
+        self.est.fit(X_train, y_train, verbose=False)
+        X_val = prepare_xgb_features(val[ALL_FEATURES], categorical_dtypes=self.cat_dtypes)
+        margin_val = self.est.predict(X_val, output_margin=True)
+        platt = LogisticRegression(C=1e10, solver="lbfgs").fit(
+            margin_val.reshape(-1, 1), val[LABEL_COL].astype(int)
+        )
+        self.coef, self.inter = float(platt.coef_[0, 0]), float(platt.intercept_[0])
+
+    def _prep(self, X: pd.DataFrame) -> pd.DataFrame:
+        return prepare_xgb_features(X, categorical_dtypes=self.cat_dtypes)
+
+    def risk(self, X: pd.DataFrame) -> np.ndarray:
+        margin = self.est.predict(self._prep(X), output_margin=True)
+        return expit(self.coef * margin + self.inter)
+
+    def contributions(self, X: pd.DataFrame) -> tuple[pd.DataFrame, float]:
+        return tree_contributions(self.est, self._prep(X), list(ALL_FEATURES))
 
 
-def global_feature_impact(pipe, test: pd.DataFrame) -> list[dict]:
-    """Mean |log-odds contribution| per feature on the test set — the model's
-    global feature impact (notebook 06 §4). Ranked, top N, with plain names."""
-    contrib = linear_contributions(pipe, test[ALL_FEATURES], original_features=list(ALL_FEATURES))
+def global_feature_impact(model: _ServedXGB, test: pd.DataFrame) -> list[dict]:
+    """Mean |margin (log-odds) contribution| per feature on the test set — the
+    model's global feature impact (TreeSHAP). Ranked, top N, with plain names."""
+    contrib, _ = model.contributions(test[ALL_FEATURES])
     mean_abs = contrib.abs().mean().sort_values(ascending=False)
     return [
         {
@@ -69,36 +99,28 @@ def global_feature_impact(pipe, test: pd.DataFrame) -> list[dict]:
     ]
 
 
-def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
-    """One worked example: how an establishment's drivers add up — in CALIBRATED
-    log-odds — to the published probability.
+def worked_waterfall(model: _ServedXGB, test: pd.DataFrame) -> dict:
+    """One worked example: how an establishment's TreeSHAP drivers add up — in
+    CALIBRATED log-odds — to the published probability.
 
-    The Platt calibration is a monotone linear map of the raw logit L:
-        calibrated_logit = -(a*L + b),  p = sigmoid(calibrated_logit).
-    Since L = intercept + Σ contributions, scaling every contribution by -a and
-    folding -b into the base term makes the CALIBRATED contributions additive and
-    sum exactly to calibrated_logit — so sigmoid(base + Σdrivers + other) lands
-    exactly on the establishment's probability (no reconciliation gap with the
-    gauge). The example is anonymised — it teaches the math, not a named place.
+    The Platt map is linear in the raw margin M: ``calibrated_logit = coef*M +
+    inter``, and ``M = base_margin + Σ contributions`` (TreeSHAP additivity).
+    Scaling each contribution by ``coef`` and folding ``inter`` into the base
+    term makes the calibrated contributions additive and sum exactly to the
+    calibrated logit — so ``sigmoid(base + Σdrivers + other)`` lands exactly on
+    the establishment's probability (no reconciliation gap with the gauge).
     """
-    sig = calibrated.calibrated_classifiers_[0].calibrators[0]
-    a, b = float(sig.a_), float(sig.b_)
-    slope = -a  # calibrated contribution = slope * raw contribution
+    risk = model.risk(test[ALL_FEATURES])
+    contrib, base_margin = model.contributions(test[ALL_FEATURES])
+    slope = model.coef  # calibrated contribution = coef * raw contribution
 
-    intercept = float(pipe.named_steps["model"].intercept_[0])
-    p_test = calibrated.predict_proba(test[ALL_FEATURES])[:, 1]
-    contrib = linear_contributions(pipe, test[ALL_FEATURES], original_features=list(ALL_FEATURES))
-
-    # Pick a pedagogically clear, deterministic example: scanning from the
-    # highest-probability rows, take the first whose top drivers include BOTH a
-    # risk-raising and a risk-lowering factor (so the waterfall shows both
-    # directions). Fall back to the single highest-probability row.
-    order = np.argsort(-p_test)
+    # Deterministic, pedagogically clear example: highest-probability row whose
+    # top drivers include BOTH a risk-raising and a risk-lowering factor.
+    order = np.argsort(-risk)
     chosen = int(order[0])
     for idx in order[:300]:
-        row_contrib = contrib.iloc[int(idx)]
         drivers = top_drivers_for_row(
-            test.iloc[int(idx)][ALL_FEATURES], row_contrib, k=N_WATERFALL_DRIVERS
+            test.iloc[int(idx)][ALL_FEATURES], contrib.iloc[int(idx)], k=N_WATERFALL_DRIVERS
         )
         if any(d.shap > 0 for d in drivers) and any(d.shap < 0 for d in drivers):
             chosen = int(idx)
@@ -109,7 +131,7 @@ def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
     drivers = top_drivers_for_row(row_values, raw_contrib, k=N_WATERFALL_DRIVERS)
     top_feats = {d.feature for d in drivers}
 
-    base_cal = slope * intercept - b
+    base_cal = slope * base_margin + model.inter
     driver_out = [
         {"feature": d.feature, "label": d.label, "contribution": round(slope * d.shap, 4)}
         for d in drivers
@@ -118,11 +140,11 @@ def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
         raw_contrib[[f for f in raw_contrib.index if f not in top_feats]].sum()
     )
     total_cal = base_cal + slope * float(raw_contrib.sum())
-    p = _sigmoid(total_cal)
+    p = float(expit(total_cal))
 
     # Sanity: the additive calibrated logit must reproduce the model's own
     # probability for this row (else the page would show a fictitious total).
-    assert abs(p - float(p_test[chosen])) < 1e-6, (p, float(p_test[chosen]))
+    assert abs(p - float(risk[chosen])) < 1e-6, (p, float(risk[chosen]))
 
     return {
         "base": round(base_cal, 4),
@@ -135,12 +157,7 @@ def worked_waterfall(pipe, calibrated, test: pd.DataFrame) -> dict:
 
 def served_tier_shares() -> dict[str, float] | None:
     """Share of *scored establishments* in each tier, from the served
-    ``scores.json`` totals — the population the app actually displays. Lets the
-    methodology page show shares without itself loading the 18 MB scores file.
-
-    Returns ``None`` if ``scores.json`` isn't built yet (fresh clone before the
-    serving script runs); the page then just omits the Share column.
-    """
+    ``scores.json`` totals — the population the app actually displays."""
     scores_path = REPO_ROOT / "app" / "public" / "data" / "scores.json"
     try:
         counts = json.loads(scores_path.read_text())["totals"]["tier_counts"]
@@ -151,13 +168,8 @@ def served_tier_shares() -> dict[str, float] | None:
 
 
 def risk_tier_bands(shares: dict[str, float] | None = None) -> list[dict]:
-    """Score→tier bands for the "How this works" page, derived from the served
-    ``RISK_TIER_THRESHOLDS`` so the page can't drift from ``score_to_tier``.
-
-    Each band is ``{label, min, max}`` on the predicted probability (top band's
-    ``max`` is ``None``), plus ``share`` (fraction of establishments) when the
-    served distribution is available.
-    """
+    """Score→tier bands for the page, derived from the served
+    ``RISK_TIER_THRESHOLDS`` so the page can't drift from ``score_to_tier``."""
     bands: list[dict] = []
     lo = 0.0
     for threshold, tier in RISK_TIER_THRESHOLDS:
@@ -181,38 +193,24 @@ def main() -> None:
     df["inspection_date"] = pd.to_datetime(df["inspection_date"])
     # Served basis: drop burn-in (no label) and right-truncated rows (their
     # forward window runs past the data, so their labels are under-counted).
-    # This is the review-time-filtered "served" test in docs/experiments.md
-    # (n≈7,008), not the unfiltered "honest test" (n≈13,812) — they are not
-    # directly comparable, so we report one basis and name it.
     df = df[(~df["is_burnin"]) & (~df["right_truncated"])].dropna(subset=[LABEL_COL])
 
     train = df[df["inspection_date"] < TRAIN_END]
     val = df[(df["inspection_date"] >= TRAIN_END) & (df["inspection_date"] < TEST_START)]
     test = df[df["inspection_date"] >= TEST_START]
 
-    pipe = build_baseline_pipeline()
-    pipe.fit(train[ALL_FEATURES], train[LABEL_COL].astype(int))
-    scores = pipe.predict_proba(test[ALL_FEATURES])[:, 1]
+    model = _ServedXGB(train, val)
+    scores = model.risk(test[ALL_FEATURES])
     y = test[LABEL_COL].astype(int).to_numpy()
 
     report = evaluate(y, scores)
     table = operating_point_table(y, scores, k_fracs=K_FRACS)
 
-    # Sigmoid (Platt) calibration on the val slice, mirroring the served model
-    # (retrain_baseline_sigmoid.py). Used only for the worked waterfall, so its
-    # additive log-odds land exactly on a calibrated probability. FrozenEstimator
-    # marks `pipe` as pre-fit so calibration doesn't refit the base estimator.
-    calibrated = CalibratedClassifierCV(FrozenEstimator(pipe), method="sigmoid")
-    calibrated.fit(val[ALL_FEATURES], val[LABEL_COL].astype(int))
-
     payload = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
-        # Uncalibrated baseline: operating points + PR/ROC-AUC are rank-based, so
-        # they're identical to the sigmoid-calibrated served form (see docstring).
-        # The string names the estimator family, not a calibration step we ran.
-        "model_version": "baseline_logreg",
-        # Provenance — ties these numbers to the exact code + dataset that
-        # produced them, so the page can't silently drift from the served model.
+        # Production XGBoost (depth-3 + monotone). Operating points + PR/ROC-AUC
+        # are rank-based, identical to the Platt-calibrated served form.
+        "model_version": "xgb_monotone",
         "provenance": provenance(FEATURES_PATH, ALL_FEATURES, REPO_ROOT),
         "test": {
             "n": int(len(test)),
@@ -225,9 +223,6 @@ def main() -> None:
             "roc_auc": round(float(report.roc_auc), 4),
             "top_decile_lift": round(float(report.top_decile_lift), 2),
         },
-        # Score→tier bands (Low/Moderate/Elevated/High) shown as the badge legend
-        # on the page — thresholds from the served constants, share from the
-        # served scores.json, so the page reads only this one JSON.
         "risk_tiers": risk_tier_bands(served_tier_shares()),
         "operating_points": [
             {
@@ -240,10 +235,10 @@ def main() -> None:
             }
             for row in table.itertuples()
         ],
-        # Global feature impact (mean |log-odds| on test) for the importance bar.
-        "global_importance": global_feature_impact(pipe, test),
+        # Global feature impact (mean |log-odds| TreeSHAP on test) for the bar.
+        "global_importance": global_feature_impact(model, test),
         # One anonymised worked example whose calibrated drivers sum to its score.
-        "waterfall": worked_waterfall(pipe, calibrated, test),
+        "waterfall": worked_waterfall(model, test),
     }
 
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
