@@ -144,11 +144,17 @@ export function ChatInterface() {
     if (!trimmed || loading) return;
 
     setInput("");
+    // Prior turns of this conversation, replayed so the agent has context for
+    // follow-ups. Captured BEFORE appending the new user turn; error bubbles are
+    // dropped (they're client-side failures, not real agent output).
+    const history = messages
+      .filter((m) => !m.error)
+      .map((m) => ({ role: m.role, content: m.content }));
     setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
     setLoading(true);
 
     try {
-      const result = await queryAgent(trimmed, sessionIdRef.current);
+      const result = await queryAgent(trimmed, sessionIdRef.current, history);
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
