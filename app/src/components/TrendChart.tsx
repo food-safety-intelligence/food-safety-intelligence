@@ -105,7 +105,7 @@ export function TrendChart({
             y={yFor(t) + 3}
             textAnchor="end"
             fontSize={8}
-            fill="#B6AE9F"
+            fill="#6B7280"
             fontFamily="var(--font-manrope), 'Manrope', sans-serif"
           >
             {t.toFixed(1)}
@@ -115,7 +115,7 @@ export function TrendChart({
           x={9}
           y={padTop + h / 2}
           fontSize={8}
-          fill="#B6AE9F"
+          fill="#6B7280"
           textAnchor="middle"
           transform={`rotate(-90 9 ${padTop + h / 2})`}
           fontFamily="var(--font-manrope), 'Manrope', sans-serif"
@@ -131,7 +131,7 @@ export function TrendChart({
               x2={width - padR}
               y1={midlineY}
               y2={midlineY}
-              stroke="#C9C1B2"
+              stroke="#9AA1A9"
               strokeWidth={1}
               strokeDasharray="2 3"
             />
@@ -140,7 +140,7 @@ export function TrendChart({
               y={midlineY - 3}
               textAnchor="end"
               fontSize={8.5}
-              fill="#9CA3AF"
+              fill="#6B7280"
               fontFamily="var(--font-manrope), 'Manrope', sans-serif"
             >
               city median {typicalScore.toFixed(2)}
@@ -189,7 +189,7 @@ export function TrendChart({
           x={padL}
           y={height - 5}
           fontSize={8.5}
-          fill="#9CA3AF"
+          fill="#6B7280"
           fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         >
           {fmtAxis(pts[0].date)}
@@ -199,7 +199,7 @@ export function TrendChart({
           y={height - 5}
           textAnchor="end"
           fontSize={8.5}
-          fill="#9CA3AF"
+          fill="#6B7280"
           fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         >
           {fmtAxis(pts[pts.length - 1].date)}

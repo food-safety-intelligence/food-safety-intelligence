@@ -48,8 +48,8 @@ function DriverIcon({ icon: Icon, className }: { icon: LucideIcon; className?: s
 /**
  * Centerpiece score panel on the detail page. A full-width horizontal band:
  * the arc gauge + tier on the left, the top driver and percentile in the
- * middle, and a minimal 90-day trend chart on the right (reconstructed from
- * the linear slope — we don't ship per-restaurant history in scores.json).
+ * middle, and a trend chart on the right plotting the forecast-only score of
+ * each recent inspection (from the shipped per-restaurant history).
  * Stacks to a single column on narrow screens.
  */
 export function ScoreCard({
@@ -75,6 +75,10 @@ export function ScoreCard({
     .slice(0, TREND_POINTS)
     .map((e) => ({ date: e.date, score: e.score }))
     .reverse();
+
+  // One gate for the header label and the chart so they never disagree: we have
+  // a trend only with a (de-confounded) slope AND at least two points to draw.
+  const hasTrend = slope !== null && trendPoints.length >= 2;
 
   // Percentile rank reads honestly across every tier. "Top X%" alone gets
   // misleading at the extremes (e.g. "top 0.00%" for the highest-scoring
@@ -157,11 +161,11 @@ export function ScoreCard({
         </div>
         <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${trend.fg}`}>
           <TrendIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
-          {slope === null ? "Insufficient history" : trend.label}
+          {hasTrend ? trend.label : "Insufficient history"}
         </span>
       </div>
       <div className="flex justify-center">
-        <TrendChart points={trendPoints} slope={slope} typicalScore={medianScore} />
+        <TrendChart points={hasTrend ? trendPoints : []} slope={slope} typicalScore={medianScore} />
       </div>
       <p className="text-[11px] text-muted mt-2 text-center leading-snug">
         Predicted risk over recent inspections — which way it&apos;s trending.

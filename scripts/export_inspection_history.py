@@ -38,7 +38,7 @@ from foodsafety.io import storage
 INSPECTIONS_PATH = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
 # Per-inspection forecast scores (Model 2), written by retrain_xgb_sigmoid. Joined
 # onto each event below so the detail-page trend chart can plot the real trajectory
-# of forecast scores over time (DR 0010). Optional — events get score=null without it.
+# of forecast scores over time (DR 0011). Optional — events get score=null without it.
 FORECAST_HISTORY_PATH = storage.join(str(PREDICTIONS_DIR), "forecast_history.parquet")
 OUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "inspection_history.json")
 # Full-comment shards live alongside the history JSON under web-app-data/comments/
