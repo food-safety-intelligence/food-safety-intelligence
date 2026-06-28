@@ -48,4 +48,20 @@ def test_handler_builds_links():
 
 
 def test_handler_requires_name():
-    assert "error" in handler({"name": "", "topics": []}, None)
+    out = handler({"name": "", "topics": []}, None)
+    assert out["error"]
+    assert out["reason"] == "missing_name"
+
+
+def test_links_percent_encode_special_chars():
+    # A name with query-significant and path-significant characters must be
+    # percent-encoded so it can't inject query params or extra path segments.
+    out = handler({"name": "Joe's & Co / Café ?q=evil", "address": "Chicago, IL"}, None)
+    urls = {link["source"]: link["url"] for link in out["review_links"]}
+    # "/" must not survive as a literal path separator in the Maps deep link.
+    tail = urls["Google"].split("/maps/search/", 1)[1]
+    assert "/" not in tail
+    # No raw "&"/"?" from the name leaks into any URL's query unencoded.
+    for url in urls.values():
+        assert " " not in url
+        assert "& Co" not in url

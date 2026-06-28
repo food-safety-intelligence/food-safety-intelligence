@@ -57,7 +57,7 @@ a request-time-inference one.
 | Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
 | Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
 
-All three run the **same** three `handler.py` files.
+All three run the **same** four `handler.py` files.
 
 ### Tools
 
@@ -306,7 +306,7 @@ agentcore deploy --config agents/harness.yaml
 ```
 
 The local `run_local.py` and the deployed harness use identical tool logic —
-the same three handler.py files run both locally (via Strands) and on Lambda.
+the same four handler.py files run both locally (via Strands) and on Lambda.
 
 ---
 

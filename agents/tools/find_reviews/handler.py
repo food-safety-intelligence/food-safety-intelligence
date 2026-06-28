@@ -76,7 +76,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
     topics: list[str] = _resolve_topics(event.get("topics"))
 
     if not name:
-        return {"error": "find_reviews requires a restaurant 'name'."}
+        return {"error": "find_reviews requires a restaurant 'name'.", "reason": "missing_name"}
 
     return {
         "name": name,
@@ -125,7 +125,9 @@ def _build_review_links(name: str, address: str, topics: list[str]) -> list[dict
     yelp = "https://www.yelp.com/search?" + urllib.parse.urlencode(
         {"find_desc": name, "find_loc": address or "Chicago, IL"}
     )
-    google = "https://www.google.com/maps/search/" + urllib.parse.quote(where)
+    # safe="" so a "/" in the name (e.g. "Sweet/Savory") is percent-encoded
+    # rather than becoming an extra path segment in the Maps search URL.
+    google = "https://www.google.com/maps/search/" + urllib.parse.quote(where, safe="")
     web = "https://duckduckgo.com/?" + urllib.parse.urlencode(
         {"q": f"{where} reviews {terms}".strip()}
     )
