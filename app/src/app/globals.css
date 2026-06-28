@@ -49,21 +49,36 @@
   --radius-4xl: 2rem;
 
   /* Type scale — named rungs so font sizes stay consistent across the app.
-     Prefer text-<name>; do not add new arbitrary text-[Npx] values. The
-     line-height is paired with each rung so the utility sets both; elements
-     that need different leading still override with an explicit leading-*. */
-  --text-2xs: 11px;    --text-2xs--line-height: 1.45;  /* micro: map chrome, tiny meta */
-  --text-xs:  12px;    --text-xs--line-height: 1.5;    /* caption, eyebrow */
-  --text-sm:  13px;    --text-sm--line-height: 1.5;    /* small / secondary body, dense tables */
-  --text-base: 14px;   --text-base--line-height: 1.55; /* default UI body */
-  --text-md:  15px;    --text-md--line-height: 1.6;    /* emphasized / lead-in body */
-  --text-lg:  17px;    --text-lg--line-height: 1.55;   /* lead paragraph, small heading */
-  --text-xl:  20px;    --text-xl--line-height: 1.35;   /* sub-heading */
-  --text-2xl: 24px;    --text-2xl--line-height: 1.2;   /* section heading */
-  --text-3xl: 30px;    --text-3xl--line-height: 1.15;  /* page heading */
-  --text-4xl: 38px;    --text-4xl--line-height: 1.08;  /* display */
-  --text-5xl: 48px;    --text-5xl--line-height: 1.05;  /* hero / sub-page h1 */
-  --text-6xl: 54px;    --text-6xl--line-height: 1.0;   /* detail gauge number */
+     Prefer text-<name>; do not add new arbitrary text-[Npx] values. Each rung
+     pairs a font-size with a line-height that the utility emits as a fallback
+     (var(--tw-leading, …)), so an explicit leading-* still wins. Exception:
+     text-base — Tailwind reserves the `base` keyword and won't attach a paired
+     line-height to it, so base inherits the 1.5 body line-height from preflight
+     (the right default for body text); use leading-* on a base element to
+     change it. */
+  --text-2xs: 11px;            /* micro: map chrome, tiny meta */
+  --text-2xs--line-height: 1.45;
+  --text-xs: 12px;             /* caption, eyebrow */
+  --text-xs--line-height: 1.5;
+  --text-sm: 13px;             /* small / secondary body, dense tables */
+  --text-sm--line-height: 1.5;
+  --text-base: 14px;           /* default UI body — inherits 1.5 (see note above) */
+  --text-md: 15px;             /* emphasized / lead-in body */
+  --text-md--line-height: 1.6;
+  --text-lg: 17px;             /* lead paragraph, small heading */
+  --text-lg--line-height: 1.55;
+  --text-xl: 20px;             /* sub-heading */
+  --text-xl--line-height: 1.35;
+  --text-2xl: 24px;            /* section heading */
+  --text-2xl--line-height: 1.2;
+  --text-3xl: 30px;            /* page heading */
+  --text-3xl--line-height: 1.15;
+  --text-4xl: 38px;            /* display */
+  --text-4xl--line-height: 1.08;
+  --text-5xl: 48px;            /* hero / sub-page h1 */
+  --text-5xl--line-height: 1.05;
+  --text-6xl: 54px;            /* detail gauge number */
+  --text-6xl--line-height: 1;
 }
 
 body {
