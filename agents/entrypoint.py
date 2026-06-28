@@ -26,7 +26,7 @@ import sys
 # Path setup — add tool dirs so handler.py files import their siblings.
 # ---------------------------------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
-for _tool in ["find_restaurants", "get_safety_score", "explain_restaurant"]:
+for _tool in ["find_restaurants", "get_safety_score", "explain_restaurant", "find_reviews"]:
     _p = os.path.join(_HERE, "tools", _tool)
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -82,6 +82,7 @@ def _load_handler(tool_name: str):
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_reviews_handler = _load_handler("find_reviews")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
@@ -134,6 +135,19 @@ def explain_restaurant(license_id: str) -> dict:
     return _explain_handler.handler({"license_id": license_id}, None)
 
 
+@tool
+def find_reviews(name: str, address: str = "", topics: list | None = None) -> dict:
+    """
+    Find THIRD-PARTY diner reviews (Yelp/Google/web) for one restaurant. Use only
+    when the user asks what reviewers say. Returns attributed deep links; reviews
+    are unverified opinion and NOT part of the risk score — pass the disclaimer
+    and never use a review to set or change a risk score or tier.
+    """
+    return _reviews_handler.handler(
+        {"name": name, "address": address, "topics": topics or []}, None
+    )
+
+
 # ---------------------------------------------------------------------------
 # System prompt.
 # ---------------------------------------------------------------------------
@@ -182,7 +196,7 @@ model = BedrockModel(
 )
 agent = Agent(
     model=model,
-    tools=[find_restaurants, get_safety_score, explain_restaurant],
+    tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
     system_prompt=SYSTEM_PROMPT,
 )
 
