@@ -191,7 +191,9 @@ def _classify_result(result: str) -> str:
     which are not inspection outcomes. They go to `other` so they are never
     miscounted as passes (the old catch-all `else` inflated the pass count).
     """
-    r = result.strip().lower()
+    # Coerce defensively: the `result` key can be present but explicitly None,
+    # which would crash on .strip()/.lower() — match the null-tolerant sort key.
+    r = str(result).strip().lower()
     if "fail" in r:
         return "fail"
     if "conditions" in r:  # "Pass w/ Conditions"

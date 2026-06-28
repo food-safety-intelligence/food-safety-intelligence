@@ -95,7 +95,7 @@ def find_restaurants(
     radius_km: float = 1.0,
     cuisine: str = "",
     limit: int = 20,
-) -> list:
+) -> list | dict:
     """
     Find restaurants near a Chicago neighborhood or lat/lon coordinates using
     OpenStreetMap (free, no API key). Filters by cuisine when provided.
@@ -191,13 +191,17 @@ SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else "
 def _guardrail_kwargs() -> dict[str, str]:
     """Attach a Bedrock Guardrail to the model when one is configured.
 
-    Enforces denied topics + a contextual-grounding check at the platform layer,
-    so off-topic or low-grounding (fabricated) responses are blocked regardless
-    of whether the model follows the prompt. A guardrail only activates when
-    BOTH an id and a version are set, so we pass them only when present; absent
-    (local dev / tests) the agent runs with no guardrail. Create the guardrail
-    out-of-band with ``agents/create_guardrail.py`` and wire the printed id and
-    version through these env vars.
+    The guardrail's denied-topic and prompt-attack filters apply to input/output
+    text automatically at the platform layer, so off-topic requests and prompt
+    injection are blocked regardless of whether the model follows the prompt. The
+    guardrail's contextual-grounding/relevance policy is NOT active as wired
+    (Strands' BedrockModel does not tag tool outputs as grounding sources), so
+    fabricated scores are not blocked here — anti-fabrication relies on the
+    system prompt's rules. A guardrail only activates when BOTH an id and a
+    version are set, so we pass them only when present; absent (local dev /
+    tests) the agent runs with no guardrail. Create the guardrail out-of-band
+    with ``agents/create_guardrail.py`` and wire the printed id and version
+    through these env vars.
     """
     gid = os.environ.get("FSI_BEDROCK_GUARDRAIL_ID")
     gver = os.environ.get("FSI_BEDROCK_GUARDRAIL_VERSION")

@@ -101,15 +101,29 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
     cuisine: str | None = event.get("cuisine")
     limit: int = min(int(event.get("limit", 20)), 50)
 
+    # Keep the explicit-coordinate path Chicago-scoped too (the neighborhood path
+    # already is). Out-of-area coordinates would otherwise return non-Chicago
+    # results that the agent isn't meant to cover.
+    if lat is not None and lon is not None and not _within_chicago(lat, lon):
+        return {
+            "error": (
+                f"Coordinates ({lat}, {lon}) are outside the Chicago area this assistant covers."
+            ),
+            "reason": "location_not_recognized",
+        }
+
     geometry = _resolve_geometry(neighborhood, lat, lon, radius_km)
     if geometry is None:
-        # A neighborhood was given but matched nothing in Chicago. Returning a
-        # whole-Chicago fallback would silently answer a different question
-        # (e.g. a non-Chicago place), so surface it instead — the agent's scope
-        # rule turns this into "I only cover Chicago and couldn't locate that
-        # area" rather than presenting mismatched results as an answer.
+        # The neighborhood table covers only the major named areas, so a real
+        # Chicago place can still miss. Returning a whole-Chicago fallback would
+        # silently answer a different question, so surface it instead — but the
+        # message must not claim the place isn't in Chicago (it might be); ask
+        # for a major neighborhood name or coordinates rather than asserting.
         return {
-            "error": f"Could not locate '{neighborhood}' as a Chicago area.",
+            "error": (
+                f"Couldn't pinpoint '{neighborhood}'. Try a major Chicago "
+                "neighborhood name or latitude/longitude."
+            ),
             "reason": "location_not_recognized",
         }
     bbox, centroid = geometry
@@ -134,6 +148,14 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _within_chicago(lat: float, lon: float) -> bool:
+    """Return True when the coordinate falls inside the Chicago bounding box."""
+    return (
+        CHICAGO_BBOX["south"] <= lat <= CHICAGO_BBOX["north"]
+        and CHICAGO_BBOX["west"] <= lon <= CHICAGO_BBOX["east"]
+    )
 
 
 def _resolve_geometry(
