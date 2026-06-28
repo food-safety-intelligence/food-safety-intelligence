@@ -180,7 +180,7 @@ export function RestaurantsExplorer({
                   {r.risk_score.toFixed(2)}
                 </div>
                 <div className="col-span-2 flex justify-end">
-                  <TrendIndicator slope={r.trend_slope_90d} compact />
+                  <TrendIndicator slope={r.trend_slope} compact />
                 </div>
               </Link>
             ))}

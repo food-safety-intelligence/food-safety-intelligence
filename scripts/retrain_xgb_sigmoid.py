@@ -211,6 +211,16 @@ def main() -> None:
     )
     forecast_scores = expit(coef_f * xgb_fore.predict(X_full_f, output_margin=True) + inter_f)
 
+    # Persist the per-inspection forecast scores so export_inspection_history can
+    # attach them to each event for the detail-page trend chart (DR 0011, PR-C).
+    forecast_history = features[["license_id", "inspection_date"]].copy()
+    forecast_history["forecast_score"] = forecast_scores.round(4)
+    forecast_history_path = storage.join(str(PREDICTIONS_DIR), "forecast_history.parquet")
+    storage.write_parquet(forecast_history, forecast_history_path)
+    print(
+        f"Wrote {forecast_history_path}: {len(forecast_history):,} per-inspection forecast scores"
+    )
+
     # --- Score every restaurant + export JSON -----------------------------
     print("Building scores table (latest inspection per license; TreeSHAP drivers)")
     scores = build_scores_table(
