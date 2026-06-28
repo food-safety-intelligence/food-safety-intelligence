@@ -37,13 +37,16 @@ DISCLAIMER = (
     "They are NOT part of the food-safety risk score."
 )
 
-# Diner-facing safety topics → human labels used in the agent-facing link text.
-# This dict is also the registry of valid topic keys.
+# Registry of valid topic keys → the diner-language SEARCH TERMS for each topic
+# (the " / " is split into separate query words). These are short synonyms of the
+# observable food-safety categories, kept brief so the search isn't over-narrowed.
+# The agent-facing link LABEL comes from the keys (see _topic_label), NOT these
+# values.
 TOPIC_LABELS: dict[str, str] = {
-    "cleanliness": "cleanliness",
-    "pests": "rodents / pests",
-    "food_quality": "food quality",
-    "illness": "illness reports",
+    "cleanliness": "cleanliness / sewage",
+    "pests": "rodents / pests / droppings",
+    "food_quality": "food quality / raw / spoiled",
+    "illness": "illness / food poisoning",
 }
 
 
@@ -103,8 +106,22 @@ def _resolve_topics(raw: Any) -> list[str]:
 
 
 def _topic_terms(topics: list[str]) -> str:
-    """Short free-text term for the search query, e.g. 'cleanliness pests'."""
+    """Search-query terms for the requested topics.
+
+    When all topics are requested (the default), a short generic term keeps the
+    query clean — concatenating every synonym over-narrows it. For a specific
+    subset, use those topics' diner-language synonyms for a focused search.
+    """
+    if set(topics) == set(TOPIC_LABELS):
+        return "food safety"
     return " ".join(TOPIC_LABELS[t].replace(" / ", " ") for t in topics)
+
+
+def _topic_label(topics: list[str]) -> str:
+    """Human label for the link — the topic keys, not the search synonyms."""
+    if set(topics) == set(TOPIC_LABELS):
+        return "food safety"
+    return ", ".join(t.replace("_", " ") for t in topics)
 
 
 # ---------------------------------------------------------------------------
@@ -114,26 +131,40 @@ def _topic_terms(topics: list[str]) -> str:
 
 def _build_review_links(name: str, address: str, topics: list[str]) -> list[dict[str, str]]:
     """
-    Build attributed deep links to each source's review search for this
-    business + topics. These are URLs the user clicks through to; we never
-    fetch them.
+    Build attributed deep links to reviews for this business. These are search
+    URLs the user clicks through to; we never fetch them.
+
+    - Yelp: a site-restricted web search (site:yelp.com) — Yelp has no API-free
+      deep link to keyword-filtered reviews, but a site: search lands on the
+      business's Yelp page AND scopes to the requested topics (validated).
+    - Google: a direct Google Maps search for the place. Google Maps can't be
+      site-searched cleanly for one place's reviews, so this lands on the place's
+      Maps page (its full review corpus) — general, not topic-scoped; the user can
+      keyword-search reviews in Google's own UI.
+    - Web: an open (cross-site) web search, scoped to the requested topics.
     """
     where = f"{name} {address}".strip()
     terms = _topic_terms(topics)
-    topic_label = ", ".join(TOPIC_LABELS[t] for t in topics)
+    label = _topic_label(topics)
 
-    yelp = "https://www.yelp.com/search?" + urllib.parse.urlencode(
-        {"find_desc": name, "find_loc": address or "Chicago, IL"}
-    )
-    # safe="" so a "/" in the name (e.g. "Sweet/Savory") is percent-encoded
-    # rather than becoming an extra path segment in the Maps search URL.
-    google = "https://www.google.com/maps/search/" + urllib.parse.quote(where, safe="")
-    web = "https://duckduckgo.com/?" + urllib.parse.urlencode(
-        {"q": f"{where} reviews {terms}".strip()}
-    )
+    def _ddg(query: str) -> str:
+        return "https://duckduckgo.com/?" + urllib.parse.urlencode({"q": query.strip()})
 
     return [
-        {"source": "Yelp", "label": f"Yelp reviews ({topic_label})", "url": yelp},
-        {"source": "Google", "label": f"Google reviews ({topic_label})", "url": google},
-        {"source": "Web", "label": f"Web search ({topic_label})", "url": web},
+        {
+            "source": "Yelp",
+            "label": f"Yelp reviews ({label})",
+            "url": _ddg(f"site:yelp.com {where} {terms}"),
+        },
+        {
+            # General (not topic-scoped): the place's full Google Maps reviews.
+            "source": "Google",
+            "label": "Google Maps reviews",
+            "url": "https://www.google.com/maps/search/" + urllib.parse.quote(where, safe=""),
+        },
+        {
+            "source": "Web",
+            "label": f"Web search ({label})",
+            "url": _ddg(f"{where} reviews {terms}"),
+        },
     ]

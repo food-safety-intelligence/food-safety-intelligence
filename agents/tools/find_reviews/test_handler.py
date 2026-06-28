@@ -54,14 +54,35 @@ def test_handler_requires_name():
 
 
 def test_links_percent_encode_special_chars():
-    # A name with query-significant and path-significant characters must be
-    # percent-encoded so it can't inject query params or extra path segments.
+    # Query-significant characters from the name must be percent-encoded so they
+    # can't inject params or path segments — in the DDG ?q= searches AND the
+    # Google Maps path.
     out = handler({"name": "Joe's & Co / Café ?q=evil", "address": "Chicago, IL"}, None)
     urls = {link["source"]: link["url"] for link in out["review_links"]}
-    # "/" must not survive as a literal path separator in the Maps deep link.
+    for url in (urls["Yelp"], urls["Web"]):
+        q = url.split("?q=", 1)[1]
+        assert " " not in q and "/" not in q and "& Co" not in q
+    # Google is a direct Maps search; the place string is encoded in the path.
     tail = urls["Google"].split("/maps/search/", 1)[1]
-    assert "/" not in tail
-    # No raw "&"/"?" from the name leaks into any URL's query unencoded.
-    for url in urls.values():
-        assert " " not in url
-        assert "& Co" not in url
+    assert " " not in tail and "/" not in tail and "& Co" not in tail
+
+
+def test_topic_scoping_in_urls():
+    # A specific topic scopes Yelp (site: search) + Web; Google is a direct,
+    # general Maps link. All-topics uses a concise "food safety" term.
+    pests = {
+        link["source"]: link["url"]
+        for link in handler(
+            {"name": "Lou Malnati's", "address": "Chicago, IL", "topics": ["pests"]}, None
+        )["review_links"]
+    }
+    assert "site%3Ayelp.com" in pests["Yelp"] and "rodents" in pests["Yelp"]
+    assert pests["Google"].startswith("https://www.google.com/maps/search/")
+    assert "rodents" in pests["Web"]
+    allt = {
+        link["source"]: link["url"]
+        for link in handler({"name": "Lou Malnati's", "address": "Chicago, IL"}, None)[
+            "review_links"
+        ]
+    }
+    assert "food+safety" in allt["Web"] and "droppings" not in allt["Web"]
