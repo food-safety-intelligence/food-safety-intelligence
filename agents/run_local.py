@@ -14,13 +14,12 @@ Usage:
 Prerequisites (see README below):
     1. AWS credentials configured  (aws configure  OR  env vars)
     2. Nova 2 Lite enabled in your Bedrock console (us-east-1)
-    3. SAGEMAKER_USE_STUB=true  (default — no SageMaker endpoint needed yet)
+    3. scores.json present (scoring reads precomputed batch scores; no model is
+       called at request time)
 
 Environment variables:
     AWS_REGION              default: us-east-1
-    SAGEMAKER_USE_STUB      default: true  (set false + SAGEMAKER_ENDPOINT to use real model)
-    SAGEMAKER_ENDPOINT      required only when SAGEMAKER_USE_STUB=false
-    SCORES_JSON_PATH        default: app/public/data/scores.json (falls back to mock)
+    SCORES_JSON_PATH        default: app/public/data/scores.json (no-record if absent)
     HISTORY_JSON_PATH       default: app/public/data/inspection_history.json
 """
 
@@ -53,9 +52,6 @@ os.environ.setdefault(
     "HISTORY_JSON_PATH",
     os.path.join(_REPO_ROOT, "app", "public", "data", "inspection_history.json"),
 )
-
-# Stub mode on by default — no SageMaker endpoint needed.
-os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 
 # ---------------------------------------------------------------------------
 # Strands imports (after path setup)
@@ -126,11 +122,12 @@ def find_restaurants(
 @tool
 def get_safety_score(restaurants: list) -> list:
     """
-    Look up Chicago food inspection risk scores for a list of restaurants.
-    Calls the XGBoost model (stub during development — set SAGEMAKER_USE_STUB=false
-    and SAGEMAKER_ENDPOINT to use the real SageMaker endpoint).
-    Returns risk_score (0-1), risk_tier, trend, SHAP drivers, and whether a
-    Chicago inspection record was found.
+    Look up the precomputed Chicago batch risk score for each restaurant from
+    scores.json. Does not call any model — a venue that matches the published
+    batch run returns that calibrated score, tier and drivers directly, and a
+    venue not in the batch run returns no score (no inspection record found).
+    Returns risk_score (0-1 or null), risk_tier, trend, SHAP drivers, and
+    whether a Chicago inspection record was found (matched_scores_json).
     Call after find_restaurants. Pass the full restaurant list from that call.
 
     Args:
@@ -144,7 +141,7 @@ def explain_restaurant(license_id: str) -> dict:
     """
     Get the full SHAP driver breakdown and inspection history for one restaurant
     identified by its Chicago license_id (from get_safety_score results).
-    Call this for the top 2-3 safest results to give the user meaningful context.
+    Call this for the 2-3 lowest predicted-risk results to give the user meaningful context.
 
     Args:
         license_id: Chicago business license ID (from get_safety_score result)
@@ -153,48 +150,35 @@ def explain_restaurant(license_id: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# System prompt
+# System prompt — single source of truth in system_prompt.txt (shared with
+# entrypoint.py, which reads the same file for the deployed agent).
 # ---------------------------------------------------------------------------
 
-SYSTEM_PROMPT = """You are a food safety assistant for Chicago restaurants.
-
-You help users find safe places to eat by combining two data sources:
-  1. OpenStreetMap — real-time restaurant names, locations, and cuisine types
-  2. Chicago food inspection scores — ML-predicted risk scores, SHAP drivers,
-     and historical inspection records
-
-TOOL CALL SEQUENCE — always follow this order:
-  Step 1: Call find_restaurants with the user's location and cuisine preference.
-  Step 2: Call get_safety_score with the full list from Step 1.
-  Step 3: For the top 2-3 safest results (lowest risk_score), call
-          explain_restaurant to retrieve full driver and history detail.
-  Step 4: Return a ranked list (safest first) with plain-English reasoning.
-
-SCORING RULES:
-  - Never fabricate inspection data. Every safety claim must come from a tool.
-  - If matched_scores_json is false, say "no Chicago inspection record found".
-  - When stub is true in results, mention scores are preliminary estimates.
-  - The risk score is a 180-day forward prediction, not a real-time verdict.
-    Say this once per session.
-
-CAREGIVER / IMMUNOCOMPROMISED CONTEXT:
-  When the user mentions immunocompromised, elderly, vulnerable, or caregiver:
-  - Prioritise Low or Moderate tier only.
-  - Highlight recurring violation drivers: temperature, pest, rodent,
-    cross-contamination, raw food.
-  - De-emphasise administrative drivers: days since inspection, license age.
-  - Add: "For additional assurance, consult your care team's guidance."
-
-RESPONSE FORMAT:
-  - Numbered list, safest first.
-  - Each entry: name, address, risk tier, 1-2 sentence driver summary.
-  - End with a one-line caveat about prediction vs. verdict.
-  - Keep total response under 300 words unless the user asks for more detail."""
+_PROMPT_FILE = os.path.join(_AGENTS_DIR, "system_prompt.txt")
+SYSTEM_PROMPT = open(_PROMPT_FILE).read() if os.path.exists(_PROMPT_FILE) else ""
 
 
 # ---------------------------------------------------------------------------
 # Agent factory
 # ---------------------------------------------------------------------------
+
+
+def _guardrail_kwargs() -> dict[str, str]:
+    """Attach a Bedrock Guardrail to the model when one is configured.
+
+    Enforces denied topics + a contextual-grounding check at the platform layer,
+    so off-topic or low-grounding (fabricated) responses are blocked regardless
+    of whether the model follows the prompt. A guardrail only activates when
+    BOTH an id and a version are set, so we pass them only when present; absent
+    (local dev / tests) the agent runs with no guardrail. Create the guardrail
+    out-of-band with ``agents/create_guardrail.py`` and wire the printed id and
+    version through these env vars.
+    """
+    gid = os.environ.get("FSI_BEDROCK_GUARDRAIL_ID")
+    gver = os.environ.get("FSI_BEDROCK_GUARDRAIL_VERSION")
+    if gid and gver:
+        return {"guardrail_id": gid, "guardrail_version": gver, "guardrail_trace": "enabled"}
+    return {}
 
 
 def build_agent() -> Agent:
@@ -206,6 +190,11 @@ def build_agent() -> Agent:
         model_id="us.amazon.nova-2-lite-v1:0",
         region_name=region,
         max_tokens=4096,
+        # Low temperature: this is a factual lookup-and-report task, not a
+        # creative one. Sampling variance only adds room for fabricated
+        # scores or names.
+        temperature=0.2,
+        **_guardrail_kwargs(),
     )
     return Agent(
         model=model,
@@ -220,8 +209,8 @@ def build_agent() -> Agent:
 
 
 def _banner():
-    stub_mode = os.environ.get("SAGEMAKER_USE_STUB", "true").lower() != "false"
-    endpoint = os.environ.get("SAGEMAKER_ENDPOINT", "not set")
+    # Scoring reads precomputed batch scores from scores.json; the agent never
+    # calls a model at request time, so the score source shown is the JSON file.
     scores_path = os.environ.get("SCORES_JSON_PATH", "")
     scores_exists = os.path.exists(scores_path)
 
@@ -230,9 +219,8 @@ def _banner():
     print("╠══════════════════════════════════════════════════════════╣")
     print("║  Model        : Nova 2 Lite (us.amazon.nova-2-lite-v1:0)        ║")
     print(
-        f"║  SageMaker    : {'STUB (deterministic hash)' if stub_mode else f'REAL → {endpoint}':<34}║"
+        f"║  Scores       : {'scores.json FOUND' if scores_exists else 'scores.json NOT FOUND':<34}║"
     )
-    print(f"║  scores.json  : {'FOUND ✓' if scores_exists else 'NOT FOUND — using mock':<34}║")
     print("╠══════════════════════════════════════════════════════════╣")
     print("║  Try: 'safe sushi near Wicker Park'                      ║")
     print("║       'low risk ramen Lincoln Square immunocompromised'  ║")

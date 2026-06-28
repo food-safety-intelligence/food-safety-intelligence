@@ -75,9 +75,12 @@ experiment per commit boundary.
 - LogReg: `notebooks/04_baseline_logreg.ipynb`; XGBoost: `notebooks/05_xgboost_model.ipynb`.
   Each writes `reports/metrics/<model>_<run>.json` with provenance.
 - **Judge on lift over base rate**, not raw PR-AUC (a rarer label mechanically
-  lowers raw PR-AUC). The **promotion gate is BOTH PR-AUC AND precision@10%**, on
-  **both models** (`docs/decisions/0002`). Baseline stays the production estimator
-  unless both clear.
+  lowers raw PR-AUC). The **promotion gate is BOTH PR-AUC AND precision@10%**
+  (both metrics), and a feature clears if **at least one model** — LogReg or
+  XGBoost — improves on both. Evaluate **both arms on the same temporal split**
+  (control vs candidate, identical rows). Ship the model the feature improves;
+  if that isn't the current production estimator, switching the served model is
+  part of promoting it (`docs/decisions/0002`, `0009`).
 - For a clean attribution, run a **controlled A/B on the same split**: train
   full-feature vs feature-removed using `temporal_split(train_end='2024-07-01',
   val_end='2025-07-01')` and `foodsafety.models.evaluate.evaluate`. Ranking metrics
@@ -105,11 +108,13 @@ a residual-risk bullet + revision date) rather than spawning a new record.
 - **Decision records**: update `0005` (ethics) if Step 5 found something; add a new
   `docs/decisions/NNNN-*.md` only for a genuine decision (confirm before creating).
 - **Re-ship the served model + app JSON** (else the demo runs the old model):
-  `PYTHONPATH=src .venv/bin/python scripts/retrain_baseline_sigmoid.py` →
+  `PYTHONPATH=src .venv/bin/python scripts/retrain_xgb_sigmoid.py` (the served
+  estimator is the depth-3 monotone XGBoost — `0002`/`0009`; the LogReg path is
+  `scripts/retrain_baseline_sigmoid.py`) →
   served model + `data/predictions/scores.parquet` → `app/public/data/scores.json`
   (schema `0.4.0`: **5** `top_drivers` per row + a top-level `calibration
   {a, b, intercept}` Platt triple — both written automatically) +
-  `reports/metrics/baseline_sigmoid_<run>.json`; then
+  `reports/metrics/xgb_monotone_sigmoid_<run>.json`; then
   `PYTHONPATH=src .venv/bin/python scripts/build_methodology_json.py` →
   `app/public/data/methodology.json` (also carries the **global feature-impact**
   ranking + the worked **calibrated-waterfall** example). A new feature flows into
@@ -122,6 +127,48 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   per-profile waterfall reconciles when `sigmoid(base + Σdrivers + other) ==
   risk_score`).
 - Commit the metrics JSONs (they're git-tracked; **never** commit `data/`).
+- **Publish to S3, then redeploy — together these update the DEPLOYED model.** The
+  re-ship above only refreshes the local laptop bundle. The app is a **static export**
+  (`output: 'export'`): `app/src/lib/scores-server.ts` reads the JSON from
+  `s3://food-safety-intelligence-data/web-app-data/` at **build time**, not per
+  request. So a new model goes live in two steps — (1) push the built artifacts to S3
+  with `scripts/publish.py`, then (2) trigger an app rebuild/redeploy (Amplify/Vercel
+  rebuild on a push to `main` re-reads S3 and re-exports the static site). Publishing
+  alone does not change the live site.
+  - **The app reads only the JSON — never the model.** Confirmed in `app/src`: the
+    static build loads `web-app-data/{scores.json, inspection_history.json,
+    methodology.json}` (+ comment shards) and never the `.joblib` (batch-score-to-JSON
+    contract). So the JSON bundle is what makes the new model *visible*; the
+    model/features/parquet are **archival** (rollback / re-scoring / provenance), not
+    read by the app at all.
+  - **Ask the user which model and which scores file to publish — don't assume the
+    latest.** Several `data/models/*_sigmoid_*.joblib` accumulate over runs — the served
+    sigmoid-calibrated models, `baseline_sigmoid_*` (LogReg) or `xgb_monotone_sigmoid_*`
+    (XGBoost), whichever is the production estimator — and `scores.parquet`/`scores.json`
+    are single-copy (each retrain overwrites them).
+    List the available models with their dates and the current `scores.json`
+    (path + mtime + row count), and have the user pick. They **must be a coherent
+    set** — the model, `features.parquet`, `scores.parquet` and `scores.json` from the
+    **same retrain run** (the on-disk set is coherent right after a retrain; an older
+    model paired with current scores is a mismatch). Then pass the choices explicitly:
+    ```
+    PYTHONPATH=src .venv/bin/python scripts/publish.py --dry-run \
+        --model data/models/baseline_sigmoid_<run>.joblib \
+        --scores-json app/public/data/scores.json \
+        --scores-parquet data/predictions/scores.parquet      # preview, upload nothing
+    PYTHONPATH=src .venv/bin/python scripts/publish.py --model … --scores-json … --scores-parquet …
+    ```
+    Omitting `--model` defaults to the newest local model matching `--model-glob`
+    (`*_sigmoid_*.joblib`); `make publish` runs the all-defaults form. The model (and its
+    `_metadata.json` sidecar, if the retrain wrote one) publishes under its versioned
+    `models/<model>_sigmoid_<run>` name (never overwritten — the binary is gitignored, so
+    S3 is the only rollback copy); features / scores / web-app JSON overwrite in place.
+  - **AWS creds first.** This space runs as the execution role, which is **not**
+    authorised on the bucket — mint `bella_davies` session-token creds into
+    `~/.aws/credentials` (the standard chain pyarrow reads) before publishing, or
+    the upload 403s.
+  - `inspections_labeled.parquet` is skipped if already in S3 — pass `--force` only
+    when a data refresh (notebook 02) actually changed it.
 
 ## Step 7 — If FLAT (missed the gate)
 Remove the column(s) from `ALL_FEATURES`, add a "Reverted" row to

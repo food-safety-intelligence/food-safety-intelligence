@@ -72,6 +72,7 @@ def build_scores_table(
     *,
     n_drivers: int = 4,
     keep_columns: tuple = ("license_id", "dba_name", "address", "lat", "lon"),
+    contributions_fn=None,
 ) -> pd.DataFrame:
     """Produce the scores table for every restaurant in ``features``.
 
@@ -111,8 +112,16 @@ def build_scores_table(
 
     # SHAP attribution for the latest-anchor rows. Done in one batched call
     # against the latest set rather than the full feature frame.
+    # Per-feature attribution for the latest-anchor rows. Defaults to the linear
+    # (LogReg) explainer; the XGB serve path injects a TreeSHAP-based fn that
+    # returns the same (rows × original_features) log-odds contribution frame.
     latest_X = latest_per_license[list(feature_columns)]
-    contributions = linear_contributions(model, latest_X, original_features=list(feature_columns))
+    if contributions_fn is None:
+        contributions = linear_contributions(
+            model, latest_X, original_features=list(feature_columns)
+        )
+    else:
+        contributions = contributions_fn(latest_X)
 
     # Build top_drivers list per row.
     drivers_per_row: list[list[dict]] = []
@@ -212,6 +221,8 @@ def write_scores_json(
     """
     import json
 
+    from foodsafety.io import storage
+
     df = scores.copy()
     df["as_of_date"] = pd.to_datetime(df["as_of_date"]).dt.strftime("%Y-%m-%d")
     df["risk_score"] = df["risk_score"].round(4)
@@ -243,8 +254,8 @@ def write_scores_json(
         "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 
-    with open(out_path, "w") as f:
-        json.dump(payload, f, separators=(",", ":"))
+    # out_path may be a local path or an s3:// URI — route through storage.
+    storage.write_text(json.dumps(payload, separators=(",", ":")), out_path)
 
 
 def _row_to_json(row) -> dict:

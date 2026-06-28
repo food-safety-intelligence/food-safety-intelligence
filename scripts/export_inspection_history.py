@@ -6,7 +6,8 @@ and was never plumbed through to `scores.json` — the original export script
 skipped it to keep the main payload small.
 
 This script writes a sidecar file `app/public/data/inspection_history.json`
-keyed by `license_id` so the web app can read it server-side at request time.
+keyed by `license_id`. The app is a static export, so it reads this at build time
+(see the comment-shard note below), not per request.
 
 It ALSO writes the full violation-comment text, sharded into
 `app/public/data/comments/<xx>.json` (xx = first two md5 hex chars of the
@@ -28,14 +29,17 @@ from __future__ import annotations
 
 import hashlib
 import json
-from pathlib import Path
 
 import pandas as pd
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-INSPECTIONS_PATH = REPO_ROOT / "data" / "processed" / "inspections_labeled.parquet"
-OUT_PATH = REPO_ROOT / "app" / "public" / "data" / "inspection_history.json"
-COMMENTS_DIR = REPO_ROOT / "app" / "public" / "data" / "comments"
+from foodsafety.config import PROCESSED_DIR, WEB_APP_DATA_DIR
+from foodsafety.io import storage
+
+INSPECTIONS_PATH = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
+OUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "inspection_history.json")
+# Full-comment shards live alongside the history JSON under web-app-data/comments/
+# (local or S3, same base as OUT_PATH). Gitignored; S3 is the source of truth.
+COMMENTS_DIR = storage.join(str(WEB_APP_DATA_DIR), "comments")
 
 # Distribution of events per restaurant: p99 = 30, max = 799. Capping at the
 # 30 most-recent inspections covers 99.6% of all events while bounding the
@@ -61,7 +65,7 @@ def _comments(v: object) -> str:
 
 def main() -> None:
     print(f"reading {INSPECTIONS_PATH}")
-    df = pd.read_parquet(INSPECTIONS_PATH)
+    df = storage.read_parquet(INSPECTIONS_PATH)
 
     # The web app's InspectionEvent type wants {date, type, result, headline}.
     # Map columns; the inspections table uses `inspection_date`, `inspection_type`,
@@ -118,26 +122,20 @@ def main() -> None:
         f"{truncated_licenses:,} restaurants (rest are full history)"
     )
 
-    OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     print(
         f"writing {OUT_PATH}: {len(history):,} restaurants, "
         f"{sum(len(v) for v in history.values()):,} inspection events"
     )
-    with open(OUT_PATH, "w") as f:
-        json.dump(history, f, separators=(",", ":"))
+    # OUT_PATH may be local or s3:// — route through storage (creates local parents).
+    storage.write_text(json.dumps(history, separators=(",", ":")), OUT_PATH)
 
-    size_mb = OUT_PATH.stat().st_size / 1024 / 1024
-    print(f"  {size_mb:.1f} MB")
-
-    # Comment shards. Gitignored + uploaded to S3 (web-app-data/comments/);
-    # the static build reads only the shards covering its pre-generated pages.
-    COMMENTS_DIR.mkdir(parents=True, exist_ok=True)
+    # Comment shards under web-app-data/comments/ (local or S3, via storage).
+    # Gitignored; the static build reads only the shards covering its pages.
     total_bytes = 0
     for shard, by_license in shards.items():
-        path = COMMENTS_DIR / f"{shard}.json"
-        with open(path, "w") as f:
-            json.dump(by_license, f, separators=(",", ":"))
-        total_bytes += path.stat().st_size
+        payload = json.dumps(by_license, separators=(",", ":"))
+        storage.write_text(payload, storage.join(COMMENTS_DIR, f"{shard}.json"))
+        total_bytes += len(payload.encode())
     print(
         f"writing {COMMENTS_DIR}/<xx>.json: {len(shards)} shards, "
         f"{total_bytes / 1024 / 1024:.1f} MB total"

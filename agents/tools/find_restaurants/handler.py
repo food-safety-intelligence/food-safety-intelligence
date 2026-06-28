@@ -76,7 +76,7 @@ CUISINE_ALIASES: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
-def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
+def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str, Any]:
     """
     Lambda entry point.
 
@@ -90,7 +90,9 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
         "limit":        int           # default 20, max 50
     }
 
-    Returns list[RestaurantStub] sorted by distance from query centroid.
+    Returns list[RestaurantStub] sorted by distance from query centroid, or a
+    top-level {"error": ..., "reason": ...} object when the requested location is
+    not a recognised Chicago area or the Overpass directory is unreachable.
     """
     neighborhood: str | None = event.get("neighborhood")
     lat: float | None = event.get("lat")
@@ -99,7 +101,18 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     cuisine: str | None = event.get("cuisine")
     limit: int = min(int(event.get("limit", 20)), 50)
 
-    bbox, centroid = _resolve_geometry(neighborhood, lat, lon, radius_km)
+    geometry = _resolve_geometry(neighborhood, lat, lon, radius_km)
+    if geometry is None:
+        # A neighborhood was given but matched nothing in Chicago. Returning a
+        # whole-Chicago fallback would silently answer a different question
+        # (e.g. a non-Chicago place), so surface it instead — the agent's scope
+        # rule turns this into "I only cover Chicago and couldn't locate that
+        # area" rather than presenting mismatched results as an answer.
+        return {
+            "error": f"Could not locate '{neighborhood}' as a Chicago area.",
+            "reason": "location_not_recognized",
+        }
+    bbox, centroid = geometry
     cuisine_filter = _cuisine_filter(cuisine)
 
     query = _build_overpass_query(bbox, cuisine_filter, limit)
@@ -107,8 +120,10 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     try:
         raw = _fetch_overpass(query)
     except urllib.error.URLError as exc:
-        # Surface the error so the agent can retry or degrade gracefully.
-        return [{"error": f"Overpass API unavailable: {exc}"}]
+        # Surface a top-level error object (not a list with a fake restaurant)
+        # so a downstream tool never reads osm_id off a malformed element and
+        # the agent can degrade gracefully on an upstream outage.
+        return {"error": f"Overpass API unavailable: {exc}", "reason": "directory_unavailable"}
 
     elements: list[dict] = raw.get("elements", [])
     results = _parse_elements(elements, centroid)
@@ -126,8 +141,13 @@ def _resolve_geometry(
     lat: float | None,
     lon: float | None,
     radius_km: float,
-) -> tuple[dict[str, float], tuple[float, float]]:
-    """Return (bbox dict, centroid tuple) for the query."""
+) -> tuple[dict[str, float], tuple[float, float]] | None:
+    """Return (bbox dict, centroid tuple) for the query.
+
+    Returns ``None`` when a neighborhood was given but is not a recognised
+    Chicago area (and no explicit coordinates were supplied) so the caller can
+    report it rather than silently falling back to a whole-Chicago search.
+    """
     # Explicit coordinates take priority.
     if lat is not None and lon is not None:
         d = radius_km / 111.0  # 1 degree ≈ 111 km
@@ -149,8 +169,11 @@ def _resolve_geometry(
                     break
         if entry:
             return entry, CENTROIDS[key]
+        # Neighborhood given but unrecognised — signal the caller, don't fall
+        # back to all-Chicago (that would answer a different question).
+        return None
 
-    # Fallback: all of Chicago.
+    # Nothing specified — default to a whole-Chicago search.
     return CHICAGO_BBOX, CHICAGO_CENTROID
 
 
