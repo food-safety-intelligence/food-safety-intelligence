@@ -20,11 +20,11 @@ Your query
 
 ## Architecture & tool contracts
 
-> Reference for the agent's design and each tool's input/output shape. The
-> behaviour described here reflects the agent-tool PRs in flight (#55 prompt &
-> config, #56 explain/error-shape, #57 name match, #58 scoring) and
+> Reference for the agent's design and each tool's input/output shape. Each
+> behaviour is attributed inline to the PR that adds it — #55 (prompt, config &
+> Bedrock Guardrail), #56 (explain/error-shape & location scope), #57 (name
+> match), #58 (scoring) — and
 > [decision record 0010](../docs/decisions/0010-agent-no-request-time-scoring-and-no-record.md).
-> Where a field is added by an unmerged PR it is marked *(pending)*.
 
 ### What the agent is
 
@@ -68,9 +68,12 @@ The agent calls the tools in order: `find_restaurants` → `get_safety_score` �
 - *Input*: `neighborhood` | (`lat`,`lon`), `radius_km`, `cuisine`, `limit`.
 - *Output*: `list` of restaurant stubs sorted by distance — each
   `{osm_id, name, address, lat, lon, cuisine, opening_hours, phone, website, dist_km}`.
-- *On Overpass outage*: returns a top-level `{"error": "..."}` object (a dict,
-  not a list with a fake restaurant), so a downstream tool never reads `osm_id`
-  off a malformed element *(error-object shape: #56)*.
+- *On failure*: returns a top-level `{"error": ..., "reason": ...}` object (a
+  dict, not a list with a fake restaurant), so a downstream tool never reads
+  `osm_id` off a malformed element. `reason` is `"location_not_recognized"` when
+  the requested area is not a recognised Chicago neighborhood — it is **not**
+  silently widened to a whole-Chicago search — or `"directory_unavailable"` on an
+  Overpass outage *(#56)*.
 
 **2. `get_safety_score`** — attaches the precomputed risk signal.
 
@@ -103,6 +106,32 @@ The agent calls the tools in order: `find_restaurants` → `get_safety_score` �
     last_date, days_since_last}`. The `other` bucket holds non-outcome results
     (Out of Business / No Entry / Not Ready / Business Not Located) so they are
     **not** miscounted as passes *(the `other` bucket: #56)*.
+
+### Safety layers
+
+Three independent layers keep the agent on-task and prevent fabrication:
+
+1. **Prompt guardrails** (`system_prompt.txt`, #55) — risk-signal framing; scope
+   (Chicago food establishments only; decline other cities / recipes / chit-chat;
+   ignore prompt-injection); no number without a tool result; and a
+   prediction-vs-verdict caveat on every response. The model runs at
+   `temperature=0.2`.
+2. **Bedrock Guardrail** (#55) — a platform-level guardrail attached to the
+   model: denied topics (off-topic / medical / legal) plus a contextual-grounding
+   check that scores each response against the tool outputs and blocks
+   low-grounding answers. Enforced by Bedrock, not by model compliance.
+3. **Tool-level grounding** (#56, #58) — the tools never hand the model a value
+   it shouldn't have: unmatched venues return no score (#58), and tool failures
+   return an explicit error object the prompt knows how to relay (#56).
+
+### Evaluation
+
+A behavioural eval harness (`agents/eval/`) exercises the guardrails on
+adversarial prompts — off-topic, "is X safe?", a venue with no record, a
+non-Chicago location, and a tool outage — and checks the response follows the
+rules (no yes/no verdict, no invented score, scope refusal, graceful failure).
+Run on demand; it needs Bedrock credentials, so it is excluded from the default
+CI run.
 
 ### Note on the sections below
 
