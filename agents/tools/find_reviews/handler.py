@@ -131,13 +131,17 @@ def _topic_label(topics: list[str]) -> str:
 
 def _build_review_links(name: str, address: str, topics: list[str]) -> list[dict[str, str]]:
     """
-    Build attributed, topic-scoped deep links to reviews for this business.
-    These are search URLs the user clicks through to; we never fetch them.
+    Build attributed deep links to reviews for this business. These are search
+    URLs the user clicks through to; we never fetch them.
 
-    Yelp and Google have no public deep link that filters a business's reviews by
-    keyword without their APIs, so we topic-scope them via a site-restricted web
-    search (site:yelp.com / site:google.com) — no API key, still scoped to the
-    requested topics. The third link is an open (cross-site) web search.
+    - Yelp: a site-restricted web search (site:yelp.com) — Yelp has no API-free
+      deep link to keyword-filtered reviews, but a site: search lands on the
+      business's Yelp page AND scopes to the requested topics (validated).
+    - Google: a direct Google Maps search for the place. Google Maps can't be
+      site-searched cleanly for one place's reviews, so this lands on the place's
+      Maps page (its full review corpus) — general, not topic-scoped; the user can
+      keyword-search reviews in Google's own UI.
+    - Web: an open (cross-site) web search, scoped to the requested topics.
     """
     where = f"{name} {address}".strip()
     terms = _topic_terms(topics)
@@ -153,9 +157,10 @@ def _build_review_links(name: str, address: str, topics: list[str]) -> list[dict
             "url": _ddg(f"site:yelp.com {where} {terms}"),
         },
         {
+            # General (not topic-scoped): the place's full Google Maps reviews.
             "source": "Google",
-            "label": f"Google reviews ({label})",
-            "url": _ddg(f"site:google.com {where} reviews {terms}"),
+            "label": "Google Maps reviews",
+            "url": "https://www.google.com/maps/search/" + urllib.parse.quote(where, safe=""),
         },
         {
             "source": "Web",
