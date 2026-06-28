@@ -36,19 +36,34 @@ from sagemaker_stub import score_restaurants
 # ---------------------------------------------------------------------------
 
 
+# Address must be a close match AND the best name in that address bucket must
+# clear its own bar before we attach a score. Name is the disambiguator at
+# shared addresses, so it gets the stricter, independently-tuned cutoff.
+_ADDRESS_CUTOFF = 0.72
+_NAME_CUTOFF = 0.6
+
+
 @functools.lru_cache(maxsize=1)
-def _load_scores_index() -> dict[str, dict]:
+def _load_scores_index() -> dict[str, list[dict]]:
     """
     Load scores.json and index it by normalised address for fuzzy matching.
     Returns empty dict if the file is unavailable.
+
+    Each address maps to a LIST of records: many Chicago establishments share
+    one street address (food courts, malls, O'Hare/Midway), so collapsing to a
+    single record per address would silently drop all but the last and let the
+    wrong business's score attach. The name disambiguates within the bucket.
     """
     scores_path = os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+    index: dict[str, list[dict]] = {}
     try:
         with open(scores_path, encoding="utf-8") as f:
             payload = json.load(f)
-        return {_normalise_address(r["address"]): r for r in payload.get("scores", [])}
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+    for r in payload.get("scores", []):
+        index.setdefault(_normalise_address(r["address"]), []).append(r)
+    return index
 
 
 def _normalise_address(addr: str) -> str:
@@ -72,13 +87,56 @@ def _normalise_address(addr: str) -> str:
     return re.sub(r"\s+", " ", addr).strip()
 
 
-def _fuzzy_lookup(address: str, index: dict[str, dict]) -> dict | None:
-    """Return the best-matching score record, or None if below cutoff."""
+def _normalise_name(name: str) -> str:
+    """Uppercase, drop store numbers, strip punctuation, collapse whitespace.
+
+    OSM `name` and city `dba_name` are formatted very differently
+    ("Dunkin'" vs "DUNKIN #305"), so fold both hard before comparing: remove
+    "#1234"-style store numbers, turn any run of non-alphanumerics into a
+    single space, and trim.
+    """
+    name = name.upper()
+    name = re.sub(r"#\s*\d+", " ", name)  # store / franchise numbers
+    name = name.replace("'", "").replace("’", "")  # join contractions ("McDonald's")
+    name = re.sub(r"[^A-Z0-9]+", " ", name)  # remaining punctuation -> space
+    return re.sub(r"\s+", " ", name).strip()
+
+
+def _fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict | None:
+    """Return the best score record for this (address, name), or None.
+
+    Resolve the address to a bucket of records (exact key, then fuzzy over the
+    keys), then pick the record in that bucket whose `dba_name` best matches
+    `name`. BOTH the address and the best name must clear their cutoffs.
+
+    A shared address (food court, airport terminal) holds many establishments,
+    so address alone can attach the wrong business's score — a consumer-facing
+    wrong-signal harm (ethics decision record 0005, principle 1). A missed
+    match (None) is safer than a confident wrong one.
+    """
     key = _normalise_address(address)
-    if key in index:
-        return index[key]
-    matches = difflib.get_close_matches(key, index.keys(), n=1, cutoff=0.72)
-    return index[matches[0]] if matches else None
+    bucket = index.get(key)
+    if bucket is None:
+        matches = difflib.get_close_matches(key, index.keys(), n=1, cutoff=_ADDRESS_CUTOFF)
+        if not matches:
+            return None
+        bucket = index[matches[0]]
+
+    target = _normalise_name(name)
+    if not target:
+        return None
+
+    best: dict | None = None
+    best_ratio = 0.0
+    for record in bucket:
+        ratio = difflib.SequenceMatcher(
+            None, target, _normalise_name(record.get("dba_name", ""))
+        ).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best = record
+
+    return best if best_ratio >= _NAME_CUTOFF else None
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +272,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     scores_json_matches: dict[str, dict] = {}
 
     for r in restaurants:
-        match = _fuzzy_lookup(r.get("address", ""), scores_index)
+        match = _fuzzy_lookup(r.get("address", ""), r.get("name", ""), scores_index)
         r["_scores_record"] = match  # attach for feature builder; stripped later
         if match:
             scores_json_matches[r["osm_id"]] = match
