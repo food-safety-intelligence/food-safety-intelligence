@@ -31,6 +31,35 @@ function resetSession(): string {
   return id;
 }
 
+// The transcript is persisted to sessionStorage so it survives the floating
+// popup -> /chat expand (a full-page navigation that remounts ChatInterface) and
+// a reload, within the same tab session. Without this the new mount starts empty
+// and the conversation — and the history sent to the agent — is lost.
+const MESSAGES_KEY = "fsi_chat_messages";
+
+function loadMessages(): Message[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveMessages(messages: Message[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+  } catch {
+    // Best-effort: ignore quota / serialization failures.
+  }
+}
+
+function clearMessages(): void {
+  if (typeof window !== "undefined") sessionStorage.removeItem(MESSAGES_KEY);
+}
+
 // ─── Markdown-lite renderer ───────────────────────────────────────────────────
 // Handles **bold**, numbered lists, and newlines without adding a dependency.
 
@@ -128,11 +157,29 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
   const sessionIdRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Guards the persist effect from clobbering a saved transcript with the initial
+  // empty state before the load below applies.
+  const hydratedRef = useRef(false);
 
-  // Initialise session on client only (avoids SSR mismatch).
+  // Initialise session + load any saved transcript on the client only (reading
+  // sessionStorage during SSR would cause a hydration mismatch).
   useEffect(() => {
     sessionIdRef.current = getOrCreateSessionId();
+    const saved = loadMessages();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (saved.length) setMessages(saved);
   }, []);
+
+  // Persist the transcript so it survives the popup -> /chat expand and reloads.
+  // Skip the first run so the initial empty render can't overwrite a saved
+  // transcript before the mount effect loads it.
+  useEffect(() => {
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      return;
+    }
+    saveMessages(messages);
+  }, [messages]);
 
   // Scroll to latest message whenever messages update.
   useEffect(() => {
@@ -177,6 +224,7 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
 
   function handleClear() {
     setMessages([]);
+    clearMessages();
     sessionIdRef.current = resetSession();
     setInput("");
     inputRef.current?.focus();
