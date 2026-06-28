@@ -31,6 +31,43 @@ function resetSession(): string {
   return id;
 }
 
+// The transcript is persisted to sessionStorage so it survives the floating
+// popup -> /chat expand (a full-page navigation that remounts ChatInterface) and
+// a reload, within the same tab session. Without this the new mount starts empty
+// and the conversation — and the history sent to the agent — is lost.
+const MESSAGES_KEY = "fsi_chat_messages";
+
+function loadMessages(): Message[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+    if (!Array.isArray(parsed)) return [];
+    // Validate shape before these reach render and the agent-history payload —
+    // sessionStorage is user-writable and the stored schema could drift.
+    return parsed.filter(
+      (m): m is Message =>
+        !!m &&
+        (m.role === "user" || m.role === "agent") &&
+        typeof m.content === "string",
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveMessages(messages: Message[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
+  } catch {
+    // Best-effort: ignore quota / serialization failures.
+  }
+}
+
+function clearMessages(): void {
+  if (typeof window !== "undefined") sessionStorage.removeItem(MESSAGES_KEY);
+}
+
 // ─── Markdown-lite renderer ───────────────────────────────────────────────────
 // Handles **bold**, numbered lists, and newlines without adding a dependency.
 
@@ -51,13 +88,81 @@ function renderContent(text: string): React.ReactNode[] {
 }
 
 // ─── Suggested queries ────────────────────────────────────────────────────────
+// Two pools so both of the agent's jobs are always represented: finding a Chicago
+// place, and general food-safety questions answered with cited sources. We pick 6
+// (3 + 3) per chat session (see the seed helpers) so repeat visits get fresh
+// prompts. The roomy /chat page shows all 6; the compact floating popup shows the
+// first 4 (a stable 2 + 2 prefix) — a launcher stays small, and six wrapping chips
+// overflow the short corner panel. Expanding the popup ADDS the last two rather
+// than reshuffling. Each "learn" entry maps to a topic the agent's food_safety_info
+// tool covers; each "find" to real neighborhoods.
 
-const SUGGESTIONS = [
+const FIND_QUERIES = [
   "Safest sushi near Wicker Park",
-  "Any High-risk restaurants in Logan Square?",
   "Best options for someone with a compromised immune system near River North",
-  "Pizza places in Lincoln Park with Low risk tier",
+  "Any High-risk restaurants in Logan Square?",
+  "Low-risk pizza in Lincoln Park",
+  "Taquerias in Pilsen with a Low risk tier",
+  "Safest Thai food near the Loop",
 ];
+
+const LEARN_QUERIES = [
+  "How common is food poisoning in the US?",
+  "Which foods carry the highest Listeria risk?",
+  "What are safe cooking temperatures?",
+  "Who's most at risk from foodborne illness?",
+  "What is Salmonella and how do you avoid it?",
+  "How does norovirus spread?",
+];
+
+const SUGGEST_SEED_KEY = "fsi_chat_suggest_seed";
+
+// Small seeded RNG (mulberry32): a given seed always yields the same picks, so
+// the floating popup and the /chat page render IDENTICAL chips within one session
+// (the expand must not swap them) while a new session rotates.
+function mulberry32(seed: number): () => number {
+  return () => {
+    seed |= 0;
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function seededSample(pool: readonly string[], n: number, rng: () => number): string[] {
+  const copy = [...pool];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy.slice(0, n);
+}
+
+// 3 "find a place" + 3 "learn", interleaved so both jobs show at a glance.
+function pickSuggestions(seed: number): string[] {
+  const rng = mulberry32(seed);
+  const find = seededSample(FIND_QUERIES, 3, rng);
+  const learn = seededSample(LEARN_QUERIES, 3, rng);
+  return [find[0], learn[0], find[1], learn[1], find[2], learn[2]];
+}
+
+// One rotation seed per chat session, stored next to the session id so the popup
+// and the full /chat page (same session) agree, and a brand-new chat rotates.
+function getOrCreateSuggestSeed(): number {
+  if (typeof window === "undefined") return 0;
+  const stored = sessionStorage.getItem(SUGGEST_SEED_KEY);
+  if (stored !== null) return Number(stored);
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  return seed;
+}
+
+function rotateSuggestSeed(): number {
+  const seed = Math.floor(Math.random() * 2 ** 31);
+  if (typeof window !== "undefined") sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  return seed;
+}
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -122,17 +227,41 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Picked client-side after mount (depends on sessionStorage), so it stays []
+  // during SSR/first paint to avoid a hydration mismatch; chips appear a tick later.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
   // Session id is read only when sending a request, never during render, so it
   // lives in a ref. A ref also keeps the client-only localStorage read out of an
   // effect setState (which would trigger a cascading render).
   const sessionIdRef = useRef<string>("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // Guards the persist effect from clobbering a saved transcript with the initial
+  // empty state before the load below applies.
+  const hydratedRef = useRef(false);
 
-  // Initialise session on client only (avoids SSR mismatch).
+  // Client-only init from sessionStorage (avoids SSR hydration mismatch): the
+  // rotation seed and any saved transcript can't be read during SSR, so we set
+  // them once post-mount.
   useEffect(() => {
     sessionIdRef.current = getOrCreateSessionId();
+    const saved = loadMessages();
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setSuggestions(pickSuggestions(getOrCreateSuggestSeed()));
+    if (saved.length) setMessages(saved);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  // Persist the transcript so it survives the popup -> /chat expand and reloads.
+  // Skip the first run so the initial empty render can't overwrite a saved
+  // transcript before the mount effect loads it.
+  useEffect(() => {
+    if (!hydratedRef.current) {
+      hydratedRef.current = true;
+      return;
+    }
+    saveMessages(messages);
+  }, [messages]);
 
   // Scroll to latest message whenever messages update.
   useEffect(() => {
@@ -177,7 +306,10 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
 
   function handleClear() {
     setMessages([]);
+    clearMessages();
     sessionIdRef.current = resetSession();
+    // A new chat rotates the starter chips to a fresh set.
+    setSuggestions(pickSuggestions(rotateSuggestSeed()));
     setInput("");
     inputRef.current?.focus();
   }
@@ -210,7 +342,7 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
                 questions — the agent remembers your session.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
-                {SUGGESTIONS.map((s) => (
+                {(compact ? suggestions.slice(0, 4) : suggestions).map((s) => (
                   <button
                     key={s}
                     onClick={() => void send(s)}
