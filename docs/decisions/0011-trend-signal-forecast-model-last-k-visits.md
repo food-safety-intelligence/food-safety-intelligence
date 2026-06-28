@@ -1,4 +1,4 @@
-# 0010 — Trend signal: forecast-only model + last-K-visits slope
+# 0011 — Trend signal: forecast-only model + last-K-visits slope
 
 - **Status**: **Proposed** (contract change — needs all-owner ack before merge)
 - **Date**: 2026-06-28

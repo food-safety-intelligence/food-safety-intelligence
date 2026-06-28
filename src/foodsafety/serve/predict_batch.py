@@ -7,7 +7,7 @@ For each restaurant in ``features.parquet`` we generate:
   * ``top_drivers`` — list of plain-English driver objects from SHAP attribution
   * ``trend_slope`` — OLS slope of the forecast-only model's score over this
     restaurant's last ``TREND_K_VISITS`` inspections (visits, not a calendar
-    window). Null if fewer than 2 scored points. See DR 0010.
+    window). Null if fewer than 2 scored points. See DR 0011.
 
 Per CLAUDE.md, this is the **batch-score-to-JSON** pattern. The output
 parquet is the authoritative contract artifact; ``scores.json`` (web app
@@ -57,7 +57,7 @@ RISK_TIER_THRESHOLDS = [
 ]
 
 # Trend slope is fit over each license's last K inspections (visits), not a fixed
-# calendar window. K=5 is the tuned default — see DR 0010 / docs/experiments.md
+# calendar window. K=5 is the tuned default — see DR 0011 / docs/experiments.md
 # (2026-06-28): coverage is K-stable and the steeply-rising watch-list lift peaks
 # at K=4-5. The trend is computed from the forecast-only model's score (passed in
 # as ``trend_scores``), not the production risk score.
@@ -86,7 +86,7 @@ def build_scores_table(
 
     Aggregation strategy: one row per ``license_id``, anchored on the most
     recent inspection. The ``trend_slope`` is the OLS slope over the license's
-    last ``TREND_K_VISITS`` inspections (see DR 0010).
+    last ``TREND_K_VISITS`` inspections (see DR 0011).
 
     ``trend_scores`` (optional) is a per-row series of forecast-only model scores
     aligned to ``features`` — the de-confounded basis for the trend. When given,
@@ -152,7 +152,7 @@ def build_scores_table(
         drivers_per_row.append([d.to_dict() for d in drivers])
     latest_per_license["top_drivers"] = drivers_per_row
 
-    # Trend slope over the last K visits, on the forecast-only score (DR 0010).
+    # Trend slope over the last K visits, on the forecast-only score (DR 0011).
     latest_per_license["trend_slope"] = _compute_trend_slopes(
         df, latest_per_license, score_col="_trend_score"
     )
@@ -190,7 +190,7 @@ def _compute_trend_slopes(
     coverage — almost any license with >=2 inspections gets a slope — and
     ``score_col`` is normally the forecast-only model's score, so the slope is
     not driven by the mandated fail->re-inspection swing in the production score.
-    See DR 0010 and docs/experiments.md (2026-06-28).
+    See DR 0011 and docs/experiments.md (2026-06-28).
     """
     slopes: list[float] = []
     full_indexed = full_scored.set_index("license_id").sort_values("inspection_date")
@@ -268,7 +268,7 @@ def write_scores_json(
                 "High": int(tier_counts.get("High", 0)),
             },
             # Key names kept for app compatibility; the slope is now last-K-visits
-            # forecast (DR 0010), not a 30-day window. Threshold retune is PR-B.
+            # forecast (DR 0011), not a 30-day window. Threshold retune is PR-B.
             "worsening_30d": int((df["trend_slope"].fillna(0) > 0.001).sum()),
             "improving_30d": int((df["trend_slope"].fillna(0) < -0.001).sum()),
         }

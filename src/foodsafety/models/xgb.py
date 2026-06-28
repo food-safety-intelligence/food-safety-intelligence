@@ -170,7 +170,7 @@ def build_production_xgb(
     time top decile.
 
     ``features`` defaults to the full ``ALL_FEATURES``. The forecast-only model
-    (DR 0010) passes its reduced set (``FORECAST_FEATURES``) so the monotone
+    (DR 0011) passes its reduced set (``FORECAST_FEATURES``) so the monotone
     constraints are built over the columns it actually trains on — the dropped
     current-outcome features simply fall out of the constraint map.
     """
