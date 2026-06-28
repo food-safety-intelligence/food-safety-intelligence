@@ -32,10 +32,14 @@ import json
 
 import pandas as pd
 
-from foodsafety.config import PROCESSED_DIR, WEB_APP_DATA_DIR
+from foodsafety.config import PREDICTIONS_DIR, PROCESSED_DIR, WEB_APP_DATA_DIR
 from foodsafety.io import storage
 
 INSPECTIONS_PATH = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
+# Per-inspection forecast scores (Model 2), written by retrain_xgb_sigmoid. Joined
+# onto each event below so the detail-page trend chart can plot the real trajectory
+# of forecast scores over time (DR 0010). Optional — events get score=null without it.
+FORECAST_HISTORY_PATH = storage.join(str(PREDICTIONS_DIR), "forecast_history.parquet")
 OUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "inspection_history.json")
 # Full-comment shards live alongside the history JSON under web-app-data/comments/
 # (local or S3, same base as OUT_PATH). Gitignored; S3 is the source of truth.
@@ -82,6 +86,28 @@ def main() -> None:
     df["license_id"] = df["license_id"].astype(str)
     df = df.sort_values(["license_id", "date"], ascending=[True, False])
 
+    # Per-inspection forecast scores keyed (license_id, date) — the trend-chart
+    # points. Events absent from features (older / burn-in) get score=None.
+    forecast_lookup: dict[tuple[str, str], float] = {}
+    if storage.exists(FORECAST_HISTORY_PATH):
+        fh = storage.read_parquet(FORECAST_HISTORY_PATH)
+        fh["license_id"] = fh["license_id"].astype(str)
+        fh["date"] = pd.to_datetime(fh["inspection_date"]).dt.strftime("%Y-%m-%d")
+        forecast_lookup = dict(
+            zip(
+                zip(fh["license_id"], fh["date"], strict=True),
+                fh["forecast_score"],
+                strict=True,
+            )
+        )
+        print(f"  loaded {len(forecast_lookup):,} per-inspection forecast scores")
+    else:
+        print(f"  note: {FORECAST_HISTORY_PATH} missing — events will have score=null")
+
+    def _score_for(license_id: str, date: str):
+        s = forecast_lookup.get((license_id, date))
+        return None if s is None or pd.isna(s) else round(float(s), 4)
+
     # Headline = first violation's NAME, truncated. The "- Comments:" inspector
     # note is dropped — it stays hidden in the collapsed timeline row and only
     # appears (in full) when the row is expanded, from the comment shards.
@@ -112,6 +138,7 @@ def main() -> None:
                 "type": "" if pd.isna(row.get("type")) else str(row["type"]),
                 "result": "" if pd.isna(row.get("result")) else str(row["result"]),
                 "headline": row["headline"],
+                "score": _score_for(license_id, row["date"]),
             }
             for _, row in group.iterrows()
         ]
