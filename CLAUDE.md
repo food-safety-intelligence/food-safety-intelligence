@@ -315,6 +315,17 @@ source of truth.
   `design/` and linking the file view is a non-inline fallback. An agent that
   can't drag-drop should save the screenshots to a known path and ask a human to
   drop them in.
+- **CI runs a rendered-UI smoke check, but it does NOT replace `/verify`.** The
+  `app-smoke` job in `.github/workflows/ci.yml` builds the static export and
+  drives it in a headless Chromium (`app/e2e/smoke.mjs`): for each key route, at
+  desktop and mobile, it asserts the page loads (HTTP ok), throws no
+  uncaught/console errors, renders its `<main>`, and has no horizontal overflow.
+  That is a coarse safety net for the crash / route-render / overflow regressions
+  the static checks (eslint, `tsc`, vitest, `next build`) sail past — **not** a
+  check of whether the change looks right. A regression fails the job (it is a
+  hard check, unlike the non-blocking coverage floors above); whether that blocks
+  the merge depends on branch protection. You still owe the per-item `/verify`
+  screenshot review for any visible change.
 
 ---
 

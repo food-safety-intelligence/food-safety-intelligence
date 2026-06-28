@@ -190,7 +190,7 @@ npm run dev      # http://localhost:3000
 ## Continuous integration
 
 Every pull request (and every push to `main`) runs `.github/workflows/ci.yml`
-— two jobs in parallel, the same checks you can run locally:
+— three jobs in parallel, the same checks you can run locally:
 
 **Python checks** (`ruff`, `pytest`, coverage)
 
@@ -206,6 +206,15 @@ Every pull request (and every push to `main`) runs `.github/workflows/ci.yml`
 - **vitest** — runs the web app's tests.
 - **build** — does a full production build, to catch errors that only show up
   when the app is built (not just type-checked).
+
+**Rendered-UI smoke check** (`app-smoke`)
+
+- Builds the app and opens each main page in a headless browser to confirm it
+  actually renders — loads without errors, shows its content, and has no
+  sideways scrolling on phone or desktop. This catches layout and page-load
+  breaks that the checks above miss, because none of them ever open a page. It
+  is a coarse safety net, not a substitute for the screenshot review in
+  `/verify`.
 
 Deploys are separate workflows (`deploy-web.yml`, `deploy-agent.yml`) that run
 when a change lands on `main`.
