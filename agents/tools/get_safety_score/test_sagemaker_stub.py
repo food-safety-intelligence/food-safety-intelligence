@@ -9,6 +9,7 @@ Tests for the SageMaker stub — verifies that:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 import types
@@ -221,6 +222,98 @@ class TestFeatureOrder:
             "FEATURE_ORDER has drifted from foodsafety.models.baseline.ALL_FEATURES; "
             "update the literal in sagemaker_stub.py to match the model contract."
         )
+
+
+class TestMatchedVenueUsesPrecomputedScore:
+    """A venue matched in scores.json returns that published score; an unmatched
+    venue returns an explicit no-record result with no number (the model is
+    never called at request time)."""
+
+    @staticmethod
+    def _write_scores(tmp_path) -> str:
+        payload = {
+            "scores": [
+                {
+                    "license_id": "L123",
+                    "dba_name": "La Pasadita",
+                    "address": "1132 N Ashland Ave, Chicago, IL",
+                    "risk_score": 0.42,
+                    "risk_tier": "Elevated",
+                    "trend_slope_90d": 0.01,
+                    "neighborhood": "West Town",
+                    "top_drivers": [
+                        {
+                            "feature": "prior_fails",
+                            "label": "Prior failed inspections",
+                            "detail": "",
+                            "shap": 0.2,
+                        }
+                    ],
+                }
+            ]
+        }
+        path = tmp_path / "scores.json"
+        path.write_text(json.dumps(payload))
+        return str(path)
+
+    def test_matched_returns_published_score(self, tmp_path, monkeypatch):
+        import handler as handler_mod
+
+        monkeypatch.setenv("SCORES_JSON_PATH", self._write_scores(tmp_path))
+        handler_mod._load_scores_index.cache_clear()
+        try:
+            out = handler_mod.handler(
+                {
+                    "restaurants": [
+                        {
+                            "osm_id": "111",
+                            "name": "La Pasadita",
+                            # "Avenue" normalises to "Ave" → matches the record.
+                            "address": "1132 N Ashland Avenue, Chicago, IL",
+                        }
+                    ]
+                },
+                None,
+            )
+        finally:
+            handler_mod._load_scores_index.cache_clear()
+
+        assert len(out) == 1
+        rec = out[0]
+        assert rec["risk_score"] == 0.42
+        assert rec["risk_tier"] == "Elevated"
+        assert rec["matched_scores_json"] is True
+        assert rec["license_id"] == "L123"
+        assert rec["stub"] is False
+        assert rec["shap_drivers"][0]["direction"] == "positive"
+
+    def test_unmatched_returns_no_record(self, tmp_path, monkeypatch):
+        import handler as handler_mod
+
+        monkeypatch.setenv("SCORES_JSON_PATH", self._write_scores(tmp_path))
+        handler_mod._load_scores_index.cache_clear()
+        try:
+            out = handler_mod.handler(
+                {
+                    "restaurants": [
+                        {
+                            "osm_id": "999",
+                            "name": "Nowhere Diner",
+                            "address": "9999 W Nothing Rd, Chicago, IL",
+                        }
+                    ]
+                },
+                None,
+            )
+        finally:
+            handler_mod._load_scores_index.cache_clear()
+
+        assert len(out) == 1
+        # No batch-run match → explicit no-record result, no fabricated number.
+        assert out[0]["matched_scores_json"] is False
+        assert out[0]["risk_score"] is None
+        assert out[0]["risk_tier"] is None
+        assert out[0]["status"] == "no_inspection_record"
 
 
 class TestSwapFlag:
