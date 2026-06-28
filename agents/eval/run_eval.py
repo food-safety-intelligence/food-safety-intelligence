@@ -77,12 +77,19 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
     handler_mod = _load_score_handler()
     handler_mod._load_scores_index.cache_clear()
 
+    # This gate relies on PR #58's contract: on a match, get_safety_score relays
+    # the precomputed scores.json record verbatim — same risk_score / risk_tier /
+    # license_id, no recompute, no rounding, same address match keying. We assert
+    # exactly that below, so if that relay-on-match behavior changes, this gate
+    # must be updated too.
+    # A missing / empty / unparseable scores.json is a FAILURE, not a skip: a
+    # broken data path must gate the (paid) Bedrock run, not silently pass it.
     try:
         with open(_scores_path(), encoding="utf-8") as f:
             records = json.load(f).get("scores", [])
     except (FileNotFoundError, json.JSONDecodeError) as exc:
-        print(f"[faithfulness] cannot read scores.json ({exc}) — skipping")
-        return 0
+        print(f"[faithfulness] FAIL — cannot read scores.json ({exc}); cannot verify relay")
+        return 1
 
     # Only records with a real published score and an address we can match on.
     # Skip non-unique normalised addresses: the index keeps one record per
@@ -103,8 +110,10 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
     ]
     sample_records = candidates[:sample]
     if not sample_records:
-        print("[faithfulness] no eligible records in scores.json — skipping")
-        return 0
+        # Zero eligible records means there is nothing to verify, so the gate
+        # cannot confirm the relay — treat it as a failure rather than a pass.
+        print("[faithfulness] FAIL — no eligible records in scores.json; nothing to verify")
+        return 1
 
     mismatches: list[str] = []
     for i, rec in enumerate(sample_records):
@@ -258,7 +267,9 @@ def evaluate_response(case: EvalCase, response: str) -> list[str]:
 
 # Nova Pro grades Nova 2 Lite's output — a stronger, same-family judge avoids the
 # self-preference bias of a model grading itself. Override via env if needed.
-JUDGE_MODEL_ID = os.environ.get("FSI_JUDGE_MODEL_ID", "amazon.nova-pro-v1:0")
+# The "us." prefix is the cross-region inference-profile id required for on-demand
+# Nova in us-east-1 (the agent itself uses the same prefixed form).
+JUDGE_MODEL_ID = os.environ.get("FSI_JUDGE_MODEL_ID", "us.amazon.nova-pro-v1:0")
 
 _JUDGE_SYSTEM = (
     "You are a strict evaluator for a Chicago food-safety assistant. You are given a "
@@ -431,7 +442,10 @@ def main() -> None:
     # the live agent + judge if those pass. A broken checker or a scores.json the
     # tool doesn't relay faithfully invalidates the guardrail run, so there's no
     # point paying for it — fail fast before any Bedrock call.
-    print("== Gate 1: checker self-test (deterministic) ==")
+    # Gate 1 only sanity-checks the default heuristic grader (evaluate_response).
+    # Under --judge the heuristics are bypassed for the live cases, so this gate
+    # does NOT validate the Nova Pro judge path.
+    print("== Gate 1: checker self-test (deterministic; heuristic grader only) ==")
     n_self = _self_test()
     print("\n== Gate 2: faithfulness vs scores.json (deterministic) ==")
     n_faith = run_faithfulness(verbose=args.verbose)
