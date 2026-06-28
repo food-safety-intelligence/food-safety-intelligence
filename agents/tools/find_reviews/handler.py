@@ -37,11 +37,11 @@ DISCLAIMER = (
     "They are NOT part of the food-safety risk score."
 )
 
-# Diner-facing safety topics → human labels used in the agent-facing link text.
-# This dict is also the registry of valid topic keys.
-# Each value is BOTH the display label and the review-search terms (the " / " is
-# split into separate query words). Terms are diner-language synonyms of the
-# observable food-safety categories — kept short so the search isn't over-narrowed.
+# Registry of valid topic keys → the diner-language SEARCH TERMS for each topic
+# (the " / " is split into separate query words). These are short synonyms of the
+# observable food-safety categories, kept brief so the search isn't over-narrowed.
+# The agent-facing link LABEL comes from the keys (see _topic_label), NOT these
+# values.
 TOPIC_LABELS: dict[str, str] = {
     "cleanliness": "cleanliness / sewage",
     "pests": "rodents / pests / droppings",
