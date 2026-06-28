@@ -27,7 +27,7 @@ SCORES_REQUIRED_COLS: dict[str, str] = {
     "risk_score": "float",
     "risk_tier": "string",
     "top_drivers": "list",  # list[struct]
-    "trend_slope_90d": "float",
+    "trend_slope": "float",
 }
 
 VALID_TIERS = {"Low", "Moderate", "Elevated", "High"}
@@ -56,7 +56,7 @@ def test_scores_dtypes(scores):
     assert pd.api.types.is_float_dtype(scores["lon"])
     assert pd.api.types.is_datetime64_any_dtype(scores["as_of_date"])
     assert pd.api.types.is_float_dtype(scores["risk_score"])
-    assert pd.api.types.is_float_dtype(scores["trend_slope_90d"])
+    assert pd.api.types.is_float_dtype(scores["trend_slope"])
 
 
 def test_scores_in_valid_range(scores):

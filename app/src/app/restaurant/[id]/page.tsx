@@ -109,7 +109,7 @@ export default async function RestaurantDetailPage({
             </div>
           </div>
 
-          <ScoreCard restaurant={restaurant} populationStats={populationStats} />
+          <ScoreCard restaurant={restaurant} populationStats={populationStats} history={history} />
         </section>
 
         {/* Drivers */}

@@ -1,0 +1,190 @@
+{
+  "experiment": "trend_deconfound_last_k_visits_forecast",
+  "date": "2026-06-28",
+  "models": {
+    "model_1_production": {
+      "role": "shipped risk_score (unchanged by this experiment)",
+      "predicts": "P(fail-or-priority within next 180 days)",
+      "features": "all features, including the current inspection's own outcome"
+    },
+    "model_2_forecast_only": {
+      "role": "used only to build the de-confounded trend trajectory",
+      "predicts": "P(fail-or-priority within next 180 days)  -- SAME label/horizon",
+      "features": "all features EXCEPT the current inspection's own outcome",
+      "dropped_features": [
+        "was_fail",
+        "n_priority_this_inspection",
+        "n_core_this_inspection"
+      ]
+    },
+    "trend": "least-squares slope of a model's score over the last K visits; computed, not predicted by a model"
+  },
+  "config": {
+    "k_grid": [
+      3,
+      4,
+      5,
+      6,
+      8
+    ],
+    "old_window_days": 90,
+    "estimator": "xgboost (both models)",
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01",
+    "n_anchors": 5226,
+    "base_rate": 0.0436,
+    "clean_base_rate": 0.0383
+  },
+  "old_baseline_model1_90d": {
+    "coverage": 0.2922,
+    "n_computable": 1527,
+    "confound_corr_last_was_fail": -0.3053,
+    "clean_early_warning": {
+      "clean_n_with_slope": 1502,
+      "loose_slope_gt_0": {
+        "n": 168,
+        "fail_rate": 0.0536,
+        "lift_vs_base": 1.23
+      },
+      "strict_top10pct": {
+        "n": 151,
+        "fail_rate": 0.0596,
+        "lift_vs_base": 1.37,
+        "slope_threshold": 0.000178
+      },
+      "strict_top20pct": {
+        "n": 301,
+        "fail_rate": 0.0631,
+        "lift_vs_base": 1.45,
+        "slope_threshold": -0.004521
+      }
+    }
+  },
+  "k_sweep_model2_lastK": {
+    "3": {
+      "coverage": 0.8741,
+      "n_computable": 4568,
+      "confound_corr_last_was_fail": -0.2173,
+      "clean_early_warning": {
+        "clean_n_with_slope": 4464,
+        "loose_slope_gt_0": {
+          "n": 2264,
+          "fail_rate": 0.0534,
+          "lift_vs_base": 1.23
+        },
+        "strict_top10pct": {
+          "n": 447,
+          "fail_rate": 0.094,
+          "lift_vs_base": 2.15,
+          "slope_threshold": 0.000571
+        },
+        "strict_top20pct": {
+          "n": 893,
+          "fail_rate": 0.0728,
+          "lift_vs_base": 1.67,
+          "slope_threshold": 0.000301
+        }
+      }
+    },
+    "4": {
+      "coverage": 0.8741,
+      "n_computable": 4568,
+      "confound_corr_last_was_fail": -0.1893,
+      "clean_early_warning": {
+        "clean_n_with_slope": 4464,
+        "loose_slope_gt_0": {
+          "n": 2157,
+          "fail_rate": 0.051,
+          "lift_vs_base": 1.17
+        },
+        "strict_top10pct": {
+          "n": 447,
+          "fail_rate": 0.094,
+          "lift_vs_base": 2.15,
+          "slope_threshold": 0.000372
+        },
+        "strict_top20pct": {
+          "n": 893,
+          "fail_rate": 0.0717,
+          "lift_vs_base": 1.64,
+          "slope_threshold": 0.000197
+        }
+      }
+    },
+    "5": {
+      "coverage": 0.8741,
+      "n_computable": 4568,
+      "confound_corr_last_was_fail": -0.188,
+      "clean_early_warning": {
+        "clean_n_with_slope": 4464,
+        "loose_slope_gt_0": {
+          "n": 2078,
+          "fail_rate": 0.0505,
+          "lift_vs_base": 1.16
+        },
+        "strict_top10pct": {
+          "n": 447,
+          "fail_rate": 0.0984,
+          "lift_vs_base": 2.26,
+          "slope_threshold": 0.000265
+        },
+        "strict_top20pct": {
+          "n": 893,
+          "fail_rate": 0.0739,
+          "lift_vs_base": 1.69,
+          "slope_threshold": 0.000139
+        }
+      }
+    },
+    "6": {
+      "coverage": 0.8741,
+      "n_computable": 4568,
+      "confound_corr_last_was_fail": -0.1882,
+      "clean_early_warning": {
+        "clean_n_with_slope": 4464,
+        "loose_slope_gt_0": {
+          "n": 1958,
+          "fail_rate": 0.0506,
+          "lift_vs_base": 1.16
+        },
+        "strict_top10pct": {
+          "n": 447,
+          "fail_rate": 0.085,
+          "lift_vs_base": 1.95,
+          "slope_threshold": 0.000217
+        },
+        "strict_top20pct": {
+          "n": 893,
+          "fail_rate": 0.0717,
+          "lift_vs_base": 1.64,
+          "slope_threshold": 0.000108
+        }
+      }
+    },
+    "8": {
+      "coverage": 0.8741,
+      "n_computable": 4568,
+      "confound_corr_last_was_fail": -0.1888,
+      "clean_early_warning": {
+        "clean_n_with_slope": 4464,
+        "loose_slope_gt_0": {
+          "n": 1838,
+          "fail_rate": 0.0555,
+          "lift_vs_base": 1.27
+        },
+        "strict_top10pct": {
+          "n": 447,
+          "fail_rate": 0.0761,
+          "lift_vs_base": 1.74,
+          "slope_threshold": 0.000148
+        },
+        "strict_top20pct": {
+          "n": 893,
+          "fail_rate": 0.0705,
+          "lift_vs_base": 1.62,
+          "slope_threshold": 7.1e-05
+        }
+      }
+    }
+  }
+}

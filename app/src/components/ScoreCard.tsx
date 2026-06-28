@@ -1,12 +1,13 @@
 import {
   ArrowDown,
   ArrowUp,
+  Info,
   Minus,
   TrendingDown,
   TrendingUp,
   type LucideIcon,
 } from "lucide-react";
-import type { PopulationStats, RestaurantScore } from "@/lib/scores";
+import type { InspectionEvent, PopulationStats, RestaurantScore } from "@/lib/scores";
 import { trendDirection } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
@@ -47,22 +48,37 @@ function DriverIcon({ icon: Icon, className }: { icon: LucideIcon; className?: s
 /**
  * Centerpiece score panel on the detail page. A full-width horizontal band:
  * the arc gauge + tier on the left, the top driver and percentile in the
- * middle, and a minimal 90-day trend chart on the right (reconstructed from
- * the linear slope — we don't ship per-restaurant history in scores.json).
+ * middle, and a trend chart on the right plotting the forecast-only score of
+ * each recent inspection (from the shipped per-restaurant history).
  * Stacks to a single column on narrow screens.
  */
 export function ScoreCard({
   restaurant,
   populationStats,
+  history = [],
 }: {
   restaurant: RestaurantScore;
   populationStats?: PopulationStats;
+  /** Inspection history (newest-first) — the scored events become chart points. */
+  history?: InspectionEvent[];
 }) {
-  const slope = restaurant.trend_slope_90d;
+  const slope = restaurant.trend_slope;
   const dir = trendDirection(slope);
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
-  const sign = slope === null ? "" : slope > 0 ? "+" : slope < 0 ? "−" : "";
+
+  // Trend-chart points: the most-recent inspections that carry a forecast score
+  // (administrative inspections have none), oldest -> newest. See decision 0011.
+  const TREND_POINTS = 5;
+  const trendPoints = history
+    .filter((e): e is InspectionEvent & { score: number } => e.score != null)
+    .slice(0, TREND_POINTS)
+    .map((e) => ({ date: e.date, score: e.score }))
+    .reverse();
+
+  // One gate for the header label and the chart so they never disagree: we have
+  // a trend only with a (forward-looking) slope AND at least two points to draw.
+  const hasTrend = slope !== null && trendPoints.length >= 2;
 
   // Percentile rank reads honestly across every tier. "Top X%" alone gets
   // misleading at the extremes (e.g. "top 0.00%" for the highest-scoring
@@ -132,24 +148,28 @@ export function ScoreCard({
   const trendInner = (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <div className="text-[11px] tracking-widest uppercase text-muted">90-day trend</div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-[11px] tracking-widest uppercase text-muted">Recent trend</span>
+          <a
+            href="/how-it-works#recent-trend"
+            aria-label="How the recent trend is calculated"
+            title="How the recent trend is calculated"
+            className="text-muted/70 hover:text-ink transition-colors"
+          >
+            <Info className="w-3.5 h-3.5" strokeWidth={2} />
+          </a>
+        </div>
         <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${trend.fg}`}>
           <TrendIcon className="w-3.5 h-3.5" strokeWidth={2.5} />
-          {slope === null ? "Insufficient history" : trend.label}
+          {hasTrend ? trend.label : "Insufficient history"}
         </span>
       </div>
       <div className="flex justify-center">
-        <TrendChart score={restaurant.risk_score} slope={slope} typicalScore={medianScore} />
+        <TrendChart points={hasTrend ? trendPoints : []} slope={slope} />
       </div>
-      {slope !== null && (
-        <div className="num text-[12px] text-muted mt-2 text-center">
-          {sign}
-          {Math.abs(slope).toFixed(4)} / day
-          {restaurant.trend_ci_low != null && restaurant.trend_ci_high != null
-            ? ` · 95% CI [${restaurant.trend_ci_low.toFixed(4)}, ${restaurant.trend_ci_high.toFixed(4)}]`
-            : ""}
-        </div>
-      )}
+      <p className="text-[11px] text-muted mt-2 text-center leading-snug">
+        Predicted risk over recent inspections — which way it&apos;s trending.
+      </p>
     </div>
   );
 

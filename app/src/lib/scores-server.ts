@@ -372,7 +372,7 @@ export async function getHomeView(opts: {
       address: r.address,
       risk_score: r.risk_score,
       risk_tier: r.risk_tier,
-      trend_slope_90d: r.trend_slope_90d,
+      trend_slope: r.trend_slope,
       top_driver: d ? toPinDriver(d) : undefined,
     };
   });
