@@ -20,6 +20,10 @@ export function FloatingChat() {
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
+  // Skip focus management on the initial mount — the effect below runs once with
+  // open=false, and without this it would focus the launcher on every page load
+  // (it's mounted site-wide in the root layout), stealing focus from the page.
+  const firstRun = useRef(true);
 
   // Esc closes the panel.
   useEffect(() => {
@@ -35,6 +39,10 @@ export function FloatingChat() {
   // away; on close, return focus to the launcher so keyboard users aren't
   // dropped back at the top of the page.
   useEffect(() => {
+    if (firstRun.current) {
+      firstRun.current = false;
+      return;
+    }
     if (open) {
       panelRef.current?.querySelector<HTMLElement>("textarea")?.focus();
     } else {
