@@ -54,14 +54,34 @@ def test_handler_requires_name():
 
 
 def test_links_percent_encode_special_chars():
-    # A name with query-significant and path-significant characters must be
-    # percent-encoded so it can't inject query params or extra path segments.
+    # Query-significant characters from the name must be percent-encoded so they
+    # can't inject params or path segments. Every link is a DuckDuckGo ?q= search.
     out = handler({"name": "Joe's & Co / Café ?q=evil", "address": "Chicago, IL"}, None)
-    urls = {link["source"]: link["url"] for link in out["review_links"]}
-    # "/" must not survive as a literal path separator in the Maps deep link.
-    tail = urls["Google"].split("/maps/search/", 1)[1]
-    assert "/" not in tail
-    # No raw "&"/"?" from the name leaks into any URL's query unencoded.
-    for url in urls.values():
-        assert " " not in url
-        assert "& Co" not in url
+    for link in out["review_links"]:
+        url = link["url"]
+        assert url.startswith("https://duckduckgo.com/?q=")
+        q = url.split("?q=", 1)[1]
+        # urlencode turns space/&/?// into %20-style escapes, so none appear raw.
+        assert " " not in q
+        assert "/" not in q
+        assert "& Co" not in q
+
+
+def test_topic_scoping_in_urls():
+    # A specific topic scopes Yelp/Google via site: search; all-topics uses a
+    # concise "food safety" term instead of every synonym.
+    pests = {
+        link["source"]: link["url"]
+        for link in handler(
+            {"name": "Lou Malnati's", "address": "Chicago, IL", "topics": ["pests"]}, None
+        )["review_links"]
+    }
+    assert "site%3Ayelp.com" in pests["Yelp"] and "rodents" in pests["Yelp"]
+    assert "site%3Agoogle.com" in pests["Google"]
+    allt = {
+        link["source"]: link["url"]
+        for link in handler({"name": "Lou Malnati's", "address": "Chicago, IL"}, None)[
+            "review_links"
+        ]
+    }
+    assert "food+safety" in allt["Web"] and "droppings" not in allt["Web"]
