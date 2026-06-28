@@ -157,7 +157,9 @@ def monotone_constraints_for(features: list[str]) -> dict[str, int]:
     }
 
 
-def build_production_xgb(*, scale_pos_weight: float) -> XGBClassifier:
+def build_production_xgb(
+    *, scale_pos_weight: float, features: list[str] | None = None
+) -> XGBClassifier:
     """The promoted production XGB: shallow (depth-3) + monotone risk constraints.
 
     The CV-validated winner over the LogReg baseline (beats it on both PR-AUC and
@@ -166,14 +168,20 @@ def build_production_xgb(*, scale_pos_weight: float) -> XGBClassifier:
     served run is deterministic. ``max_depth=3`` (vs the experiment default 6):
     the signal is low-order, so deep trees over-fragment it and lose the forward-
     time top decile.
+
+    ``features`` defaults to the full ``ALL_FEATURES``. The forecast-only model
+    (DR 0011) passes its reduced set (``FORECAST_FEATURES``) so the monotone
+    constraints are built over the columns it actually trains on — the dropped
+    current-outcome features simply fall out of the constraint map.
     """
+    feats = list(features) if features is not None else list(ALL_FEATURES)
     return build_xgb_estimator(
         n_estimators=300,
         max_depth=3,
         learning_rate=0.05,
         scale_pos_weight=scale_pos_weight,
         early_stopping_rounds=None,
-        monotone_constraints=monotone_constraints_for(list(ALL_FEATURES)),
+        monotone_constraints=monotone_constraints_for(feats),
     )
 
 
