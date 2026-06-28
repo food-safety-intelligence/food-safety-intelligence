@@ -164,7 +164,7 @@ def build_production_xgb(
 
     The CV-validated winner over the LogReg baseline (beats it on both PR-AUC and
     precision@10% in 5/6 expanding-window folds — see DR 0002/0009 and
-    docs/experiments.md). Fixed ``n_estimators`` with early stopping off so the
+    docs/model-experiments.md). Fixed ``n_estimators`` with early stopping off so the
     served run is deterministic. ``max_depth=3`` (vs the experiment default 6):
     the signal is low-order, so deep trees over-fragment it and lose the forward-
     time top decile.

@@ -8,7 +8,7 @@ script so it runs against S3 and so several experiments can share one raw pull. 
 discipline lives inside the feature modules; this orchestrator doesn't touch it.
 
 The 311 complaints and block-face building-violation joins are intentionally skipped: both
-families were tested and dropped from ALL_FEATURES (see baseline.py + docs/experiments.md).
+families were tested and dropped from ALL_FEATURES (see baseline.py + docs/model-experiments.md).
 Their feature code is kept in-tree but unwired (complaint_features.py / building_features.py);
 building violations can still be fetched via scripts/fetch_building_violations.py if the
 experiment is ever revisited. Wiring either back in adds BallTree runtime for no model gain.

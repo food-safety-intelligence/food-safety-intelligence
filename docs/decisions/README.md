@@ -43,5 +43,5 @@ file per decision; the log is **append-only** — don't renumber existing record
 
 *Not a decision record?* Schema and **data cleaning** rules live in
 [`../interface_contracts.md`](../interface_contracts.md); experiment results in
-[`../experiments.md`](../experiments.md). See [`../README.md`](../README.md) for the
+[`../model-experiments.md`](../model-experiments.md). See [`../README.md`](../README.md) for the
 full docs map.
