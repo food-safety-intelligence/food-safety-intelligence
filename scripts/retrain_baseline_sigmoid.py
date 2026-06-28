@@ -33,13 +33,19 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-import joblib
 import numpy as np
-import pandas as pd
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 
-from foodsafety.config import LABEL_WINDOW_DAYS, RANDOM_STATE
+from foodsafety.config import (
+    FEATURES_PATH,
+    LABEL_WINDOW_DAYS,
+    MODELS_DIR,
+    PREDICTIONS_DIR,
+    RANDOM_STATE,
+    WEB_APP_DATA_DIR,
+)
+from foodsafety.io import storage
 from foodsafety.models.baseline import (
     ALL_FEATURES,
     LABEL_COL,
@@ -54,10 +60,10 @@ from foodsafety.tracking import provenance
 from foodsafety.utils.time import temporal_split
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
-MODELS_DIR = REPO_ROOT / "data" / "models"
-PRED_DIR = REPO_ROOT / "data" / "predictions"
-SCORES_JSON_PATH = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+# FEATURES_PATH / MODELS_DIR / PREDICTIONS_DIR / WEB_APP_DATA_DIR come from config and
+# may be local or s3://. Metrics reports stay repo-local (small, git-committed/diffable).
+SCORES_JSON_PATH = storage.join(str(WEB_APP_DATA_DIR), "scores.json")
+SCORES_PARQUET_PATH = storage.join(str(PREDICTIONS_DIR), "scores.parquet")
 REPORTS_METRICS_DIR = REPO_ROOT / "reports" / "metrics"
 
 # Mirror the original training run's cutoffs so the comparison is apples-to-
@@ -70,12 +76,12 @@ MODEL_VERSION = "baseline_logreg_sigmoid"
 
 def main() -> None:
     print(f"Loading {FEATURES_PATH}")
-    if not FEATURES_PATH.exists():
+    if not storage.exists(FEATURES_PATH):
         raise SystemExit(
-            "Missing data artifact: data/processed/features.parquet was not found. "
-            "Run notebooks/03_feature_engineering.ipynb to generate the feature parquet before `make retrain`."
+            f"Missing data artifact: {FEATURES_PATH} was not found. "
+            "Run `make features` (scripts/build_features.py) before `make retrain`."
         )
-    features = pd.read_parquet(FEATURES_PATH)
+    features = storage.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}, dtypes verified for {len(ALL_FEATURES)} feature cols")
 
     if "inspection_date" not in features.columns:
@@ -171,7 +177,7 @@ def main() -> None:
             "feature_set_version": prov["feature_set_version"],
         },
         "dataset": {
-            "features_parquet": str(FEATURES_PATH.relative_to(REPO_ROOT)),
+            "features_parquet": str(FEATURES_PATH),
             "features_sha256": prov["features_sha256"],
             "rows_total": int(len(features)),
             "rows_modelable": int(len(features_modelable)),
@@ -180,12 +186,11 @@ def main() -> None:
     }
 
     # Persist model + metadata (NEVER overwrite per CLAUDE.md — run-id stamps it).
-    MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    model_path = MODELS_DIR / f"baseline_sigmoid_{run_id}.joblib"
-    meta_path = MODELS_DIR / f"baseline_sigmoid_{run_id}_metadata.json"
-    joblib.dump(calibrated, model_path)
-    with open(meta_path, "w") as f:
-        json.dump(metadata, f, indent=2)
+    # Targets may be local or s3:// — storage creates local parents and puts S3 objects.
+    model_path = storage.join(str(MODELS_DIR), f"baseline_sigmoid_{run_id}.joblib")
+    meta_path = storage.join(str(MODELS_DIR), f"baseline_sigmoid_{run_id}_metadata.json")
+    storage.dump_joblib(calibrated, model_path)
+    storage.write_text(json.dumps(metadata, indent=2), meta_path)
     print(f"Saved model → {model_path}")
     print(f"Saved metadata → {meta_path}")
 
@@ -221,10 +226,8 @@ def main() -> None:
     print("Building scores table (per-license_id, anchored on latest inspection)")
     scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=5)
 
-    PRED_DIR.mkdir(parents=True, exist_ok=True)
-    scores_parquet_path = PRED_DIR / "scores.parquet"
-    scores.to_parquet(scores_parquet_path)
-    print(f"Wrote {scores_parquet_path}: {len(scores):,} restaurants")
+    storage.write_parquet(scores, SCORES_PARQUET_PATH)
+    print(f"Wrote {SCORES_PARQUET_PATH}: {len(scores):,} restaurants")
 
     # Display fields — copy across from the licenses table if available, else
     # default to empty strings. The existing scores.json already had these
@@ -267,8 +270,6 @@ def main() -> None:
         calibration=calibration,
     )
     print(f"Wrote {SCORES_JSON_PATH}")
-    size_mb = SCORES_JSON_PATH.stat().st_size / 1024 / 1024
-    print(f"  {size_mb:.1f} MB")
 
 
 if __name__ == "__main__":

@@ -120,12 +120,24 @@ the audit in `notebooks/06` and `fairness_audit.md`.
 
 ---
 
-## 2. `data/processed/features.parquet`
+## 2. `processed/features/<name>.parquet`
 
 **Grain**: one row per `(license_id, as_of_date)`.
 **Key**: `(license_id, as_of_date)`.
-**Producer**: `src/foodsafety/features/build.py` (Bella + Deepak).
-**Consumers**: model training, batch scoring.
+**Producer**: `scripts/build_features.py` → `src/foodsafety/features/build.py`
+(Bella + Deepak). Default name `features_current_inspection` (config `FEATURES_NAME`).
+**Consumers** (all read it through `foodsafety.io.storage`): `scripts/retrain_xgb_sigmoid.py`,
+`scripts/retrain_baseline_sigmoid.py`, `scripts/build_methodology_json.py`, batch scoring.
+
+**Storage location.** All pipeline artifacts live under `FOODSAFETY_DATA_DIR` (config) —
+a local path by default (`./data`, so `data/processed/features/<name>.parquet`) or an
+`s3://…` base for the AWS iteration (`s3://<bucket>/processed/features/<name>.parquet`).
+Reads/writes go through `foodsafety.io.storage`, which resolves either to the same
+`(filesystem, path)` interface, so the pipeline runs identically local or on S3. The
+web-app JSON targets live under `FOODSAFETY_WEB_APP_DATA_DIR` (default `app/public/data`,
+or `s3://<bucket>/web-app-data`). The flat `data/processed/features.parquet` is the
+legacy location still used by notebook 03 and the local experiment scripts; the migrated
+pipeline (`make data features retrain`) uses the versioned path above.
 
 `as_of_date` is one row per inspection in the MVP — `as_of_date =
 inspection_date` is set as a synonym in `features/build.py`. The Phase-4
@@ -358,6 +370,38 @@ to the committed/locally-generated copies under `app/public/data/`).
   pages. Producer `_shard_of()` and the web app's `commentShardOf()` must use
   the same md5 scheme. Regenerate and upload `inspection_history.json` and the
   shards **together** so the index alignment holds.
+
+---
+
+## S3 deploy layout (publish pipeline)
+
+`scripts/publish.py` (`make publish`) uploads a built, coherent artifact set to
+`s3://food-safety-intelligence-data/`. It is publish-only — it never trains or
+re-scores; run `make features retrain history` first. Two tiers:
+
+| S3 key | Source | Tier | Overwrite? |
+|---|---|---|---|
+| `web-app-data/scores.json` | `app/public/data/scores.json` | live app reads it | yes |
+| `web-app-data/inspection_history.json` | `app/public/data/inspection_history.json` | live app reads it | yes |
+| `web-app-data/methodology.json` | `app/public/data/methodology.json` | live app reads it | yes |
+| `web-app-data/comments/<xx>.json` (256 shards) | `app/public/data/comments/` | live app build reads it | yes |
+| `models/<model>_sigmoid_<run>.joblib` (+ `_metadata.json` if written) | `data/models/…` | archival (rollback) | **no — versioned** |
+| `processed/features.parquet` | `data/processed/features/<name>.parquet` | archival | yes |
+| `processed/inspections_labeled.parquet` | `data/processed/inspections_labeled.parquet` | archival | yes (skipped if present unless `--force`) |
+| `predictions/scores.parquet` | `data/predictions/scores.parquet` | archival | yes |
+
+The Next.js app is a **static export** (`output: 'export'`): `app/src/lib/scores-server.ts`
+reads **only** the `web-app-data/` JSON (the three top-level files plus the comment shards)
+at **build time** — never at request time, and never the model (batch-score-to-JSON
+contract). The model/parquets are kept in S3 for rollback, re-scoring and provenance only.
+The served model is **model-agnostic** (`baseline_sigmoid_*` for LogReg or
+`xgb_monotone_sigmoid_*` for XGBoost, per the production estimator) and **versioned** (never
+overwritten) because the binary is gitignored, so S3 is the only rollback copy; a
+`_metadata.json` sidecar is published when the retrain emits one. A newly-trained model goes
+live in **two steps** — publish the
+JSON to S3, **then** rebuild/redeploy the app (an Amplify/Vercel rebuild re-reads S3 and
+re-exports); publishing alone does not change the live site. See the `update-model` skill,
+Step 6.
 
 ---
 
