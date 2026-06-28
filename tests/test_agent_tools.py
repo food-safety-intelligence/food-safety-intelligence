@@ -152,3 +152,34 @@ def test_get_safety_score_skips_malformed_elements():
     assert isinstance(out, list)
     assert len(out) == 1
     assert out[0]["osm_id"] == "123"
+
+
+# ---------------------------------------------------------------------------
+# Item 3 — find_restaurants location scope (Chicago only)
+# ---------------------------------------------------------------------------
+
+
+def test_unrecognised_neighborhood_returns_location_error(monkeypatch):
+    """A neighborhood that isn't a Chicago area returns an error object and does
+    NOT silently fall back to a whole-Chicago search."""
+
+    def _must_not_call(_query):
+        raise AssertionError("Overpass must not be queried for an unknown area")
+
+    monkeypatch.setattr(find_restaurants, "_fetch_overpass", _must_not_call)
+    result = find_restaurants.handler({"neighborhood": "Brooklyn"}, None)
+
+    assert isinstance(result, dict)
+    assert result["reason"] == "location_not_recognized"
+    assert "osm_id" not in result
+
+
+def test_no_location_still_searches_whole_chicago():
+    """No neighborhood and no coordinates → a whole-Chicago search, not an error."""
+    geom = find_restaurants._resolve_geometry(None, None, None, 1.0)
+    assert geom is not None  # falls back to Chicago, does not short-circuit
+
+
+def test_unrecognised_neighborhood_resolves_to_none():
+    """An unknown area resolves to None so the handler can report it."""
+    assert find_restaurants._resolve_geometry("Atlantis", None, None, 1.0) is None
