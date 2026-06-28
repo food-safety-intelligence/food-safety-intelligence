@@ -112,7 +112,7 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   estimator is the depth-3 monotone XGBoost — `0002`/`0009`; the LogReg path is
   `scripts/retrain_baseline_sigmoid.py`) →
   served model + `data/predictions/scores.parquet` → `app/public/data/scores.json`
-  (schema `0.4.0`: **5** `top_drivers` per row + a top-level `calibration
+  (schema `0.5.0`: **5** `top_drivers` per row + a top-level `calibration
   {a, b, intercept}` Platt triple — both written automatically) +
   `reports/metrics/xgb_monotone_sigmoid_<run>.json`; then
   `PYTHONPATH=src .venv/bin/python scripts/build_methodology_json.py` →
@@ -127,14 +127,21 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   per-profile waterfall reconciles when `sigmoid(base + Σdrivers + other) ==
   risk_score`).
 - Commit the metrics JSONs (they're git-tracked; **never** commit `data/`).
-- **Publish to S3, then redeploy — together these update the DEPLOYED model.** The
-  re-ship above only refreshes the local laptop bundle. The app is a **static export**
-  (`output: 'export'`): `app/src/lib/scores-server.ts` reads the JSON from
-  `s3://food-safety-intelligence-data/web-app-data/` at **build time**, not per
-  request. So a new model goes live in two steps — (1) push the built artifacts to S3
-  with `scripts/publish.py`, then (2) trigger an app rebuild/redeploy (Amplify/Vercel
-  rebuild on a push to `main` re-reads S3 and re-exports the static site). Publishing
-  alone does not change the live site.
+- **Publish to S3 AND commit the app JSON, then redeploy — together these update the
+  DEPLOYED model.** The re-ship above only refreshes the local laptop bundle. The app is
+  a **static export** (`output: 'export'`): the `app` prebuild (`prebuild-sync-s3.mjs`)
+  pulls the JSON into a build cache and `app/src/lib/scores-server.ts` reads it during
+  `next build` — at **build time**, not per request. Deploy is the
+  `.github/workflows/deploy-web.yml` GitHub Actions workflow (push to `main` touching
+  `app/**`, or a manual `workflow_dispatch`): it rebuilds the static export, `aws s3 sync`s
+  it to the CloudFront-fronted S3 website bucket, and invalidates the cache. **Important:**
+  that CI build runs `next build` *before* configuring AWS creds, so its prebuild S3 pull
+  fails and falls back to the **committed `app/public/data` JSON** — so what actually goes
+  live is the committed copy, not the S3 upload. A new model therefore goes live in two
+  steps: (1) `scripts/publish.py` pushes the artifacts to S3 (archival / rollback + the
+  build-time read when creds are present), and (2) commit the matching
+  `app/public/data/*.json` and merge to `main` (or dispatch the workflow) to rebuild and
+  republish. Neither step alone changes the live site.
   - **The app reads only the JSON — never the model.** Confirmed in `app/src`: the
     static build loads `web-app-data/{scores.json, inspection_history.json,
     methodology.json}` (+ comment shards) and never the `.joblib` (batch-score-to-JSON

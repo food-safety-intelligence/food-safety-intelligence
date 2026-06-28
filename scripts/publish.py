@@ -9,10 +9,19 @@ retrain + history). It does NOT train or re-score. Build first, then publish:
 The artifacts split into two tiers:
 
   LIVE-APP-CRITICAL — what the Next.js app reads from S3. The app is a STATIC export
-  (next.config ``output: 'export'``), so ``app/src/lib/scores-server.ts`` reads these
-  during ``next build`` — at BUILD time, not per request. Publishing therefore takes
-  effect only after the app is rebuilt/redeployed (Amplify/Vercel rebuild on push to
-  main re-reads S3); uploading alone does not change the live site:
+  (next.config ``output: 'export'``), so the ``app`` prebuild (``prebuild-sync-s3.mjs``)
+  pulls these into a build cache and ``app/src/lib/scores-server.ts`` reads them during
+  ``next build`` — at BUILD time, not per request. Publishing therefore takes effect only
+  after the app is rebuilt and redeployed; uploading to S3 alone does not change the live
+  site. The deploy is the ``.github/workflows/deploy-web.yml`` GitHub Actions workflow
+  (push to ``main`` touching ``app/**``, or a manual ``workflow_dispatch``): it rebuilds
+  the static export, ``aws s3 sync``s it to the website bucket, and invalidates CloudFront.
+  NOTE: that workflow builds BEFORE configuring AWS creds, so its prebuild S3 pull fails
+  and falls back to the COMMITTED ``app/public/data`` JSON — meaning what currently goes
+  live is the committed copy, not this S3 upload. So after ``make publish`` you must also
+  commit the matching ``app/public/data`` JSON and merge to ``main`` (or dispatch the
+  workflow) for it to reach the live site; the S3 copies here are read at build time only
+  when creds are present (local build / the SSR path):
       web-app-data/scores.json
       web-app-data/inspection_history.json
       web-app-data/methodology.json
