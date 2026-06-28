@@ -77,7 +77,7 @@ export function ScoreCard({
     .reverse();
 
   // One gate for the header label and the chart so they never disagree: we have
-  // a trend only with a (de-confounded) slope AND at least two points to draw.
+  // a trend only with a (forward-looking) slope AND at least two points to draw.
   const hasTrend = slope !== null && trendPoints.length >= 2;
 
   // Percentile rank reads honestly across every tier. "Top X%" alone gets
