@@ -302,13 +302,19 @@ def judge_response(case: EvalCase, response: str, region: str) -> tuple[bool, st
     return bool(verdict.get("pass")), str(verdict.get("reason", ""))
 
 
-def run_guardrails(verbose: bool, use_judge: bool = False) -> int:
+def run_guardrails(verbose: bool, use_judge: bool = False, only: str | None = None) -> int:
     """Invoke the real agent for every case. Returns the number of failures.
 
     With use_judge, each response is graded by Nova Pro instead of the substring
     heuristics — more robust, at the cost of one extra Bedrock call per case.
+    With `only`, run just the case with that id (cheap re-check of one finding).
     """
     import run_local  # noqa: PLC0415 — imported lazily so the deterministic paths need no Bedrock
+
+    cases = [c for c in CASES if not only or c.id == only]
+    if only and not cases:
+        print(f"[guardrails] no case named {only!r}; known: {[c.id for c in CASES]}")
+        return 1
 
     region = os.environ.get("AWS_REGION", "us-east-1")
     agent = run_local.build_agent()
@@ -316,7 +322,7 @@ def run_guardrails(verbose: bool, use_judge: bool = False) -> int:
     original_fetch = find_handler._fetch_overpass
 
     n_failed = 0
-    for case in CASES:
+    for case in cases:
         if case.simulate_outage:
 
             def _boom(_query):
@@ -408,6 +414,11 @@ def main() -> None:
         action="store_true",
         help="grade guardrail responses with the Nova Pro LLM judge instead of heuristics",
     )
+    parser.add_argument(
+        "--case",
+        metavar="ID",
+        help="run only the guardrail case with this id (e.g. is_it_safe_verdict)",
+    )
     args = parser.parse_args()
 
     if args.self_test:
@@ -416,16 +427,27 @@ def main() -> None:
     if args.faithfulness:
         sys.exit(1 if run_faithfulness(verbose=args.verbose) else 0)
 
-    # Full run: deterministic faithfulness first, then the live-agent guardrails.
-    print("== Faithfulness (deterministic) ==")
+    # Full pipeline: deterministic GATES first (free, no Bedrock); only spend on
+    # the live agent + judge if those pass. A broken checker or a scores.json the
+    # tool doesn't relay faithfully invalidates the guardrail run, so there's no
+    # point paying for it — fail fast before any Bedrock call.
+    print("== Gate 1: checker self-test (deterministic) ==")
+    n_self = _self_test()
+    print("\n== Gate 2: faithfulness vs scores.json (deterministic) ==")
     n_faith = run_faithfulness(verbose=args.verbose)
+    if n_self or n_faith:
+        print(
+            "\nDeterministic gates FAILED — skipping the live-agent/judge run (no Bedrock spend)."
+        )
+        sys.exit(1)
+
     grader = "Nova Pro judge" if args.judge else "heuristics"
-    print(f"\n== Guardrails ({len(CASES)} adversarial cases, graded by {grader}) ==")
-    n_guard = run_guardrails(args.verbose, use_judge=args.judge)
-    print(
-        f"\n{len(CASES) - n_guard}/{len(CASES)} guardrail cases passed; {n_faith} faithfulness mismatches."
-    )
-    sys.exit(1 if (n_faith or n_guard) else 0)
+    scope = f"case {args.case}" if args.case else f"{len(CASES)} adversarial cases"
+    print(f"\n== Guardrails ({scope}, graded by {grader}) ==")
+    n_guard = run_guardrails(args.verbose, use_judge=args.judge, only=args.case)
+    ran = 1 if args.case else len(CASES)
+    print(f"\n{ran - n_guard}/{ran} guardrail cases passed; {n_faith} faithfulness mismatches.")
+    sys.exit(1 if n_guard else 0)
 
 
 if __name__ == "__main__":
