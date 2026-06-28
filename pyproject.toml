@@ -84,11 +84,16 @@ omit = [
     "agents/tools/*/test_*.py",
     # Untestable in CI: these only execute against a live Bedrock/AgentCore
     # session (create the guardrail, run the agent runtime / a local chat loop),
-    # so CI can't exercise a single line. Excluded so the floor reflects code we
-    # can actually test here — the tool handlers and the deterministic eval.
+    # so CI can't exercise a single line. Excluded so the floor reflects the
+    # tool-handler code we can actually test here.
     "agents/create_guardrail.py",
     "agents/entrypoint.py",
     "agents/run_local.py",
+    # The eval harness is test tooling, not the agent product — same reason we
+    # don't measure tests/. Its deterministic gates still RUN under coverage in
+    # CI (to exercise the handlers), but its own lines aren't scored; half of
+    # them are the Bedrock-judge / live-link paths CI can't reach anyway.
+    "agents/eval/*",
 ]
 
 [tool.coverage.report]
