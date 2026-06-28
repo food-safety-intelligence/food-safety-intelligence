@@ -14,6 +14,7 @@ Your query
       → find_restaurants   — Overpass/OSM, free, no key
       → get_safety_score   — precomputed batch scores from scores.json
       → explain_restaurant — scores.json + inspection_history.json
+      → find_reviews       — third-party review links (opt-in; not a score input)
   → Plain-English ranked response
 ```
 
@@ -61,8 +62,9 @@ All three run the **same** three `handler.py` files.
 ### Tools
 
 The agent calls the tools in order: `find_restaurants` → `get_safety_score` →
-`explain_restaurant` (for the lowest-risk few). Each handler takes
-`handler(event, _ctx)`.
+`explain_restaurant` (for the lowest-risk few). `find_reviews` is an optional
+add-on outside that sequence, called only when the user asks what reviewers say.
+Each handler takes `handler(event, _ctx)`.
 
 **1. `find_restaurants`** — OpenStreetMap/Overpass lookup (no key).
 
@@ -108,6 +110,22 @@ The agent calls the tools in order: `find_restaurants` → `get_safety_score` �
     last_date, days_since_last}`. The `other` bucket holds non-outcome results
     (Out of Business / No Entry / Not Ready / Business Not Located) so they are
     **not** miscounted as passes *(the `other` bucket: #56)*.
+
+**4. `find_reviews`** — optional third-party diner reviews (only on request).
+
+- *Input*: `{"name": "...", "address": "...", "topics": [...]}` — `topics` is a
+  subset of `cleanliness`, `pests`, `food_quality`, `illness` (empty = all).
+- *Output*: `{name, topics, review_links, excerpts, excerpts_available,
+  disclaimer}`. `review_links` are attributed Yelp / Google / web deep links the
+  **user** clicks through to. `excerpts` holds a few official Yelp Fusion review
+  snippets (with attribution) **only** when `YELP_API_KEY` is set — otherwise
+  `[]` and `excerpts_available` is `false`.
+- *Boundary — reviews are not a model feature*: the tool **never scrapes or
+  stores** Yelp / Google pages (their Terms of Service forbid automated page
+  access); by default it only builds links the user follows. Reviews are
+  unverified opinion and are **NOT** an input to the risk score — every response
+  carries `disclaimer`, and the prompt forbids using a review to set or change a
+  score or tier.
 
 ### Safety layers
 

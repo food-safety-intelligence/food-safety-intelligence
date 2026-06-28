@@ -39,6 +39,7 @@ for _tool_dir in [
     os.path.join(_AGENTS_DIR, "tools", "find_restaurants"),
     os.path.join(_AGENTS_DIR, "tools", "get_safety_score"),
     os.path.join(_AGENTS_DIR, "tools", "explain_restaurant"),
+    os.path.join(_AGENTS_DIR, "tools", "find_reviews"),
 ]:
     if _tool_dir not in sys.path:
         sys.path.insert(0, _tool_dir)
@@ -77,6 +78,7 @@ def _load_handler(tool_name: str) -> _types.ModuleType:
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_reviews_handler = _load_handler("find_reviews")
 
 
 # ---------------------------------------------------------------------------
@@ -149,6 +151,30 @@ def explain_restaurant(license_id: str) -> dict:
     return _explain_handler.handler({"license_id": license_id}, None)
 
 
+@tool
+def find_reviews(name: str, address: str = "", topics: list | None = None) -> dict:
+    """
+    Find THIRD-PARTY diner reviews (Yelp, Google, web) for one restaurant,
+    focused on food-safety topics: cleanliness, pests, food_quality, illness.
+    Use ONLY when the user asks what reviewers say about a place. Returns
+    attributed "view reviews" deep links the user can click, plus a few Yelp
+    review excerpts if a review API is configured.
+
+    Reviews are unverified opinion and are NOT part of the risk score — present
+    them separately and always pass along the returned `disclaimer`. Never use a
+    review to change or justify a risk score or tier.
+
+    Args:
+        name: Restaurant name (from find_restaurants / get_safety_score)
+        address: Street address — improves link and match quality (optional)
+        topics: Subset of ["cleanliness", "pests", "food_quality", "illness"];
+                omit for all topics
+    """
+    return _reviews_handler.handler(
+        {"name": name, "address": address, "topics": topics or []}, None
+    )
+
+
 # ---------------------------------------------------------------------------
 # System prompt — single source of truth in system_prompt.txt (shared with
 # entrypoint.py, which reads the same file for the deployed agent).
@@ -198,7 +224,7 @@ def build_agent() -> Agent:
     )
     return Agent(
         model=model,
-        tools=[find_restaurants, get_safety_score, explain_restaurant],
+        tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
         system_prompt=SYSTEM_PROMPT,
     )
 
