@@ -23,7 +23,7 @@ concurrency:
 
 jobs:
   python:
-    name: Python (ruff · pytest · coverage)
+    name: Python (ruff + pytest)
     runs-on: ubuntu-latest
     # pull-requests: write lets the coverage action post/update its PR comment;
     # contents: write lets it store the coverage baseline on a data branch when
@@ -91,7 +91,7 @@ jobs:
         run: uv run diff-cover coverage.xml --compare-branch=origin/${{ github.base_ref }} --fail-under=85
 
   app:
-    name: Web app (eslint · tsc · vitest · build)
+    name: Web app (eslint + tsc + vitest)
     runs-on: ubuntu-latest
     defaults:
       run:
