@@ -20,6 +20,10 @@ my-project/
 └── evaluators/             # Custom evaluator code (if any)
 ```
 
+> **This project:** the agent runtime code is not under `app/`. It lives in the
+> repo's top-level `agents/` directory, referenced by `agentcore/agentcore.json`
+> (`entrypoint: entrypoint.py`, `codeLocation: ../agents/`).
+
 ## Getting Started
 
 ### Prerequisites

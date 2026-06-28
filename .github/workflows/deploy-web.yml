@@ -41,16 +41,19 @@ jobs:
 
       - run: npm ci
 
-      # No AWS creds are configured yet at this point, so the prebuild S3 pull
-      # fails fast and falls back to the committed data — which is what we want.
-      - name: Build static export
-        run: npm run build
-
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.WEB_DEPLOY_ROLE_ARN }}
           aws-region: ${{ vars.AWS_REGION }}
+
+      # Creds are configured BEFORE the build so the prebuild step can pull data
+      # from S3 — critically the gitignored comment shards, which have no
+      # committed fallback (scores.json/inspection_history.json still fall back
+      # to their committed copies if S3 is unavailable). Requires the deploy role
+      # to have s3:GetObject on the data bucket, not just the website bucket.
+      - name: Build static export
+        run: npm run build
 
       - name: Upload to S3
         run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete
