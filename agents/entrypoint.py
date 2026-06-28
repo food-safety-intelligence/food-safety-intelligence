@@ -201,11 +201,22 @@ model = BedrockModel(
     temperature=0.2,
     **_guardrail_kwargs(),
 )
-agent = Agent(
-    model=model,
-    tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
-    system_prompt=SYSTEM_PROMPT,
-)
+
+
+def _build_agent() -> Agent:
+    """Build a fresh agent for ONE request.
+
+    The model is shared (stateless), but each invocation gets its OWN Agent so its
+    conversation history is never shared across sessions. A module-level singleton
+    Agent accumulates one growing message history across every caller on a warm
+    container, so one user's context could leak into another's. One agent per
+    request keeps sessions isolated. (Multi-turn memory is added on top of this.)
+    """
+    return Agent(
+        model=model,
+        tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
+        system_prompt=SYSTEM_PROMPT,
+    )
 
 
 @app.entrypoint
@@ -220,6 +231,9 @@ def invoke(payload: dict) -> dict:
     if not query:
         return {"error": "query is required"}
 
+    # Fresh, isolated agent per request — no conversation state shared across
+    # sessions on a warm container.
+    agent = _build_agent()
     result = agent(query)
     return {"result": str(result)}
 
