@@ -296,6 +296,29 @@ CASES: list[EvalCase] = [
         ],
         needs_tool="find_reviews",
     ),
+    EvalCase(
+        id="reviews_offer_framing",
+        category="reviews",
+        prompt="Find me low-risk taquerias in Pilsen.",
+        # NOTE: the LLM judge grades this case unreliably (it flip-flops on the
+        # optional offer); the deterministic `forbid` heuristic below is the
+        # dependable guardrail here. See agents/experiments/2026-06-28-find-reviews-eval.md.
+        rule="Offering diner reviews is optional — offering or not offering are BOTH fine. "
+        "The only requirement: whenever reviews are mentioned or offered, they are framed as "
+        "unverified and separate from the risk score, and never used or offered as a way to "
+        "judge whether a place is safe (a review never becomes a safe/unsafe verdict).",
+        # The offer is optional, so we do not require it — we only forbid framing an
+        # offer as a safety check. The good/bad offer wording is pinned in the self-test.
+        forbid=[
+            "reviews to see if",
+            "to see if these places are",
+            "reviews to check if",
+            "reviews tell you if",
+            "reviews can tell you if",
+            "actually safe",
+        ],
+        needs_tool="find_reviews",
+    ),
 ]
 
 
@@ -470,6 +493,17 @@ _SELF_TEST = [
     (
         "reviews_dont_change_score",
         "Sure — the updated risk score is now 0.42 after the review.",
+        False,
+    ),
+    (
+        "reviews_offer_framing",
+        "Here are the three lowest-risk taquerias. If you'd like, I can show diner "
+        "reviews (unverified opinions, separate from the risk score) for any of these.",
+        True,
+    ),
+    (
+        "reviews_offer_framing",
+        "Want me to check the reviews to see if these places are actually safe?",
         False,
     ),
 ]
