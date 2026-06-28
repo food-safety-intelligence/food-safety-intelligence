@@ -13,7 +13,7 @@
  */
 
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
@@ -53,50 +53,69 @@ async function fetchAndCache(key) {
 
 // Comment shards (web-app-data/comments/<xx>.json) have NO committed fallback —
 // they're gitignored (266 MB). The static export reads the full comment text at
-// build time, so unless we warm the shards here, every pre-rendered detail page
-// would fetch its shard from S3 live (256 shards × N parallel build workers). We
-// pull all 256 once into the build cache; scores-server.ts then reads from there.
-// Iterating the fixed shard names (00..ff) instead of listing the prefix keeps
-// the IAM ask to s3:GetObject only — no s3:ListBucket needed.
+// build time. We pull the 256 md5 shards and immediately RE-SHARD them to one
+// file per license under comments-by-license/, mirroring shard-history.mjs: a
+// detail page then reads only its own license's comments, so no build worker
+// ever holds the whole 266 MB resident (that pattern OOMs the static export —
+// the same reason inspection_history is sharded). Processing one shard at a
+// time keeps prebuild itself to ~1 MB resident. Iterating the fixed shard names
+// (00..ff) keeps the IAM ask to s3:GetObject only — no s3:ListBucket needed.
 async function syncComments() {
   const t0 = Date.now();
-  await mkdir(path.join(CACHE_DIR, "comments"), { recursive: true });
+  const outDir = path.join(CACHE_DIR, "comments-by-license");
+  // Start clean so a stale shard from an older data version can't linger.
+  await rm(outDir, { recursive: true, force: true });
+  await mkdir(outDir, { recursive: true });
   const shards = Array.from({ length: 256 }, (_, n) =>
     n.toString(16).padStart(2, "0"),
   );
 
-  let ok = 0;
-  let bytes = 0;
+  let licenses = 0;
   let next = 0;
   async function worker() {
     while (next < shards.length) {
       const key = `comments/${shards[next++]}.json`;
+      let map;
       try {
         const res = await s3.send(
           new GetObjectCommand({ Bucket: BUCKET, Key: `${PREFIX}/${key}` }),
         );
         if (!res.Body) continue;
-        const text = await res.Body.transformToString();
-        await writeFile(path.join(CACHE_DIR, key), text, "utf-8");
-        ok += 1;
-        bytes += text.length;
+        map = JSON.parse(await res.Body.transformToString());
       } catch {
         // Missing shard or no creds — skip. With no creds none arrive and the
         // timeline shows "No comments were recorded" (graceful, non-fatal).
+        continue;
       }
+      // Explode this shard into per-license files, then let it be GC'd so
+      // prebuild never holds more than one shard at a time.
+      const ids = Object.keys(map);
+      for (let i = 0; i < ids.length; i += 128) {
+        await Promise.all(
+          ids.slice(i, i + 128).map((id) =>
+            writeFile(
+              path.join(outDir, `${id}.json`),
+              JSON.stringify(map[id]),
+              "utf-8",
+            ),
+          ),
+        );
+      }
+      licenses += ids.length;
     }
   }
-  // Bounded concurrency so we don't open 256 sockets at once.
-  await Promise.all(Array.from({ length: 16 }, worker));
+  // 4 shards in flight: bounded sockets, and at most 4×128 open file descriptors.
+  await Promise.all(Array.from({ length: 4 }, worker));
 
-  if (ok === 0) {
+  if (licenses === 0) {
     console.warn(
-      "  comments/                    none fetched (no S3 creds?) — timeline will show no comments",
+      "  comments-by-license/         none fetched (no S3 creds?) — timeline will show no comments",
     );
     return;
   }
-  const mb = (bytes / 1024 / 1024).toFixed(1);
-  console.log(`  comments/ (${ok}/256 shards)  ${mb} MB  ${Date.now() - t0} ms`);
+  console.log(
+    `  comments-by-license/ (${licenses} licenses)  ${Date.now() - t0} ms`,
+  );
 }
 
 async function main() {

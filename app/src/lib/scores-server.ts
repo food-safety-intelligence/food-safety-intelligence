@@ -7,7 +7,6 @@
  */
 
 import "server-only";
-import crypto from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -41,6 +40,10 @@ const BUILD_CACHE_DIR = "/tmp/fsi-build-cache";
 // Per-license inspection-history shards (scripts/shard-history.mjs), so a
 // detail page reads only its own slice instead of the whole 45 MB map.
 const HISTORY_SHARD_DIR = path.join(BUILD_CACHE_DIR, "history");
+// Per-license comment files (scripts/prebuild-sync-s3.mjs re-shards the 266 MB
+// of md5 comment shards into one file per license), same anti-OOM reason as
+// HISTORY_SHARD_DIR: a page reads only its own comments, nothing holds them all.
+const COMMENTS_BY_LICENSE_DIR = path.join(BUILD_CACHE_DIR, "comments-by-license");
 
 const s3 = new S3Client({ region: S3_REGION });
 
@@ -241,65 +244,27 @@ export async function getInspectionHistory(
   return fullHistoryFallback[licenseId] ?? [];
 }
 
-// Full violation-comment text lives in sharded sidecars
-// (web-app-data/comments/<xx>.json), keyed by license_id, each value an array
-// index-aligned to that license's inspection_history events. The text is too
-// large (~277MB) for one file, so each shard holds ~1/256th and we load only
-// the shards the static build's pages touch. Shards are cached per process.
-const commentShards = new Map<string, Record<string, string[]>>();
-
-// Must match `_shard_of` in scripts/export_inspection_history.py: first two
-// md5 hex chars of the license_id → one of 256 even buckets.
-function commentShardOf(licenseId: string): string {
-  return crypto.createHash("md5").update(licenseId).digest("hex").slice(0, 2);
-}
-
-async function loadCommentShard(
-  shard: string,
-): Promise<Record<string, string[]>> {
-  const cached = commentShards.get(shard);
-  if (cached) return cached;
-
-  let parsed: Record<string, string[]> = {};
-  try {
-    parsed = JSON.parse(
-      await fetchS3Text(`comments/${shard}.json`),
-    ) as Record<string, string[]>;
-  } catch (s3Err) {
-    // Local fallback: a fresh clone / local build with no AWS creds reads the
-    // shards the exporter wrote under public/data/comments/ (gitignored).
-    try {
-      const localPath = path.join(
-        process.cwd(),
-        "public",
-        "data",
-        "comments",
-        `${shard}.json`,
-      );
-      parsed = JSON.parse(
-        await fs.readFile(localPath, "utf-8"),
-      ) as Record<string, string[]>;
-    } catch {
-      const msg = s3Err instanceof Error ? s3Err.message : String(s3Err);
-      console.warn(
-        `[scores-server] comment shard ${shard} unavailable (S3 + local miss): ${msg}`,
-      );
-    }
-  }
-  commentShards.set(shard, parsed);
-  return parsed;
-}
-
 /**
  * Full comment text per inspection for one license, index-aligned to
- * getInspectionHistory(licenseId). Empty array if the shard is missing; an
- * empty string at index i means that inspection recorded no comments.
+ * getInspectionHistory(licenseId). Reads the per-license file the prebuild step
+ * re-sharded from the md5 comment shards (see COMMENTS_BY_LICENSE_DIR). Empty
+ * array if the file is missing (no shard / no S3 creds at build time); an empty
+ * string at index i means that inspection recorded no comments. No module-scope
+ * cache — each page reads only its own slice, so nothing accumulates.
  */
 export async function getInspectionComments(
   licenseId: string,
 ): Promise<string[]> {
-  const shard = await loadCommentShard(commentShardOf(licenseId));
-  return shard[licenseId] ?? [];
+  try {
+    const raw = await fs.readFile(
+      path.join(COMMENTS_BY_LICENSE_DIR, `${licenseId}.json`),
+      "utf-8",
+    );
+    return JSON.parse(raw) as string[];
+  } catch {
+    // No comment file for this license → no comments on record.
+    return [];
+  }
 }
 
 // Lean pin record for the home map — every matching establishment with valid
