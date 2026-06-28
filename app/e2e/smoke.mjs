@@ -12,7 +12,7 @@
  * Assertion-based, NOT pixel snapshots: font hinting / antialiasing differ
  * between CI and local, so screenshot baselines churn. For each key route, at
  * desktop and mobile widths, we assert:
- *   - the navigation responded 2xx/3xx (the page exists in the export),
+ *   - no same-origin resource (the page, a JS chunk, a data JSON) returned >=400,
  *   - no uncaught page errors and no app-level console errors,
  *   - the page's <main> landmark rendered (not a blank / error shell),
  *   - no horizontal overflow (scrollWidth <= innerWidth).
@@ -87,14 +87,19 @@ async function checkRoute(browser, route, viewport) {
     if (IGNORED_CONSOLE.some((re) => re.test(text))) return;
     failures.push(`console.error: ${text}`);
   });
+  // Any same-origin resource that returns >=400 — the page itself, a JS chunk,
+  // a data JSON — is a real regression, but it otherwise surfaces only as a
+  // "Failed to load resource" console line we filter as tile noise. Check the
+  // response status directly. Aborted requests (cancelled <Link> prefetches,
+  // cross-origin map tiles) produce no response, so they never trip this.
+  page.on("response", (res) => {
+    if (res.url().startsWith(BASE_URL) && res.status() >= 400) {
+      failures.push(`HTTP ${res.status()} ${res.url().slice(BASE_URL.length) || "/"}`);
+    }
+  });
 
   try {
-    const response = await page.goto(`${BASE_URL}${route}`, {
-      waitUntil: "domcontentloaded",
-    });
-    if (!response || response.status() >= 400) {
-      failures.push(`HTTP ${response ? response.status() : "no response"}`);
-    }
+    await page.goto(`${BASE_URL}${route}`, { waitUntil: "domcontentloaded" });
 
     // Wait for the page to actually render its content, then let client
     // hydration settle so the measured layout is the interactive one.
