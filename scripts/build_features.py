@@ -1,101 +1,81 @@
-"""Build data/processed/features.parquet from labeled inspections + raw datasets.
+"""Build the modeling feature set from raw + labeled inputs (Stage 2).
 
-This is the scripted equivalent of notebooks/03_feature_engineering.ipynb for
-use in automated runs (make features). The notebook remains the canonical
-exploration artifact; this script is the automation entry point.
+Reads the labeled inspections (``processed/inspections_labeled.parquet``) and the raw
+side inputs (historical licenses) from the configured data dir — local or S3 — runs
+``foodsafety.features.build.build_features``, and writes the result to ``FEATURES_PATH``
+(``processed/features/<name>.parquet``). This is the build notebook 03 does, lifted into a
+script so it runs against S3 and so several experiments can share one raw pull. The leakage
+discipline lives inside the feature modules; this orchestrator doesn't touch it.
 
-Inputs (all must exist under data/):
-    processed/inspections_labeled.parquet   built by notebook 02
-    raw/licenses_historical.parquet         fetched by notebook 00 / 01
+The 311 complaints and block-face building-violation joins are intentionally skipped: both
+families were tested and dropped from ALL_FEATURES (see baseline.py + docs/experiments.md).
+Their feature code is kept in-tree but unwired (complaint_features.py / building_features.py);
+building violations can still be fetched via scripts/fetch_building_violations.py if the
+experiment is ever revisited. Wiring either back in adds BallTree runtime for no model gain.
 
-Output:
-    processed/features.parquet             model-ready feature table
-
-The 311 complaints and block-face building-violation joins are intentionally
-skipped: both families were tested and dropped from ALL_FEATURES (see
-baseline.py comments and docs/experiments.md). Their feature code is kept
-in-tree but unwired (complaint_features.py / building_features.py); building
-violations can still be fetched via scripts/fetch_building_violations.py if the
-experiment is ever revisited. Wiring either back in adds BallTree runtime for
-zero model gain.
-
-Usage:
+Run:
     PYTHONPATH=src uv run python scripts/build_features.py
+    FOODSAFETY_DATA_DIR=s3://food-safety-intelligence-data \\
+        PYTHONPATH=src uv run python scripts/build_features.py
 """
 
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import argparse
 
-import pandas as pd
-
-from foodsafety.config import PROCESSED_DIR, RAW_DIR
+from foodsafety.config import FEATURES_PATH, PROCESSED_DIR, RAW_DIR
 from foodsafety.features.build import build_features
+from foodsafety.io import storage
 from foodsafety.models.baseline import ALL_FEATURES
-
-REPO_ROOT = Path(__file__).resolve().parent.parent
-
-LABELED_PATH = PROCESSED_DIR / "inspections_labeled.parquet"
-LICENSES_HIST_PATH = RAW_DIR / "licenses_historical.parquet"
-OUT_PATH = PROCESSED_DIR / "features.parquet"
 
 
 def main() -> None:
-    # --- Input validation ---------------------------------------------------
-    missing = [p for p in (LABELED_PATH, LICENSES_HIST_PATH) if not p.exists()]
-    if missing:
-        for p in missing:
-            print(f"ERROR: missing required input: {p}", file=sys.stderr)
-        raise SystemExit(1)
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument(
+        "--out",
+        default=str(FEATURES_PATH),
+        help="feature-set target (default: config.FEATURES_PATH)",
+    )
+    args = ap.parse_args()
 
-    # --- Load inputs --------------------------------------------------------
-    print(f"Loading {LABELED_PATH.name} ...", end=" ", flush=True)
-    labeled = pd.read_parquet(LABELED_PATH)
-    print(f"{len(labeled):,} rows")
+    labeled_path = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
+    licenses_hist_path = storage.join(str(RAW_DIR), "licenses_historical.parquet")
 
-    print(f"Loading {LICENSES_HIST_PATH.name} ...", end=" ", flush=True)
-    licenses_historical = pd.read_parquet(LICENSES_HIST_PATH)
-    print(f"{len(licenses_historical):,} rows")
+    # Labeled inspections + historical licenses are the required inputs.
+    for p in (labeled_path, licenses_hist_path):
+        if not storage.exists(p):
+            raise SystemExit(
+                f"Missing required input: {p}. Run scripts/ingest_raw.py for the raw "
+                f"datasets and the label build (notebook 02) first."
+            )
 
-    # --- Build features -----------------------------------------------------
-    # complaints and building violations are left unwired (None) — both feature
-    # families were dropped from ALL_FEATURES (see module docstring).
-    print("\nBuilding features (this takes a few minutes)...")
+    print("Reading inputs:")
+    print(f"  {labeled_path}")
+    labeled = storage.read_parquet(labeled_path)
+    print(f"  {licenses_hist_path}")
+    licenses_historical = storage.read_parquet(licenses_hist_path)
+
+    # 311 complaints and building violations are intentionally left unwired (None) — both
+    # feature families were dropped from ALL_FEATURES (see the module docstring).
     features = build_features(
         labeled,
         complaints=None,
         licenses_historical=licenses_historical,
     )
-    print(f"  → {features.shape[0]:,} rows × {features.shape[1]} cols")
 
-    # --- Validate ALL_FEATURES coverage -------------------------------------
     missing_cols = [c for c in ALL_FEATURES if c not in features.columns]
     if missing_cols:
-        print(
-            f"\nWARNING: {len(missing_cols)} ALL_FEATURES columns missing from output:\n"
-            f"  {missing_cols}",
-            file=sys.stderr,
-        )
+        print(f"  WARNING: {len(missing_cols)} ALL_FEATURES columns missing: {missing_cols}")
     else:
-        print(f"  All {len(ALL_FEATURES)} ALL_FEATURES columns present.")
+        print(f"  all {len(ALL_FEATURES)} ALL_FEATURES columns present")
 
-    # --- Write output -------------------------------------------------------
-    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
-    out = features.copy()
-    obj_cols = out.select_dtypes("object").columns
-    out[obj_cols] = out[obj_cols].astype("string")
-    out.to_parquet(OUT_PATH, index=False)
+    # Cast object cols to pandas string for a consistent parquet round-trip
+    # (matches notebook 03's write).
+    obj_cols = features.select_dtypes("object").columns
+    features[obj_cols] = features[obj_cols].astype("string")
 
-    size_mb = OUT_PATH.stat().st_size / 1e6
-    print(f"\nWrote → {OUT_PATH}")
-    print(f"  {len(out):,} rows · {out.shape[1]} cols · {size_mb:.1f} MB")
-
-    label_col = "y_fail_or_critical_next_180d"
-    if label_col in out.columns:
-        trainable = out[out[label_col].notna() & ~out.get("is_burnin", pd.Series(False))]
-        print(f"  Trainable rows (non-NA label, non-burnin): {len(trainable):,}")
-        print(f"  Positive rate: {trainable[label_col].mean():.2%}")
+    storage.write_parquet(features, args.out, index=False)
+    print(f"Wrote {args.out}: {len(features):,} rows × {features.shape[1]} cols")
 
 
 if __name__ == "__main__":

@@ -25,8 +25,10 @@ import pandas as pd
 from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
 
+from foodsafety.config import FEATURES_PATH, WEB_APP_DATA_DIR
 from foodsafety.explain.feature_labels import display_name
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
+from foodsafety.io import storage
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.models.xgb import (
@@ -39,8 +41,7 @@ from foodsafety.serve.predict_batch import RISK_TIER_THRESHOLDS
 from foodsafety.tracking import provenance
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-FEATURES_PATH = REPO_ROOT / "data" / "processed" / "features.parquet"
-OUTPUT_PATH = REPO_ROOT / "app" / "public" / "data" / "methodology.json"
+OUTPUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "methodology.json")
 
 # Chronological split — must match the served model: train through 2024-07,
 # the 2024-07 → 2025-07 year is the calibration/validation slice, and 2025-07
@@ -157,11 +158,18 @@ def worked_waterfall(model: _ServedXGB, test: pd.DataFrame) -> dict:
 
 def served_tier_shares() -> dict[str, float] | None:
     """Share of *scored establishments* in each tier, from the served
-    ``scores.json`` totals — the population the app actually displays."""
-    scores_path = REPO_ROOT / "app" / "public" / "data" / "scores.json"
+    ``scores.json`` totals — the population the app actually displays. Lets the
+    methodology page show shares without itself loading the 18 MB scores file.
+
+    Returns ``None`` if ``scores.json`` isn't built yet (fresh clone before the
+    serving script runs); the page then just omits the Share column.
+    """
+    scores_path = storage.join(str(WEB_APP_DATA_DIR), "scores.json")
+    if not storage.exists(scores_path):
+        return None
     try:
-        counts = json.loads(scores_path.read_text())["totals"]["tier_counts"]
-    except (FileNotFoundError, KeyError, json.JSONDecodeError):
+        counts = json.loads(storage.read_text(scores_path))["totals"]["tier_counts"]
+    except (KeyError, json.JSONDecodeError):
         return None
     total = sum(counts.values())
     return {label: count / total for label, count in counts.items()} if total else None
@@ -183,13 +191,13 @@ def risk_tier_bands(shares: dict[str, float] | None = None) -> list[dict]:
 
 
 def main() -> None:
-    if not FEATURES_PATH.exists():
+    if not storage.exists(FEATURES_PATH):
         raise SystemExit(
-            f"Missing {FEATURES_PATH}. Run notebooks/03_feature_engineering.ipynb "
+            f"Missing {FEATURES_PATH}. Run `make features` (scripts/build_features.py) "
             "to build the feature parquet first."
         )
 
-    df = pd.read_parquet(FEATURES_PATH)
+    df = storage.read_parquet(FEATURES_PATH)
     df["inspection_date"] = pd.to_datetime(df["inspection_date"])
     # Served basis: drop burn-in (no label) and right-truncated rows (their
     # forward window runs past the data, so their labels are under-counted).
@@ -241,10 +249,10 @@ def main() -> None:
         "waterfall": worked_waterfall(model, test),
     }
 
-    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    OUTPUT_PATH.write_text(json.dumps(payload, indent=2) + "\n")
+    # OUTPUT_PATH may be local or s3:// — route through storage (creates local parents).
+    storage.write_text(json.dumps(payload, indent=2) + "\n", OUTPUT_PATH)
     print(
-        f"wrote {OUTPUT_PATH.relative_to(REPO_ROOT)}: "
+        f"wrote {OUTPUT_PATH}: "
         f"{len(payload['operating_points'])} operating points, "
         f"PR-AUC {payload['headline']['pr_auc']}, test n={payload['test']['n']}"
     )

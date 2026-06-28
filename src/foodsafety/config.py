@@ -16,16 +16,53 @@ RANDOM_STATE: int = 42
 # weirdness (notebooks run from notebooks/, scripts run from project root).
 _PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent.parent
 
-# Override DATA_DIR via env var to point at a different cache location (e.g. an
-# SSD, a shared NAS, or — in a future iteration — an S3 mount). The default
-# resolves to <project_root>/data regardless of where the import happens.
-DATA_DIR: Path = Path(os.environ.get("FOODSAFETY_DATA_DIR") or (_PROJECT_ROOT / "data"))
+# Override DATA_DIR via env var to point at a different base location. It may be a
+# local path (default) or an ``s3://…`` URI (Phase-2 AWS, read via foodsafety.io.storage).
+# The default resolves to <project_root>/data regardless of where the import happens.
+_DATA_DIR: str = os.environ.get("FOODSAFETY_DATA_DIR") or str(_PROJECT_ROOT / "data")
 
-RAW_DIR: Path = DATA_DIR / "raw"
-INTERIM_DIR: Path = DATA_DIR / "interim"
-PROCESSED_DIR: Path = DATA_DIR / "processed"
-MODELS_DIR: Path = DATA_DIR / "models"
-PREDICTIONS_DIR: Path = DATA_DIR / "predictions"
+
+def _join(base: str | Path, *parts: str) -> str | Path:
+    """Join path parts onto a base that may be local or s3://.
+
+    Keep local roots as ``Path`` (notebooks/scripts do Path ops on them); for an
+    ``s3://`` base return a plain string prefix, because ``Path`` collapses the
+    ``//`` after the scheme into ``s3:/bucket``.
+    """
+    if str(base).startswith("s3://"):
+        out = str(base).rstrip("/")
+        for part in parts:
+            out = f"{out}/{part.strip('/')}"
+        return out
+    return Path(base).joinpath(*parts)
+
+
+DATA_DIR: str | Path = _DATA_DIR if _DATA_DIR.startswith("s3://") else Path(_DATA_DIR)
+
+RAW_DIR: str | Path = _join(_DATA_DIR, "raw")
+INTERIM_DIR: str | Path = _join(_DATA_DIR, "interim")
+PROCESSED_DIR: str | Path = _join(_DATA_DIR, "processed")
+MODELS_DIR: str | Path = _join(_DATA_DIR, "models")
+PREDICTIONS_DIR: str | Path = _join(_DATA_DIR, "predictions")
+
+# Canonical feature-set artifact for the migrated pipeline. Versioned under
+# processed/features/<name>.parquet (rather than a flat processed/features.parquet) so
+# multiple experiments can keep distinctly-named sets side by side; the exact contract
+# version is still recorded as the feature_set_version hash in each run's metadata.
+# Override the name with FOODSAFETY_FEATURES_NAME. build_features.py writes this path;
+# retrain reads it.
+FEATURES_NAME: str = os.environ.get("FOODSAFETY_FEATURES_NAME") or "features_current_inspection"
+FEATURES_PATH: str | Path = _join(PROCESSED_DIR, "features", f"{FEATURES_NAME}.parquet")
+
+# Web-app JSON targets — the three files the Next.js app reads (scores.json,
+# inspection_history.json, methodology.json). Default writes under app/public/data
+# (committed fallback); override to s3://<bucket>/web-app-data for the hosted bucket.
+_WEB_APP_DATA_DIR: str = os.environ.get("FOODSAFETY_WEB_APP_DATA_DIR") or str(
+    _PROJECT_ROOT / "app" / "public" / "data"
+)
+WEB_APP_DATA_DIR: str | Path = (
+    _WEB_APP_DATA_DIR if _WEB_APP_DATA_DIR.startswith("s3://") else Path(_WEB_APP_DATA_DIR)
+)
 
 # Chicago SODA (Socrata) API base. All datasets are served from here.
 SODA_BASE: str = "https://data.cityofchicago.org/resource"
