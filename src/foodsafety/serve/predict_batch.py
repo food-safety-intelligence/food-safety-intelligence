@@ -221,6 +221,8 @@ def write_scores_json(
     """
     import json
 
+    from foodsafety.io import storage
+
     df = scores.copy()
     df["as_of_date"] = pd.to_datetime(df["as_of_date"]).dt.strftime("%Y-%m-%d")
     df["risk_score"] = df["risk_score"].round(4)
@@ -252,8 +254,8 @@ def write_scores_json(
         "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 
-    with open(out_path, "w") as f:
-        json.dump(payload, f, separators=(",", ":"))
+    # out_path may be a local path or an s3:// URI — route through storage.
+    storage.write_text(json.dumps(payload, separators=(",", ":")), out_path)
 
 
 def _row_to_json(row) -> dict:
