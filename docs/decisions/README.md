@@ -31,6 +31,9 @@ file per decision; the log is **append-only** — don't renumber existing record
 - 0006 — Chatbot surface and agent↔model integration *(in open PR #21; not yet on `main`)*
 - [0008 — Risk-tier thresholds (Low / Moderate / Elevated / High)](0008-risk-tier-thresholds.md)
   — the score→tier cutoffs every user sees, why the mock thresholds were recalibrated.
+- [0010 — Agent: no request-time scoring; no-record for venues not in the batch run](0010-agent-no-request-time-scoring-and-no-record.md)
+  — why the chat agent reports only precomputed batch scores and returns an
+  explicit "no record" (not an estimate) for OSM venues the batch run doesn't cover.
 
 ---
 
