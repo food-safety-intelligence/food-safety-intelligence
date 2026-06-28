@@ -187,6 +187,29 @@ npm install
 npm run dev      # http://localhost:3000
 ```
 
+## Continuous integration
+
+Every pull request (and every push to `main`) runs `.github/workflows/ci.yml`
+— two jobs in parallel, the same checks you can run locally:
+
+**Python checks** (`ruff`, `pytest`, coverage)
+
+- **ruff** — checks the Python code for style problems and bad formatting.
+- **pytest** — runs the Python tests.
+- **coverage** — reports how much of the code the tests actually run. Shown on
+  the pull request, but it does not block a merge (a nudge, not a gate).
+
+**Web app checks** (`eslint`, `tsc`, `vitest`, build)
+
+- **eslint** — checks the web code for style problems and common mistakes.
+- **tsc** — checks that the TypeScript types line up.
+- **vitest** — runs the web app's tests.
+- **build** — does a full production build, to catch errors that only show up
+  when the app is built (not just type-checked).
+
+Deploys are separate workflows (`deploy-web.yml`, `deploy-agent.yml`) that run
+when a change lands on `main`.
+
 ## Project layout
 
 | Path | What lives there |

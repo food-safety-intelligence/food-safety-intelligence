@@ -1,0 +1,109 @@
+name: Deploy agent
+
+# Deploy the AgentCore runtime (agents/entrypoint.py) + the proxy Lambda via
+# scripts/deploy_aws.sh. Runs automatically on merge to main that touches the agent
+# (mirrors deploy-web.yml for the web app), and can also be run on demand.
+#
+# deploy_aws.sh is hardened for unattended runs: it FAILS (not warns) on missing S3
+# data or an empty runtime ARN, pins the proxy deps, and re-applies the Lambda role
+# policy idempotently. The post-deploy smoke test below gates the run — if scoring
+# doesn't come back, the workflow fails.
+#
+# Prerequisite (one-time, owner of AWS account 991500268971):
+#   - A GitHub repo variable AGENT_DEPLOY_ROLE_ARN: an OIDC role in that account
+#     trusting this repo, with permissions for CloudFormation, Bedrock AgentCore,
+#     Lambda, IAM (the CDK creates roles + the S3 grant), and S3.
+#   - CDK already bootstrapped in the account.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "agents/**"
+      - "agentcore-deploy/**"
+      - "scripts/deploy_aws.sh"
+      - ".github/workflows/deploy-agent.yml"
+  workflow_dispatch:
+    inputs:
+      region:
+        description: AWS region to deploy into
+        default: us-west-2
+        required: false
+      account:
+        description: AWS account id (must match the assumed role's account)
+        default: "991500268971"
+        required: false
+
+# One deploy at a time; never interrupt a half-finished CDK/Lambda update.
+concurrency:
+  group: deploy-agent
+  cancel-in-progress: false
+
+permissions:
+  id-token: write # mint the OIDC token AWS exchanges for temporary creds
+  contents: read
+
+# inputs.* are empty on a push event, so fall back to the defaults.
+env:
+  REGION: ${{ inputs.region || 'us-west-2' }}
+  ACCOUNT: ${{ inputs.account || '991500268971' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: agentcore-deploy/agentcore/cdk/package-lock.json
+
+      # deploy_aws.sh runs `npm run build` + `npm run cdk` in the cdk dir but does
+      # not install deps itself.
+      - name: Install CDK deps
+        working-directory: agentcore-deploy/agentcore/cdk
+        run: npm ci
+
+      # Python 3.11 = the proxy Lambda runtime; deploy_aws.sh pip-installs the
+      # proxy's deps into its package before zipping.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AGENT_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.REGION }}
+
+      - name: Deploy agent (CDK runtime + proxy Lambda)
+        run: bash scripts/deploy_aws.sh "$REGION" "$ACCOUNT"
+
+      # Post-deploy gate: the agent must return a real score, not the S3-permissions
+      # apology. Retries to absorb Lambda-update propagation; fails the run if scoring
+      # never recovers (POST /api/agent is not CloudFront-cached, so this reflects the
+      # new deploy).
+      - name: Smoke-test scoring (gate)
+        run: |
+          ok=0
+          for attempt in 1 2 3 4 5 6; do
+            resp=$(curl -s --max-time 60 -X POST https://d1uefdb2te19wk.cloudfront.net/api/agent \
+              -H 'Content-Type: application/json' \
+              -d '{"query":"safe sushi near Wicker Park","session_id":"sess-ci-smoke-0001-0001-0001-000000000001"}' || true)
+            echo "attempt $attempt: $resp"
+            if echo "$resp" | grep -qi "permissions error"; then
+              echo "  scoring still returns a permissions error; retrying in 20s"
+              sleep 20; continue
+            fi
+            if echo "$resp" | grep -qiE "risk|tier|score|inspection record"; then
+              ok=1; break
+            fi
+            sleep 20
+          done
+          if [ "$ok" != "1" ]; then
+            echo "::error::Post-deploy smoke test failed — scoring did not return a usable result."
+            exit 1
+          fi
+          echo "✓ scoring responded after deploy"

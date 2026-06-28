@@ -54,8 +54,12 @@ for file in "scores.json" "inspection_history.json"; do
     if aws s3 ls "s3://$DATA_BUCKET/web-app-data/$file" --region "$REGION" &>/dev/null; then
         echo "✓ Found s3://$DATA_BUCKET/web-app-data/$file"
     else
-        echo "⚠ Missing s3://$DATA_BUCKET/web-app-data/$file"
-        echo "  Upload from $REPO_ROOT/data/processed/ before continuing."
+        # Fail rather than warn: an unattended deploy must not ship a runtime that
+        # has no data to score against. (Also catches a deploy role missing
+        # s3:ListBucket on the data bucket.)
+        echo "❌ ERROR: Missing or unreadable s3://$DATA_BUCKET/web-app-data/$file"
+        echo "   Upload the data and/or grant the deploy role s3:ListBucket before deploying."
+        exit 1
     fi
 done
 echo ""
@@ -76,22 +80,30 @@ npm run cdk -- deploy \
     --region "$REGION" \
     2>&1 | tail -10
 
-# Extract Agent Runtime ARN
+# Extract Agent Runtime ARN — retry, since the stack output can lag the deploy.
 echo "Waiting for stack outputs..."
-sleep 5
-AGENT_RUNTIME_ARN=$(aws cloudformation describe-stacks \
-    --stack-name "$STACK_NAME" \
-    --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreRuntimeArn`].OutputValue' \
-    --output text \
-    --region "$REGION" 2>/dev/null || echo "")
+AGENT_RUNTIME_ARN=""
+for attempt in 1 2 3 4 5 6; do
+    AGENT_RUNTIME_ARN=$(aws cloudformation describe-stacks \
+        --stack-name "$STACK_NAME" \
+        --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreRuntimeArn`].OutputValue' \
+        --output text \
+        --region "$REGION" 2>/dev/null || echo "")
+    if [ -n "$AGENT_RUNTIME_ARN" ] && [ "$AGENT_RUNTIME_ARN" != "None" ]; then
+        break
+    fi
+    echo "  ... runtime ARN not ready (attempt $attempt/6), retrying in 10s"
+    sleep 10
+done
 
-if [ -z "$AGENT_RUNTIME_ARN" ]; then
-    echo "⚠ Warning: Could not retrieve Agent Runtime ARN from CloudFormation."
-    echo "  Manually retrieve from AWS console or:"
-    echo "  aws cloudformation describe-stacks --stack-name $STACK_NAME --region $REGION"
-else
-    echo "✓ Agent Runtime ARN: $AGENT_RUNTIME_ARN"
+# Refuse to continue with an empty ARN — updating the proxy Lambda with an empty
+# AGENT_RUNTIME_ARN would silently break chat (proxy points at no runtime).
+if [ -z "$AGENT_RUNTIME_ARN" ] || [ "$AGENT_RUNTIME_ARN" = "None" ]; then
+    echo "❌ ERROR: Could not retrieve Agent Runtime ARN from stack $STACK_NAME."
+    echo "   Aborting before the proxy Lambda is pointed at an empty runtime."
+    exit 1
 fi
+echo "✓ Agent Runtime ARN: $AGENT_RUNTIME_ARN"
 echo ""
 
 # ── Step 5: Create Lambda Proxy ─────────────────────────────────────────────
@@ -103,7 +115,9 @@ mkdir -p dist
 cp handler.py dist/
 
 cd dist
-pip install bedrock-agentcore boto3 -t . --quiet
+# Bound the major version so an upstream breaking release can't silently break the
+# proxy on an unattended deploy. Floor matches agents/pyproject.toml.
+pip install "bedrock-agentcore>=1.9,<2" "boto3>=1.35,<2" -t . --quiet
 rm -f ../lambda_proxy.zip
 zip -q -r ../lambda_proxy.zip ./* 2>/dev/null || true
 cd ..
@@ -138,45 +152,45 @@ if [ -z "$ROLE_ARN" ]; then
         }' \
         --query 'Role.Arn' \
         --output text)
-    
-    # Attach policies
+
     aws iam attach-role-policy \
         --role-name "$ROLE_NAME" \
         --policy-arn "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-    
-    # Add Bedrock + S3 access
-    aws iam put-role-policy \
-        --role-name "$ROLE_NAME" \
-        --policy-name "BedrockAgentCoreAndS3Access" \
-        --policy-document '{
-            "Version": "2012-10-17",
-            "Statement": [
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "bedrock-agentcore:InvokeAgentRuntime",
-                        "bedrock:InvokeAgentRuntime",
-                        "bedrock:InvokeModel"
-                    ],
-                    "Resource": "*"
-                },
-                {
-                    "Effect": "Allow",
-                    "Action": [
-                        "s3:GetObject",
-                        "s3:ListBucket"
-                    ],
-                    "Resource": [
-                        "arn:aws:s3:::food-safety-intelligence-data",
-                        "arn:aws:s3:::food-safety-intelligence-data/*"
-                    ]
-                }
-            ]
-        }'
-    
-    sleep 2  # Wait for role to be available
+
+    sleep 10  # let the new role propagate before the Lambda assumes it
     echo "✓ IAM role created: $ROLE_ARN"
 fi
+
+# Always (re)apply the inline policy so re-runs converge IAM even when the role
+# already exists with a stale policy. put-role-policy is an idempotent overwrite.
+aws iam put-role-policy \
+    --role-name "$ROLE_NAME" \
+    --policy-name "BedrockAgentCoreAndS3Access" \
+    --policy-document '{
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "bedrock-agentcore:InvokeAgentRuntime",
+                    "bedrock:InvokeAgentRuntime",
+                    "bedrock:InvokeModel"
+                ],
+                "Resource": "*"
+            },
+            {
+                "Effect": "Allow",
+                "Action": [
+                    "s3:GetObject",
+                    "s3:ListBucket"
+                ],
+                "Resource": [
+                    "arn:aws:s3:::food-safety-intelligence-data",
+                    "arn:aws:s3:::food-safety-intelligence-data/*"
+                ]
+            }
+        ]
+    }'
 
 # Create or update Lambda function
 LAMBDA_FUNC_NAME="food-safety-agent-proxy"
