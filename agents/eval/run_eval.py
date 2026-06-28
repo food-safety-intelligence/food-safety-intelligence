@@ -77,11 +77,11 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
     handler_mod = _load_score_handler()
     handler_mod._load_scores_index.cache_clear()
 
-    # This gate relies on PR #58's contract: on a match, get_safety_score relays
-    # the precomputed scores.json record verbatim — same risk_score / risk_tier /
-    # license_id, no recompute, no rounding, same address match keying. We assert
-    # exactly that below, so if that relay-on-match behavior changes, this gate
-    # must be updated too.
+    # This gate relies on the no-record contract: on a match, get_safety_score
+    # relays the precomputed scores.json record verbatim — same risk_score /
+    # risk_tier / license_id, no recompute, no rounding, same address-and-name
+    # match keying. We assert exactly that below, so if that relay-on-match
+    # behavior changes, this gate must be updated too.
     # A missing / empty / unparseable scores.json is a FAILURE, not a skip: a
     # broken data path must gate the (paid) Bedrock run, not silently pass it.
     try:
@@ -92,9 +92,10 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
         return 1
 
     # Only records with a real published score and an address we can match on.
-    # Skip non-unique normalised addresses: the index keeps one record per
-    # address, so a duplicate would resolve to a different (still correct)
-    # record and read as a false mismatch.
+    # Restrict to unique normalised addresses: scores.json is indexed as a
+    # per-address bucket disambiguated by name, so sampling only single-record
+    # addresses keeps each assertion unambiguous (the lone record is the only
+    # possible match) and avoids depending on name-similarity tie-breaks here.
     norm = handler_mod._normalise_address
     seen: dict[str, int] = {}
     for r in records:
