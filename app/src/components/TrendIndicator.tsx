@@ -27,7 +27,7 @@ export function TrendIndicator({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-[11px] text-muted",
+          "inline-flex items-center gap-1 text-2xs text-muted",
           className,
         )}
       >
@@ -44,7 +44,7 @@ export function TrendIndicator({
     return (
       <span
         className={cn(
-          "inline-flex items-center gap-1 text-[13px]",
+          "inline-flex items-center gap-1 text-sm",
           color,
           className,
         )}
@@ -58,7 +58,7 @@ export function TrendIndicator({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 text-[11px]",
+        "inline-flex items-center gap-1 text-2xs",
         color,
         className,
       )}

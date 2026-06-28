@@ -29,15 +29,15 @@ export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
             <MapPin className="w-[18px] h-[18px] text-sage" strokeWidth={2} />
           </span>
           <div className="leading-tight">
-            <div className="text-[16px] font-semibold tracking-tight group-hover:text-teal transition-colors">
+            <div className="text-lg font-semibold tracking-tight group-hover:text-teal transition-colors">
               Food Safety
             </div>
-            <div className="text-[11px] text-muted tracking-wide">
+            <div className="text-2xs text-muted tracking-wide">
               Chicago · public-data preview
             </div>
           </div>
         </Link>
-        <nav className="flex flex-wrap items-center gap-1 text-[13px]">
+        <nav className="flex flex-wrap items-center gap-1 text-sm">
           {NAV.map((item) => {
             const active = item.id === activeNav;
             return (

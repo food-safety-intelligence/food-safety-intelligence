@@ -21,7 +21,7 @@ export function TierPill({
   className,
 }: TierPillProps) {
   const sizing =
-    size === "sm" ? "text-[10.5px] px-2 py-0.5" : "text-[12px] px-3.5 py-1.5";
+    size === "sm" ? "text-2xs px-2 py-0.5" : "text-xs px-3.5 py-1.5";
 
   const variant = {
     Low: "bg-tier-low-bg text-tier-low-fg",
@@ -42,7 +42,7 @@ export function TierPill({
       <span className="w-[7px] h-[7px] rounded-full bg-current" />
       {tier}
       {withCount !== undefined && (
-        <span className="num text-[11px] opacity-75 ml-0.5">
+        <span className="num text-2xs opacity-75 ml-0.5">
           {withCount.toLocaleString()}
         </span>
       )}

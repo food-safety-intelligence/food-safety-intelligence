@@ -65,13 +65,13 @@ export default async function HomePage() {
         <section className="max-w-[1240px] mx-auto px-8 mt-16 w-full">
           <div className="grid grid-cols-12 gap-6 items-end">
             <div className="col-span-12 lg:col-span-7">
-              <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3">
+              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
                 A risk signal, not a verdict
               </p>
-              <h2 className="text-[2.4rem] font-light tracking-tight leading-[1.1]">
+              <h2 className="text-4xl font-light tracking-tight leading-[1.1]">
                 Why this exists
               </h2>
-              <p className="text-[16px] text-muted leading-[1.6] mt-4 max-w-[58ch]">
+              <p className="text-lg text-muted leading-[1.6] mt-4 max-w-[58ch]">
                 Chicago publishes every food establishment inspection it
                 conducts. We
                 pair that record with nearby 311 complaints and license
@@ -82,24 +82,24 @@ export default async function HomePage() {
             </div>
             <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-3">
               <div className="rounded-2xl bg-card p-5 soft-shadow border border-line">
-                <div className="text-[11px] tracking-widest uppercase text-muted">
+                <div className="text-2xs tracking-widest uppercase text-muted">
                   In the index
                 </div>
-                <div className="num text-[28px] font-medium mt-1 leading-none">
+                <div className="num text-3xl font-medium mt-1 leading-none">
                   {payload.totals.establishments.toLocaleString()}
                 </div>
-                <div className="text-[12px] text-muted mt-1">
+                <div className="text-xs text-muted mt-1">
                   licensed establishments
                 </div>
               </div>
               <div className="rounded-2xl bg-card p-5 soft-shadow border border-line">
-                <div className="text-[11px] tracking-widest uppercase text-muted">
+                <div className="text-2xs tracking-widest uppercase text-muted">
                   High tier today
                 </div>
-                <div className="num text-[28px] font-medium mt-1 leading-none text-terra">
+                <div className="num text-3xl font-medium mt-1 leading-none text-terra">
                   {payload.totals.tier_counts.High.toLocaleString()}
                 </div>
-                <div className="text-[12px] text-muted mt-1">
+                <div className="text-xs text-muted mt-1">
                   {(
                     (payload.totals.tier_counts.High /
                       payload.totals.establishments) *
@@ -115,11 +115,11 @@ export default async function HomePage() {
         <section className="max-w-[1240px] mx-auto px-8 mt-12 w-full">
           <div className="rounded-3xl bg-tint border border-line p-8 grid grid-cols-12 gap-6 items-center">
             <div className="col-span-12 md:col-span-7">
-              <p className="text-sage text-[12.5px] tracking-[0.18em] uppercase mb-3 flex items-center gap-2">
+              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3 flex items-center gap-2">
                 <Heart className="w-3.5 h-3.5" strokeWidth={2} />
                 For caregivers
               </p>
-              <h3 className="text-[1.75rem] tracking-tight leading-tight">
+              <h3 className="text-3xl tracking-tight leading-tight">
                 If you&apos;re choosing for someone with{" "}
                 <span
                   className="serif italic text-terra"
@@ -129,7 +129,7 @@ export default async function HomePage() {
                 </span>{" "}
                 the drivers matter more than the score.
               </h3>
-              <p className="text-[14.5px] text-muted leading-relaxed mt-3 max-w-[60ch]">
+              <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
                 Two food establishments can share the same score for different
                 reasons — and for someone with a weakened immune system, the
                 reason matters. We surface the top drivers, like temperature
@@ -143,7 +143,7 @@ export default async function HomePage() {
                   under the card. */}
               <div className="md:ml-auto md:max-w-[320px] flex flex-col items-center gap-4">
                 <div className="w-full rounded-2xl border border-line bg-card/80 p-4">
-                  <div className="text-[11px] tracking-widest uppercase text-muted mb-2.5">
+                  <div className="text-2xs tracking-widest uppercase text-muted mb-2.5">
                     Example drivers
                   </div>
                   <div className="space-y-2">
@@ -154,7 +154,7 @@ export default async function HomePage() {
                 </div>
                 <Link
                   href="/caregivers"
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-[14px] font-medium hover:bg-teal transition-colors"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
                 >
                   Open the caregiver guide
                   <ArrowRight className="w-3.5 h-3.5" strokeWidth={2.5} />

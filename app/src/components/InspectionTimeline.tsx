@@ -72,7 +72,7 @@ export function InspectionTimeline({
 
   if (events.length === 0) {
     return (
-      <div className="rounded-3xl bg-card border border-line p-6 text-muted text-[14px]">
+      <div className="rounded-3xl bg-card border border-line p-6 text-muted text-base">
         No inspection history on record for this license.
       </div>
     );
@@ -119,7 +119,7 @@ export function InspectionTimeline({
                 className="group flex items-start gap-4 w-full text-left rounded-xl px-2 py-2 -mx-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
               >
                 <span
-                  className={`shrink-0 inline-flex w-6 h-6 rounded-full items-center justify-center text-[10px] font-semibold text-white ${s.bg}`}
+                  className={`shrink-0 inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${s.bg}`}
                 >
                   {s.label}
                 </span>
@@ -128,12 +128,12 @@ export function InspectionTimeline({
                     <div className={`font-semibold ${isFail ? "text-terra" : ""}`}>
                       {e.result}
                     </div>
-                    <div className="num text-[12px] text-muted shrink-0">
+                    <div className="num text-xs text-muted shrink-0">
                       {formatInspectionDate(e.date)}
                     </div>
                   </div>
                   <div
-                    className={`text-[13px] mt-0.5 ${
+                    className={`text-sm mt-0.5 ${
                       isFail ? "text-ink/90" : "text-muted"
                     }`}
                   >
@@ -160,7 +160,7 @@ export function InspectionTimeline({
               {isOpen && (
                 <div
                   id={panelId}
-                  className="ml-10 mr-2 mt-1 mb-2 rounded-xl bg-tint border border-line p-4 text-[13px] leading-relaxed"
+                  className="ml-10 mr-2 mt-1 mb-2 rounded-xl bg-tint border border-line p-4 text-sm leading-relaxed"
                 >
                   {violations.length === 0 ? (
                     <p className="text-ink/75 italic">
@@ -187,7 +187,7 @@ export function InspectionTimeline({
       {hidden > 0 && (
         <button
           onClick={() => setExpanded(true)}
-          className="block w-full text-center text-[13px] mt-6 text-teal hover:underline"
+          className="block w-full text-center text-sm mt-6 text-teal hover:underline"
         >
           Show {hidden} older inspection{hidden === 1 ? "" : "s"}
         </button>
@@ -195,7 +195,7 @@ export function InspectionTimeline({
       {expanded && sorted.length > maxVisible && (
         <button
           onClick={() => setExpanded(false)}
-          className="block w-full text-center text-[13px] mt-6 text-teal hover:underline"
+          className="block w-full text-center text-sm mt-6 text-teal hover:underline"
         >
           Show fewer
         </button>

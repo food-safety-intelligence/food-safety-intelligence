@@ -72,14 +72,14 @@ export function RestaurantsExplorer({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name, address, or neighborhood"
-              className="bg-transparent flex-1 text-[18px] placeholder:text-muted/70 focus:outline-none"
+              className="bg-transparent flex-1 text-lg placeholder:text-muted/70 focus:outline-none"
             />
-            <kbd className="text-[11px] text-muted px-2 py-1 rounded-md bg-tint">
+            <kbd className="text-2xs text-muted px-2 py-1 rounded-md bg-tint">
               ⌘ K
             </kbd>
           </div>
           <div className="flex flex-wrap items-center gap-2 px-3 pt-4 pb-2">
-            <span className="text-[11.5px] tracking-widest uppercase text-muted mr-2">
+            <span className="text-xs tracking-widest uppercase text-muted mr-2">
               Tiers:
             </span>
             {ALL_TIERS.map((tier) => (
@@ -95,7 +95,7 @@ export function RestaurantsExplorer({
               </button>
             ))}
             <span className="grow" />
-            <button className="text-[12px] flex items-center gap-2 text-teal hover:underline">
+            <button className="text-xs flex items-center gap-2 text-teal hover:underline">
               <Filter className="w-[14px] h-[14px]" strokeWidth={2} />
               Filter for immunocompromised guidance
             </button>
@@ -116,12 +116,12 @@ export function RestaurantsExplorer({
       {/* Full ranked table */}
       <section>
         <div className="flex items-baseline justify-between mb-4 gap-4 flex-wrap">
-          <h2 className="text-[1.5rem] font-medium tracking-tight">
+          <h2 className="text-2xl font-medium tracking-tight">
             {query
               ? `Matching "${query}"`
               : "Highest-risk food establishments today"}
           </h2>
-          <span className="text-[12px] text-muted">
+          <span className="text-xs text-muted">
             Sorted by predicted score · {filtered.length} of{" "}
             {scores.length.toLocaleString()}
             {totalEstablishments && totalEstablishments > scores.length && (
@@ -137,7 +137,7 @@ export function RestaurantsExplorer({
         </div>
 
         <div className="rounded-3xl bg-card border border-line soft-shadow overflow-hidden">
-          <div className="grid grid-cols-12 px-6 py-3 text-[11px] tracking-widest uppercase text-muted border-b border-line bg-cream/40">
+          <div className="grid grid-cols-12 px-6 py-3 text-2xs tracking-widest uppercase text-muted border-b border-line bg-cream/40">
             <div className="col-span-5">Establishment</div>
             <div className="col-span-3">Tier</div>
             <div className="col-span-2 text-right">Score</div>
@@ -145,7 +145,7 @@ export function RestaurantsExplorer({
           </div>
 
           {filtered.length === 0 && (
-            <div className="px-6 py-10 text-center text-[14px] text-muted">
+            <div className="px-6 py-10 text-center text-base text-muted">
               No food establishments match this search.
             </div>
           )}
@@ -164,7 +164,7 @@ export function RestaurantsExplorer({
               >
                 <div className="col-span-5">
                   <div className="font-semibold">{r.dba_name}</div>
-                  <div className="text-[12.5px] text-muted">
+                  <div className="text-xs text-muted">
                     {r.address} · {r.neighborhood}
                   </div>
                 </div>
@@ -173,7 +173,7 @@ export function RestaurantsExplorer({
                 </div>
                 <div
                   className={cn(
-                    "col-span-2 text-right num text-[20px] font-medium",
+                    "col-span-2 text-right num text-xl font-medium",
                     TIER_TEXT_CLASS[r.risk_tier],
                   )}
                 >

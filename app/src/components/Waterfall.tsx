@@ -35,7 +35,7 @@ function Row({
         strong && "bg-tint/50",
       )}
     >
-      <span className={cn("text-[14px]", strong ? "text-ink font-medium" : "text-ink/85")}>
+      <span className={cn("text-base", strong ? "text-ink font-medium" : "text-ink/85")}>
         {label}
       </span>
       <span
@@ -73,7 +73,7 @@ export function Waterfall({
   const other = round2(total - base - steps.reduce((sum, s) => sum + s.c, 0));
 
   return (
-    <div className="rounded-2xl border border-line bg-card overflow-hidden text-[14px]">
+    <div className="rounded-2xl border border-line bg-card overflow-hidden text-base">
       <Row label="Base rate (model intercept)" value={base} muted />
       {steps.map((s, i) => (
         <Row key={s.feature + i} label={s.label} value={s.c} />
@@ -82,7 +82,7 @@ export function Waterfall({
       <Row label="Total (calibrated log-odds)" value={total} strong />
       <div className="flex items-center justify-between px-4 py-3 bg-cream/50">
         <span className="font-medium">Squashed to a probability (the gauge)</span>
-        <span className="num font-semibold text-terra-strong text-[16px]">
+        <span className="num font-semibold text-terra-strong text-lg">
           {(wf.probability * 100).toFixed(1)}%
         </span>
       </div>

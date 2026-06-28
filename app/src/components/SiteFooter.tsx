@@ -1,7 +1,7 @@
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-cream/70 mt-auto">
-      <div className="max-w-[1240px] mx-auto px-8 py-8 grid grid-cols-12 gap-6 items-start text-[13px] text-muted">
+      <div className="max-w-[1240px] mx-auto px-8 py-8 grid grid-cols-12 gap-6 items-start text-sm text-muted">
         <div className="col-span-12 md:col-span-5">
           <div className="text-ink font-medium">
             A research preview · UC Berkeley MIDS Capstone
@@ -13,7 +13,7 @@ export function SiteFooter() {
           </p>
         </div>
         <div className="col-span-6 md:col-span-3">
-          <div className="text-[11px] tracking-widest uppercase text-muted mb-2">
+          <div className="text-2xs tracking-widest uppercase text-muted mb-2">
             Sources
           </div>
           <ul className="space-y-1">
@@ -23,7 +23,7 @@ export function SiteFooter() {
           </ul>
         </div>
         <div className="col-span-6 md:col-span-4">
-          <div className="text-[11px] tracking-widest uppercase text-muted mb-2">
+          <div className="text-2xs tracking-widest uppercase text-muted mb-2">
             Team
           </div>
           <p>

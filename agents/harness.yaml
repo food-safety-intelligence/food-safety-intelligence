@@ -1,5 +1,10 @@
 # AgentCore Harness configuration — Food Safety Intelligence
-# Deploy: agentcore deploy --config agents/harness.yaml
+#
+# NOT THE WIRED DEPLOY PATH. The agent is deployed as a single CodeZip runtime
+# via the CDK + agentcore-deploy/agentcore/agentcore.json (run scripts/deploy_aws.sh);
+# see agents/README.md "Deploying to AgentCore". This file describes an alternate
+# per-tool-Lambda harness (agentcore deploy --config agents/harness.yaml) that the
+# repo does not currently use; kept for reference.
 #
 # Model: Amazon Nova 2 Lite (AWS-native, $0.30/M input tokens)
 # Runtime: Amazon Bedrock AgentCore Harness (Strands Agents)
