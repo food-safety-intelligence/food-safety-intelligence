@@ -272,10 +272,18 @@ export default async function HowItWorksPage() {
               </span>
             </div>
             <p className="text-[12.5px] text-muted leading-relaxed mt-3">
-              The trendline on the detail page plots the establishment&apos;s last
-              few inspections at their real dates. To keep the direction honest, the
-              points come from a separate{" "}
-              <span className="font-medium text-ink/80">forecast model</span> — the
+              On the detail page this becomes a small chart. Each dot is a{" "}
+              <span className="font-medium text-ink/80">predicted</span>{" "}risk for one
+              past inspection — a model score from 0 to 1, not that inspection&apos;s
+              pass/fail result (those are in the inspection list below) — placed at
+              its real date; hover a dot to see the date and value. The dashed line
+              is the <span className="font-medium text-ink/80">citywide median</span>{" "}
+              risk, so you can see whether this establishment sits above or below a
+              typical one.
+            </p>
+            <p className="text-[12.5px] text-muted leading-relaxed mt-2">
+              To keep the direction honest, those points come from a separate{" "}
+              <span className="font-medium text-ink/80">forecast model</span>{" "}— the
               same 180-day prediction, but trained without the current
               inspection&apos;s own result. A failed inspection triggers a required
               re-inspection that usually passes, which would otherwise pull the main

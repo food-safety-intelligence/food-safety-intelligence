@@ -164,7 +164,7 @@ export function ScoreCard({
         <TrendChart points={trendPoints} slope={slope} typicalScore={medianScore} />
       </div>
       <p className="text-[11px] text-muted mt-2 text-center leading-snug">
-        Forecast risk across recent inspections — direction over time, not a prediction.
+        Predicted risk over recent inspections — which way it&apos;s trending.
       </p>
     </div>
   );
