@@ -12,7 +12,7 @@
 
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 // Skill lives outside app/, so a bare `import "playwright"` won't resolve.
@@ -54,6 +54,27 @@ function shortText(s, max = 40) {
   return (s || "").replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+async function buttonKey(handle) {
+  const text = ((await handle.textContent()) || "").trim();
+  const aria = ((await handle.getAttribute("aria-label")) || "").trim();
+  return (text || aria).toLowerCase().slice(0, 60);
+}
+
+// Re-resolve a button by its key right before acting on it. Clicking one
+// button often re-renders a React list and detaches any handle captured
+// earlier ("Element is not attached to the DOM"), so handles are never
+// reused across a click. Only visible buttons match — hidden responsive
+// controls (e.g. the mobile map/list toggle on a desktop viewport) are
+// skipped rather than counted as failures.
+async function findVisibleButtonByKey(page, key) {
+  for (const handle of await page.$$("button:not([disabled])")) {
+    if ((await buttonKey(handle)) === key && (await handle.isVisible())) {
+      return handle;
+    }
+  }
+  return null;
+}
+
 async function exerciseRoute(browser, baseUrl, route) {
   const findings = {
     label: route.label,
@@ -61,6 +82,7 @@ async function exerciseRoute(browser, baseUrl, route) {
     errors: [],
     actions: [],
     networkFailures: [],
+    screenshots: {},
   };
 
   const context = await browser.newContext({ viewport: VIEWPORT });
@@ -96,10 +118,9 @@ async function exerciseRoute(browser, baseUrl, route) {
   await page.waitForTimeout(600);
 
   try {
-    await page.screenshot({
-      path: `${SHOTS_DIR}/${route.label}-initial.png`,
-      fullPage: false,
-    });
+    const initialPath = `${SHOTS_DIR}/${route.label}-initial.png`;
+    await page.screenshot({ path: initialPath, fullPage: false });
+    findings.screenshots.initial = initialPath;
   } catch {}
 
   // ── Inputs: type a test value into each. ──────────────────────────────
@@ -140,24 +161,33 @@ async function exerciseRoute(browser, baseUrl, route) {
   // kind of thing.
   const allButtons = await page.$$("button:not([disabled])");
   const seenKeys = new Set();
-  const uniqueButtons = [];
+  const uniqueKeys = [];
   for (const button of allButtons) {
-    const text = ((await button.textContent()) || "").trim();
-    const aria = ((await button.getAttribute("aria-label")) || "").trim();
-    const key = (text || aria).toLowerCase().slice(0, 60);
+    // Only enumerate visible buttons so hidden responsive controls aren't
+    // exercised on the wrong viewport. Keep keys (strings), not handles —
+    // each handle is re-resolved at click time (see findVisibleButtonByKey).
+    if (!(await button.isVisible())) continue;
+    const key = await buttonKey(button);
     if (!key) continue;
     if (seenKeys.has(key)) continue;
     seenKeys.add(key);
-    uniqueButtons.push({ button, key });
-    if (uniqueButtons.length >= 20) break;
+    uniqueKeys.push(key);
+    if (uniqueKeys.length >= 20) break;
   }
   findings.actions.push(
-    `enumerated ${allButtons.length} button(s), exercising ${uniqueButtons.length} unique`,
+    `enumerated ${allButtons.length} button(s), exercising ${uniqueKeys.length} unique visible`,
   );
 
-  for (const [i, { button }] of uniqueButtons.entries()) {
-    let desc = `button#${i}`;
+  for (const key of uniqueKeys) {
+    let desc = shortText(key);
     try {
+      const button = await findVisibleButtonByKey(page, key);
+      if (!button) {
+        // The key vanished from the DOM after an earlier click re-rendered
+        // the page (e.g. a list item or suggestion chip). Not a failure.
+        findings.actions.push(`· skipped "${desc}" (no longer in DOM)`);
+        continue;
+      }
       const text = await button.textContent();
       const aria = await button.getAttribute("aria-label");
       desc = shortText(text || aria || desc);
@@ -191,15 +221,27 @@ async function exerciseRoute(browser, baseUrl, route) {
 
   // ── Route-specific extras (hover-only things crawlers miss). ──────────
   if (route.label === "home") {
-    const marker = await page.$(".maplibregl-marker");
-    if (marker) {
-      try {
-        await marker.hover({ timeout: 2000 });
-        await page.waitForTimeout(250);
-        findings.actions.push("✓ hovered a map pin");
-      } catch (e) {
-        findings.actions.push(`✗ map pin hover failed: ${shortText(e.message, 80)}`);
+    // Try several markers: the first one is often under the floating search
+    // box and not hoverable, so a single-marker attempt spuriously times out.
+    const markers = await page.$$(".maplibregl-marker");
+    if (markers.length) {
+      let hovered = false;
+      let lastErr = "";
+      for (const marker of markers.slice(0, 8)) {
+        try {
+          await marker.hover({ timeout: 1500 });
+          await page.waitForTimeout(200);
+          hovered = true;
+          break;
+        } catch (e) {
+          lastErr = shortText(e.message, 80);
+        }
       }
+      findings.actions.push(
+        hovered
+          ? `✓ hovered a map pin (of ${markers.length})`
+          : `✗ map pin hover failed on all ${Math.min(markers.length, 8)} tried: ${lastErr}`,
+      );
     } else {
       findings.actions.push("⚠ no map pins found (selector .maplibregl-marker)");
     }
@@ -224,10 +266,9 @@ async function exerciseRoute(browser, baseUrl, route) {
   }
 
   try {
-    await page.screenshot({
-      path: `${SHOTS_DIR}/${route.label}-final.png`,
-      fullPage: false,
-    });
+    const finalPath = `${SHOTS_DIR}/${route.label}-final.png`;
+    await page.screenshot({ path: finalPath, fullPage: false });
+    findings.screenshots.final = finalPath;
   } catch {}
 
   await context.close();
@@ -263,6 +304,7 @@ function emitReport(allFindings) {
 
   let errorTotal = 0;
   let networkTotal = 0;
+  let actionFailTotal = 0;
   for (const f of allFindings) {
     console.log(`### ${f.label} (${f.path})`);
     if (f.errors.length) {
@@ -278,6 +320,10 @@ function emitReport(allFindings) {
     if (f.actions.length) {
       console.log(`\n**Actions:**`);
       for (const a of f.actions) console.log(`- ${a}`);
+      // A leading "✗" marks an interaction that failed (click, type, hover).
+      // These feed the verdict so a route where everything failed can't
+      // report "clean" just because no console/network error fired.
+      actionFailTotal += f.actions.filter((a) => a.startsWith("✗")).length;
     } else {
       console.log(`\n_(no interactive elements found on this route)_`);
     }
@@ -285,9 +331,10 @@ function emitReport(allFindings) {
   }
 
   const verdict =
-    errorTotal === 0 && networkTotal === 0
-      ? "clean — no errors caught, no network failures."
-      : `${errorTotal} error(s), ${networkTotal} network failure(s) across ${allFindings.length} routes.`;
+    errorTotal === 0 && networkTotal === 0 && actionFailTotal === 0
+      ? "clean — no errors, no network failures, no failed interactions."
+      : `${errorTotal} error(s), ${networkTotal} network failure(s), ` +
+        `${actionFailTotal} failed interaction(s) across ${allFindings.length} routes.`;
   console.log(`---\n**Summary:** ${verdict}\n`);
 }
 
@@ -307,6 +354,32 @@ async function main() {
 
   await browser.close();
   emitReport(allFindings);
+
+  // Machine-readable findings for the issue-filing step (see SKILL.md).
+  // Each route carries its failed interactions split out so the filer can
+  // build an issue body without re-parsing the markdown.
+  const routes_json = allFindings.map((f) => ({
+    label: f.label,
+    path: f.path,
+    errors: f.errors,
+    networkFailures: f.networkFailures,
+    failedActions: f.actions.filter((a) => a.startsWith("✗")),
+    screenshots: f.screenshots,
+    hasFailures:
+      f.errors.length > 0 ||
+      f.networkFailures.length > 0 ||
+      f.actions.some((a) => a.startsWith("✗")),
+  }));
+  const report = {
+    appUrl: APP_URL,
+    viewport: `${VIEWPORT.width}x${VIEWPORT.height}`,
+    shotsDir: SHOTS_DIR,
+    routes: routes_json,
+    anyFailures: routes_json.some((r) => r.hasFailures),
+  };
+  const reportPath = `${SHOTS_DIR}/findings.json`;
+  await writeFile(reportPath, JSON.stringify(report, null, 2));
+  console.log(`findings JSON → ${reportPath}`);
 }
 
 main().catch((e) => {
