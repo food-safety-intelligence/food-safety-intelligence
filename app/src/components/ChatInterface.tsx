@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, RotateCcw, AlertCircle, MapPin } from "lucide-react";
-import { queryAgent } from "@/lib/agent-api";
+import { ArrowUp, RotateCcw, AlertCircle, MapPin, Store, X } from "lucide-react";
+import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
+import type { ChatEstablishment } from "@/components/ChatScopeContext";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -269,10 +270,47 @@ function TypingIndicator() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
+export function ChatInterface({
+  compact = false,
+  establishment,
+}: {
+  compact?: boolean;
+  /** Establishment whose detail page is in view; scopes "this restaurant". */
+  establishment?: ChatEstablishment | null;
+} = {}) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // The establishment the user dismissed the scope chip for. Scoping is on while
+  // an establishment is in view AND the user hasn't dismissed this one.
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+
+  // Reset the dismissal whenever the in-view establishment changes — including
+  // leaving a detail page (undefined) and returning — so each fresh arrival
+  // shows the chip again rather than staying hidden from a stale dismiss. This
+  // is the "adjust state during render on prop change" pattern (React docs),
+  // which avoids an extra effect + render.
+  const lastScopeRef = useRef<string | null | undefined>(establishment?.licenseId);
+  if (lastScopeRef.current !== establishment?.licenseId) {
+    lastScopeRef.current = establishment?.licenseId;
+    if (dismissedId !== null) setDismissedId(null);
+  }
+  const scoped =
+    establishment && establishment.licenseId !== dismissedId
+      ? establishment
+      : null;
+
+  // Show the hover/focus tooltip only when the (truncated) chip name actually
+  // overflows — no point revealing a full name that's already fully visible.
+  // Overflow can only be read from layout after render, so measure in an effect
+  // and re-measure when the name changes.
+  const nameRef = useRef<HTMLParagraphElement>(null);
+  const [nameTruncated, setNameTruncated] = useState(false);
+  useEffect(() => {
+    const el = nameRef.current;
+    const truncated = !!el && el.scrollWidth > el.clientWidth;
+    setNameTruncated((prev) => (prev === truncated ? prev : truncated));
+  }, [scoped?.name]);
   // Picked client-side after mount (depends on sessionStorage), so it stays []
   // during SSR/first paint to avoid a hydration mismatch; chips appear a tick later.
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -337,7 +375,15 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
     setLoading(true);
 
     try {
-      const result = await queryAgent(trimmed, sessionIdRef.current, history);
+      // Pass the in-view establishment (when not dismissed) so the agent
+      // resolves "this restaurant". The stored user turn above keeps the clean
+      // typed text; only the wire query carries the context tag.
+      const result = await queryAgent(
+        trimmed,
+        sessionIdRef.current,
+        history,
+        scoped ?? undefined,
+      );
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong.";
@@ -372,6 +418,51 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* ── Scope chip ─────────────────────────────────────────────────────────
+          Shown while a detail page is in view: the chat scopes "this restaurant"
+          to it. The icon + "Asking about" label carry the meaning without relying
+          on colour; ✕ drops the scope for a general question (re-armed on the
+          next establishment). */}
+      {scoped && (
+        <div className="group relative flex-none flex items-center gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
+          <Store
+            className="w-4 h-4 text-sage-strong flex-none"
+            strokeWidth={2}
+            aria-hidden
+          />
+          {/* Whole line is ink (AA: 10.35:1 on the tint) — hierarchy comes from
+              weight, not a faint colour, so the label clears AA for small text
+              (the muted token is ~3.85:1 here, below 4.5). */}
+          {/* truncate keeps the chip to one line; the tooltip below reveals the
+              full name on hover AND keyboard focus (group-focus-within fires when
+              the ✕ is focused), only when the name actually overflows. The full
+              name is also in the placeholder and the ✕'s aria-label, and screen
+              readers read the untruncated text. */}
+          <p ref={nameRef} className="flex-1 min-w-0 text-sm text-ink truncate">
+            Asking about <span className="font-medium">{scoped.name}</span>
+          </p>
+          {nameTruncated && (
+            // Visual-only (aria-hidden): SR users already get the full name from
+            // the placeholder + the ✕ aria-label. ink/cream clears AA.
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-4 md:left-8 top-full z-10 mt-1 inline-block max-w-[16rem] whitespace-normal break-words rounded-md bg-ink px-2 py-1 text-xs text-cream opacity-0 shadow-md transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {scoped.name}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => setDismissedId(scoped.licenseId)}
+            aria-label={`Stop scoping the chat to ${scoped.name}`}
+            title="Ask about anything instead"
+            className="flex-none p-1 rounded-full text-muted hover:text-terra hover:bg-terra/10 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+          >
+            <X className="w-4 h-4" strokeWidth={2} />
+          </button>
+        </div>
+      )}
+
       {/* ── Message area ───────────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 md:px-8">
         <div className="max-w-2xl mx-auto py-6 flex flex-col gap-4">
@@ -386,14 +477,16 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
                   <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                     <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
                   </span>
+                  {/* "Eatelligence" = Eat + intelligence; sage "Eat" stem
+                      (sage-strong clears AA) plays up the pun. */}
                   <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                    Ask about food safety
+                    <span className="text-sage-strong">Eat</span>elligence
                   </h2>
                 </>
               )}
               <p className={`text-base text-muted max-w-[42ch] leading-relaxed ${compact ? "mb-5" : "mb-8"}`}>
-                Search by neighborhood, cuisine, or risk level. Ask follow-up
-                questions — the agent remembers your conversation as you go.
+                Ask about a specific place, a neighborhood or cuisine, or food
+                safety in general.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {(compact ? suggestions.slice(0, 4) : suggestions).map((s) => (
@@ -433,9 +526,16 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about a neighborhood, cuisine, or risk level…"
+              placeholder={
+                scoped
+                  ? `Ask about ${scoped.name}…`
+                  : "Ask about a neighborhood, cuisine, or risk level…"
+              }
               disabled={loading}
               aria-label="Chat input"
+              // When scoped, the context tag is prepended to the wire query;
+              // cap the user's text so tag + text stay within the proxy's limit.
+              maxLength={scoped ? scopedInputBudget(scoped) : undefined}
               className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto disabled:opacity-50"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />

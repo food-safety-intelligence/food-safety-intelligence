@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageCircle, X, Maximize2 } from "lucide-react";
 import { ChatInterface } from "@/components/ChatInterface";
+import { useChatScope } from "@/components/ChatScopeContext";
 
 /**
  * Site-wide chat launcher. Mounted once in the root layout, so it floats over
@@ -17,6 +18,7 @@ import { ChatInterface } from "@/components/ChatInterface";
  */
 export function FloatingChat() {
   const pathname = usePathname();
+  const { current: establishment } = useChatScope();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -90,8 +92,10 @@ export function FloatingChat() {
               <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sage/15 flex-none">
                 <MessageCircle className="w-4 h-4 text-sage" strokeWidth={2} />
               </span>
+              {/* "Eatelligence" = Eat + intelligence; the sage "Eat" stem
+                  (sage-strong clears AA) plays up the pun. */}
               <span className="text-sm font-semibold tracking-tight truncate">
-                Ask about food safety
+                <span className="text-sage-strong">Eat</span>elligence
               </span>
             </span>
             <span className="flex items-center gap-1 flex-none">
@@ -114,8 +118,9 @@ export function FloatingChat() {
           </div>
 
           {/* Chat — fills the rest; ChatInterface is flex-1 min-h-0 internally.
-              compact drops the big empty-state heading (the panel header has it). */}
-          <ChatInterface compact />
+              compact drops the big empty-state heading (the panel header has it).
+              establishment scopes "this restaurant" to the detail page in view. */}
+          <ChatInterface compact establishment={establishment} />
         </div>
       )}
     </>

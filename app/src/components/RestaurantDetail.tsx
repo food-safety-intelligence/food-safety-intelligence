@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
 import { InspectionTimeline } from "@/components/InspectionTimeline";
+import { RegisterChatEstablishment } from "@/components/RegisterChatEstablishment";
 import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
@@ -88,6 +89,13 @@ function DetailLoader({ id }: { id: string }) {
 
   return (
     <>
+      {/* Registers this establishment into the chat scope so the floating chat
+          can answer "tell me about this restaurant" about it. Clears on unmount
+          (navigating away). Renders nothing. */}
+      <RegisterChatEstablishment
+        licenseId={restaurant.license_id}
+        name={restaurant.dba_name}
+      />
       <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
