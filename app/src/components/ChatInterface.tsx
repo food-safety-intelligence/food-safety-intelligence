@@ -406,8 +406,16 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
             </div>
           </div>
           <p className="text-2xs text-muted/70 text-center mt-2">
-            Scores are 180-day predictions from public Chicago data · Not a
-            health department inspection
+            180-day model predictions from public Chicago data, not a safety
+            verdict or city inspection{" "}
+            (
+            <a
+              href="/how-it-works#reading-the-score"
+              className="text-teal underline underline-offset-2 hover:text-ink transition-colors"
+            >
+              how the score works
+            </a>
+            ) · any diner reviews shown are unverified
           </p>
         </div>
       </div>

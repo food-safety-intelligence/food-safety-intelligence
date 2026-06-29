@@ -70,7 +70,12 @@ def _warm_data_files() -> None:
             print(f"[warm-up] Done: {os.path.getsize(local_path):,} bytes")
 
 
-_warm_data_files()
+# NOTE: _warm_data_files() is intentionally NOT called here at import time. The
+# score files are ~68MB, and downloading them during module init blows AgentCore's
+# 30s runtime-init budget so the container never becomes ready (every invocation
+# 502s with "Runtime initialization time exceeded"). It is called lazily from the
+# invocation handler instead; being idempotent, only the first request on a fresh
+# container pays the download.
 
 # ---------------------------------------------------------------------------
 # Tool handler loader.
@@ -319,6 +324,12 @@ def invoke(payload: dict) -> dict:
     }
     Returns:          { "result": "1. Mirai Sushi ..." }
     """
+    # Warm score data on first use, not at import: a cold container downloading
+    # ~68MB from S3 during module init blows AgentCore's 30s init budget (#100).
+    # _warm_data_files() is idempotent (skips files already in /tmp), so only the
+    # first invocation on a fresh container pays the download.
+    _warm_data_files()
+
     query = payload.get("query") or payload.get("prompt", "")
     if not query:
         return {"error": "query is required"}

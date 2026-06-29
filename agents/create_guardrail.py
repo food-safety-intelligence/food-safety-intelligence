@@ -11,6 +11,10 @@ system prompt:
     not about food safety" topic makes Bedrock's classifier over-match and block
     legitimate food-safety queries. Off-topic requests (recipes, other cities,
     chit-chat) are declined by the system prompt instead.
+  - Denied topics — genuinely off-topic requests (recipes, other-city
+    restaurant lookups, meal planning, chit-chat) plus PERSONALISED medical and
+    legal advice. General factual food-safety education (answered with cited
+    public health sources) is deliberately NOT denied — it is in scope.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
 
 The contextual-grounding + relevance policy is configured below but is NOT active
@@ -54,6 +58,29 @@ _BLOCK_MESSAGE = (
 # to genuinely off-topic requests and to *personalised* medical advice only —
 # general factual food-safety education is allowed.
 _DENIED_TOPICS = [
+    {
+        "name": "PersonalisedMedicalAdvice",
+        "definition": (
+            "Personalised medical advice for a specific person — diagnosis, "
+            "treatment or medication, or whether a food is safe given their "
+            "health condition. General factual food-safety education is allowed."
+        ),
+        "examples": [
+        "name": "OffTopicNonFoodSafety",
+        "definition": (
+            "Requests neither about food-safety risk for Chicago establishments "
+            "nor general food safety or foodborne illness — e.g. recipes, "
+            "cooking, meal planning, other-city restaurants, or unrelated chat."
+        ),
+        "examples": [
+            "Give me a recipe for deep dish pizza.",
+            "Find safe sushi in New York.",
+            "What should I cook for dinner tonight?",
+            "Plan a week of healthy meals for me.",
+            "Tell me a joke.",
+        ],
+        "type": "DENY",
+    },
     {
         "name": "PersonalisedMedicalAdvice",
         "definition": (

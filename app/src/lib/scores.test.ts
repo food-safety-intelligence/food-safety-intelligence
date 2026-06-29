@@ -98,6 +98,19 @@ describe("computeWaterfall", () => {
     const wf = computeWaterfall(restaurant([1.0], 1.0), cal);
     expect(Number.isFinite(wf.total)).toBe(true);
   });
+
+  it("clamps p=0 so the total stays finite (lower bound)", () => {
+    const wf = computeWaterfall(restaurant([-1.0], 0), cal);
+    expect(Number.isFinite(wf.total)).toBe(true);
+    expect(wf.total).toBeLessThan(0); // a clamped-to-~0 probability → large negative logit
+  });
+
+  it("passes the raw risk_score through as `probability` (unclamped)", () => {
+    // probability is the published score verbatim, even at the p=1 edge where
+    // `total` is clamped — the gauge shows the score, the waterfall reconciles to it.
+    expect(computeWaterfall(restaurant([0.5], 0.73), cal).probability).toBe(0.73);
+    expect(computeWaterfall(restaurant([1.0], 1.0), cal).probability).toBe(1.0);
+  });
 });
 
 describe("trendDirection", () => {
