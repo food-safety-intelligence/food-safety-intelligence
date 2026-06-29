@@ -72,7 +72,7 @@ jobs:
       - name: Pytest (+ agent suites under coverage)
         run: |
           uv run pytest --cov --cov-report=
-          for d in agents/tools/*/; do
+          for d in agents/tools/*/ agents/lambda_proxy/; do
             if ls "$d"test_*.py >/dev/null 2>&1; then
               uv run pytest "$d" --cov --cov-append --cov-report=
             fi
@@ -229,7 +229,7 @@ jobs:
       # duplicate module names. Run each tool's tests as a SEPARATE invocation.
       - name: Agent tool tests
         run: |
-          for d in agents/tools/*/; do
+          for d in agents/tools/*/ agents/lambda_proxy/; do
             if ls "$d"test_*.py >/dev/null 2>&1; then
               echo "== $d ==" && uv run pytest "$d" -q
             fi
