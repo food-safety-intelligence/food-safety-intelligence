@@ -72,6 +72,13 @@ jobs:
         with:
           python-version: "3.11"
 
+      # The AgentCore CodeZip runtime (agentcore.json) is bundled during `cdk synth`
+      # with `uv`, which cross-installs the agent's Python deps for the ARM runtime
+      # (aarch64-manylinux2014). uv is not on the GitHub runner by default, so synth
+      # fails with "uv install failed on platform aarch64-manylinux2014".
+      - name: Install uv
+        uses: astral-sh/setup-uv@v8
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
