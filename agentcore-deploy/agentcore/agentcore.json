@@ -32,6 +32,14 @@
         {
           "name": "DATA_PREFIX",
           "value": "web-app-data"
+        },
+        {
+          "name": "FSI_BEDROCK_GUARDRAIL_ID",
+          "value": "zyt2wviv56b7"
+        },
+        {
+          "name": "FSI_BEDROCK_GUARDRAIL_VERSION",
+          "value": "1"
         }
       ]
     }
