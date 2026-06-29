@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { trendDirection } from "@/lib/scores";
 
 /**
@@ -40,6 +40,7 @@ export function TrendChart({
   points,
   slope,
   windowSize,
+  view,
   width = 320,
   height = 116,
 }: {
@@ -53,10 +54,18 @@ export function TrendChart({
    * Defaults to all points (no band) when omitted.
    */
   windowSize?: number;
+  /**
+   * Visible time range (epoch ms) for a zoomed view — set by the enlarge modal
+   * so a dense history can be inspected. The x-axis maps across this sub-range
+   * and the plot is clipped to it. Omitted = map across the full data range
+   * (the inline default, unchanged).
+   */
+  view?: { start: number; end: number };
   width?: number;
   height?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
+  const clipId = useId();
 
   const padL = 24; // y-axis label gutter
   const padR = 10;
@@ -84,11 +93,17 @@ export function TrendChart({
   }
 
   const times = pts.map((p) => Date.parse(p.date));
-  const tMin = times[0];
-  const span = times[times.length - 1] - tMin || 1;
+  const dataMin = times[0];
+  const dataMax = times[times.length - 1];
+  // When the enlarge modal passes a zoomed `view`, map x against that sub-range
+  // and clip the plot to it; otherwise map across the full data range.
+  const vStart = view?.start ?? dataMin;
+  const vEnd = view?.end ?? dataMax;
+  const span = vEnd - vStart || 1;
 
   const yFor = (s: number) => padTop + h * (1 - clamp01(s));
-  const xFor = (t: number) => padL + (w * (t - tMin)) / span;
+  const xFor = (t: number) => padL + (w * (t - vStart)) / span;
+  const inView = (t: number) => t >= vStart - 1 && t <= vEnd + 1;
 
   const xy = pts.map((p, i) => ({ x: xFor(times[i]), y: yFor(p.score) }));
   const linePath = xy.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
@@ -101,8 +116,10 @@ export function TrendChart({
   const winStart = windowSize == null ? 0 : Math.max(0, pts.length - windowSize);
   const bandLeft = winStart > 0 ? (xy[winStart - 1].x + xy[winStart].x) / 2 : null;
 
-  const fmtAxis = (iso: string) =>
-    new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  // Axis labels come from the visible range edges (timestamps) so they read
+  // correctly when zoomed; UTC keeps them aligned with the yyyy-mm-dd dates.
+  const fmtAxis = (ms: number) =>
+    new Date(ms).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
   const fmtFull = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
       month: "short",
@@ -147,9 +164,20 @@ export function TrendChart({
           risk
         </text>
 
+        {/* Clip the trajectory to the plot rect so a zoomed `view` (where points
+            fall outside the visible range) never paints into the axis gutters. */}
+        <defs>
+          <clipPath id={clipId}>
+            <rect x={padL} y={padTop} width={w} height={h} />
+          </clipPath>
+        </defs>
+
+        <g clipPath={`url(#${clipId})`}>
         {/* Trend-window band — full plot height over the most-recent points the
-            slope is fit over. Drawn first so it sits behind the trajectory. */}
-        {bandLeft !== null && (
+            slope is fit over. Drawn first so it sits behind the trajectory.
+            Hidden when a zoomed view sits entirely left of the window (its left
+            edge is past the right plot edge) so the "trend" label never orphans. */}
+        {bandLeft !== null && bandLeft < padL + w && (
           <>
             <rect
               x={bandLeft}
@@ -196,8 +224,11 @@ export function TrendChart({
           strokeLinejoin="round"
         />
 
-        {/* Inspection dots — latest emphasised; hover/focus reveals the tooltip. */}
+        {/* Inspection dots — latest emphasised; hover/focus reveals the tooltip.
+            When zoomed, dots outside the view are dropped (not just clipped) so
+            there are no invisible keyboard-focus targets off-plot. */}
         {xy.map((q, i) => {
+          if (!inView(times[i])) return null;
           const isLast = i === xy.length - 1;
           const active = hover === i;
           return (
@@ -223,8 +254,9 @@ export function TrendChart({
             />
           );
         })}
+        </g>
 
-        {/* x-axis — real first/last inspection dates (month + full year). */}
+        {/* x-axis — visible range edges (month + full year). */}
         <text
           x={padL}
           y={height - 5}
@@ -232,7 +264,7 @@ export function TrendChart({
           fill="#6B7280"
           fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         >
-          {fmtAxis(pts[0].date)}
+          {fmtAxis(vStart)}
         </text>
         <text
           x={width - padR}
@@ -242,7 +274,7 @@ export function TrendChart({
           fill="#6B7280"
           fontFamily="var(--font-manrope), 'Manrope', sans-serif"
         >
-          {fmtAxis(pts[pts.length - 1].date)}
+          {fmtAxis(vEnd)}
         </text>
       </svg>
 
