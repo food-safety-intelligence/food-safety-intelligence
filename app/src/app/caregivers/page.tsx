@@ -5,6 +5,7 @@ import {
   CalendarClock,
   Heart,
   History,
+  IdCard,
   type LucideIcon,
   Search,
 } from "lucide-react";
@@ -22,23 +23,22 @@ export const metadata = {
 /**
  * One "what to weigh" pattern. Each is grounded in a real model driver
  * (see src/foodsafety/explain/feature_labels.py) so the guidance matches what a
- * reader will actually find on a detail page. `weight` drives the visual
- * treatment: "more" reads terra (a pattern about the kitchen itself), "less"
- * reads muted (administrative, not evidence of a problem).
+ * reader will actually find on a detail page. Patterns are split into two
+ * groups — kitchen signals vs administrative signals — so the more/less
+ * distinction is carried by the page structure, not just a per-card colour.
  */
 type Pattern = {
   icon: LucideIcon;
   title: string;
   body: string;
-  weight: "more" | "less";
 };
 
-const PATTERNS: Pattern[] = [
+// Signals that describe what's happening in the kitchen — weigh these more.
+const KITCHEN_PATTERNS: Pattern[] = [
   {
     icon: History,
     title: "Recurring violations",
     body: "Multiple priority violations in prior history — especially temperature, handwashing, or cross-contamination — describe how the kitchen actually operates. These are the drivers your care team would most want to consider.",
-    weight: "more",
   },
   {
     // Driver: flag_kw_rodent / flag_kw_pest — vermin/pest noted in the
@@ -47,18 +47,32 @@ const PATTERNS: Pattern[] = [
     icon: Bug,
     title: "Pest or vermin on inspection",
     body: "Rodent, vermin, or pest activity recorded in the establishment's own recent inspection violations. Repeated pest findings point to a sanitation problem in the kitchen itself — exactly the kind of pattern that matters most for a vulnerable diner.",
-    weight: "more",
   },
+];
+
+// Administrative signals the score uses but that don't reflect the kitchen —
+// real drivers, but not something to base a choice on. Weigh these less.
+const ADMIN_PATTERNS: Pattern[] = [
   {
     icon: CalendarClock,
     title: "Long since last inspection",
     body: "An administrative gap, not evidence of a problem. The score treats it as a risk signal because inspection cadence correlates with risk in Chicago's data — but it doesn't tell you anything about the kitchen itself.",
-    weight: "less",
+  },
+  {
+    icon: IdCard,
+    title: "License age",
+    body: "How long the business has held its license. The score uses it because tenure correlates with risk in Chicago's data — but it's a proxy for the business, not a measure of what happens in the kitchen, so it shouldn't sway your choice much.",
   },
 ];
 
-function PatternCard({ icon: Icon, title, body, weight }: Pattern) {
-  const more = weight === "more";
+function PatternCard({
+  pattern: { icon: Icon, title, body },
+  tone,
+}: {
+  pattern: Pattern;
+  tone: "more" | "less";
+}) {
+  const more = tone === "more";
   return (
     <div
       className={cn(
@@ -75,22 +89,36 @@ function PatternCard({ icon: Icon, title, body, weight }: Pattern) {
         >
           <Icon className="w-[19px] h-[19px]" strokeWidth={1.75} />
         </span>
-        <div className="min-w-0">
-          {/* Non-colour label so the weigh-more / weigh-less distinction isn't
-              carried by the terra/muted colour alone. */}
-          <p
-            className={cn(
-              "text-2xs tracking-widest uppercase",
-              more ? "text-terra-strong" : "text-muted",
-            )}
-          >
-            {more ? "Weigh more" : "Weigh less"}
-          </p>
-          <h3 className="text-xl font-medium tracking-tight">{title}</h3>
-        </div>
+        <h3 className="text-xl font-medium tracking-tight min-w-0">{title}</h3>
       </div>
       <p className="text-base text-muted leading-relaxed mt-3">{body}</p>
     </div>
+  );
+}
+
+/**
+ * The label above each pattern group. The "weigh these (less)" wording carries
+ * the more/less distinction in text, so it never depends on the dot's colour
+ * alone.
+ */
+function GroupLabel({ tone, children }: { tone: "more" | "less"; children: string }) {
+  const more = tone === "more";
+  return (
+    <p
+      className={cn(
+        "flex items-center gap-2.5 text-xs tracking-[0.14em] uppercase font-medium",
+        more ? "text-terra-strong" : "text-muted",
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "w-2 h-2 rounded-full shrink-0",
+          more ? "bg-terra" : "bg-muted",
+        )}
+      />
+      {children}
+    </p>
   );
 }
 
@@ -135,13 +163,29 @@ export default function CaregiversPage() {
           <p className="text-base text-muted leading-relaxed mt-2 max-w-[60ch]">
             On an establishment&apos;s detail page, the score comes with its top
             drivers — the specific patterns pushing risk up or down. Some
-            describe the kitchen itself; others are administrative. Here&apos;s
-            how to weigh the ones you&apos;ll see most.
+            describe the kitchen itself; others are administrative. The score
+            counts both, but for your decision they don&apos;t carry the same
+            weight.
           </p>
-          <div className="mt-6 grid gap-5">
-            {PATTERNS.map((p) => (
-              <PatternCard key={p.title} {...p} />
-            ))}
+
+          <div className="mt-8">
+            <GroupLabel tone="more">About the kitchen — weigh these</GroupLabel>
+            <div className="mt-4 grid gap-5">
+              {KITCHEN_PATTERNS.map((p) => (
+                <PatternCard key={p.title} pattern={p} tone="more" />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8">
+            <GroupLabel tone="less">
+              Administrative — weigh these less
+            </GroupLabel>
+            <div className="mt-4 grid gap-5">
+              {ADMIN_PATTERNS.map((p) => (
+                <PatternCard key={p.title} pattern={p} tone="less" />
+              ))}
+            </div>
           </div>
         </section>
 
