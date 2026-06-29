@@ -4,6 +4,8 @@
 
 | Name                                                     |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
 |--------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
+| agents/lambda\_proxy/handler.py                          |       70 |       21 |       24 |        3 |     70% |69, 74-75, 84, 88, 106-109, 119-122, 129-138 |
+| agents/lambda\_proxy/test\_handler.py                    |       51 |        1 |        6 |        1 |     96% |        25 |
 | agents/tools/explain\_restaurant/handler.py              |       79 |        6 |       24 |        1 |     93% |32-33, 43-44, 225-\>231, 228-229 |
 | agents/tools/find\_restaurants/chicago\_neighborhoods.py |        4 |        0 |        0 |        0 |    100% |           |
 | agents/tools/find\_restaurants/handler.py                |      108 |        7 |       36 |        2 |     94% |189-191, 236-247, 313 |
@@ -43,7 +45,7 @@
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **1639** |  **143** |  **456** |   **64** | **89%** |           |
+| **TOTAL**                                                | **1760** |  **165** |  **486** |   **68** | **89%** |           |
 
 
 ## Setup coverage badge
