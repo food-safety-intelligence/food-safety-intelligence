@@ -421,7 +421,11 @@ export function ChatInterface({
           {/* Whole line is ink (AA: 10.35:1 on the tint) — hierarchy comes from
               weight, not a faint colour, so the label clears AA for small text
               (the muted token is ~3.85:1 here, below 4.5). */}
-          <p className="flex-1 min-w-0 text-sm text-ink truncate">
+          {/* truncate keeps the chip to one line; title surfaces the full name
+              on hover (the same pattern as the "Top factor" chip). The full name
+              is also in the placeholder and the dismiss button's aria-label, and
+              screen readers read the untruncated text. */}
+          <p className="flex-1 min-w-0 text-sm text-ink truncate" title={scoped.name}>
             Asking about <span className="font-medium">{scoped.name}</span>
           </p>
           <button
@@ -450,14 +454,16 @@ export function ChatInterface({
                   <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                     <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
                   </span>
+                  {/* "Eatelligence" = Eat + intelligence; sage "Eat" stem
+                      (sage-strong clears AA) plays up the pun. */}
                   <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                    Ask about food safety
+                    <span className="text-sage-strong">Eat</span>elligence
                   </h2>
                 </>
               )}
               <p className={`text-base text-muted max-w-[42ch] leading-relaxed ${compact ? "mb-5" : "mb-8"}`}>
-                Search by neighborhood, cuisine, or risk level. Ask follow-up
-                questions — the agent remembers your conversation as you go.
+                Ask about a specific place, a neighborhood or cuisine, or food
+                safety in general.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {(compact ? suggestions.slice(0, 4) : suggestions).map((s) => (
