@@ -31,10 +31,24 @@ function resetSession(): string {
   return id;
 }
 
+// True only when this page load is a browser reload (F5 / Cmd-R). The popup ->
+// /chat expand is a <Link> click (a soft navigation, type "navigate"), so the
+// Navigation Timing type tells the two apart: a reload should start a fresh
+// conversation, the soft navigation should carry the transcript over.
+function wasPageReloaded(): boolean {
+  if (typeof window === "undefined" || !window.performance) return false;
+  const [nav] = performance.getEntriesByType(
+    "navigation",
+  ) as PerformanceNavigationTiming[];
+  return nav?.type === "reload";
+}
+
 // The transcript is persisted to sessionStorage so it survives the floating
-// popup -> /chat expand (a full-page navigation that remounts ChatInterface) and
-// a reload, within the same tab session. Without this the new mount starts empty
-// and the conversation — and the history sent to the agent — is lost.
+// popup -> /chat expand (a <Link> navigation that remounts ChatInterface) within
+// the same tab session. Without this the new mount starts empty and the
+// conversation — and the history sent to the agent — is lost. A browser reload
+// deliberately does NOT carry it over (see wasPageReloaded): a refresh starts a
+// fresh chat.
 const MESSAGES_KEY = "fsi_chat_messages";
 
 function loadMessages(): Message[] {
@@ -276,7 +290,15 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
   // rotation seed and any saved transcript can't be read during SSR, so we set
   // them once post-mount.
   useEffect(() => {
-    sessionIdRef.current = getOrCreateSessionId();
+    // A browser refresh starts a fresh conversation. The transcript is meant to
+    // survive the popup -> /chat expand (a <Link> soft navigation), not a reload,
+    // so on a reload we drop the saved transcript and start a new session.
+    if (wasPageReloaded()) {
+      clearMessages();
+      sessionIdRef.current = resetSession();
+    } else {
+      sessionIdRef.current = getOrCreateSessionId();
+    }
     const saved = loadMessages();
     /* eslint-disable react-hooks/set-state-in-effect */
     setSuggestions(pickSuggestions(getOrCreateSuggestSeed()));
@@ -284,9 +306,9 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
-  // Persist the transcript so it survives the popup -> /chat expand and reloads.
-  // Skip the first run so the initial empty render can't overwrite a saved
-  // transcript before the mount effect loads it.
+  // Persist the transcript so it survives the popup -> /chat expand. Skip the
+  // first run so the initial empty render can't overwrite a saved transcript
+  // before the mount effect loads it.
   useEffect(() => {
     if (!hydratedRef.current) {
       hydratedRef.current = true;
@@ -371,7 +393,7 @@ export function ChatInterface({ compact = false }: { compact?: boolean } = {}) {
               )}
               <p className={`text-base text-muted max-w-[42ch] leading-relaxed ${compact ? "mb-5" : "mb-8"}`}>
                 Search by neighborhood, cuisine, or risk level. Ask follow-up
-                questions — the agent remembers your session.
+                questions — the agent remembers your conversation as you go.
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {(compact ? suggestions.slice(0, 4) : suggestions).map((s) => (
