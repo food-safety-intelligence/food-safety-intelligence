@@ -118,12 +118,10 @@ jobs:
       - name: Vitest
         run: npm test
 
-      # `tsc --noEmit` typechecks but never exercises the production build, so a
-      # static-export / build-time data-loading regression would pass CI and only
-      # surface on deploy. The build reads the committed public/data JSON (no S3
-      # creds needed) — verified headless. This catches that class of break.
-      - name: Build
-        run: npm run build
+      # NOTE: `npm run build` is intentionally NOT run here — the rendered-UI smoke
+      # job below runs the identical build, so a static-export / build-time
+      # regression still fails CI there. Building once instead of twice keeps this
+      # job fast (tsc already typechecks).
 
   app-smoke:
     name: Web app (rendered-UI smoke)
@@ -144,17 +142,37 @@ jobs:
       - name: Install dependencies (locked)
         run: npm ci
 
+      # Persist the Next.js compile cache (.next/cache) across runs so the static
+      # export rebuilds warm. Keyed on the lockfile; the per-sha key always saves a
+      # fresh cache and restore-keys restores the most recent prior one.
+      - name: Cache Next.js build
+        uses: actions/cache@v4
+        with:
+          path: app/.next/cache
+          key: nextjs-${{ hashFiles('app/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            nextjs-${{ hashFiles('app/package-lock.json') }}-
+
       # The same static export deploy-web.yml publishes. Reads the committed
       # public/data JSON, so it builds without S3 creds (the prebuild S3 sync
       # falls back to the committed copies).
       - name: Build static export
         run: npm run build
 
-      # The eslint/tsc/vitest/build job above never RENDERS a page, so layout,
-      # overflow, and route-render regressions pass CI green. Install a headless
-      # Chromium (and its system libs via --with-deps) to drive the built site.
-      # Kept out of package.json — it is browser-only test tooling, not an app
-      # dependency — and pinned here so the run is reproducible.
+      # Cache the Playwright browser download (the slow ~25s part); --with-deps
+      # still installs system libs (fast) and `playwright install` reuses the
+      # cached binary on a hit. Keyed on the pinned playwright version.
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-1.61.1-${{ runner.os }}
+
+      # The eslint/tsc/vitest job above never RENDERS a page, so layout, overflow,
+      # and route-render regressions pass CI green. Install a headless Chromium
+      # (and its system libs via --with-deps) to drive the built site. Kept out of
+      # package.json — it is browser-only test tooling, not an app dependency — and
+      # pinned here so the run is reproducible.
       - name: Install Playwright + Chromium
         run: |
           npm install --no-save playwright@1.61.1
