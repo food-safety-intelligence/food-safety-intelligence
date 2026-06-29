@@ -325,16 +325,23 @@ export function matchesQuery(
 }
 
 /**
- * "A–Z" comparator. `localeCompare` alone sorts names that start with a digit
- * or symbol (e.g. "7-Eleven", "#1 Wok") ahead of the letters, so the list opens
- * on numbers instead of "A". Group letter-initial names first, the rest after,
- * then sort alphabetically within each group.
+ * "A–Z" comparator. Two quirks of raw `dba_name` values break a naive
+ * `localeCompare` sort:
+ *   - names starting with a digit or symbol ("7-Eleven", "#1 Wok") sort ahead
+ *     of the letters, so the list opens on numbers instead of "A";
+ *   - some names carry leading whitespace ("  JIMMY FAMOUS BURGER"), and
+ *     localeCompare orders a leading space ahead of letters too — floating
+ *     those names above the "A"s.
+ * Compare on the trimmed name: group letter-initial names first, the rest
+ * after, then sort alphabetically within each group.
  */
 export function compareByName(a: string, b: string): number {
-  const aLetter = /^\p{L}/u.test(a.trimStart());
-  const bLetter = /^\p{L}/u.test(b.trimStart());
+  const at = a.trimStart();
+  const bt = b.trimStart();
+  const aLetter = /^\p{L}/u.test(at);
+  const bLetter = /^\p{L}/u.test(bt);
   if (aLetter !== bLetter) return aLetter ? -1 : 1;
-  return a.localeCompare(b);
+  return at.localeCompare(bt);
 }
 
 /** Validate a raw `?sort=` value into a {@link HomeSort}; default "risk". */

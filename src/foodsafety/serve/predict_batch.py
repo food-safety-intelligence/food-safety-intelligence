@@ -291,10 +291,14 @@ def write_scores_json(
 
 
 def _row_to_json(row) -> dict:
+    # Strip surrounding whitespace on the display strings at this JSON boundary:
+    # some source dba_name/address values carry leading spaces (e.g.
+    # "  JIMMY FAMOUS BURGER"), which sort ahead of the "A"s in the app's A–Z
+    # list. Normalising here keeps every consumer of scores.json clean.
     return {
         "license_id": str(row.license_id),
-        "dba_name": "" if pd.isna(row.dba_name) else str(row.dba_name),
-        "address": "" if pd.isna(row.address) else str(row.address),
+        "dba_name": "" if pd.isna(row.dba_name) else str(row.dba_name).strip(),
+        "address": "" if pd.isna(row.address) else str(row.address).strip(),
         "neighborhood": "",
         "zip": "",
         "facility_type": "",
