@@ -163,7 +163,7 @@ def test_ingest_dataset_no_new_rows_returns_existing(mock_fetch, mock_storage):
 @patch("foodsafety.ingest.storage")
 @patch("foodsafety.ingest.fetch_soda_keyset")
 def test_ingest_dataset_passes_select_for_system_columns(mock_fetch, mock_storage):
-    spec = DatasetSpec("test-id", "date", ":id", "2010-01-01T00:00:00", select=":id,*")
+    spec = DatasetSpec("test-id", "date", ":id", "2010-01-01T00:00:00", select="*,:id")
 
     mock_storage.exists.return_value = False
     mock_storage.join.side_effect = lambda *args: "/".join(str(a) for a in args)
@@ -172,4 +172,33 @@ def test_ingest_dataset_passes_select_for_system_columns(mock_fetch, mock_storag
     ingest_dataset("test", spec, verbose=False)
 
     call_kwargs = mock_fetch.call_args[1]
-    assert call_kwargs["select"] == ":id,*"
+    assert call_kwargs["select"] == "*,:id"
+
+
+@patch("foodsafety.ingest.storage")
+@patch("foodsafety.ingest.fetch_soda_keyset")
+def test_ingest_dataset_keep_cols_prunes_columns(mock_fetch, mock_storage):
+    spec = DatasetSpec(
+        "test-id",
+        "date",
+        "pk",
+        "2010-01-01T00:00:00",
+        keep_cols=("lat", "lon"),
+    )
+
+    mock_storage.exists.return_value = False
+    mock_storage.join.side_effect = lambda *args: "/".join(str(a) for a in args)
+    mock_fetch.return_value = pd.DataFrame(
+        {
+            "pk": ["a"],
+            "date": ["2025-01-01"],
+            "lat": [41.9],
+            "lon": [-87.6],
+            "extra": ["drop"],
+        }
+    )
+
+    result = ingest_dataset("test", spec, verbose=False)
+
+    assert set(result.columns) == {"pk", "date", "lat", "lon"}
+    assert "extra" not in result.columns

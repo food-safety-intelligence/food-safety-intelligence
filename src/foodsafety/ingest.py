@@ -97,6 +97,13 @@ def ingest_dataset(
         fetch_kwargs["select"] = spec.select
     new = fetch_soda_keyset(**fetch_kwargs)
 
+    # Column pruning: keep only the columns needed downstream (plus pk/cursor,
+    # which are always required for upsert and watermarking).
+    if spec.keep_cols is not None and not new.empty:
+        required = {spec.pk, spec.cursor_col, *spec.keep_cols}
+        keep = [c for c in new.columns if c in required]
+        new = new[keep]
+
     if new.empty:
         if verbose:
             print(f"  {name}: no new rows")

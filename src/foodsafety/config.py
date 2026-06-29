@@ -124,6 +124,9 @@ class DatasetSpec:
     where_extra: str | None = None
     # Socrata omits system columns like :id by default; set this to request them.
     select: str | None = None
+    # If set, only these columns (plus pk and cursor_col) are kept after fetch.
+    # Reduces storage for wide datasets like building_violations (~8MB vs ~200MB).
+    keep_cols: tuple[str, ...] | None = None
 
 
 # Re-pull this many days behind the stored watermark every run. Chicago records
@@ -161,7 +164,7 @@ INGEST_SPECS: dict[str, DatasetSpec] = {
         "license_start_date",
         ":id",
         "2010-01-01T00:00:00",
-        select=":id,*",
+        select="*,:id",  # Socrata requires * before named system columns
     ),
     "building_permits": DatasetSpec(
         "ydr8-5enu",
@@ -174,5 +177,6 @@ INGEST_SPECS: dict[str, DatasetSpec] = {
         "violation_date",
         "id",
         "2010-01-01T00:00:00",
+        keep_cols=("latitude", "longitude", "department_bureau"),
     ),
 }
