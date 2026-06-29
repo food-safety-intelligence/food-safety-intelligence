@@ -7,6 +7,7 @@ Single source of truth for dataset IDs, the SODA base URL, and where data lives.
 from __future__ import annotations
 
 import os
+from dataclasses import dataclass
 from pathlib import Path
 
 # Reproducibility: every random seed in the pipeline reads this.
@@ -105,3 +106,73 @@ LABEL_WINDOW_DAYS: int = 180
 # procedure change makes pre/post labels non-comparable, so we don't train on
 # the pre-period).
 TRAIN_START_DATE: str = "2019-01-01"
+
+
+# ---------------------------------------------------------------------------
+# Incremental ingestion specs (Phase-2 weekly refresh)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DatasetSpec:
+    """How to incrementally ingest one SODA dataset."""
+
+    dataset_id: str
+    cursor_col: str
+    pk: str
+    start: str  # ISO timestamp for first full pull when no data exists
+    where_extra: str | None = None
+    # Socrata omits system columns like :id by default; set this to request them.
+    select: str | None = None
+
+
+# Re-pull this many days behind the stored watermark every run. Chicago records
+# are mutable (an inspection is amended, a 311 status changes), and a pure
+# "cursor >= watermark" pull would miss edits to already-ingested rows. The
+# upsert-on-pk merge makes the overlap free of duplicates.
+LOOKBACK_DAYS: int = 90
+
+_SR_TYPES_SOQL: str = "sr_type in (" + ", ".join(f"'{t}'" for t in RELEVANT_SR_TYPES) + ")"
+
+INGEST_SPECS: dict[str, DatasetSpec] = {
+    "inspections": DatasetSpec(
+        "4ijn-s7e5",
+        "inspection_date",
+        "inspection_id",
+        "2010-01-01T00:00:00",
+    ),
+    "complaints_311": DatasetSpec(
+        "v6vf-nfxy",
+        "created_date",
+        "sr_number",
+        "2019-01-01T00:00:00",
+        where_extra=_SR_TYPES_SOQL,
+    ),
+    "licenses_current": DatasetSpec(
+        "uupf-x98q",
+        "license_start_date",
+        "id",
+        "2010-01-01T00:00:00",
+    ),
+    # Historical licenses have no user-defined unique key; use Socrata's system
+    # row identifier :id (stable, guaranteed unique). Must request it explicitly.
+    "licenses_historical": DatasetSpec(
+        "vgg9-bn8p",
+        "license_start_date",
+        ":id",
+        "2010-01-01T00:00:00",
+        select=":id,*",
+    ),
+    "building_permits": DatasetSpec(
+        "ydr8-5enu",
+        "issue_date",
+        "id",
+        "2017-01-01T00:00:00",
+    ),
+    "building_violations": DatasetSpec(
+        "22u3-xenr",
+        "violation_date",
+        "id",
+        "2010-01-01T00:00:00",
+    ),
+}
