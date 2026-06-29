@@ -195,13 +195,14 @@ def main() -> None:
     print(f"Saved metadata → {meta_path}")
 
     # RECONCILE: write the SERVED model's metrics to the git-tracked ledger
-    # (reports/metrics/), alongside baseline_*/xgb_* — so the numbers we cite
-    # describe the model that actually feeds scores.json. data/models/ is
-    # gitignored, so without this the served (sigmoid, RT-filtered) model had
-    # no tracked metrics, while the committed reports described a different
-    # (isotonic, unfiltered) model.
-    REPORTS_METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    report_path = REPORTS_METRICS_DIR / f"baseline_sigmoid_{run_id}.json"
+    # (reports/metrics/baseline_sigmoid/), alongside baseline/ and xgb/ — so the
+    # numbers we cite describe the model that actually feeds scores.json.
+    # data/models/ is gitignored, so without this the served (sigmoid,
+    # RT-filtered) model had no tracked metrics, while the committed reports
+    # described a different (isotonic, unfiltered) model.
+    metrics_subdir = REPORTS_METRICS_DIR / "baseline_sigmoid"
+    metrics_subdir.mkdir(parents=True, exist_ok=True)
+    report_path = metrics_subdir / f"baseline_sigmoid_{run_id}.json"
     report = {
         "model": MODEL_VERSION,
         "run_id": run_id,
