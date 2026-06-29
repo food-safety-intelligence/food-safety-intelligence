@@ -178,41 +178,69 @@ async function exerciseRoute(browser, baseUrl, route) {
     `enumerated ${allButtons.length} button(s), exercising ${uniqueKeys.length} unique visible`,
   );
 
+  // Let the page settle before driving it — the risk list re-renders as
+  // markers and rows hydrate, and clicking a still-moving element times out
+  // on Playwright's actionability check (it requires a stable target; 2s is
+  // generous for the click itself, so a timeout means "never settled", not
+  // "slow click").
+  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForTimeout(300);
+
   for (const key of uniqueKeys) {
     let desc = shortText(key);
+    let outcome;
+    const button = await findVisibleButtonByKey(page, key);
+    if (!button) {
+      // The key vanished after an earlier click re-rendered the page
+      // (e.g. a list item or suggestion chip). Not a failure.
+      findings.actions.push(`· skipped "${desc}" (no longer in DOM)`);
+      continue;
+    }
     try {
-      const button = await findVisibleButtonByKey(page, key);
-      if (!button) {
-        // The key vanished from the DOM after an earlier click re-rendered
-        // the page (e.g. a list item or suggestion chip). Not a failure.
-        findings.actions.push(`· skipped "${desc}" (no longer in DOM)`);
-        continue;
-      }
       const text = await button.textContent();
       const aria = await button.getAttribute("aria-label");
       desc = shortText(text || aria || desc);
-      const urlBefore = page.url();
       await button.scrollIntoViewIfNeeded({ timeout: 1000 }).catch(() => {});
+      // Only click what a user could actually click. The home risk list is
+      // an internally-scrolling container with hundreds of rows; scrollIntoView
+      // can't reliably position every row, so some land off-screen or under
+      // the list's sticky header. Hit-test with the browser's own
+      // elementFromPoint and skip unreachable elements instead of fighting
+      // the click until it times out (which read as false failures).
+      const reachable = await button
+        .evaluate((el) => {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return false;
+          const cx = r.x + r.width / 2;
+          const cy = r.y + r.height / 2;
+          if (cx < 0 || cy < 0 || cx > window.innerWidth || cy > window.innerHeight)
+            return false;
+          const top = document.elementFromPoint(cx, cy);
+          return !!top && (el === top || el.contains(top) || top.contains(el));
+        })
+        .catch(() => false);
+      if (!reachable) {
+        findings.actions.push(`· skipped "${desc}" (off-screen or covered)`);
+        continue;
+      }
+      const urlBefore = page.url();
       await button.click({ timeout: 2000 });
       await page.waitForTimeout(180);
       const urlAfter = page.url();
       if (urlAfter !== urlBefore) {
-        findings.actions.push(
-          `→ clicked "${desc}" → navigated to ${new URL(urlAfter).pathname}`,
-        );
+        outcome = `→ clicked "${desc}" → navigated to ${new URL(urlAfter).pathname}`;
         // Restore route so subsequent buttons remain reachable.
         await page
           .goto(`${baseUrl}${route.path}`, { waitUntil: "networkidle", timeout: 15000 })
           .catch(() => {});
         await page.waitForTimeout(300);
       } else {
-        findings.actions.push(`✓ clicked "${desc}"`);
+        outcome = `✓ clicked "${desc}"`;
       }
     } catch (e) {
-      findings.actions.push(
-        `✗ click failed on "${desc}": ${shortText(e.message, 80)}`,
-      );
+      outcome = `✗ click failed on "${desc}": ${shortText(e.message, 80)}`;
     }
+    findings.actions.push(outcome);
   }
 
   // ── Links: enumerate, don't navigate. ──────────────────────────────────
