@@ -247,6 +247,16 @@ describe("compareByName", () => {
   it("ignores leading whitespace when grouping", () => {
     expect(["  Cafe", "9 Bar"].sort(compareByName)).toEqual(["  Cafe", "9 Bar"]);
   });
+
+  it("ignores leading whitespace when ordering within the letter group", () => {
+    // Real data has names like "  JIMMY FAMOUS BURGER" that previously sorted
+    // ahead of the "A"s because the leading space sorts before letters.
+    expect(
+      ["  JIMMY FAMOUS BURGER", "A & A SOUTH FOOD MART", "  UNI UNI"].sort(
+        compareByName,
+      ),
+    ).toEqual(["A & A SOUTH FOOD MART", "  JIMMY FAMOUS BURGER", "  UNI UNI"]);
+  });
 });
 
 describe("computeHomeView", () => {
