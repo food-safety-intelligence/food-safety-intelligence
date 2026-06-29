@@ -299,6 +299,18 @@ export function ChatInterface({
     establishment && establishment.licenseId !== dismissedId
       ? establishment
       : null;
+
+  // Show the hover/focus tooltip only when the (truncated) chip name actually
+  // overflows — no point revealing a full name that's already fully visible.
+  // Overflow can only be read from layout after render, so measure in an effect
+  // and re-measure when the name changes.
+  const nameRef = useRef<HTMLParagraphElement>(null);
+  const [nameTruncated, setNameTruncated] = useState(false);
+  useEffect(() => {
+    const el = nameRef.current;
+    const truncated = !!el && el.scrollWidth > el.clientWidth;
+    setNameTruncated((prev) => (prev === truncated ? prev : truncated));
+  }, [scoped?.name]);
   // Picked client-side after mount (depends on sessionStorage), so it stays []
   // during SSR/first paint to avoid a hydration mismatch; chips appear a tick later.
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -412,7 +424,7 @@ export function ChatInterface({
           on colour; ✕ drops the scope for a general question (re-armed on the
           next establishment). */}
       {scoped && (
-        <div className="flex-none flex items-center gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
+        <div className="group relative flex-none flex items-center gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
           <Store
             className="w-4 h-4 text-sage-strong flex-none"
             strokeWidth={2}
@@ -421,13 +433,24 @@ export function ChatInterface({
           {/* Whole line is ink (AA: 10.35:1 on the tint) — hierarchy comes from
               weight, not a faint colour, so the label clears AA for small text
               (the muted token is ~3.85:1 here, below 4.5). */}
-          {/* truncate keeps the chip to one line; title surfaces the full name
-              on hover (the same pattern as the "Top factor" chip). The full name
-              is also in the placeholder and the dismiss button's aria-label, and
-              screen readers read the untruncated text. */}
-          <p className="flex-1 min-w-0 text-sm text-ink truncate" title={scoped.name}>
+          {/* truncate keeps the chip to one line; the tooltip below reveals the
+              full name on hover AND keyboard focus (group-focus-within fires when
+              the ✕ is focused), only when the name actually overflows. The full
+              name is also in the placeholder and the ✕'s aria-label, and screen
+              readers read the untruncated text. */}
+          <p ref={nameRef} className="flex-1 min-w-0 text-sm text-ink truncate">
             Asking about <span className="font-medium">{scoped.name}</span>
           </p>
+          {nameTruncated && (
+            // Visual-only (aria-hidden): SR users already get the full name from
+            // the placeholder + the ✕ aria-label. ink/cream clears AA.
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-4 md:left-8 top-full z-10 mt-1 inline-block max-w-[16rem] whitespace-normal break-words rounded-md bg-ink px-2 py-1 text-xs text-cream opacity-0 shadow-md transition-opacity duration-100 group-hover:opacity-100 group-focus-within:opacity-100"
+            >
+              {scoped.name}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setDismissedId(scoped.licenseId)}
