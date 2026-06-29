@@ -21,7 +21,7 @@ import type {
   RiskTier,
   ScoresPayload,
 } from "@/lib/scores";
-import { isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
+import { compareByName, isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
 
 // S3 source of truth for the precomputed JSONs. Credentials resolve via the
 // AWS SDK's default chain: env vars → ~/.aws/credentials → the SSR runtime's
@@ -327,7 +327,7 @@ export async function getHomeView(opts: {
   // List: sort by the chosen key, then cap. Name surfaces all tiers
   // alphabetically; "low" surfaces the lowest-risk end; default is highest-risk.
   const sorted = matched.slice().sort((a, b) => {
-    if (sort === "name") return a.dba_name.localeCompare(b.dba_name);
+    if (sort === "name") return compareByName(a.dba_name, b.dba_name);
     if (sort === "low") return a.risk_score - b.risk_score;
     return b.risk_score - a.risk_score;
   });
