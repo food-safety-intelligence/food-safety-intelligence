@@ -60,8 +60,28 @@ jobs:
       # (.coverage for the comment + threshold, coverage.xml for diff-cover) but
       # NOT thresholded in this step — the floors live in their own non-blocking
       # steps below so a coverage dip never blocks a green test run.
-      - name: Pytest
-        run: uv run pytest --cov --cov-report=term-missing --cov-report=xml
+      #
+      # Coverage spans src/foodsafety AND the agent app (agents/). The agent code
+      # lives outside tests/, so we exercise it here under coverage: the package
+      # suite first (fresh run), then each agent tool suite as a SEPARATE
+      # invocation (the tool dirs share a `handler` module name and collide in
+      # one combined run), then the deterministic eval gates — all appended into
+      # one .coverage. The `agent` job below still runs these as the
+      # authoritative pass/fail gate; here they run only to record coverage.
+      # Reports are emitted after every append so they reflect the full picture.
+      - name: Pytest (+ agent suites under coverage)
+        run: |
+          uv run pytest --cov --cov-report=
+          for d in agents/tools/*/; do
+            if ls "$d"test_*.py >/dev/null 2>&1; then
+              uv run pytest "$d" --cov --cov-append --cov-report=
+            fi
+          done
+          uv run coverage run -a agents/eval/run_eval.py --self-test
+          uv run coverage run -a agents/eval/run_eval.py --faithfulness
+          uv run coverage run -a agents/eval/run_eval.py --citations
+          uv run coverage report -m
+          uv run coverage xml
 
       # Post/update a sticky PR comment with overall coverage, the delta vs main,
       # and per-file DIFF coverage (how well the lines changed in this PR are
@@ -188,3 +208,39 @@ jobs:
             curl -sf -o /dev/null http://localhost:3000/ && break || sleep 1
           done
           node e2e/smoke.mjs
+
+  agent:
+    name: Agent (deterministic checks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen --extra dev
+
+      # Each agent tool dir is its own mini-package loaded via sys.path, and they
+      # share a `handler` module name — so one combined pytest run collides on the
+      # duplicate module names. Run each tool's tests as a SEPARATE invocation.
+      - name: Agent tool tests
+        run: |
+          for d in agents/tools/*/; do
+            if ls "$d"test_*.py >/dev/null 2>&1; then
+              echo "== $d ==" && uv run pytest "$d" -q
+            fi
+          done
+
+      # Deterministic eval gates only: the checker self-test, faithfulness vs the
+      # committed scores.json, and the citation allow-list. No Bedrock — the
+      # --judge guardrail suite stays a manual, paid run via the eval-agent skill
+      # — and no network (--links is opt-in; it hits external public-health sites).
+      - name: Agent eval (deterministic gates)
+        run: |
+          uv run python agents/eval/run_eval.py --self-test
+          uv run python agents/eval/run_eval.py --faithfulness
+          uv run python agents/eval/run_eval.py --citations

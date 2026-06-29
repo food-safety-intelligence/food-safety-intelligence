@@ -15,6 +15,7 @@ Your query
       → get_safety_score   — precomputed batch scores from scores.json
       → explain_restaurant — scores.json + inspection_history.json
       → find_reviews       — third-party review links (opt-in; not a score input)
+      → food_safety_info   — general food-safety facts + authoritative citations
   → Plain-English ranked response
 ```
 
@@ -62,9 +63,11 @@ All three run the **same** four `handler.py` files.
 ### Tools
 
 The agent calls the tools in order: `find_restaurants` → `get_safety_score` →
-`explain_restaurant` (for the lowest-risk few). `find_reviews` is an optional
-add-on outside that sequence, called only when the user asks what reviewers say.
-Each handler takes `handler(event, _ctx)`.
+`explain_restaurant` (for the lowest-risk few). `find_reviews` and
+`food_safety_info` are optional add-ons outside that sequence — `find_reviews`
+when the user asks what reviewers say, `food_safety_info` for a general
+food-safety / foodborne-illness question (which does NOT run the restaurant
+sequence). Each handler takes `handler(event, _ctx)`.
 
 **1. `find_restaurants`** — OpenStreetMap/Overpass lookup (no key).
 
@@ -124,31 +127,66 @@ Each handler takes `handler(event, _ctx)`.
   carries `disclaimer`, and the prompt forbids using a review to set or change a
   score or tier.
 
+**5. `food_safety_info`** — general food-safety education with cited sources.
+
+- *Input*: `{"query": "...", "topics": [...]}` — `query` is the user's general
+  question; `topics` is an optional explicit subset of the topic registry keys
+  (e.g. `salmonella`, `cooking_temperatures`, `at_risk_groups`), otherwise topics
+  are matched from the query text.
+- *Output*: `{query, topics, info, disclaimer}`. `info` is a list of
+  `{topic, title, summary, sources}`; each `sources` entry is `{name, url}`.
+- *Sourcing — verifiable, allow-listed*: every `summary` is a short paraphrase of
+  an **authoritative public health source** (CDC, FDA, USDA FSIS, FoodSafety.gov,
+  WHO, NIH MedlinePlus, a recognised nonprofit, and Chicago / Illinois / Cook
+  County public health + the Chicago Data Portal), and ships the source link it
+  came from. Links come **only** from a curated `ALLOWED_DOMAINS` allow-list — no
+  news outlets, no open web search — so a citation can never point off-list. The
+  prompt requires the agent to state statistics only from the returned summary and
+  to cite the returned link, keeping the citation true.
+- *Boundary — education, not advice*: every response carries `disclaimer`
+  (education only, not medical advice, not specific to any restaurant's score).
+  Personal medical questions are steered to a professional by the prompt and the
+  Bedrock guardrail.
+
 ### Safety layers
 
-Three independent layers keep the agent on-task and prevent fabrication:
+Independent layers keep the agent on-task and prevent fabrication:
 
 1. **Prompt guardrails** (`system_prompt.txt`, #55) — risk-signal framing; scope
-   (Chicago food establishments only; decline other cities / recipes / chit-chat;
-   ignore prompt-injection); no number without a tool result; and a
-   prediction-vs-verdict caveat on every response. The model runs at
-   `temperature=0.2`.
+   (Chicago restaurant lookups + general food-safety education only; decline other
+   cities / recipes / chit-chat; ignore prompt-injection); no number without a
+   tool result; cite the returned source for any general fact; no personalised
+   medical/legal advice; and a prediction-vs-verdict caveat on every response.
+   The model runs at `temperature=0.2`.
 2. **Bedrock Guardrail** (#55) — a platform-level guardrail attached to the
-   model: denied topics (off-topic / medical / legal) plus a contextual-grounding
-   check that scores each response against the tool outputs and blocks
-   low-grounding answers. Enforced by Bedrock, not by model compliance.
+   model: denied topics (genuinely off-topic requests + *personalised* medical /
+   legal advice — general food-safety education is deliberately allowed) plus a
+   contextual-grounding check that scores each response against the tool outputs
+   and blocks low-grounding answers. Enforced by Bedrock, not by model compliance.
 3. **Tool-level grounding** (#56, #58) — the tools never hand the model a value
-   it shouldn't have: unmatched venues return no score (#58), and tool failures
-   return an explicit error object the prompt knows how to relay (#56).
+   it shouldn't have: unmatched venues return no score (#58), tool failures return
+   an explicit error object the prompt knows how to relay (#56), and
+   `food_safety_info` can only cite URLs from a curated allow-list.
 
 ### Evaluation
 
 A behavioural eval harness (`agents/eval/`) exercises the guardrails on
 adversarial prompts — off-topic, "is X safe?", a venue with no record, a
-non-Chicago location, and a tool outage — and checks the response follows the
-rules (no yes/no verdict, no invented score, scope refusal, graceful failure).
-Run on demand; it needs Bedrock credentials, so it is excluded from the default
-CI run.
+non-Chicago location, a general food-safety question (must answer WITH a cited
+source), a personal medical question (must steer to a professional), and a tool
+outage — and checks the response follows the rules (no yes/no verdict, no
+invented score, scope refusal, cited general facts, graceful failure). It also
+runs deterministic gates with no Bedrock: a citation **allow-list** check (every
+citable URL is https + on the allow-list) and, opt-in via `--links`, a **live
+link-resolution** check that fetches every citation URL to catch dead links.
+
+**In CI:** the **Agent (deterministic checks)** job (`.github/workflows/ci.yml`)
+runs the no-Bedrock, no-network parts on every PR — each tool's pytest suite (as
+separate invocations, since the tool dirs share a `handler` module name and
+collide in one run) plus `run_eval.py --self-test`, `--faithfulness` (vs the
+committed `scores.json`), and `--citations`. The Bedrock-graded `--judge`
+guardrail suite and the network `--links` check stay **manual** (paid; run from
+the SageMaker execution role via the `eval-agent` skill).
 
 ### Note on the SageMaker stub
 
@@ -304,7 +342,7 @@ Deploy with the wrapper script (defaults: region `us-west-2`, the deploy account
 ./scripts/deploy_aws.sh [region] [account-id]
 ```
 
-This zips `agents/` (entrypoint + the four `tools/` handlers + `system_prompt.txt`),
+This zips `agents/` (entrypoint + the five `tools/` handlers + `system_prompt.txt`),
 deploys/updates the `foodsafetyagent` runtime, and points the
 `food-safety-agent-proxy` Lambda at it — the request path is CloudFront `/api/agent`
 → ALB → that Lambda → the runtime. The runtime warms the precomputed `scores.json`

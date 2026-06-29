@@ -190,7 +190,7 @@ npm run dev      # http://localhost:3000
 ## Continuous integration
 
 Every pull request (and every push to `main`) runs `.github/workflows/ci.yml`
-— three jobs in parallel, the same checks you can run locally:
+— four jobs in parallel, the same checks you can run locally:
 
 **Python checks** (`ruff`, `pytest`, coverage)
 
@@ -215,6 +215,16 @@ Every pull request (and every push to `main`) runs `.github/workflows/ci.yml`
   breaks that the checks above miss, because none of them ever open a page. It
   is a coarse safety net, not a substitute for the screenshot review in
   `/verify`.
+
+**Agent checks** (`agent`)
+
+- Runs the chat agent's deterministic tests on every PR — each tool's `pytest`
+  suite, plus the eval harness's no-Bedrock gates (checker self-test, faithfulness
+  vs the published `scores.json`, and the citation-source allow-list). The agent
+  app lives outside `src/foodsafety`, so the coverage above doesn't cover it; this
+  job is its gate. The Bedrock-graded guardrail eval and the live citation
+  link-check stay manual (they cost money / hit the network) — see
+  `agents/README.md` and the `eval-agent` skill.
 
 Deploys are separate workflows (`deploy-web.yml`, `deploy-agent.yml`) that run
 when a change lands on `main`.
