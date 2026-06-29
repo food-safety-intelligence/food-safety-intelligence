@@ -67,18 +67,21 @@ export function ScoreCard({
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
 
-  // Trend-chart points: the most-recent inspections that carry a forecast score
-  // (administrative inspections have none), oldest -> newest. See decision 0011.
+  // Plot the FULL forecast trajectory — every inspection that carries a forecast
+  // score (i.e. every training-data inspection; administrative ones have none),
+  // oldest -> newest (history is newest-first). The chart shades the last
+  // TREND_POINTS as the trend window — the visits trend_slope is fit over (DR
+  // 0011) — so the full arc is visible without the chart contradicting the header.
   const TREND_POINTS = 5;
-  const trendPoints = history
+  const scoredPoints = history
     .filter((e): e is InspectionEvent & { score: number } => e.score != null)
-    .slice(0, TREND_POINTS)
-    .map((e) => ({ date: e.date, score: e.score }))
+    .map((e) => ({ date: e.date, score: e.score, result: e.result }))
     .reverse();
+  const trendWindow = Math.min(TREND_POINTS, scoredPoints.length);
 
   // One gate for the header label and the chart so they never disagree: we have
   // a trend only with a (forward-looking) slope AND at least two points to draw.
-  const hasTrend = slope !== null && trendPoints.length >= 2;
+  const hasTrend = slope !== null && scoredPoints.length >= 2;
 
   // Percentile rank reads honestly across every tier. "Top X%" alone gets
   // misleading at the extremes (e.g. "top 0.00%" for the highest-scoring
@@ -165,10 +168,15 @@ export function ScoreCard({
         </span>
       </div>
       <div className="flex justify-center">
-        <TrendChart points={hasTrend ? trendPoints : []} slope={slope} />
+        <TrendChart
+          points={hasTrend ? scoredPoints : []}
+          slope={slope}
+          windowSize={trendWindow}
+        />
       </div>
       <p className="text-2xs text-muted mt-2 text-center leading-snug">
-        Predicted risk over recent inspections — which way it&apos;s trending.
+        Predicted risk across all scored inspections; the shaded band is the
+        recent window that sets the trend.
       </p>
     </div>
   );
