@@ -31,7 +31,7 @@ from foodsafety.config import DATASETS, RELEVANT_SR_TYPES, TRAIN_START_DATE
 from foodsafety.io.soda import fetch_soda, fetch_soda_keyset
 
 
-def upload_df(df: pd.DataFrame, s3: "boto3.client", bucket: str, key: str) -> None:
+def upload_df(df: pd.DataFrame, s3: boto3.client, bucket: str, key: str) -> None:
     buf = io.BytesIO()
     df.to_parquet(buf, index=False)
     buf.seek(0)
