@@ -2,41 +2,48 @@
 
 
 
-| Name                                                  |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
-|------------------------------------------------------ | -------: | -------: | -------: | -------: | ------: | --------: |
-| src/foodsafety/\_\_init\_\_.py                        |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/config.py                              |       28 |        4 |        4 |        1 |     78% |     33-36 |
-| src/foodsafety/data/\_\_init\_\_.py                   |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/data/labels.py                         |       65 |        0 |       16 |        1 |     99% | 199-\>201 |
-| src/foodsafety/explain/\_\_init\_\_.py                |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/explain/feature\_labels.py             |       10 |        1 |        0 |        0 |     90% |       160 |
-| src/foodsafety/explain/shap\_drivers.py               |       99 |       12 |       36 |        8 |     82% |75-78, 101, 108, 125, 189-\>191, 194-\>198, 200-201, 245, 255-256 |
-| src/foodsafety/features/\_\_init\_\_.py               |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/features/build.py                      |       35 |        4 |       14 |        7 |     78% |98, 102, 109, 118-\>120, 120-\>122, 122-\>124, 131 |
-| src/foodsafety/features/building\_features.py         |       89 |       28 |       32 |        2 |     67% |179, 199, 228-282 |
-| src/foodsafety/features/complaint\_features.py        |      106 |        3 |       20 |        2 |     96% |139-140, 292 |
-| src/foodsafety/features/inspection\_features.py       |       66 |        1 |        6 |        1 |     97% |        92 |
-| src/foodsafety/features/keyword\_flags.py             |       11 |        0 |        2 |        0 |    100% |           |
-| src/foodsafety/features/license\_features.py          |       37 |        2 |       20 |        2 |     93% |    66, 99 |
-| src/foodsafety/features/license\_history\_features.py |       25 |        0 |        2 |        0 |    100% |           |
-| src/foodsafety/features/temporal\_features.py         |       12 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/features/text\_features.py             |       24 |        1 |        2 |        1 |     92% |        85 |
-| src/foodsafety/features/violation\_labels.py          |       27 |        1 |        2 |        1 |     93% |        94 |
-| src/foodsafety/io/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/io/cache.py                            |       21 |        3 |        8 |        3 |     79% |46, 50, 59 |
-| src/foodsafety/io/soda.py                             |      105 |       11 |       54 |       11 |     86% |65-\>89, 83-84, 155-156, 161-\>207, 173, 197, 212, 217, 257, 292, 297 |
-| src/foodsafety/io/storage.py                          |       74 |        2 |       12 |        3 |     94% |51-52, 72-\>exit, 74-\>exit |
-| src/foodsafety/models/\_\_init\_\_.py                 |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/models/baseline.py                     |       20 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/models/evaluate.py                     |      108 |        3 |       20 |        3 |     95% |72, 122, 275 |
-| src/foodsafety/models/xgb.py                          |       33 |        0 |       10 |        0 |    100% |           |
-| src/foodsafety/serve/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/serve/predict\_batch.py                |       78 |       11 |       20 |        6 |     83% |72, 115, 117, 145, 204-206, 218-219, 224-225, 261-\>277 |
-| src/foodsafety/tracking.py                            |       20 |       20 |        0 |        0 |      0% |     18-62 |
-| src/foodsafety/utils/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/utils/geo.py                           |       23 |        0 |        4 |        0 |    100% |           |
-| src/foodsafety/utils/time.py                          |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                             | **1172** |  **109** |  **300** |   **54** | **88%** |           |
+| Name                                                     |    Stmts |     Miss |   Branch |   BrPart |   Cover |   Missing |
+|--------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
+| agents/tools/explain\_restaurant/handler.py              |       79 |        6 |       24 |        1 |     93% |32-33, 43-44, 225-\>231, 228-229 |
+| agents/tools/find\_restaurants/chicago\_neighborhoods.py |        4 |        0 |        0 |        0 |    100% |           |
+| agents/tools/find\_restaurants/handler.py                |      108 |        7 |       36 |        2 |     94% |189-191, 236-247, 313 |
+| agents/tools/find\_reviews/handler.py                    |       34 |        0 |       10 |        0 |    100% |           |
+| agents/tools/food\_safety\_info/handler.py               |       40 |        1 |       14 |        3 |     93% |381, 383-\>386, 391-\>388 |
+| agents/tools/get\_safety\_score/handler.py               |       95 |        3 |       34 |        3 |     95% |205, 244, 331 |
+| agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
+| src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/config.py                                 |       28 |        4 |        4 |        1 |     78% |     33-36 |
+| src/foodsafety/data/\_\_init\_\_.py                      |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/data/labels.py                            |       65 |        0 |       16 |        1 |     99% | 199-\>201 |
+| src/foodsafety/explain/\_\_init\_\_.py                   |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/explain/feature\_labels.py                |       10 |        1 |        0 |        0 |     90% |       160 |
+| src/foodsafety/explain/shap\_drivers.py                  |       99 |       12 |       36 |        8 |     82% |75-78, 101, 108, 125, 189-\>191, 194-\>198, 200-201, 245, 255-256 |
+| src/foodsafety/features/\_\_init\_\_.py                  |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/features/build.py                         |       35 |        4 |       14 |        7 |     78% |98, 102, 109, 118-\>120, 120-\>122, 122-\>124, 131 |
+| src/foodsafety/features/building\_features.py            |       89 |       28 |       32 |        2 |     67% |179, 199, 228-282 |
+| src/foodsafety/features/complaint\_features.py           |      106 |        3 |       20 |        2 |     96% |139-140, 292 |
+| src/foodsafety/features/inspection\_features.py          |       66 |        1 |        6 |        1 |     97% |        92 |
+| src/foodsafety/features/keyword\_flags.py                |       11 |        0 |        2 |        0 |    100% |           |
+| src/foodsafety/features/license\_features.py             |       37 |        2 |       20 |        2 |     93% |    66, 99 |
+| src/foodsafety/features/license\_history\_features.py    |       25 |        0 |        2 |        0 |    100% |           |
+| src/foodsafety/features/temporal\_features.py            |       12 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/features/text\_features.py                |       24 |        1 |        2 |        1 |     92% |        85 |
+| src/foodsafety/features/violation\_labels.py             |       27 |        1 |        2 |        1 |     93% |        94 |
+| src/foodsafety/io/\_\_init\_\_.py                        |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/io/cache.py                               |       21 |        3 |        8 |        3 |     79% |46, 50, 59 |
+| src/foodsafety/io/soda.py                                |      105 |       11 |       54 |       11 |     86% |65-\>89, 83-84, 155-156, 161-\>207, 173, 197, 212, 217, 257, 292, 297 |
+| src/foodsafety/io/storage.py                             |       74 |        2 |       12 |        3 |     94% |51-52, 72-\>exit, 74-\>exit |
+| src/foodsafety/models/\_\_init\_\_.py                    |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/models/baseline.py                        |       20 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/models/evaluate.py                        |      108 |        3 |       20 |        3 |     95% |72, 122, 275 |
+| src/foodsafety/models/xgb.py                             |       33 |        0 |       10 |        0 |    100% |           |
+| src/foodsafety/serve/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/serve/predict\_batch.py                   |       78 |       11 |       20 |        6 |     83% |72, 115, 117, 145, 204-206, 218-219, 224-225, 261-\>277 |
+| src/foodsafety/tracking.py                               |       20 |       20 |        0 |        0 |      0% |     18-62 |
+| src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
+| src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
+| **TOTAL**                                                | **1600** |  **143** |  **438** |   **63** | **89%** |           |
 
 
 ## Setup coverage badge
