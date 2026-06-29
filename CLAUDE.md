@@ -219,6 +219,9 @@ billing), Redux/Zustand (small state, use React hooks).
   `metadata.json` (train cutoff, features, metrics). **Never overwrite.**
 - `reports/figures/` — small PNGs referenced by the writeup. Checked in.
 - `reports/metrics/` — one JSON per training run. Checked in, diffable.
+  Organized by model type: `baseline/`, `baseline_sigmoid/`, `xgb/`, `mlp/`,
+  and `experiments/` for standalone (no-model-artifact) experiment runs. The
+  filename keeps the type prefix (e.g. `xgb/xgb_<run>.json`).
 - `scripts/` — Python CLI entry points called from the Makefile.
 - `tests/` — pytest, mirrors `src/foodsafety/`.
 - `docs/` — short markdown only. No auto-generated API docs.
@@ -407,7 +410,8 @@ Process:
 
 - Commit code **before** running a tracked experiment, so the run's provenance
   (git SHA → run id) points to the exact committed code.
-- Flow: commit code → run the experiment (writes `reports/metrics/<run>.json`
+- Flow: commit code → run the experiment (writes
+  `reports/metrics/<model_type>/<run>.json`
   plus the model + its `metadata.json` sidecar) → review the metrics → commit
   the metrics JSON. **Never commit `data/` artifacts** (parquets/models) —
   they're gitignored; the dataset is versioned by the `features_sha256` recorded
