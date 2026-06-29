@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { MessageCircle, X, Maximize2 } from "lucide-react";
 import { ChatInterface } from "@/components/ChatInterface";
+import { useChatScope } from "@/components/ChatScopeContext";
 
 /**
  * Site-wide chat launcher. Mounted once in the root layout, so it floats over
@@ -17,6 +18,7 @@ import { ChatInterface } from "@/components/ChatInterface";
  */
 export function FloatingChat() {
   const pathname = usePathname();
+  const { current: establishment } = useChatScope();
   const [open, setOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
@@ -114,8 +116,9 @@ export function FloatingChat() {
           </div>
 
           {/* Chat — fills the rest; ChatInterface is flex-1 min-h-0 internally.
-              compact drops the big empty-state heading (the panel header has it). */}
-          <ChatInterface compact />
+              compact drops the big empty-state heading (the panel header has it).
+              establishment scopes "this restaurant" to the detail page in view. */}
+          <ChatInterface compact establishment={establishment} />
         </div>
       )}
     </>
