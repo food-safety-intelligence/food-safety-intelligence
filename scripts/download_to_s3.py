@@ -82,16 +82,21 @@ def main() -> None:
     parser.add_argument("--bucket", required=True, help="S3 bucket name")
     parser.add_argument("--prefix", default="raw", help="S3 key prefix (default: raw)")
     parser.add_argument("--region", default=None, help="AWS region (default: from aws configure)")
-    parser.add_argument("--skip", nargs="*", default=[], metavar="FILENAME",
-                        help="Filenames to skip, e.g. --skip inspections.parquet complaints_311.parquet")
+    parser.add_argument(
+        "--skip",
+        nargs="*",
+        default=[],
+        metavar="FILENAME",
+        help="Filenames to skip, e.g. --skip inspections.parquet complaints_311.parquet",
+    )
     args = parser.parse_args()
 
     s3 = boto3.client("s3", region_name=args.region)
 
     datasets = [
-        (download_inspections,         "inspections.parquet"),
-        (download_complaints,          "complaints_311.parquet"),
-        (download_licenses_current,    "licenses_current.parquet"),
+        (download_inspections, "inspections.parquet"),
+        (download_complaints, "complaints_311.parquet"),
+        (download_licenses_current, "licenses_current.parquet"),
         (download_licenses_historical, "licenses_historical.parquet"),
     ]
 
