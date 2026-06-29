@@ -26,7 +26,13 @@ import sys
 # Path setup — add tool dirs so handler.py files import their siblings.
 # ---------------------------------------------------------------------------
 _HERE = os.path.dirname(os.path.abspath(__file__))
-for _tool in ["find_restaurants", "get_safety_score", "explain_restaurant", "find_reviews"]:
+for _tool in [
+    "find_restaurants",
+    "get_safety_score",
+    "explain_restaurant",
+    "find_reviews",
+    "food_safety_info",
+]:
     _p = os.path.join(_HERE, "tools", _tool)
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -88,6 +94,7 @@ _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
 _reviews_handler = _load_handler("find_reviews")
+_info_handler = _load_handler("food_safety_info")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
@@ -158,6 +165,25 @@ def find_reviews(name: str, address: str = "", topics: list | None = None) -> di
     return _reviews_handler.handler(
         {"name": name, "address": address, "topics": topics or []}, None
     )
+
+
+@tool
+def food_safety_info(query: str, topics: list | None = None) -> dict:
+    """
+    Answer a GENERAL food-safety / foodborne-illness question (what a germ is, how
+    common illness is, safe cooking temperatures, who is most at risk, how to
+    prevent it) with short vetted facts AND a citation to an authoritative public
+    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or Chicago/Illinois
+    public health). Use for general questions NOT about one Chicago restaurant's
+    score. Base any statistic on the returned summary and cite the returned source
+    links. Education, not medical advice — never use it to judge what is safe for
+    someone personally.
+
+    Args:
+        query: The user's general food-safety question, passed through verbatim
+        topics: Optional explicit subset of topic keys; omit to match on the query
+    """
+    return _info_handler.handler({"query": query, "topics": topics or []}, None)
 
 
 # ---------------------------------------------------------------------------
@@ -275,7 +301,13 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     return Agent(
         model=model,
         messages=messages or [],
-        tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
+        tools=[
+            find_restaurants,
+            get_safety_score,
+            explain_restaurant,
+            find_reviews,
+            food_safety_info,
+        ],
         system_prompt=SYSTEM_PROMPT,
     )
 
