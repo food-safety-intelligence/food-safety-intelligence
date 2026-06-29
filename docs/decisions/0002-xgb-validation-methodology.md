@@ -120,6 +120,6 @@ on all three model families — LogReg, XGBoost, and the nb07 MLP — and was re
 - `src/foodsafety/utils/time.py` (`expanding_year_folds`, `temporal_split`),
   `notebooks/05_xgboost_model.ipynb`, `tests/` (leak guards)
 - Code commit `70075e9`; metrics commit `0d3de14`
-  (`reports/metrics/xgb_20260614_70075e927.json`)
+  (`reports/metrics/xgb/xgb_20260614_70075e927.json`)
 - Decision record `0001` (experiment tracking; served = sigmoid), CLAUDE.md
   § "What NOT to do" (no shuffle, leakage guards)

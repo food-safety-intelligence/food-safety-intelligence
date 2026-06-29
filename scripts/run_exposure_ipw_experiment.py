@@ -391,8 +391,9 @@ def main() -> None:
             "deconfounding failed — read the diagnostic (corr(score,exposure)) too."
         ),
     }
-    METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METRICS_DIR / f"exposure_ipw_experiment_{date.today().isoformat()}.json"
+    experiments_dir = METRICS_DIR / "experiments"
+    experiments_dir.mkdir(parents=True, exist_ok=True)
+    out_path = experiments_dir / f"exposure_ipw_experiment_{date.today().isoformat()}.json"
     out_path.write_text(json.dumps(out, indent=2))
     print(f"\nwrote {out_path}")
 
