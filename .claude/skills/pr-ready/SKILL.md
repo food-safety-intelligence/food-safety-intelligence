@@ -1,6 +1,6 @@
 ---
 name: pr-ready
-description: Run the same checks CI runs (Python ruff + pytest, web-app eslint + tsc + vitest) against the local branch BEFORE pushing, fix anything that fails, and draft a clear PR description summarizing the change. Use when the user says "pr-ready", "/pr-ready", "run CI locally", "check before I push/PR", or asks to prep a PR. Mirrors .github/workflows/ci.yml exactly so a green run here means a green run on GitHub.
+description: Run the same checks CI runs (Python ruff + pytest, agent tool tests + deterministic eval, web-app eslint + tsc + vitest + build + rendered-UI smoke) against the local branch BEFORE pushing, fix anything that fails, and draft a clear PR description summarizing the change. Use when the user says "pr-ready", "/pr-ready", "run CI locally", "check before I push/PR", or asks to prep a PR. Mirrors .github/workflows/ci.yml exactly so a green run here means a green run on GitHub.
 ---
 
 # pr-ready
@@ -38,9 +38,31 @@ see every failure at once.
 
 `make lint` runs the two ruff commands; `make test` runs pytest. Notebooks are
 excluded from ruff in `pyproject.toml` — this gates the package, `scripts/`,
-`tests/`, and agents only.
+`tests/`, and agents only. Note `pytest` here runs only `tests/` (`testpaths`);
+the agent suites are Step 1b.
 
-## Step 2 — Web-app checks (eslint + tsc + vitest)
+## Step 1b — Agent checks (deterministic, no Bedrock/network)
+
+Only if the change touches `agents/`. CI gates these in the dedicated **Agent
+(deterministic checks)** job, and also runs them under coverage in the Python
+job. Each tool dir is loaded via `sys.path` and they share a `handler` module
+name, so run each suite as a SEPARATE invocation (one combined run collides on
+the duplicate module name):
+
+```bash
+for d in agents/tools/*/; do
+  ls "$d"test_*.py >/dev/null 2>&1 && .venv/bin/python -m pytest "$d"
+done
+
+# Deterministic eval gates only — no Bedrock, no network. The --judge (Bedrock
+# LLM grader) and --links (live URL fetch) checks stay manual via the
+# eval-agent skill; they are not part of CI.
+.venv/bin/python agents/eval/run_eval.py --self-test
+.venv/bin/python agents/eval/run_eval.py --faithfulness
+.venv/bin/python agents/eval/run_eval.py --citations
+```
+
+## Step 2 — Web-app checks (eslint + tsc + vitest + build)
 
 Only if the change touches `app/`. Same order as CI:
 
@@ -50,7 +72,32 @@ npm ci            # locked install, matches CI; use plain `npm install` only to 
 npm run lint      # eslint
 npx tsc --noEmit  # typecheck
 npm test          # vitest
+npm run build     # static export — tsc never exercises the build; this catches
+                  # a build-time / static-export data-loading break CI would fail on
 ```
+
+## Step 2b — Web-app rendered-UI smoke
+
+Only if the change touches `app/`. CI's fourth job builds the static export and
+drives the key routes in headless Chromium (asserting no ≥400 responses, no
+console errors, `<main>` rendered, no overflow) — `tsc`/`vitest` never render a
+page, so layout/route-render breaks pass them but fail here. Reuses the build
+from Step 2:
+
+```bash
+cd app
+# one-time per machine: a headless browser for the smoke driver
+npm install --no-save playwright@1.61.1
+npx playwright install --with-deps chromium
+
+python3 -m http.server 3000 --directory out >/dev/null 2>&1 &   # serve the export
+for _ in $(seq 1 30); do curl -sf -o /dev/null http://localhost:3000/ && break || sleep 1; done
+node e2e/smoke.mjs
+kill %1   # stop the background server
+```
+
+For a richer, screenshot-based check of a *visible* change, use `/verify`
+(the `verifier-app` skill) — this smoke is only the CI pass/fail gate.
 
 ## Step 3 — Fix every failure
 

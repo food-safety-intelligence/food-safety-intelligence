@@ -1,6 +1,6 @@
 ---
 name: eval-agent
-description: Run the Food Safety chat-agent eval (agents/eval/run_eval.py) — deterministic gates (checker self-test + faithfulness vs scores.json) then the live-agent guardrail suite graded by a Nova Pro LLM judge. Use when asked to "eval the agent", "test the agent guardrails", "run the agent eval", or before merging a prompt/model/temperature change to the agent. Covers the Bedrock execution-role setup, cost, and logging results to docs/agent-experiments.md.
+description: Run the Food Safety chat-agent eval (agents/eval/run_eval.py) — deterministic gates (checker self-test + faithfulness vs scores.json + citation allow-list), an opt-in live link-resolution check, then the live-agent guardrail suite graded by a Nova Pro LLM judge. Use when asked to "eval the agent", "test the agent guardrails", "check the agent citations / links", "run the agent eval", or before merging a prompt/model/temperature/tool change to the agent. Covers the Bedrock execution-role setup, cost, and logging results to docs/agent-experiments.md.
 ---
 
 # eval-agent
@@ -16,14 +16,23 @@ result. One entry point: `agents/eval/run_eval.py`.
    runs each record through `get_safety_score`, and asserts `risk_score` /
    `risk_tier` / `license_id` are relayed exactly (the batch-score-to-JSON
    contract, decision record 0010).
-3. **Guardrails** (needs Bedrock): runs the agent on adversarial prompts across
-   six categories — off-topic/scope, verdict-avoidance, no-record/no-fabrication,
-   non-Chicago scope, prompt-injection, tool-outage resilience — and grades each
+3. **Gate 3 — citation allow-list** (deterministic, no Bedrock): every URL the
+   `food_safety_info` tool can cite is https and on the curated allow-list, so the
+   agent can only cite authoritative public-health sources (decision record 0012).
+4. **Live link-resolution** (`--links`, needs network, opt-in — not a gate):
+   fetches every citation URL and flags dead links (404/410/DNS). A bot-block
+   (403/etc.) is reachable-but-restricted, not dead. Run before a release to catch
+   link rot; kept out of the gate because it hits external gov sites.
+5. **Guardrails** (needs Bedrock): runs the agent on adversarial prompts —
+   off-topic/scope, verdict-avoidance, no-record/no-fabrication, non-Chicago
+   scope, prompt-injection, tool-outage resilience, **general-info (a general
+   food-safety question must be answered WITH a cited source; a personal medical
+   question must be steered to a professional)**, and reviews — and grades each
    response. With `--judge`, an **Amazon Nova Pro** LLM judge grades (more robust
    than the substring heuristics); Nova Pro grading Nova 2 Lite avoids a model
    grading itself.
 
-The full run **gates**: if either deterministic gate fails, it stops before any
+The full run **gates**: if any deterministic gate (1–3) fails, it stops before any
 Bedrock call (no spend on a run that's already invalid).
 
 ## Running it
@@ -32,6 +41,8 @@ Bedrock call (no spend on a run that's already invalid).
 
     uv run python agents/eval/run_eval.py --self-test     # checker sanity
     uv run python agents/eval/run_eval.py --faithfulness  # tool vs scores.json
+    uv run python agents/eval/run_eval.py --citations     # citation allow-list
+    uv run python agents/eval/run_eval.py --links         # live-resolve citation URLs (network)
 
 **Full run (needs Bedrock).** The agent calls Bedrock (Nova 2 Lite) and the
 judge calls Nova Pro, so you need an identity with Bedrock access **and** model
