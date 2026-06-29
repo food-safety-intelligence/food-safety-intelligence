@@ -59,13 +59,6 @@ _BLOCK_MESSAGE = (
 # general factual food-safety education is allowed.
 _DENIED_TOPICS = [
     {
-        "name": "PersonalisedMedicalAdvice",
-        "definition": (
-            "Personalised medical advice for a specific person — diagnosis, "
-            "treatment or medication, or whether a food is safe given their "
-            "health condition. General factual food-safety education is allowed."
-        ),
-        "examples": [
         "name": "OffTopicNonFoodSafety",
         "definition": (
             "Requests neither about food-safety risk for Chicago establishments "
