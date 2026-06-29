@@ -17,6 +17,8 @@ import os
 import sys
 import types
 
+import pytest
+
 # ---------------------------------------------------------------------------
 # Path setup — allow running from the repo root or from this directory.
 # ---------------------------------------------------------------------------
@@ -29,6 +31,7 @@ if _THIS_DIR not in sys.path:
 _boto3_stub = types.ModuleType("boto3")
 sys.modules.setdefault("boto3", _boto3_stub)
 
+import handler  # noqa: E402
 from handler import (  # noqa: E402
     _fuzzy_lookup,
     _load_scores_index,
@@ -134,3 +137,162 @@ def test_loader_retains_all_shared_address_records(tmp_path, monkeypatch):
         assert len(buckets[0]) == 2  # both records retained
     finally:
         _load_scores_index.cache_clear()
+
+
+# ---------------------------------------------------------------------------
+# Name + geographic-proximity fallback (the Thai-search "no record" bug)
+# ---------------------------------------------------------------------------
+
+# A small batch run with real-ish Chicago coordinates. CHINA CAFE is the only
+# record near 100 W Randolph, used to check that a different nearby business does
+# not borrow its score.
+_GEO_SCORES = {
+    "scores": [
+        {
+            "license_id": "1801618",
+            "dba_name": "AMARIT RESTAURANT",
+            "address": "600 S DEARBORN ST",
+            "lat": 41.87448,
+            "lon": -87.62935,
+            "risk_score": 0.0352,
+            "risk_tier": "Low",
+            "trend_slope_90d": 0.0,
+            "neighborhood": "Loop",
+            "top_drivers": [],
+        },
+        {
+            "license_id": "555",
+            "dba_name": "LOU MALNATIS PIZZERIA",
+            "address": "439 N WELLS ST",
+            "lat": 41.89030,
+            "lon": -87.63410,
+            "risk_score": 0.11,
+            "risk_tier": "Moderate",
+            "trend_slope_90d": 0.0,
+            "neighborhood": "River North",
+            "top_drivers": [],
+        },
+        {
+            "license_id": "222",
+            "dba_name": "CHINA CAFE",
+            "address": "100 W RANDOLPH ST",
+            "lat": 41.88400,
+            "lon": -87.63100,
+            "risk_score": 0.20,
+            "risk_tier": "Moderate",
+            "trend_slope_90d": 0.0,
+            "neighborhood": "Loop",
+            "top_drivers": [],
+        },
+    ]
+}
+
+
+@pytest.fixture
+def _geo_scores(tmp_path, monkeypatch):
+    """Point the handler at the geo fixture and reset both caches."""
+    path = tmp_path / "scores.json"
+    path.write_text(json.dumps(_GEO_SCORES), encoding="utf-8")
+    monkeypatch.setenv("SCORES_JSON_PATH", str(path))
+    handler._load_scores_index.cache_clear()
+    handler._load_scores_records.cache_clear()
+    yield
+    handler._load_scores_index.cache_clear()
+    handler._load_scores_records.cache_clear()
+
+
+def _score_one(osm: dict) -> dict:
+    return handler.handler({"restaurants": [osm]}, None)[0]
+
+
+def test_geo_fallback_recovers_venue_with_no_osm_address(_geo_scores):
+    # "Amarit" (OSM) vs "AMARIT RESTAURANT" (city) at the same corner, with the
+    # placeholder address OSM usually returns. The address match fails; geo +
+    # name must recover the real record. This is the reported Thai-search bug.
+    out = _score_one(
+        {
+            "osm_id": "1",
+            "name": "Amarit",
+            "address": "Chicago, IL",
+            "lat": 41.87450,
+            "lon": -87.62930,
+            "cuisine": "thai",
+        }
+    )
+    assert out["matched_scores_json"] is True
+    assert out["status"] == "scored"
+    assert out["license_id"] == "1801618"
+    assert out["risk_tier"] == "Low"
+
+
+def test_geo_fallback_token_subset_name(_geo_scores):
+    # OSM short name is a token-subset of the longer city name ("Lou Malnati's"
+    # vs "LOU MALNATIS PIZZERIA"); SequenceMatcher alone scores this too low.
+    out = _score_one(
+        {"osm_id": "2", "name": "Lou Malnati's", "address": "", "lat": 41.89028, "lon": -87.63412}
+    )
+    assert out["matched_scores_json"] is True
+    assert out["license_id"] == "555"
+
+
+def test_geo_fallback_rejects_nearby_different_name(_geo_scores):
+    # A different establishment ~15 m from CHINA CAFE must NOT inherit its score
+    # just because it is close — the name has to agree (ethics DR 0005).
+    out = _score_one(
+        {"osm_id": "3", "name": "China Grill", "address": "", "lat": 41.88401, "lon": -87.63099}
+    )
+    assert out["matched_scores_json"] is False
+    assert out["status"] == "no_inspection_record"
+
+
+def test_geo_fallback_respects_proximity(_geo_scores):
+    # Same name as a dataset venue but kilometres away -> not the same place.
+    out = _score_one(
+        {"osm_id": "4", "name": "Amarit", "address": "", "lat": 41.95000, "lon": -87.70000}
+    )
+    assert out["matched_scores_json"] is False
+
+
+def test_absent_venue_returns_no_record(_geo_scores):
+    out = _score_one(
+        {
+            "osm_id": "5",
+            "name": "Totally Made Up Thai Place",
+            "address": "",
+            "lat": 41.88000,
+            "lon": -87.63000,
+        }
+    )
+    assert out["matched_scores_json"] is False
+    assert out["risk_score"] is None
+
+
+def test_address_path_still_matches(_geo_scores):
+    # A clean street address still matches via the original address path.
+    out = _score_one(
+        {
+            "osm_id": "6",
+            "name": "Amarit Thai",
+            "address": "600 S Dearborn Street",
+            "lat": 41.87448,
+            "lon": -87.62935,
+        }
+    )
+    assert out["matched_scores_json"] is True
+    assert out["license_id"] == "1801618"
+
+
+@pytest.mark.parametrize(
+    ("osm", "dba", "expected"),
+    [
+        ("Amarit", "AMARIT RESTAURANT", True),
+        ("Lou Malnati's", "LOU MALNATIS PIZZERIA", True),
+        ("Star of Siam", "STAR OF SIAM INC", True),
+        ("China Grill", "CHINA CAFE", False),
+        # A name made only of generic words must never match by token-subset.
+        ("Restaurant", "AMARIT RESTAURANT", False),
+        ("", "AMARIT RESTAURANT", False),
+    ],
+)
+def test_names_match(osm, dba, expected):
+    assert handler._names_match(osm, dba) is expected
