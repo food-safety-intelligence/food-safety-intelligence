@@ -324,6 +324,19 @@ export function matchesQuery(
   return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
 }
 
+/**
+ * "A–Z" comparator. `localeCompare` alone sorts names that start with a digit
+ * or symbol (e.g. "7-Eleven", "#1 Wok") ahead of the letters, so the list opens
+ * on numbers instead of "A". Group letter-initial names first, the rest after,
+ * then sort alphabetically within each group.
+ */
+export function compareByName(a: string, b: string): number {
+  const aLetter = /^\p{L}/u.test(a.trimStart());
+  const bLetter = /^\p{L}/u.test(b.trimStart());
+  if (aLetter !== bLetter) return aLetter ? -1 : 1;
+  return a.localeCompare(b);
+}
+
 /** Validate a raw `?sort=` value into a {@link HomeSort}; default "risk". */
 export function parseSort(raw: string | null | undefined): HomeSort {
   return raw === "name" ? "name" : raw === "low" ? "low" : "risk";
@@ -391,7 +404,7 @@ export function computeHomeView(
 
   const byScore = (a: SearchIndexRow, b: SearchIndexRow) =>
     sort === "name"
-      ? a.dba_name.localeCompare(b.dba_name)
+      ? compareByName(a.dba_name, b.dba_name)
       : sort === "low"
         ? a.risk_score - b.risk_score
         : b.risk_score - a.risk_score;
