@@ -214,6 +214,12 @@ if [ -z "$LAMBDA_EXISTS" ]; then
         --environment "Variables={AGENT_RUNTIME_ARN=$AGENT_RUNTIME_ARN,DATA_BUCKET=$DATA_BUCKET}" \
         --region "$REGION" \
         --output text > /dev/null
+
+    # A new function starts in Pending; block until it is Active so the post-deploy
+    # smoke test can invoke it.
+    aws lambda wait function-active-v2 \
+        --function-name "$LAMBDA_FUNC_NAME" \
+        --region "$REGION"
 else
     echo "Updating existing Lambda function..."
     aws lambda update-function-code \
@@ -221,7 +227,14 @@ else
         --zip-file "fileb://lambda_proxy.zip" \
         --region "$REGION" \
         --output text > /dev/null
-    
+
+    # update-function-code leaves the function in LastUpdateStatus=InProgress; the
+    # very next update-function-configuration call races it and fails with
+    # ResourceConflictException. Wait for the code update to finish first.
+    aws lambda wait function-updated-v2 \
+        --function-name "$LAMBDA_FUNC_NAME" \
+        --region "$REGION"
+
     aws lambda update-function-configuration \
         --function-name "$LAMBDA_FUNC_NAME" \
         --handler handler.handler \
