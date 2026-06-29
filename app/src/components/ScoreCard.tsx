@@ -12,6 +12,7 @@ import { trendDirection } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
 import { ArcGauge } from "@/components/ArcGauge";
+import { Tooltip } from "@/components/Tooltip";
 import { TierPill } from "@/components/TierPill";
 import { TrendChart } from "@/components/TrendChart";
 
@@ -150,14 +151,15 @@ export function ScoreCard({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-1.5">
           <span className="text-2xs tracking-widest uppercase text-muted">Recent trend</span>
-          <a
-            href="/how-it-works#recent-trend"
-            aria-label="How the recent trend is calculated"
-            title="How the recent trend is calculated"
-            className="text-muted/70 hover:text-ink transition-colors"
-          >
-            <Info className="w-3.5 h-3.5" strokeWidth={2} />
-          </a>
+          <Tooltip content="How the recent trend is calculated">
+            <a
+              href="/how-it-works#recent-trend"
+              aria-label="How the recent trend is calculated"
+              className="text-muted/70 hover:text-ink transition-colors"
+            >
+              <Info className="w-3.5 h-3.5" strokeWidth={2} />
+            </a>
+          </Tooltip>
         </div>
         <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${trend.fg}`}>
           <TrendIcon className="w-3.5 h-3.5" strokeWidth={2.5} />

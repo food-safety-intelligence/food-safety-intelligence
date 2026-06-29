@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { MessageCircle, X, Maximize2 } from "lucide-react";
 import { ChatInterface } from "@/components/ChatInterface";
 import { useChatScope } from "@/components/ChatScopeContext";
+import { Tooltip } from "@/components/Tooltip";
 
 /**
  * Site-wide chat launcher. Mounted once in the root layout, so it floats over
@@ -99,14 +100,15 @@ export function FloatingChat() {
               </span>
             </span>
             <span className="flex items-center gap-1 flex-none">
-              <Link
-                href="/chat"
-                aria-label="Open the full chat page"
-                title="Open the full chat page"
-                className="p-1.5 rounded-full text-muted hover:text-teal hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
-              >
-                <Maximize2 className="w-4 h-4" strokeWidth={2} />
-              </Link>
+              <Tooltip content="Open the full chat page" align="end">
+                <Link
+                  href="/chat"
+                  aria-label="Open the full chat page"
+                  className="p-1.5 rounded-full text-muted hover:text-teal hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                >
+                  <Maximize2 className="w-4 h-4" strokeWidth={2} />
+                </Link>
+              </Tooltip>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close chat"
