@@ -1,4 +1,12 @@
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  BookMarked,
+  BookOpen,
+  type LucideIcon,
+  Target,
+  TriangleAlert,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
@@ -58,18 +66,67 @@ function WaterfallRow({
 }
 
 /**
- * A part divider — an uppercase eyebrow over a hairline that groups the page
- * into "read it / how it's built / how well it works / caveats". Matches the
- * "Methodology" eyebrow in the header.
+ * A part divider — a numbered, icon-led marker over a hairline that groups the
+ * page into "read it / how it's built / how well it works / caveats / reference".
+ * The serif numeral and tinted icon give each part a clear visual anchor while
+ * staying in the Clinical Quiet palette.
  */
-function SectionLabel({ children, id }: { children: string; id?: string }) {
+function SectionLabel({
+  children,
+  id,
+  number,
+  icon: Icon,
+}: {
+  children: string;
+  id?: string;
+  number: string;
+  icon: LucideIcon;
+}) {
   return (
-    <p
+    <div
       id={id}
-      className="scroll-mt-20 text-sage text-xs tracking-[0.18em] uppercase pt-8 border-t border-line"
+      className="scroll-mt-20 pt-9 mt-4 border-t border-line flex items-center gap-4"
     >
-      {children}
-    </p>
+      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-sage/12 text-sage shrink-0">
+        <Icon className="w-[19px] h-[19px]" strokeWidth={1.75} />
+      </span>
+      <span className="flex items-baseline gap-3">
+        <span className="serif italic text-2xl text-teal/70 leading-none">
+          {number}
+        </span>
+        <span className="text-sage text-xs tracking-[0.18em] uppercase">
+          {children}
+        </span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * A single headline metric in the hero — a big number over a one-line gloss.
+ * `accent` colours the figure terra for the one stat we most want to land.
+ */
+function HeroStat({
+  value,
+  label,
+  accent = false,
+}: {
+  value: string;
+  label: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl border border-line bg-card/70 backdrop-blur px-4 py-3.5 soft-shadow">
+      <div
+        className={cn(
+          "num text-3xl font-medium leading-none",
+          accent ? "text-terra-strong" : "text-ink",
+        )}
+      >
+        {value}
+      </div>
+      <div className="text-xs text-muted mt-1.5 leading-snug">{label}</div>
+    </div>
   );
 }
 
@@ -140,19 +197,54 @@ export default async function HowItWorksPage() {
           Back to search
         </Link>
 
-        <header className="mt-6">
-          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-            Methodology
-          </p>
-          <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
-            How this works
-          </h1>
-          <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
-            A gradient-boosted decision-tree model (XGBoost) fit on six years of
-            Chicago inspection history. The score is a calibrated probability
-            that a food establishment will fail an inspection or be cited for a
-            priority violation in the next 180 days.
-          </p>
+        {/* Hero band — a soft diagonal wash (cream → white) with a faint sage
+            glow lifts the page out of plain-document territory while staying in
+            the muted Clinical Quiet palette. The headline metrics sit here as
+            stat cards so the page leads with what the model actually does. */}
+        <header
+          className="relative mt-6 overflow-hidden rounded-3xl border border-line p-7 sm:p-10 soft-shadow"
+          style={{
+            background:
+              "linear-gradient(135deg, #EFE9DC 0%, #F6F1E9 48%, #FFFFFF 100%)",
+          }}
+        >
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full blur-3xl"
+            style={{ background: "rgba(122, 143, 106, 0.16)" }}
+          />
+          <div className="relative">
+            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
+              Methodology
+            </p>
+            <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
+              How this <span className="serif italic text-teal">works</span>
+            </h1>
+            <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
+              A gradient-boosted decision-tree model (XGBoost) fit on six years
+              of Chicago inspection history. The score is a calibrated
+              probability that a food establishment will fail an inspection or be
+              cited for a priority violation in the next 180 days.
+            </p>
+
+            <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <HeroStat
+                value={`${methodology.headline.top_decile_lift.toFixed(1)}×`}
+                label="more hits than random, working the top 10% by risk"
+                accent
+              />
+              <HeroStat
+                value={top20 ? `${Math.round(top20.recall * 100)}%` : "—"}
+                label="of next-180-day events caught in the top 20%"
+              />
+              <HeroStat
+                value={methodology.headline.pr_auc.toFixed(2)}
+                label={`precision–recall AUC, vs a ${Math.round(
+                  methodology.test.prevalence * 100,
+                )}% base rate`}
+              />
+            </dl>
+          </div>
         </header>
 
         {/* Sticky jump-nav — lets a reader skip to any part without scrolling
@@ -161,27 +253,44 @@ export default async function HowItWorksPage() {
             cleanly underneath. */}
         <nav
           aria-label="Sections"
-          className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-3 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-5 gap-y-1.5 text-xs"
+          className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-2.5 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-1.5 gap-y-1 text-xs"
         >
-          <a href="#reading-the-score" className="text-muted hover:text-ink transition-colors">
+          <a
+            href="#reading-the-score"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
             Reading the score
           </a>
-          <a href="#how-its-built" className="text-muted hover:text-ink transition-colors">
+          <a
+            href="#how-its-built"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
             How it&apos;s built
           </a>
-          <a href="#how-well-it-works" className="text-muted hover:text-ink transition-colors">
+          <a
+            href="#how-well-it-works"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
             How well it works
           </a>
-          <a href="#limits" className="text-muted hover:text-ink transition-colors">
+          <a
+            href="#limits"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
             Limits
           </a>
-          <a href="#reference" className="text-muted hover:text-ink transition-colors">
+          <a
+            href="#reference"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
             Reference
           </a>
         </nav>
 
         <section className="mt-10 space-y-8">
-          <SectionLabel id="reading-the-score">Reading the score</SectionLabel>
+          <SectionLabel id="reading-the-score" number="01" icon={BookOpen}>
+            Reading the score
+          </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
               How to read a score
@@ -298,7 +407,9 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel id="how-its-built">How it&apos;s built</SectionLabel>
+          <SectionLabel id="how-its-built" number="02" icon={Wrench}>
+            How it&apos;s built
+          </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
               What the score predicts
@@ -397,7 +508,9 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel id="how-well-it-works">How well it works</SectionLabel>
+          <SectionLabel id="how-well-it-works" number="03" icon={Target}>
+            How well it works
+          </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
               What it catches
@@ -408,35 +521,42 @@ export default async function HowItWorksPage() {
               how much of the real risk you catch at the slice you can actually
               staff:
             </p>
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-ink/15">
-                    <th className="py-2 pr-4 font-medium">Inspect top</th>
-                    <th className="py-2 pr-4 font-medium">Establishments</th>
-                    <th className="py-2 pr-4 font-medium">Precision</th>
-                    <th className="py-2 pr-4 font-medium">Events caught</th>
-                    <th className="py-2 font-medium">Lift</th>
-                  </tr>
-                </thead>
-                <tbody className="num text-ink/85">
-                  {methodology.operating_points.map((p) => (
-                    <tr key={p.frac} className="border-b border-ink/10">
-                      <td className="py-2 pr-4">{Math.round(p.frac * 100)}%</td>
-                      <td className="py-2 pr-4">
-                        {p.n_flagged.toLocaleString()}
-                      </td>
-                      <td className="py-2 pr-4">
-                        {Math.round(p.precision * 100)}%
-                      </td>
-                      <td className="py-2 pr-4">
-                        {Math.round(p.recall * 100)}%
-                      </td>
-                      <td className="py-2">{p.lift.toFixed(1)}×</td>
+            <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
+                      <th className="py-2.5 px-4 font-medium">Inspect top</th>
+                      <th className="py-2.5 px-4 font-medium">Establishments</th>
+                      <th className="py-2.5 px-4 font-medium">Precision</th>
+                      <th className="py-2.5 px-4 font-medium">Events caught</th>
+                      <th className="py-2.5 px-4 font-medium">Lift</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="num text-ink/85">
+                    {methodology.operating_points.map((p) => (
+                      <tr
+                        key={p.frac}
+                        className="border-b border-line last:border-b-0"
+                      >
+                        <td className="py-2.5 px-4">
+                          {Math.round(p.frac * 100)}%
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {p.n_flagged.toLocaleString()}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {Math.round(p.precision * 100)}%
+                        </td>
+                        <td className="py-2.5 px-4">
+                          {Math.round(p.recall * 100)}%
+                        </td>
+                        <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
             <p className="text-xs text-muted leading-relaxed mt-3">
               Working the top 20% by risk surfaces{" "}
@@ -527,9 +647,11 @@ export default async function HowItWorksPage() {
                     </div>
                     <span className="mt-1 block h-2.5 rounded-full bg-tint overflow-hidden">
                       <span
-                        className="block h-full rounded-full bg-teal/70"
+                        className="block h-full rounded-full"
                         style={{
                           width: `${maxImpact > 0 ? (d.mean_abs_logodds / maxImpact) * 100 : 0}%`,
+                          background:
+                            "linear-gradient(90deg, var(--color-teal), var(--color-sage))",
                         }}
                       />
                     </span>
@@ -607,7 +729,9 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel id="limits">Limits</SectionLabel>
+          <SectionLabel id="limits" number="04" icon={TriangleAlert}>
+            Limits
+          </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
               What it doesn&apos;t do
@@ -638,7 +762,9 @@ export default async function HowItWorksPage() {
             </ul>
           </article>
 
-          <SectionLabel id="reference">Reference</SectionLabel>
+          <SectionLabel id="reference" number="05" icon={BookMarked}>
+            Reference
+          </SectionLabel>
           <article id="definitions">
             <h2 className="text-2xl font-medium tracking-tight">
               Definitions
