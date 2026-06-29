@@ -55,8 +55,19 @@ jobs:
       - name: Build static export
         run: npm run build
 
-      - name: Upload to S3
-        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete
+      # Sync the app shell (HTML, JS/CSS chunks, the small data JSONs) with the
+      # plain mtime-based sync — it is small and changes on every code deploy.
+      # The ~23.6k per-license detail bundles are EXCLUDED here (excluded keys
+      # are also exempt from --delete) and handled by the content-aware step
+      # below: they are byte-identical across code-only deploys, so re-uploading
+      # all of them every time (mtime always changes on rebuild) is pure waste.
+      - name: Upload app shell to S3
+        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete --exclude "data/detail/*"
+
+      # Upload only the detail bundles whose content actually changed (md5 vs the
+      # live object ETag), and delete bundles for licenses that no longer exist.
+      - name: Upload changed detail bundles to S3
+        run: node scripts/sync-detail-s3.mjs out/data/detail "${{ vars.WEBSITE_BUCKET }}" "data/detail/"
 
       - name: Invalidate CloudFront cache
         run: >

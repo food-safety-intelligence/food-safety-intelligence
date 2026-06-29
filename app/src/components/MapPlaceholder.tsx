@@ -134,7 +134,7 @@ export function MapPlaceholder({
                 {featured.address}
               </div>
               <Link
-                href={`/restaurant/${featured.license_id}`}
+                href={`/restaurant/?id=${featured.license_id}`}
                 className="text-xs text-teal underline mt-1.5 inline-block"
               >
                 Open profile →
@@ -196,7 +196,7 @@ export function NearbyList({ restaurants }: { restaurants: RestaurantScore[] }) 
             className="rounded-2xl border border-line hover:bg-cream/60 transition-colors"
           >
             <Link
-              href={`/restaurant/${r.license_id}`}
+              href={`/restaurant/?id=${r.license_id}`}
               className="flex items-start gap-3 p-3"
             >
               <div

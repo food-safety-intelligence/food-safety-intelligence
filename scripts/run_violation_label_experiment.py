@@ -258,8 +258,9 @@ def main() -> None:
         "fairness_vulnerable_groups": fairness,
         "label_fairness_hazard_skew": hazard_skew,
     }
-    METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METRICS_DIR / f"violation_label_experiment_{date.today().isoformat()}.json"
+    experiments_dir = METRICS_DIR / "experiments"
+    experiments_dir.mkdir(parents=True, exist_ok=True)
+    out_path = experiments_dir / f"violation_label_experiment_{date.today().isoformat()}.json"
     out_path.write_text(json.dumps(out, indent=2))
     print(f"\nwrote {out_path}")
 

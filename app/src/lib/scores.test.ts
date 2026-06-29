@@ -9,6 +9,7 @@ import type {
 } from "@/lib/scores";
 import {
   ALL_TIERS,
+  compareByName,
   computeHomeView,
   computeWaterfall,
   isAllTiers,
@@ -225,6 +226,39 @@ describe("parseSort", () => {
   });
 });
 
+describe("compareByName", () => {
+  it("sorts letter-initial names before digit/symbol names", () => {
+    expect(["7-Eleven", "Apple", "#1 Wok", "Zoo"].sort(compareByName)).toEqual([
+      "Apple",
+      "Zoo",
+      "#1 Wok",
+      "7-Eleven",
+    ]);
+  });
+
+  it("is case-insensitive-ish and alphabetical within the letter group", () => {
+    expect(["banana", "Apple", "cherry"].sort(compareByName)).toEqual([
+      "Apple",
+      "banana",
+      "cherry",
+    ]);
+  });
+
+  it("ignores leading whitespace when grouping", () => {
+    expect(["  Cafe", "9 Bar"].sort(compareByName)).toEqual(["  Cafe", "9 Bar"]);
+  });
+
+  it("ignores leading whitespace when ordering within the letter group", () => {
+    // Real data has names like "  JIMMY FAMOUS BURGER" that previously sorted
+    // ahead of the "A"s because the leading space sorts before letters.
+    expect(
+      ["  JIMMY FAMOUS BURGER", "A & A SOUTH FOOD MART", "  UNI UNI"].sort(
+        compareByName,
+      ),
+    ).toEqual(["A & A SOUTH FOOD MART", "  JIMMY FAMOUS BURGER", "  UNI UNI"]);
+  });
+});
+
 describe("computeHomeView", () => {
   const mk = (
     license_id: string,
@@ -302,6 +336,22 @@ describe("computeHomeView", () => {
       "4",
       "1",
     ]);
+  });
+
+  it("orders A–Z with letter names before digit/symbol names", () => {
+    const idx: SearchIndex = {
+      ...INDEX,
+      rows: [
+        mk("a", "Alpha", 0.1, "Low", true),
+        mk("n", "7-Eleven", 0.1, "Low", true),
+        mk("s", "#1 Wok", 0.1, "Low", true),
+        mk("z", "Zeta", 0.1, "Low", true),
+      ],
+    };
+    // Letters first (Alpha, Zeta), then the non-letter names — not "#"/"7" first.
+    expect(
+      ids(computeHomeView(idx, opts({ sort: "name" })).listRows),
+    ).toEqual(["a", "z", "s", "n"]);
   });
 
   it("caps the list but keeps the true match count", () => {

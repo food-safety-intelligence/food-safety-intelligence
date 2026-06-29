@@ -24,6 +24,7 @@ import pandas as pd
 
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
 from foodsafety.serve.predict_batch import (
+    _row_to_json,
     build_scores_table,
     score_to_tier,
     write_scores_json,
@@ -173,3 +174,29 @@ def test_write_scores_json_emits_app_payload(tmp_path):
     assert {"license_id", "risk_score", "risk_tier", "top_drivers"} <= first.keys()
     # Dates are serialised as ISO strings, not timestamps.
     assert isinstance(first["as_of_date"], str)
+
+
+def test_row_to_json_strips_whitespace_on_display_strings():
+    # Source data carries names like "  JIMMY FAMOUS BURGER" with leading
+    # spaces; the JSON boundary must strip them so the app's A–Z sort doesn't
+    # float those names above the "A"s.
+    df = pd.DataFrame(
+        [
+            {
+                "license_id": "L1",
+                "dba_name": "  JIMMY FAMOUS BURGER",
+                "address": "  123 W Example St  ",
+                "lat": 41.9,
+                "lon": -87.6,
+                "as_of_date": pd.Timestamp("2026-06-01"),
+                "risk_score": 0.5,
+                "risk_tier": "Moderate",
+                "trend_slope": None,
+                "top_drivers": [],
+            }
+        ]
+    )
+    row = next(df.itertuples(index=False))
+    out = _row_to_json(row)
+    assert out["dba_name"] == "JIMMY FAMOUS BURGER"
+    assert out["address"] == "123 W Example St"
