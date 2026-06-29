@@ -81,12 +81,16 @@ npm run cdk -- deploy \
     2>&1 | tail -10
 
 # Extract Agent Runtime ARN — retry, since the stack output can lag the deploy.
+# The AgentCore L3 construct names its outputs from the construct path, so the key
+# is e.g. ApplicationAgentFoodsafetyagentRuntimeArnOutput<hash>, not a fixed name.
+# Match on the stable "RuntimeArnOutput" suffix (uniquely the runtime ARN — distinct
+# from the Role and RuntimeId outputs) instead of a literal key that never existed.
 echo "Waiting for stack outputs..."
 AGENT_RUNTIME_ARN=""
 for attempt in 1 2 3 4 5 6; do
     AGENT_RUNTIME_ARN=$(aws cloudformation describe-stacks \
         --stack-name "$STACK_NAME" \
-        --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreRuntimeArn`].OutputValue' \
+        --query "Stacks[0].Outputs[?contains(OutputKey, 'RuntimeArnOutput')].OutputValue | [0]" \
         --output text \
         --region "$REGION" 2>/dev/null || echo "")
     if [ -n "$AGENT_RUNTIME_ARN" ] && [ "$AGENT_RUNTIME_ARN" != "None" ]; then
