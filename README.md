@@ -9,7 +9,7 @@
 | agents/tools/find\_restaurants/handler.py                |      108 |        7 |       36 |        2 |     94% |189-191, 236-247, 313 |
 | agents/tools/find\_reviews/handler.py                    |       34 |        0 |       10 |        0 |    100% |           |
 | agents/tools/food\_safety\_info/handler.py               |       40 |        1 |       14 |        3 |     93% |381, 383-\>386, 391-\>388 |
-| agents/tools/get\_safety\_score/handler.py               |       95 |        3 |       34 |        3 |     95% |205, 244, 331 |
+| agents/tools/get\_safety\_score/handler.py               |      134 |        3 |       52 |        4 |     96% |250, 259-\>247, 318, 363 |
 | agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
 | src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/config.py                                 |       28 |        4 |        4 |        1 |     78% |     33-36 |
@@ -43,7 +43,7 @@
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **1600** |  **143** |  **438** |   **63** | **89%** |           |
+| **TOTAL**                                                | **1639** |  **143** |  **456** |   **64** | **89%** |           |
 
 
 ## Setup coverage badge
