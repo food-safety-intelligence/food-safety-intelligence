@@ -69,22 +69,54 @@ function clearMessages(): void {
 }
 
 // ─── Markdown-lite renderer ───────────────────────────────────────────────────
-// Handles **bold**, numbered lists, and newlines without adding a dependency.
+// Handles **bold**, [label](url) links, numbered lists, and newlines without
+// adding a dependency. The agent cites sources as markdown links, so without
+// link support those render as raw "[CDC ...](https://...)" text.
+
+// Inline tokens we recognise: **bold** and [label](url). Split on a capturing
+// group so the delimiters survive the split and each token can be rendered.
+const INLINE_TOKEN = /(\*\*[^*]+\*\*|\[[^\]]+\]\([^)]+\))/g;
+const LINK_TOKEN = /^\[([^\]]+)\]\(([^)]+)\)$/;
+
+function renderInline(line: string): React.ReactNode[] {
+  return line.split(INLINE_TOKEN).map((seg, j) => {
+    if (seg.startsWith("**") && seg.endsWith("**")) {
+      return <strong key={j}>{seg.slice(2, -2)}</strong>;
+    }
+    const link = LINK_TOKEN.exec(seg);
+    if (link) {
+      const [, label, href] = link;
+      // Only http(s) links become clickable; any other scheme (javascript:,
+      // data:) renders as plain text so a model reply can't inject a live
+      // attack vector into the page.
+      if (/^https?:\/\//i.test(href)) {
+        return (
+          <a
+            key={j}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            // sage-strong (not sage) clears AA contrast for text; the underline
+            // is a non-colour cue so the link reads as a link without relying
+            // on colour alone.
+            className="text-sage-strong underline underline-offset-2 hover:text-ink break-words"
+          >
+            {label}
+          </a>
+        );
+      }
+      return label;
+    }
+    return seg;
+  });
+}
 
 function renderContent(text: string): React.ReactNode[] {
-  return text.split("\n").map((line, i) => {
-    const parts = line.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => {
-      if (seg.startsWith("**") && seg.endsWith("**")) {
-        return <strong key={j}>{seg.slice(2, -2)}</strong>;
-      }
-      return seg;
-    });
-    return (
-      <span key={i} className="block">
-        {parts}
-      </span>
-    );
-  });
+  return text.split("\n").map((line, i) => (
+    <span key={i} className="block">
+      {renderInline(line)}
+    </span>
+  ));
 }
 
 // ─── Suggested queries ────────────────────────────────────────────────────────
