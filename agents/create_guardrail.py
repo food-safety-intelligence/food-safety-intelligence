@@ -6,6 +6,11 @@ platform-level guardrail the agent attaches to. Two of its policies apply to
 input/output text automatically, independently of whether the model follows the
 system prompt:
 
+  - Denied topics — PERSONALISED medical advice and legal advice only. There is
+    deliberately NO catch-all "off-topic" topic: a negatively-defined "anything
+    not about food safety" topic makes Bedrock's classifier over-match and block
+    legitimate food-safety queries. Off-topic requests (recipes, other cities,
+    chit-chat) are declined by the system prompt instead.
   - Denied topics — genuinely off-topic requests (recipes, other-city
     restaurant lookups, meal planning, chit-chat) plus PERSONALISED medical and
     legal advice. General factual food-safety education (answered with cited
@@ -40,9 +45,9 @@ import boto3
 GUARDRAIL_NAME = "food-safety-agent"
 
 _BLOCK_MESSAGE = (
-    "I can help with predicted food-safety risk for Chicago food establishments "
-    "and with general food-safety information from public health sources. I can't "
-    "help with that request."
+    "I can't help with that. I can look up a Chicago food establishment's "
+    "predicted food-safety risk, or answer a general food-safety question with a "
+    "cited public health source — would you like me to?"
 )
 
 # Topics the agent must refuse. Bedrock matches on the definition + examples.
