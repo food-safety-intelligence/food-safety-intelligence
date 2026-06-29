@@ -81,7 +81,7 @@ Stages run in order — `make data features retrain history`:
 | Ingest | `scripts/ingest_raw.py` | Chicago SODA API (6 datasets) | `data/raw/*.parquet` |
 | Label | `notebooks/01`,`02` → `data/labels.py` | `raw/inspections.parquet` | `processed/inspections_labeled.parquet` |
 | Features | `scripts/build_features.py` → `features/build.py` | labeled + raw side-inputs | `processed/features/<name>.parquet` |
-| Train + score | `scripts/retrain_baseline_sigmoid.py` | features | model `.joblib` + `predictions/scores.parquet` + `scores.json` + `reports/metrics/*.json` |
+| Train + score | `scripts/retrain_baseline_sigmoid.py` | features | model `.joblib` + `predictions/scores.parquet` + `scores.json` + `reports/metrics/<model_type>/*.json` |
 | History sidecar | `scripts/export_inspection_history.py` | labeled | `inspection_history.json` |
 | Methodology | `scripts/build_methodology_json.py` | features | `methodology.json` |
 | Publish (AWS) | `scripts/publish.py` | local artifacts | uploads to `s3://…` |
