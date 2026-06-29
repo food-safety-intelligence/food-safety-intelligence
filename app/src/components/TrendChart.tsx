@@ -26,17 +26,33 @@ export interface TrendPoint {
   date: string;
   /** Forecast-model score (calibrated probability, 0..1). */
   score: number;
+  /**
+   * The actual inspection result at this date (Pass / Fail / Pass w/ Conditions).
+   * Shown as context in the tooltip — NOT what the dot predicts. The dot is the
+   * forecast model's read of the *next 180 days* as of this date, and it
+   * deliberately ignores this visit's own outcome (see DR 0011), so this is
+   * "what happened here," not "what the score predicted."
+   */
+  result?: string;
 }
 
 export function TrendChart({
   points,
   slope,
+  windowSize,
   width = 320,
   height = 116,
 }: {
   points: TrendPoint[];
   /** Trend slope — only used for the chart's `aria-label` direction word. */
   slope: number | null;
+  /**
+   * How many of the most-recent points form the trend window (what `slope` is
+   * fit over, DR 0011). A full-height band shades that window so the long-run
+   * trajectory is visible without the chart contradicting the header direction.
+   * Defaults to all points (no band) when omitted.
+   */
+  windowSize?: number;
   width?: number;
   height?: number;
 }) {
@@ -78,6 +94,13 @@ export function TrendChart({
   const linePath = xy.map((q, i) => `${i === 0 ? "M" : "L"} ${q.x} ${q.y}`).join(" ");
   const areaPath = `${linePath} L ${xy[xy.length - 1].x} ${padTop + h} L ${xy[0].x} ${padTop + h} Z`;
 
+  // Trend-window band: a full-height shade over the last `windowSize` points (the
+  // visits the slope is fit over). Only drawn when older points sit outside it,
+  // else it would cover the whole chart. Left edge sits midway between the last
+  // out-of-window point and the first in-window one.
+  const winStart = windowSize == null ? 0 : Math.max(0, pts.length - windowSize);
+  const bandLeft = winStart > 0 ? (xy[winStart - 1].x + xy[winStart].x) / 2 : null;
+
   const fmtAxis = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", year: "numeric" });
   const fmtFull = (iso: string) =>
@@ -94,7 +117,9 @@ export function TrendChart({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Predicted-risk trajectory across ${pts.length} inspections, ${direction}`}
+        aria-label={`Predicted-risk trajectory across ${pts.length} inspections${
+          bandLeft !== null ? `, recent ${windowSize} highlighted as the trend window` : ""
+        }, ${direction}`}
       >
         {/* y-axis: 0..1 risk scale (most establishments sit low). */}
         {[0, 1].map((t) => (
@@ -122,6 +147,45 @@ export function TrendChart({
           risk
         </text>
 
+        {/* Trend-window band — full plot height over the most-recent points the
+            slope is fit over. Drawn first so it sits behind the trajectory. */}
+        {bandLeft !== null && (
+          <>
+            <rect
+              x={bandLeft}
+              y={padTop}
+              width={padL + w - bandLeft}
+              height={h}
+              fill="#2A2724"
+              fillOpacity={0.06}
+            />
+            <line
+              x1={bandLeft}
+              y1={padTop}
+              x2={bandLeft}
+              y2={padTop + h}
+              stroke="#2A2724"
+              strokeOpacity={0.25}
+              strokeWidth={1}
+              strokeDasharray="2 2"
+            />
+            {/* Right-anchored so it always sits inside the band (which ends at
+                the right plot edge) — a centred label clips when the band is
+                narrow. The caption below the chart carries the full wording. */}
+            <text
+              x={padL + w - 2}
+              y={padTop + 7}
+              textAnchor="end"
+              fontSize={7}
+              fill="#2A2724"
+              fillOpacity={0.55}
+              fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+            >
+              trend
+            </text>
+          </>
+        )}
+
         <path d={areaPath} fill={LINE} fillOpacity={0.08} />
         <path
           d={linePath}
@@ -148,7 +212,9 @@ export function TrendChart({
               strokeWidth={2.5}
               tabIndex={0}
               role="button"
-              aria-label={`${fmtFull(pts[i].date)}, predicted risk ${pts[i].score.toFixed(2)}`}
+              aria-label={`${fmtFull(pts[i].date)}, predicted risk ${pts[i].score.toFixed(2)}${
+                pts[i].result ? `, inspection result ${pts[i].result}` : ""
+              }`}
               style={{ cursor: "pointer", outline: "none" }}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
@@ -192,7 +258,14 @@ export function TrendChart({
             transform: "translate(-50%, -100%)",
           }}
         >
-          {fmtFull(pts[hover].date)} · predicted risk {pts[hover].score.toFixed(2)}
+          <div>
+            {fmtFull(pts[hover].date)} · predicted risk {pts[hover].score.toFixed(2)}
+          </div>
+          {pts[hover].result && (
+            <div className="opacity-70">
+              At this inspection: {pts[hover].result}
+            </div>
+          )}
         </div>
       )}
     </div>
