@@ -357,7 +357,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
               {visibleRows.map((r) => (
                 <li key={r.license_id}>
                   <Link
-                    href={`/restaurant/${r.license_id}`}
+                    href={`/restaurant/?id=${r.license_id}`}
                     className="flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors"
                   >
                     <div
