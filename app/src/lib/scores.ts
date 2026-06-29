@@ -141,6 +141,30 @@ export interface ScoresPayload {
   inspection_history?: Record<string, InspectionEvent[]>;
 }
 
+/**
+ * Per-license bundle the client-rendered detail page fetches from
+ * `/data/detail/<license_id>.json` (written by scripts/build-detail-data.mjs).
+ * `restaurant.percentile_rank` is precomputed at build time; `comments` is
+ * index-aligned to `history`.
+ */
+export interface DetailBundle {
+  restaurant: RestaurantScore;
+  history: InspectionEvent[];
+  comments: string[];
+}
+
+/**
+ * Globals the detail page needs once, fetched from `/data/detail-globals.json`:
+ * the demo-mode flag, the Platt-calibration triple (for the waterfall), and the
+ * population aggregate stats (for the score percentile). Mirrors what the server
+ * detail page used to derive from `loadScores()` + `getPopulationStats()`.
+ */
+export interface DetailGlobals {
+  is_mock: boolean;
+  calibration: Calibration | null;
+  populationStats: PopulationStats;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers — safe to call from server or client.
 // ---------------------------------------------------------------------------

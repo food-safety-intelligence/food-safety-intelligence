@@ -156,7 +156,7 @@ export function RestaurantsExplorer({
             .map((r, i) => (
               <Link
                 key={r.license_id}
-                href={`/restaurant/${r.license_id}`}
+                href={`/restaurant/?id=${r.license_id}`}
                 className={cn(
                   "grid grid-cols-12 px-6 py-4 items-center hover:bg-cream/40 transition-colors",
                   i < filtered.length - 1 && "border-b border-line",
