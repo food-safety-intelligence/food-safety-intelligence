@@ -305,9 +305,13 @@ export default async function HowItWorksPage() {
               risk band and a recent trend. Each score is anchored to the
               establishment&apos;s{" "}
               <span className="font-medium text-ink/80">most recent inspection on
-              file</span>{" "}(its date is shown on the detail page), so an
-              establishment that hasn&apos;t been inspected in a while shows older
-              data throughout — not a fresh reading.
+              file</span>{" "}— its{" "}
+              <span className="font-medium text-ink/80">current inspection</span>{" "}—
+              and is the risk{" "}
+              <span className="font-medium text-ink/80">as of that date</span>{" "}
+              (shown on the detail page next to &ldquo;Last inspected&rdquo;), not a
+              fixed time window. So an establishment that hasn&apos;t been inspected
+              in a while shows older data throughout — not a fresh reading.
             </p>
 
             <h3 className="text-lg font-medium tracking-tight mt-6">
@@ -393,17 +397,27 @@ export default async function HowItWorksPage() {
               date</span>{" "}(a score from 0 to 1, not the inspection&apos;s pass/fail
               result, which is in the inspection list below) — placed at its real
               date; hover a dot to see the date and value. So a 2019 dot is what the
-              model would have estimated in 2019, not a guess about the past.
+              model would have estimated in 2019, not a guess about the past. Only
+              inspections the model can score appear as dots — 2019 onward, each
+              with a usable result, up to the five most recent — so an establishment
+              can show just two or three.
             </p>
             <p className="text-xs text-muted leading-relaxed mt-2">
-              To keep the direction honest, those points come from a separate{" "}
-              <span className="font-medium text-ink/80">forecast model</span>{" "}— the
-              same 180-day prediction, but trained without the current
-              inspection&apos;s own result. A failed inspection triggers a required
-              re-inspection that usually passes, which would otherwise pull the main
-              score down and read as &quot;improving&quot; for purely procedural
-              reasons; the forecast model leaves that out. It is a read of direction
-              over time, not a separate prediction.
+              The score and the trend come from{" "}
+              <span className="font-medium text-ink/80">two related models</span>.
+              The headline score{" "}
+              <span className="font-medium text-ink/80">uses the current
+              inspection&apos;s own outcome</span>{" "}— whether it passed that day and
+              what violations were cited — because that is the strongest signal of
+              near-term risk. The trend&apos;s points come from a separate{" "}
+              <span className="font-medium text-ink/80">forecast model</span>: the
+              same 180-day prediction, but trained{" "}
+              <span className="font-medium text-ink/80">without</span>{" "}that current
+              result. A failed inspection triggers a required re-inspection that
+              usually passes, which would otherwise pull the headline score down and
+              read as &quot;improving&quot; for purely procedural reasons; the
+              forecast model leaves that out. So the trend is a read of direction
+              over time, not a second risk number.
             </p>
           </article>
 
