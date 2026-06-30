@@ -1,6 +1,6 @@
 """NOAA GHCN-Daily loader — Chicago O'Hare station (citywide weather proxy).
 
-Per ``docs/decisions/0013-noaa-weather-citywide-station.md``: GHCN-Daily publishes
+Per ``docs/decisions/0014-noaa-weather-citywide-station.md``: GHCN-Daily publishes
 one plain CSV per station, no API key required, so this is a single GET + parse —
 no pagination/retry machinery like ``foodsafety.io.soda`` needs for the Socrata
 API. We use Chicago O'Hare International Airport (GHCND ID ``USW00094846``) as a

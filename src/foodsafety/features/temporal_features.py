@@ -4,8 +4,12 @@ Cheap, leak-free, and well-motivated:
 
   * **Seasonality.** Food-safety violations are seasonal — Chicago summers
     drive cold-holding failures, winters the inverse. The 2014 Chicago
-    forecasting paper used a 3-day rolling high temperature; in lieu of NOAA
-    (deferred per CLAUDE.md), month and quarter are zero-cost proxies.
+    forecasting paper used a 3-day rolling high temperature; month and
+    quarter are zero-cost proxies for that. NOAA weather itself is now
+    implemented (``foodsafety.features.weather_features``) as an opt-in
+    family pending an A/B that tests whether it adds *incremental* signal
+    over these calendar proxies — see ``docs/data_dictionary.md`` § NOAA
+    weather.
   * **Day-of-week.** Inspection cadence varies by weekday. Weekend
     inspections are rare; Monday inspections often follow weekend complaints.
 

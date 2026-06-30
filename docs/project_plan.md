@@ -25,8 +25,13 @@ Three product questions the UI must answer for any establishment:
 ## Data
 
 Chicago Food Inspections (core, 2010+; train on 2019+, with pre-2019 inspections
-as burn-in only), Business Licenses, and 311 complaints. NOAA weather and Yelp are
-named in the original plan but deferred to Phase 2.
+as burn-in only), Business Licenses, and 311 complaints. Yelp is named in the
+original plan but is a dead end (ToS forbids ML training, see
+`docs/data_dictionary.md`). NOAA weather (Phase-2 deferral in the original
+plan) is implemented as of 2026-06-30 — see `docs/data_dictionary.md` §
+NOAA weather and `docs/decisions/0014-noaa-weather-citywide-station.md`; it's
+an opt-in feature family pending an A/B promotion gate, not yet in
+`ALL_FEATURES`.
 
 ## Approach
 

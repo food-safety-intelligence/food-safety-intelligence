@@ -37,6 +37,17 @@ with the workspace file, this file wins.
 > **Chicago-only**. **No open web search and no news sources**: citations come
 > from a curated allow-list, enforced by the agent eval (allow-list gate + an
 > opt-in live link-resolution check).
+>
+> **NOAA weather data scope widened (2026-06-30 — pending Jun's sign-off as
+> scope guard).** NOAA weather, previously cut from the MVP and listed as a
+> Phase-2 Roadmap item, is now implemented: `foodsafety.io.noaa` (GHCN-Daily,
+> Chicago O'Hare station) and `foodsafety.features.weather_features` (citywide
+> daily features, joined by date, leak-guarded). It is wired as an **opt-in**
+> feature family (`WEATHER_FEATURES` in `baseline.py`) — **not** in
+> `ALL_FEATURES` / the served model — pending the A/B promotion run
+> (`scripts/experiment_weather_features.py`) clearing the both-metrics gate.
+> See [`docs/data_dictionary.md`](docs/data_dictionary.md) § NOAA weather and
+> [0014](docs/decisions/0014-noaa-weather-citywide-station.md).
 
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
@@ -123,7 +134,6 @@ Three layers, in this order — A and B are required, C is a stretch:
   K8s). The web app runs `next dev` locally.
 - Hosted inference / FastAPI / REST endpoints / Next.js API routes that hit
   a live model
-- NOAA weather data
 - Yelp Open Dataset + Yelp fuzzy join
 - LLM / Bedrock / transformer NLP (TF-IDF + SVD is the ceiling, layer C only)
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
@@ -156,7 +166,7 @@ when someone asks "what about X?" the answer is "noted, post-demo."
   without re-pulling the world. No scheduling code lives in this repo for
   this iteration.
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
-- NOAA weather features, Yelp Open Dataset + fuzzy join
+- Yelp Open Dataset + fuzzy join
 - LLM-based violation-text classification or NLP search
 - Production fairness audit (disparate-impact tests, reweighting)
 - Multi-city support beyond Chicago
