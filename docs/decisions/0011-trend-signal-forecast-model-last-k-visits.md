@@ -87,7 +87,7 @@ license's latest inspection. It fails two ways, both user-facing today:
 
 Reconstruction of the 2026-06-22 prototype on real data + a K sweep (full run:
 [`experiments.md`](../experiments.md) 2026-06-28 row;
-`reports/metrics/trend_deconfound_experiment_2026-06-28.json`). Anchors = each
+`reports/metrics/experiments/trend_deconfound_experiment_2026-06-28.json`). Anchors = each
 license's latest non-right-truncated test inspection (n=5,226, base 4.4%, 97.5%
 currently-clean); XGBoost for both models.
 

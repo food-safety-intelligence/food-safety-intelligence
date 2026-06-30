@@ -22,6 +22,21 @@ with the workspace file, this file wins.
 > [0009](docs/decisions/0009-production-estimator-revisit-logreg-vs-xgb.md) for
 > the production-estimator state; the Phase-2 deep-learning bets are scoped in a
 > separate deep-learning decision record.
+>
+> **Chat-agent scope widened (2026-06-28, decision record 0012 — pending Jun's
+> sign-off as scope guard).** The chat agent now does two jobs: (A) predicted
+> food-safety risk for Chicago food establishments, and (B) **general
+> food-safety / foodborne-illness questions** (e.g. how common food poisoning
+> is, what a pathogen is, safe cooking temperatures, who is at risk, prevention)
+> answered from **curated authoritative public-health sources** — CDC, FDA, USDA
+> FSIS, FoodSafety.gov, WHO, NIH MedlinePlus, and Chicago / Illinois / Cook
+> County public health + the Chicago Data Portal — **with a citation link the
+> user can verify**. Boundaries that do **not** change: job B is education only —
+> no personalised medical/legal advice (personal questions are steered to a
+> professional), never an eat/don't-eat verdict, and restaurant risk stays
+> **Chicago-only**. **No open web search and no news sources**: citations come
+> from a curated allow-list, enforced by the agent eval (allow-list gate + an
+> opt-in live link-resolution check).
 
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
@@ -204,6 +219,9 @@ billing), Redux/Zustand (small state, use React hooks).
   `metadata.json` (train cutoff, features, metrics). **Never overwrite.**
 - `reports/figures/` — small PNGs referenced by the writeup. Checked in.
 - `reports/metrics/` — one JSON per training run. Checked in, diffable.
+  Organized by model type: `baseline/`, `baseline_sigmoid/`, `xgb/`, `mlp/`,
+  and `experiments/` for standalone (no-model-artifact) experiment runs. The
+  filename keeps the type prefix (e.g. `xgb/xgb_<run>.json`).
 - `scripts/` — Python CLI entry points called from the Makefile.
 - `tests/` — pytest, mirrors `src/foodsafety/`.
 - `docs/` — short markdown only. No auto-generated API docs.
@@ -392,7 +410,8 @@ Process:
 
 - Commit code **before** running a tracked experiment, so the run's provenance
   (git SHA → run id) points to the exact committed code.
-- Flow: commit code → run the experiment (writes `reports/metrics/<run>.json`
+- Flow: commit code → run the experiment (writes
+  `reports/metrics/<model_type>/<run>.json`
   plus the model + its `metadata.json` sidecar) → review the metrics → commit
   the metrics JSON. **Never commit `data/` artifacts** (parquets/models) —
   they're gitignored; the dataset is versioned by the `features_sha256` recorded

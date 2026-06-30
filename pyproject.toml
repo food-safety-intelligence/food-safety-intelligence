@@ -65,15 +65,36 @@ addopts = "-q --strict-markers"
 # main pytest run never goes red on coverage; the floor lives in its own step.
 # Run locally with: uv run pytest --cov
 [tool.coverage.run]
-source = ["src/foodsafety"]
+# The agent app lives outside src/foodsafety; include it so its tool code is
+# measured. The CI Pytest step runs the agent tool suites and the deterministic
+# eval under coverage (see .github/workflows/ci.yml) so these lines are exercised.
+source = ["src/foodsafety", "agents"]
 branch = true
 # Store paths relative to the repo root so the PR-comment action can map
 # coverage data to changed files (and compute per-file diff coverage).
 relative_files = true
-# Untestable-by-design: peek() is a notebook display helper (prints a profile);
-# exercising it would assert on stdout for no real safety. Excluded so the floor
-# reflects testable code.
-omit = ["src/foodsafety/utils/peek.py"]
+omit = [
+    # Untestable-by-design: peek() is a notebook display helper (prints a
+    # profile); exercising it would assert on stdout for no real safety.
+    # Excluded so the floor reflects testable code.
+    "src/foodsafety/utils/peek.py",
+    # Agent test files sit next to the tool code (not under tests/), so without
+    # this they would count toward their own coverage. Measure the tools, not
+    # the tests.
+    "agents/tools/*/test_*.py",
+    # Untestable in CI: these only execute against a live Bedrock/AgentCore
+    # session (create the guardrail, run the agent runtime / a local chat loop),
+    # so CI can't exercise a single line. Excluded so the floor reflects the
+    # tool-handler code we can actually test here.
+    "agents/create_guardrail.py",
+    "agents/entrypoint.py",
+    "agents/run_local.py",
+    # The eval harness is test tooling, not the agent product — same reason we
+    # don't measure tests/. Its deterministic gates still RUN under coverage in
+    # CI (to exercise the handlers), but its own lines aren't scored; half of
+    # them are the Bedrock-judge / live-link paths CI can't reach anyway.
+    "agents/eval/*",
+]
 
 [tool.coverage.report]
 show_missing = true

@@ -45,27 +45,29 @@ const IGNORED_CONSOLE = [
   /AbortError/i,
 ];
 
-// Pick a real pre-rendered restaurant id from the build output rather than
-// hardcode one — generateStaticParams decides which detail pages exist, so a
-// hardcoded id could 404 after a data refresh.
+// Pick a real establishment id from the build output rather than hardcode one.
+// The detail page is a single client-rendered shell (/restaurant/?id=…) that
+// fetches per-license bundles from out/data/detail/<id>.json, so read an id from
+// there — a hardcoded one could vanish after a data refresh.
 function firstRestaurantId() {
-  const dir = `${OUT_DIR}/restaurant`;
-  const ids = readdirSync(dir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
+  const dir = `${OUT_DIR}/data/detail`;
+  const ids = readdirSync(dir)
+    .filter((name) => name.endsWith(".json"))
+    .map((name) => name.slice(0, -".json".length))
     .sort();
   if (ids.length === 0) {
-    throw new Error(`no pre-rendered restaurant pages under ${dir}`);
+    throw new Error(`no detail bundles under ${dir}`);
   }
   return ids[0];
 }
 
-// Trailing slashes match next.config `trailingSlash: true` so the static host
-// resolves each path to its index.html without a redirect.
+// The detail page is one static shell keyed by the `?id=` query param (read
+// client-side). Trailing slash matches next.config `trailingSlash: true` so the
+// static host resolves the other paths to their index.html without a redirect.
 function routesToCheck(restaurantId) {
   return [
     "/",
-    `/restaurant/${restaurantId}/`,
+    `/restaurant/?id=${restaurantId}`,
     "/how-it-works/",
     "/chat/",
     "/sources/",

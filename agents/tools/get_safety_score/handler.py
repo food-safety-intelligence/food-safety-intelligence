@@ -39,6 +39,48 @@ from typing import Any
 _ADDRESS_CUTOFF = 0.72
 _NAME_CUTOFF = 0.6
 
+# Name + geographic-proximity fallback, used only when the address match fails.
+# OSM very often carries no clean street address (just "Chicago, IL" or nothing),
+# so address-only matching reports a venue that IS in the batch run as having no
+# record (e.g. "Amarit" -> the real "AMARIT RESTAURANT"). lat/lon + name recovers
+# it: OSM and the city geocode the same building to slightly different points, so
+# any record within ~0.0025° (≈250 m) is a candidate, then the name must agree.
+# Proximity alone is not enough — a dense block holds many venues — so the name
+# is what identifies the establishment (ethics decision record 0005, principle 1:
+# a confident wrong score is worse than a miss).
+_GEO_RADIUS_DEG = 0.0025
+# SequenceMatcher ratio bar for the near-identical / typo case; the token-subset
+# rule below handles the common "Amarit" vs "AMARIT RESTAURANT" length mismatch
+# that ratio alone scores too low (~0.55) to accept.
+_GEO_NAME_RATIO_CUTOFF = 0.87
+
+# Generic establishment words carry no identifying signal, so a name made only of
+# them (e.g. a bare "Restaurant" OSM node) must never match by the token-subset
+# rule — that would attach a neighbour's score on proximity alone.
+_GENERIC_NAME_TOKENS = frozenset(
+    {
+        "RESTAURANT",
+        "CAFE",
+        "GRILL",
+        "BAR",
+        "KITCHEN",
+        "INC",
+        "LLC",
+        "LTD",
+        "CO",
+        "CORP",
+        "THE",
+        "AND",
+        "OF",
+        "CHICAGO",
+        "FOOD",
+        "FOODS",
+        "CUISINE",
+        "EATERY",
+        "DINER",
+    }
+)
+
 
 @functools.lru_cache(maxsize=1)
 def _load_scores_index() -> dict[str, list[dict]]:
@@ -61,6 +103,15 @@ def _load_scores_index() -> dict[str, list[dict]]:
     for r in payload.get("scores", []):
         index.setdefault(_normalise_address(r["address"]), []).append(r)
     return index
+
+
+@functools.lru_cache(maxsize=1)
+def _load_scores_records() -> list[dict]:
+    """Flat list of every score record, for the name + proximity fallback.
+
+    Derived from the cached address index so scores.json is read only once.
+    """
+    return [r for bucket in _load_scores_index().values() for r in bucket]
 
 
 def _normalise_address(addr: str) -> str:
@@ -149,6 +200,68 @@ def _fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict
     return best if best_ratio >= _NAME_CUTOFF else None
 
 
+def _names_match(osm_name: str, dba_name: str) -> bool:
+    """True if an OSM name and a city dba_name plausibly name the same venue.
+
+    Two complementary rules, because OSM and the city write names very
+    differently:
+
+    * Token-subset: every word of the shorter name appears in the longer one,
+      and the shorter name has at least one distinctive (non-generic) word.
+      This accepts "Amarit" vs "AMARIT RESTAURANT" (a pure length mismatch that
+      SequenceMatcher scores far too low) while rejecting "China Cafe" vs
+      "China Grill" (neither is a subset of the other).
+    * High SequenceMatcher ratio: catches near-identical spellings / word order
+      that the subset rule misses.
+    """
+    a = _normalise_name(osm_name).split()
+    b = _normalise_name(dba_name).split()
+    if not a or not b:
+        return False
+
+    short, long = (a, b) if len(a) <= len(b) else (b, a)
+    short_set, long_set = set(short), set(long)
+    if short_set <= long_set and any(t not in _GENERIC_NAME_TOKENS for t in short_set):
+        return True
+
+    ratio = difflib.SequenceMatcher(None, " ".join(sorted(a)), " ".join(sorted(b))).ratio()
+    return ratio >= _GEO_NAME_RATIO_CUTOFF
+
+
+def _geo_lookup(
+    name: str, lat: float | None, lon: float | None, records: list[dict]
+) -> dict | None:
+    """Find a score record by name within ~250 m of (lat, lon), or None.
+
+    The address-first path misses any venue whose OSM record lacks a clean
+    street address; this recovers it from coordinates + name. Among all records
+    inside the proximity box whose name matches, return the one with the highest
+    name-similarity ratio (ties resolve to scores.json order).
+    """
+    if lat is None or lon is None or not _normalise_name(name):
+        return None
+
+    target = " ".join(sorted(_normalise_name(name).split()))
+    best: dict | None = None
+    best_ratio = -1.0
+    for record in records:
+        rlat, rlon = record.get("lat"), record.get("lon")
+        if rlat is None or rlon is None:
+            continue
+        # Cheap bounding-box reject before the (relatively costly) name compare.
+        if abs(rlat - lat) > _GEO_RADIUS_DEG or abs(rlon - lon) > _GEO_RADIUS_DEG:
+            continue
+        if not _names_match(name, record.get("dba_name", "")):
+            continue
+        ratio = difflib.SequenceMatcher(
+            None, target, " ".join(sorted(_normalise_name(record.get("dba_name", "")).split()))
+        ).ratio()
+        if ratio > best_ratio:
+            best_ratio = ratio
+            best = record
+    return best
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -205,6 +318,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
         return []
 
     scores_index = _load_scores_index()
+    scores_records = _load_scores_records()
 
     # A venue matched in scores.json returns its published batch score directly;
     # an unmatched venue has no record on file and returns no number. The model
@@ -213,6 +327,11 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     output: list[dict[str, Any]] = []
     for r in restaurants:
         match = _fuzzy_lookup(r.get("address", ""), r.get("name", ""), scores_index)
+        if match is None:
+            # Address path failed — OSM often has no usable street address, which
+            # wrongly reports a covered venue as "no record". Fall back to name +
+            # geographic proximity to recover it.
+            match = _geo_lookup(r.get("name", ""), r.get("lat"), r.get("lon"), scores_records)
         if match is not None:
             output.append(_output_from_scores(r, match))
         else:
