@@ -161,6 +161,18 @@ BUILDING_FEATURES: list[str] = [
     "days_since_last_food_safety_bldg_violation",
 ]
 
+# Citywide NOAA weather features (computed by weather_features.py but NOT in
+# ALL_FEATURES until the A/B clears the both-metrics gate — see
+# docs/model-experiments.md). Named here, same pattern as BUILDING_FEATURES,
+# so experiment scripts can do ALL_FEATURES + WEATHER_FEATURES for an A/B.
+WEATHER_FEATURES: list[str] = [
+    "prior_tmax_3d_avg",
+    "prior_tmin_3d_avg",
+    "prior_precip_7d_sum",
+    "prior_heat_days_30d",
+    "prior_freeze_days_30d",
+]
+
 # The current inspection's OWN outcome — the features that make a model a
 # "current-state" risk score rather than a forecast. The forecast-only model
 # (used to compute the forward-looking trend slope; see DR 0011) drops these so

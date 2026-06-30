@@ -147,6 +147,25 @@ FEATURES: dict[str, FeaturePresentation] = {
     # Block-face building-violation features were reverted (not in ALL_FEATURES) —
     # they failed the both-metrics gate under CV. Their driver labels are removed
     # with them; re-add here if the feature is ever promoted.
+    # Citywide NOAA weather features — present here so the A/B's leave-one-out
+    # attribution reads clearly. Not yet in ALL_FEATURES; see WEATHER_FEATURES
+    # in baseline.py and docs/model-experiments.md.
+    "prior_tmax_3d_avg": FeaturePresentation(
+        "3-day average high temperature", "3-day average high of {value:.0f}°C"
+    ),
+    "prior_tmin_3d_avg": FeaturePresentation(
+        "3-day average low temperature", "3-day average low of {value:.0f}°C"
+    ),
+    "prior_precip_7d_sum": FeaturePresentation(
+        "7-day total precipitation", "{value:.0f}mm of rain in the last 7 days"
+    ),
+    "prior_heat_days_30d": FeaturePresentation(
+        "Hot days in the last 30 days", "{value:.0f} days over 90°F in the last 30 days"
+    ),
+    "prior_freeze_days_30d": FeaturePresentation(
+        "Freezing days in the last 30 days",
+        "{value:.0f} days below freezing in the last 30 days",
+    ),
 }
 
 # Derived view — the per-row label map. Existing call sites (top_drivers_for_row,
