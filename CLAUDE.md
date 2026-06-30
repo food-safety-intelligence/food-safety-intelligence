@@ -129,8 +129,11 @@ Three layers, in this order — A and B are required, C is a stretch:
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
 - Real-time ingestion, authentication, multi-city support
-- **Scheduled / periodic ingestion (Airflow, Prefect, cron, etc.)** — see
-  "Roadmap" below; not in this iteration
+- **A scheduler for periodic ingestion (Airflow, Prefect, cron, Fargate timer)**
+  — the incremental ingestion *capability* (`ingest_raw.py --incremental`:
+  watermark + lookback + upsert on the natural key) is now in scope for Phase 2.
+  What stays out is the scheduling layer that runs it on a timer. See "Roadmap"
+  below.
 - **Live model inference at request time** — the web app never calls the
   model on a page load, even after AWS arrives. The batch-score-to-JSON
   pattern (Python pipeline writes `scores.parquet` → script writes
@@ -149,12 +152,12 @@ These are likely Phase 2 work. They are NOT in current scope — same rules
 as the OUT list above (no stubs, no seams, no TODO comments). Listed here so
 when someone asks "what about X?" the answer is "noted, post-demo."
 
-- **Periodic incremental ingestion (Airflow / Prefect / scheduled job)** —
-  daily or weekly pulls of new inspection, complaint, and license records.
-  Note: `fetch_soda_keyset` is already cursor-based, so when this comes back
-  it can resume from a stored `created_date` / `inspection_date` watermark
-  without re-pulling the world. No scheduling code lives in this repo for
-  this iteration.
+- **Scheduling periodic ingestion (Airflow / Prefect / Fargate timer)** — the
+  incremental ingestion *mode* is now in scope (`ingest_raw.py --incremental`:
+  reads a watermark from the existing parquet, re-pulls a lookback window via the
+  cursor-based `fetch_soda_keyset`, upserts on the natural key). What remains
+  roadmap is the scheduler that runs it on a daily / weekly timer — no scheduling
+  code lives in this repo.
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
 - NOAA weather features, Yelp Open Dataset + fuzzy join
 - LLM-based violation-text classification or NLP search
