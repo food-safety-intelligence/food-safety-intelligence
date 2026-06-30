@@ -130,10 +130,26 @@ class DatasetSpec:
 
 
 # Re-pull this many days behind the stored watermark every run. Chicago records
-# are mutable (an inspection is amended, a 311 status changes), and a pure
-# "cursor >= watermark" pull would miss edits to already-ingested rows. The
-# upsert-on-pk merge makes the overlap free of duplicates.
-LOOKBACK_DAYS: int = 90
+# are mutable (an inspection is amended, a 311 status changes, a license is
+# renewed retroactively), and a pure "cursor >= watermark" pull would miss
+# edits to already-ingested rows. The upsert-on-pk merge makes the overlap
+# free of duplicates. 730d (2y) — team review widened this from an initial 90d
+# guess; amendments to Chicago records (esp. licenses) can lag well past 90
+# days, and the keyset re-pull cost of a wider window is cheap relative to
+# missing a silent edit.
+LOOKBACK_DAYS: int = 730
+
+# Food-related licenses only — mirrors the existing scripts/ingest_raw.py
+# server-side filter (keeps the historical-licenses pull tractable: ~80k of
+# several hundred thousand rows). Must stay in sync with
+# _fetch_licenses_historical in scripts/ingest_raw.py.
+_FOOD_LICENSE_WHERE: str = (
+    "(upper(license_description) like '%FOOD%'"
+    " OR upper(license_description) like '%RESTAURANT%'"
+    " OR upper(license_description) like '%TAVERN%'"
+    " OR upper(license_description) like '%LIQUOR%'"
+    " OR upper(license_description) like '%KITCHEN%')"
+)
 
 _SR_TYPES_SOQL: str = "sr_type in (" + ", ".join(f"'{t}'" for t in RELEVANT_SR_TYPES) + ")"
 
@@ -164,8 +180,12 @@ INGEST_SPECS: dict[str, DatasetSpec] = {
         "license_start_date",
         ":id",
         "2010-01-01T00:00:00",
+        where_extra=_FOOD_LICENSE_WHERE,
         select="*,:id",  # Socrata requires * before named system columns
     ),
+    # Start date matches scripts/ingest_raw.py: derived from the existing raw
+    # parquets' min issue_date / violation_date — pre-2017 building records
+    # would only ever back-fill burn-in rows that never enter training.
     "building_permits": DatasetSpec(
         "ydr8-5enu",
         "issue_date",
@@ -176,7 +196,7 @@ INGEST_SPECS: dict[str, DatasetSpec] = {
         "22u3-xenr",
         "violation_date",
         "id",
-        "2010-01-01T00:00:00",
+        "2017-01-01T00:00:00",
         keep_cols=("latitude", "longitude", "department_bureau"),
     ),
 }

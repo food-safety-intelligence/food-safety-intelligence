@@ -67,6 +67,14 @@ def test_cursor_start_without_watermark_falls_back_to_spec():
     assert cursor_start(None, 90, spec) == "2010-01-01T00:00:00"
 
 
+def test_cursor_start_uses_production_lookback_days():
+    # LOOKBACK_DAYS is 730 (2y) per team review — re-pull window must cover
+    # late edits to mutable Chicago records (esp. license amendments).
+    spec = DatasetSpec("x", "d", "pk", "2010-01-01T00:00:00")
+    result = cursor_start("2025-06-15T00:00:00", LOOKBACK_DAYS, spec)
+    assert result == "2023-06-16T00:00:00"
+
+
 # ---------------------------------------------------------------------------
 # upsert
 # ---------------------------------------------------------------------------
@@ -120,6 +128,8 @@ def test_ingest_dataset_incremental_flow(mock_fetch, mock_storage):
     call_kwargs = mock_fetch.call_args[1]
     assert call_kwargs["dataset_id"] == "test-id"
     assert call_kwargs["cursor_col"] == "date"
+    # watermark "2025-03-01" minus a 90-day lookback (explicit override here;
+    # the production default is LOOKBACK_DAYS, exercised in the cursor_start tests).
     assert call_kwargs["cursor_start"] == "2024-12-01T00:00:00"
 
     mock_storage.write_parquet.assert_called_once()
@@ -202,3 +212,57 @@ def test_ingest_dataset_keep_cols_prunes_columns(mock_fetch, mock_storage):
 
     assert set(result.columns) == {"pk", "date", "lat", "lon"}
     assert "extra" not in result.columns
+
+
+@patch("foodsafety.ingest.storage")
+@patch("foodsafety.ingest.fetch_soda_keyset")
+def test_ingest_dataset_defaults_spec_from_ingest_specs(mock_fetch, mock_storage):
+    # No explicit spec passed: must look up INGEST_SPECS[name] (real dataset name).
+    mock_storage.exists.return_value = False
+    mock_storage.join.side_effect = lambda *args: "/".join(str(a) for a in args)
+    mock_fetch.return_value = pd.DataFrame(
+        {"inspection_id": ["1"], "inspection_date": ["2025-01-01"]}
+    )
+
+    result = ingest_dataset("inspections", verbose=False)
+
+    assert len(result) == 1
+    call_kwargs = mock_fetch.call_args[1]
+    assert call_kwargs["dataset_id"] == INGEST_SPECS["inspections"].dataset_id
+
+
+@patch("foodsafety.ingest.storage")
+@patch("foodsafety.ingest.fetch_soda_keyset")
+def test_ingest_dataset_verbose_prints_watermark_and_merge_stats(mock_fetch, mock_storage, capsys):
+    spec = DatasetSpec("test-id", "date", "pk", "2010-01-01T00:00:00")
+
+    existing = pd.DataFrame({"pk": ["a"], "date": ["2025-01-01"], "v": [1]})
+    new_rows = pd.DataFrame({"pk": ["b"], "date": ["2025-06-01"], "v": [2]})
+
+    mock_storage.exists.return_value = True
+    mock_storage.read_parquet.return_value = existing
+    mock_storage.join.side_effect = lambda *args: "/".join(str(a) for a in args)
+    mock_fetch.return_value = new_rows
+
+    ingest_dataset("test", spec, verbose=True)
+
+    out = capsys.readouterr().out
+    assert "watermark=" in out
+    assert "existing +" in out and "merged" in out
+
+
+@patch("foodsafety.ingest.storage")
+@patch("foodsafety.ingest.fetch_soda_keyset")
+def test_ingest_dataset_verbose_prints_no_new_rows(mock_fetch, mock_storage, capsys):
+    spec = DatasetSpec("test-id", "date", "pk", "2010-01-01T00:00:00")
+
+    existing = pd.DataFrame({"pk": ["a"], "date": ["2025-01-01"], "v": [1]})
+    mock_storage.exists.return_value = True
+    mock_storage.read_parquet.return_value = existing
+    mock_storage.join.side_effect = lambda *args: "/".join(str(a) for a in args)
+    mock_fetch.return_value = pd.DataFrame()
+
+    ingest_dataset("test", spec, verbose=True)
+
+    out = capsys.readouterr().out
+    assert "no new rows" in out
