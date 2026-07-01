@@ -1,0 +1,95 @@
+{
+  "experiment": "xgb_weather_features",
+  "date": "2026-07-01",
+  "label_window_days": 180,
+  "random_state": 42,
+  "train_end": "2024-07-01",
+  "val_end": "2025-07-01",
+  "weather_source": "Open-Meteo historical archive (ERA5 reanalysis, Chicago O'Hare coords)",
+  "new_features": [
+    "weather_temp_max_f",
+    "weather_temp_3d_max_f",
+    "weather_hot_days_30d",
+    "weather_temp_30d_mean_f"
+  ],
+  "hot_day_threshold_f": 86.0,
+  "n_features_control": 36,
+  "n_features_candidate": 40,
+  "production_baseline_stored": {
+    "test_pr_auc": 0.382016,
+    "test_p10": 0.415121
+  },
+  "val": {
+    "control": {
+      "pr_auc": 0.339328,
+      "p10": 0.397103
+    },
+    "candidate": {
+      "pr_auc": 0.336719,
+      "p10": 0.3965
+    },
+    "delta_pr_auc": -0.002609,
+    "delta_p10": -0.000604
+  },
+  "cv": {
+    "n_folds": 3,
+    "control_per_fold": [
+      0.39146,
+      0.375112,
+      0.387105
+    ],
+    "candidate_per_fold": [
+      0.390063,
+      0.375649,
+      0.388706
+    ],
+    "deltas_per_fold": [
+      -0.001397,
+      0.000537,
+      0.001601
+    ],
+    "mean_delta": 0.000247,
+    "wins": "2/3"
+  },
+  "test": {
+    "control": {
+      "n": 6702,
+      "positive_rate": 0.105342,
+      "pr_auc": 0.375856,
+      "roc_auc": 0.805801,
+      "precision_at_5pct": 0.491071,
+      "precision_at_10pct": 0.412817,
+      "precision_at_20pct": 0.310216,
+      "recall_at_5pct": 0.233711,
+      "recall_at_10pct": 0.392351,
+      "recall_at_20pct": 0.589235,
+      "top_decile_lift": 3.918835,
+      "brier_score": 0.162144,
+      "log_loss": 0.500655
+    },
+    "candidate": {
+      "n": 6702,
+      "positive_rate": 0.105342,
+      "pr_auc": 0.372237,
+      "roc_auc": 0.805493,
+      "precision_at_5pct": 0.47619,
+      "precision_at_10pct": 0.409836,
+      "precision_at_20pct": 0.313199,
+      "recall_at_5pct": 0.226629,
+      "recall_at_10pct": 0.389518,
+      "recall_at_20pct": 0.594901,
+      "top_decile_lift": 3.89054,
+      "brier_score": 0.161849,
+      "log_loss": 0.500223
+    },
+    "delta_pr_auc": -0.003619,
+    "delta_p10": -0.002981
+  },
+  "both_metrics_gate": "FAIL",
+  "weather_feature_gain": {
+    "weather_temp_max_f": 20.1897,
+    "weather_temp_3d_max_f": 19.7963,
+    "weather_hot_days_30d": 20.3992,
+    "weather_temp_30d_mean_f": 25.0227
+  }
+}
