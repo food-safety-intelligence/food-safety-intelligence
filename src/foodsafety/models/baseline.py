@@ -143,6 +143,24 @@ BOOLEAN_FEATURES: list[str] = [
 
 ALL_FEATURES: list[str] = NUMERIC_FEATURES + CATEGORICAL_FEATURES + BOOLEAN_FEATURES
 
+# Block-face building features (computed by building_features.py but NOT in
+# ALL_FEATURES — tested flat/negative in expanding-window CV). Kept here as a
+# named list so experiment scripts can do ALL_FEATURES + BUILDING_FEATURES for
+# an A/B comparison without hardcoding column names.
+BUILDING_FEATURES: list[str] = [
+    "prior_bldg_violations_365d",
+    "prior_bldg_violations_730d",
+    "days_since_last_bldg_violation",
+    "prior_bldg_permits_365d",
+    "days_since_last_bldg_permit",
+    "prior_bldg_conservation_365d",
+    "prior_bldg_refrigeration_365d",
+    "prior_bldg_plumbing_365d",
+    "prior_bldg_ventilation_365d",
+    "prior_bldg_electrical_365d",
+    "days_since_last_food_safety_bldg_violation",
+]
+
 # The current inspection's OWN outcome — the features that make a model a
 # "current-state" risk score rather than a forecast. The forecast-only model
 # (used to compute the forward-looking trend slope; see DR 0011) drops these so

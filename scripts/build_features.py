@@ -36,6 +36,11 @@ def main() -> None:
         default=str(FEATURES_PATH),
         help="feature-set target (default: config.FEATURES_PATH)",
     )
+    ap.add_argument(
+        "--with-buildings",
+        action="store_true",
+        help="include block-face building permit/violation features (for A/B experiment)",
+    )
     args = ap.parse_args()
 
     labeled_path = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
@@ -55,12 +60,28 @@ def main() -> None:
     print(f"  {licenses_hist_path}")
     licenses_historical = storage.read_parquet(licenses_hist_path)
 
-    # 311 complaints and building violations are intentionally left unwired (None) — both
-    # feature families were dropped from ALL_FEATURES (see the module docstring).
+    building_permits = None
+    building_violations = None
+    if args.with_buildings:
+        permits_path = storage.join(str(RAW_DIR), "building_permits.parquet")
+        violations_path = storage.join(str(RAW_DIR), "building_violations.parquet")
+        if storage.exists(permits_path):
+            print(f"  {permits_path}")
+            building_permits = storage.read_parquet(permits_path)
+        if storage.exists(violations_path):
+            print(f"  {violations_path}")
+            building_violations = storage.read_parquet(violations_path)
+        if building_permits is None and building_violations is None:
+            print("  WARNING: --with-buildings but no building parquets found; skipping")
+
+    # 311 complaints are intentionally left unwired (None) — the feature family was
+    # dropped from ALL_FEATURES (see baseline.py + docs/model-experiments.md).
     features = build_features(
         labeled,
         complaints=None,
         licenses_historical=licenses_historical,
+        building_permits=building_permits,
+        building_violations=building_violations,
     )
 
     missing_cols = [c for c in ALL_FEATURES if c not in features.columns]

@@ -15,7 +15,7 @@
 # Publish a local build to S3:  make features retrain history && make publish
 # The EDA / label-construction steps still run from notebooks/0{1,2}_*.ipynb.
 
-.PHONY: help data features retrain history publish normalize test lint clean
+.PHONY: help data data-incremental features retrain history publish normalize test lint clean
 
 help:
 	@echo "Python pipeline (working today):"
@@ -38,6 +38,9 @@ help:
 
 data:
 	PYTHONPATH=src $(PYTHON) scripts/ingest_raw.py
+
+data-incremental:
+	PYTHONPATH=src $(PYTHON) scripts/ingest_raw.py --incremental
 
 features:
 	PYTHONPATH=src $(PYTHON) scripts/build_features.py

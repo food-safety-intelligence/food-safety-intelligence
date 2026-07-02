@@ -94,6 +94,7 @@ def fetch_soda_keyset(
     cursor_col: str,
     cursor_start: str,
     where_extra: str | None = None,
+    select: str | None = None,
     page_size: int = 50_000,
     max_pages: int = 500,
     timeout: int = 180,
@@ -126,6 +127,7 @@ def fetch_soda_keyset(
             (e.g. `created_date`, `inspection_date`).
         cursor_start: ISO timestamp to start at (e.g. "2019-01-01T00:00:00").
         where_extra: extra SoQL predicate AND-ed with the cursor clause.
+        select: SoQL ``$select`` clause, e.g. ``":id,*"`` to include system columns.
         page_size: rows per request.
         max_pages: hard cap on iterations.
         timeout: per-request timeout in seconds.
@@ -167,6 +169,8 @@ def fetch_soda_keyset(
             "$order": f"{cursor_col} ASC",
             "$limit": page_size,
         }
+        if select:
+            params["$select"] = select
         response, elapsed = _request_with_retry(url, params, timeout, max_retries, verbose, page)
         chunk = pd.DataFrame(response.json())
         if chunk.empty:
