@@ -108,6 +108,27 @@ function DetailLoader({ id }: { id: string }) {
 
       {is_mock && <DemoBanner />}
 
+      {restaurant.is_out_of_business && (
+        <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
+          <div
+            role="note"
+            className="rounded-xl border border-line bg-tint px-5 py-3.5 text-sm text-ink"
+          >
+            <span className="font-semibold">
+              This establishment appears to be out of business
+            </span>
+            {restaurant.closed_since && (
+              <>
+                {" "}
+                — an inspector found it closed on{" "}
+                {formatInspectionDate(restaurant.closed_since)}
+              </>
+            )}
+            . The risk information below is historical, not a current signal.
+          </div>
+        </div>
+      )}
+
       {/* max-w-full on mobile (capped to the viewport) so content wraps instead
           of forcing a horizontal scroll; overflow-x-clip trims any small residual
           overhang from intrinsic-width content (gauge, waterfall) without

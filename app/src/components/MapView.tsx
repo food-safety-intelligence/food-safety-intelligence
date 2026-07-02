@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
-import { TIER_HEX } from "@/lib/scores";
+import { CLOSED_HEX, TIER_HEX } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
 
@@ -163,14 +163,25 @@ export function MapView({
               <div className="flex items-center gap-2 mb-1.5 pr-6">
                 <span
                   className="inline-block w-2 h-2 rounded-full"
-                  style={{ background: TIER_HEX[selected.risk_tier] }}
+                  style={{
+                    background: selected.is_out_of_business
+                      ? CLOSED_HEX
+                      : TIER_HEX[selected.risk_tier],
+                  }}
                 />
                 <span className="text-2xs uppercase tracking-[0.14em] text-muted font-medium">
-                  {selected.risk_tier}
+                  {selected.is_out_of_business
+                    ? "Out of business"
+                    : selected.risk_tier}
                 </span>
-                <span className="num text-base font-medium ml-auto">
-                  {selected.risk_score.toFixed(2)}
-                </span>
+                {/* No risk number for a closed venue — a fresh-looking score
+                    next to "out of business" invites misreading; the profile
+                    page carries the historical detail. */}
+                {!selected.is_out_of_business && (
+                  <span className="num text-base font-medium ml-auto">
+                    {selected.risk_score.toFixed(2)}
+                  </span>
+                )}
               </div>
               <div className="font-semibold text-base leading-tight">
                 {selected.dba_name}
@@ -178,7 +189,7 @@ export function MapView({
               <div className="text-xs text-muted mt-0.5">
                 {selected.address}
               </div>
-              {selected.top_driver && (
+              {selected.top_driver && !selected.is_out_of_business && (
                 <div className="mt-1.5">
                   <PinDriverLine driver={selected.top_driver} />
                 </div>
@@ -294,11 +305,16 @@ function PinLayer({
         >
           <TeardropPin
             tier={p.risk_tier}
+            closed={p.is_out_of_business ?? false}
             isHovered={hovered === p.license_id}
             isSelected={selected?.license_id === p.license_id}
             onMouseEnter={() => onHover(p.license_id)}
             onMouseLeave={() => onHover(null)}
-            label={`${p.dba_name} — ${p.risk_tier} risk`}
+            label={
+              p.is_out_of_business
+                ? `${p.dba_name} — out of business (was ${p.risk_tier} risk)`
+                : `${p.dba_name} — ${p.risk_tier} risk`
+            }
           />
         </Marker>
       ))}
@@ -313,6 +329,7 @@ function PinLayer({
  */
 function TeardropPin({
   tier,
+  closed,
   isHovered,
   isSelected,
   onMouseEnter,
@@ -320,13 +337,14 @@ function TeardropPin({
   label,
 }: {
   tier: RiskTier;
+  closed: boolean;
   isHovered: boolean;
   isSelected: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   label: string;
 }) {
-  const color = TIER_HEX[tier];
+  const color = closed ? CLOSED_HEX : TIER_HEX[tier];
   const active = isHovered || isSelected;
 
   return (
@@ -355,10 +373,22 @@ function TeardropPin({
         <path
           d="M12 0 C 17.5 0 22 4.5 22 10 C 22 17 13.5 26.5 12.7 29.2 C 12.4 30.2 11.6 30.2 11.3 29.2 C 10.5 26.5 2 17 2 10 C 2 4.5 6.5 0 12 0 Z"
           fill={color}
+          // Closed pins sit back: dimmed fill; the "×" centre (not colour
+          // alone) marks them, and the aria-label says "out of business".
+          fillOpacity={closed ? 0.62 : 1}
           stroke="#FFFFFF"
           strokeWidth={1.5}
         />
-        <circle cx={12} cy={10} r={3.5} fill="#FFFFFF" />
+        {closed ? (
+          <path
+            d="M9.5 7.5 L14.5 12.5 M14.5 7.5 L9.5 12.5"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        ) : (
+          <circle cx={12} cy={10} r={3.5} fill="#FFFFFF" />
+        )}
       </svg>
     </button>
   );

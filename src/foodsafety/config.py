@@ -54,6 +54,11 @@ PREDICTIONS_DIR: str | Path = _join(_DATA_DIR, "predictions")
 FEATURES_NAME: str = os.environ.get("FOODSAFETY_FEATURES_NAME") or "features_current_inspection"
 FEATURES_PATH: str | Path = _join(PROCESSED_DIR, "features", f"{FEATURES_NAME}.parquet")
 
+# The labeled all-events artifact (Arun's contract). Serving reads it for the
+# out-of-business status (DR 0014): closure events (Out of Business / Business
+# Not Located) exist only here — they are not scoreable feature rows.
+INSPECTIONS_LABELED_PATH: str | Path = _join(PROCESSED_DIR, "inspections_labeled.parquet")
+
 # Web-app JSON targets — the three files the Next.js app reads (scores.json,
 # inspection_history.json, methodology.json). Default writes under app/public/data
 # (committed fallback); override to s3://<bucket>/web-app-data for the hosted bucket.

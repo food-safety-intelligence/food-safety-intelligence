@@ -26,6 +26,7 @@ from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_p
 from foodsafety.serve.predict_batch import (
     _row_to_json,
     build_scores_table,
+    out_of_business_status,
     score_to_tier,
     write_scores_json,
 )
@@ -38,6 +39,8 @@ CONTRACT_COLUMNS = [
     "risk_tier",
     "top_drivers",
     "trend_slope",
+    "is_out_of_business",
+    "closed_since",
 ]
 
 
@@ -193,6 +196,8 @@ def test_row_to_json_strips_whitespace_on_display_strings():
                 "risk_tier": "Moderate",
                 "trend_slope": None,
                 "top_drivers": [],
+                "is_out_of_business": False,
+                "closed_since": None,
             }
         ]
     )
@@ -200,3 +205,99 @@ def test_row_to_json_strips_whitespace_on_display_strings():
     out = _row_to_json(row)
     assert out["dba_name"] == "JIMMY FAMOUS BURGER"
     assert out["address"] == "123 W Example St"
+
+
+# ---------------------------------------------------------------------------
+# Out-of-business status (DR 0014)
+# ---------------------------------------------------------------------------
+
+
+def _make_labeled_events() -> pd.DataFrame:
+    """Minimal ``inspections_labeled``-shaped event stream (all event types)."""
+    return pd.DataFrame(
+        [
+            # L0: pass, then found closed — latest event wins.
+            {"license_id": "L0", "inspection_date": "2024-01-10", "results": "Pass"},
+            {"license_id": "L0", "inspection_date": "2025-01-13", "results": "Out of Business"},
+            # L1: old closure, then reopened/passed — NOT closed (latest is Pass).
+            {"license_id": "L1", "inspection_date": "2023-05-01", "results": "Out of Business"},
+            {"license_id": "L1", "inspection_date": "2024-03-01", "results": "Pass"},
+            # L2: latest is No Entry — not a closure signal.
+            {"license_id": "L2", "inspection_date": "2024-06-01", "results": "No Entry"},
+            # L3: Business Not Located counts as closed.
+            {
+                "license_id": "L3",
+                "inspection_date": "2024-07-04",
+                "results": "Business Not Located",
+            },
+        ]
+    )
+
+
+def test_out_of_business_status_uses_latest_event_only():
+    status = out_of_business_status(_make_labeled_events())
+
+    assert status.loc["L0", "is_out_of_business"]
+    assert status.loc["L0", "closed_since"] == pd.Timestamp("2025-01-13")
+    # A closure followed by a later Pass means the license is active.
+    assert not status.loc["L1", "is_out_of_business"]
+    assert pd.isna(status.loc["L1", "closed_since"])
+    # "No Entry" is not a closure.
+    assert not status.loc["L2", "is_out_of_business"]
+    assert status.loc["L3", "is_out_of_business"]
+
+
+def test_scores_table_carries_closure_and_defaults_active():
+    features = _make_features()
+    model = _fit_model(features)
+
+    closure = out_of_business_status(
+        pd.DataFrame(
+            [
+                {"license_id": "L0", "inspection_date": "2025-01-13", "results": "Out of Business"},
+                {"license_id": "L1", "inspection_date": "2024-03-01", "results": "Pass"},
+            ]
+        )
+    )
+    scores = build_scores_table(model, features, ALL_FEATURES, closure_status=closure)
+
+    by_lic = scores.set_index("license_id")
+    assert bool(by_lic.loc["L0", "is_out_of_business"])
+    assert by_lic.loc["L0", "closed_since"] == pd.Timestamp("2025-01-13")
+    assert not bool(by_lic.loc["L1", "is_out_of_business"])
+    # Licenses absent from the closure frame default to active, not NaN.
+    assert not bool(by_lic.loc["L5", "is_out_of_business"])
+    assert scores["is_out_of_business"].dtype == bool
+
+    # No closure frame at all -> every row active (test/dev convenience path).
+    scores_none = build_scores_table(model, features, ALL_FEATURES)
+    assert not scores_none["is_out_of_business"].any()
+
+
+def test_write_scores_json_closure_fields_and_active_only_trend_counts(tmp_path):
+    features = _make_features()
+    model = _fit_model(features)
+    closure = out_of_business_status(
+        pd.DataFrame(
+            # L0 is one of the two multi-inspection licenses, so it has a real
+            # trend slope — closing it must remove it from the trend counts.
+            [{"license_id": "L0", "inspection_date": "2025-01-13", "results": "Out of Business"}]
+        )
+    )
+    scores = build_scores_table(model, features, ALL_FEATURES, closure_status=closure)
+
+    out = tmp_path / "scores.json"
+    write_scores_json(scores, str(out), calibration={"a": 1.0, "b": 0.0, "intercept": 0.0})
+    payload = json.loads(out.read_text())
+
+    assert payload["totals"]["out_of_business"] == 1
+    rows = {r["license_id"]: r for r in payload["scores"]}
+    assert rows["L0"]["is_out_of_business"] is True
+    assert rows["L0"]["closed_since"] == "2025-01-13"
+    assert rows["L5"]["is_out_of_business"] is False
+    assert rows["L5"]["closed_since"] is None
+
+    # Trend counts must cover active venues only: recompute from the rows.
+    active = [r for r in payload["scores"] if not r["is_out_of_business"]]
+    expected_worsening = sum(1 for r in active if (r["trend_slope"] or 0) > 0.001)
+    assert payload["totals"]["worsening_30d"] == expected_worsening

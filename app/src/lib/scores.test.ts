@@ -354,6 +354,41 @@ describe("computeHomeView", () => {
     ).toEqual(["a", "z", "s", "n"]);
   });
 
+  it("sorts out-of-business venues after actives in risk sorts, not in A–Z", () => {
+    const idx: SearchIndex = {
+      ...INDEX,
+      rows: [
+        // Closed venue with the HIGHEST score — must not lead the list/pins.
+        { ...mk("c", "Closed High", 0.95, "High", true), is_out_of_business: true },
+        mk("1", "Zeta Pizza", 0.9, "High", true),
+        mk("4", "Delta Diner", 0.1, "Low", true),
+      ],
+    };
+    // Risk sort: actives by score desc, then closed.
+    expect(ids(computeHomeView(idx, opts()).listRows)).toEqual(["1", "4", "c"]);
+    // Pins follow the same order — the map's zoom cap takes the FIRST N,
+    // so a closed venue must never crowd out live signal at city zoom.
+    expect(ids(computeHomeView(idx, opts()).pins)).toEqual(["1", "4", "c"]);
+    // Low-first sort: closed still last.
+    expect(ids(computeHomeView(idx, opts({ sort: "low" })).listRows)).toEqual([
+      "4",
+      "1",
+      "c",
+    ]);
+    // A–Z keeps pure alphabetical order — a closed venue is findable in place.
+    expect(ids(computeHomeView(idx, opts({ sort: "name" })).listRows)).toEqual([
+      "c",
+      "4",
+      "1",
+    ]);
+    // The flag rides through to the rows the UI renders.
+    const risk = computeHomeView(idx, opts());
+    expect(risk.listRows.find((r) => r.license_id === "c")?.is_out_of_business).toBe(
+      true,
+    );
+    expect(risk.pins.find((p) => p.license_id === "c")?.is_out_of_business).toBe(true);
+  });
+
   it("caps the list but keeps the true match count", () => {
     const v = computeHomeView(INDEX, opts({ listLimit: 2 }));
     expect(v.listRows).toHaveLength(2);

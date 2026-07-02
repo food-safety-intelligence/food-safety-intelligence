@@ -44,6 +44,7 @@ export interface PinSummary {
   risk_score: number;
   risk_tier: RiskTier;
   top_driver?: PinDriver;
+  is_out_of_business?: boolean;
 }
 
 export interface Driver {
@@ -69,6 +70,14 @@ export interface RestaurantScore {
   trend_ci_low?: number | null;
   trend_ci_high?: number | null;
   top_drivers: Driver[];
+  /**
+   * Latest inspection event found the venue closed ("Out of Business" /
+   * "Business Not Located"). The score/tier are historical for these rows —
+   * the UI de-emphasises them and never presents the risk as current.
+   */
+  is_out_of_business?: boolean;
+  /** Date of the closing inspection event (ISO), when is_out_of_business. */
+  closed_since?: string | null;
   /**
    * Server-computed percentile rank of this restaurant's `risk_score` in the
    * full scored population (0–100). 100 = highest score in the dataset.
@@ -211,6 +220,14 @@ export const TIER_HEX: Record<RiskTier, string> = {
 };
 
 /**
+ * Pin/dot colour for out-of-business venues — a neutral warm grey so closed
+ * pins recede behind the tier palette. Colour is never the only cue: the pin
+ * swaps its centre dot for an "×" glyph and the accessible name says "out of
+ * business".
+ */
+export const CLOSED_HEX = "#A8A49A";
+
+/**
  * Reduce a full {@link Driver} to the compact {@link PinDriver} a map pin /
  * list row carries: keep the label + feature key (for the icon), and collapse
  * the signed `shap` to an `up` direction (true = raises risk). A zero `shap`
@@ -304,6 +321,7 @@ export interface HomeListRow {
   risk_tier: RiskTier;
   trend_slope: number | null;
   top_driver?: PinDriver;
+  is_out_of_business?: boolean;
 }
 
 /**
@@ -373,6 +391,17 @@ export function parseSort(raw: string | null | undefined): HomeSort {
   return raw === "name" ? "name" : raw === "low" ? "low" : "risk";
 }
 
+/**
+ * Order closed venues after active ones (0 vs 1), before any score compare.
+ * Two reasons: the map's zoom-density budget takes the FIRST N pins, so closed
+ * venues must never crowd out live signal at city zoom; and a risk-sorted list
+ * shouldn't lead with establishments that no longer exist. Name sort is exempt
+ * (an A–Z lookup should find a closed venue in its alphabetical place).
+ */
+export function closedRank(r: { is_out_of_business?: boolean }): number {
+  return r.is_out_of_business ? 1 : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Client search index
 //
@@ -394,6 +423,7 @@ export interface SearchIndexRow {
   risk_tier: RiskTier;
   trend_slope: number | null;
   top_driver: PinDriver | null;
+  is_out_of_business?: boolean;
 }
 
 /** The whole `search-index.json` file the client fetches once. */
@@ -437,8 +467,8 @@ export function computeHomeView(
     sort === "name"
       ? compareByName(a.dba_name, b.dba_name)
       : sort === "low"
-        ? a.risk_score - b.risk_score
-        : b.risk_score - a.risk_score;
+        ? closedRank(a) - closedRank(b) || a.risk_score - b.risk_score
+        : closedRank(a) - closedRank(b) || b.risk_score - a.risk_score;
 
   const listRows: HomeListRow[] = matched
     .slice()
@@ -452,12 +482,17 @@ export function computeHomeView(
       risk_tier: r.risk_tier,
       trend_slope: r.trend_slope,
       top_driver: r.top_driver ?? undefined,
+      is_out_of_business: r.is_out_of_business,
     }));
 
   const pins: PinSummary[] = matched
     .filter(hasCoords)
-    .sort((a, b) =>
-      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
+    .sort(
+      (a, b) =>
+        closedRank(a) - closedRank(b) ||
+        (sort === "low"
+          ? a.risk_score - b.risk_score
+          : b.risk_score - a.risk_score),
     )
     .map((r) => ({
       license_id: r.license_id,
@@ -468,6 +503,7 @@ export function computeHomeView(
       risk_score: r.risk_score,
       risk_tier: r.risk_tier,
       top_driver: r.top_driver ?? undefined,
+      is_out_of_business: r.is_out_of_business,
     }));
 
   return {

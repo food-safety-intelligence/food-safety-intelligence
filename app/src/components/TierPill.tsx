@@ -49,3 +49,31 @@ export function TierPill({
     </span>
   );
 }
+
+/**
+ * Neutral badge for an out-of-business venue — shown in place of the tier
+ * pill so a closed venue never presents its historical tier as current.
+ */
+export function ClosedPill({
+  size = "md",
+  className,
+}: {
+  size?: "sm" | "md";
+  className?: string;
+}) {
+  const sizing =
+    size === "sm" ? "text-2xs px-2 py-0.5" : "text-xs px-3.5 py-1.5";
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-2 rounded-full font-medium tracking-[0.04em]",
+        "bg-tint text-muted",
+        sizing,
+        className,
+      )}
+    >
+      <span aria-hidden="true">×</span>
+      Closed
+    </span>
+  );
+}
