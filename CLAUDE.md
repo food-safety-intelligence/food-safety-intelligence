@@ -6,18 +6,17 @@ with the workspace file, this file wins.
 
 ---
 
-## Project goal (this iteration only)
+## Project goal
 
-> **Phase 2 status — scope update (the team moved into Phase 2 ~2026-06-15).**
-> The scope text below describes the **MVP-demo iteration** and is kept for the
-> record. Several items it lists as OUT are now **IN scope**: AWS (SageMaker /
-> Bedrock / S3), agentic AI, transformer/LLM NLP **for batch feature extraction**,
-> hosted **batch** inference, and **deployment** — the web app is live on AWS
-> Amplify and Vercel, both auto-deploying on push to `main`, so **merging to
-> `main` publishes to production** (verify app changes before merging). What does
-> **not** change: the permanent **batch-score-to-JSON** pattern (the app never
-> calls the model at request time), the temporal-split / leakage discipline, and
-> the both-metrics promotion gate. See
+> **Phase 2 status (the team moved into Phase 2 ~2026-06-15).** The project is
+> past the MVP demo and is **built on AWS**: raw data + served JSON live in S3
+> (CloudFront-fronted), the chat agent runs on Bedrock (AgentCore + Nova 2
+> Lite), transformer/LLM NLP is used for **batch** feature extraction, and the
+> web app is live on AWS Amplify, auto-deploying on push to `main` — so
+> **merging to `main` publishes to production** (verify app changes before
+> merging). What does **not** change: the permanent **batch-score-to-JSON**
+> pattern (the app never calls the model at request time), the temporal-split /
+> leakage discipline, and the both-metrics promotion gate. See
 > [`docs/project_plan.md`](docs/project_plan.md) for the project intent and
 > [0009](docs/decisions/0009-production-estimator-revisit-logreg-vs-xgb.md) for
 > the production-estimator state; the Phase-2 deep-learning bets are scoped in a
@@ -50,10 +49,11 @@ Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
 
 1. A measured, calibrated model (logistic regression baseline + XGBoost) with
    SHAP explainability.
-2. A demoable **Next.js web app** that runs on Jun's laptop.
+2. A **Next.js web app**, live on AWS and auto-deployed from `main`, plus a
+   Bedrock chat agent over the same batch scores.
 
 Success = model performance on a **time-held-out** test set + a web app that
-loads in <5s and renders a restaurant detail page. Not deployment. Not AWS.
+loads in <5s and renders a restaurant detail page.
 
 Three product questions the UI must answer for any restaurant:
 
@@ -88,8 +88,12 @@ Three product questions the UI must answer for any restaurant:
   fail-rate-by-decile
 - Basic group-performance check by `facility_type` and zip prefix
 - Web app (Next.js): search (substring on `dba_name`) + map + restaurant detail
-  + methodology page
-- Local laptop training only
+  + methodology page + the chat agent
+- AWS: S3 for raw data + served JSON (CloudFront-fronted), the chat agent on
+  Bedrock (AgentCore + Nova 2 Lite), GitHub Actions deploys, and weekly
+  scheduled raw-data ingestion (design approved, implementation in flight)
+- Training runs locally or on AWS SageMaker; either way, scores are produced
+  in batch and published as JSON
 
 ### Violation-text NLP strategy (in scope, hybrid)
 
@@ -109,38 +113,27 @@ Three layers, in this order — A and B are required, C is a stretch:
 
 ## What is OUT of scope — do not add, do not stub, do not leave seams
 
-> **See the Phase-2 status note at the top.** Several items below (AWS,
-> deployment, hosted batch inference, transformer/LLM NLP for batch features) are
-> now **IN scope**. The list is kept for the MVP-iteration record; the discipline
-> it encodes — no request-time inference, no premature seams — still applies.
-
-- **AWS this iteration** — no `boto3`, no S3 paths in code, no SageMaker /
-  Lambda / Bedrock references. The Phase-2 plan IS hosted training and
-  scoring on AWS (see Roadmap) — but no AWS code lands in this iteration.
-  The seam for the future migration is one env var (`FOODSAFETY_DATA_DIR`);
-  no other seams should be added pre-emptively.
-- Deployment of any kind this iteration (Vercel, Streamlit Cloud, Docker,
-  K8s). The web app runs `next dev` locally.
-- Hosted inference / FastAPI / REST endpoints / Next.js API routes that hit
-  a live model
 - NOAA weather data
 - Yelp Open Dataset + Yelp fuzzy join
-- LLM / Bedrock / transformer NLP (TF-IDF + SVD is the ceiling, layer C only)
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
 - Real-time ingestion, authentication, multi-city support
-- **Scheduled / periodic ingestion (Airflow, Prefect, cron, etc.)** — see
-  "Roadmap" below; not in this iteration
+- **A scheduler for periodic ingestion (Airflow, Prefect, cron, Fargate timer)**
+  — the incremental ingestion *capability* (`ingest_raw.py --incremental`:
+  watermark + lookback + upsert on the natural key) is now in scope for Phase 2.
+  What stays out is the scheduling layer that runs it on a timer. See "Roadmap"
+  below.
 - **Live model inference at request time** — the web app never calls the
-  model on a page load, even after AWS arrives. The batch-score-to-JSON
-  pattern (Python pipeline writes `scores.parquet` → script writes
-  `scores.json` → app reads the precomputed JSON) is **permanent by design**;
-  what changes in Phase 2 is *where* the batch job runs (laptop now,
-  SageMaker / scheduled Lambda later) and *where* the JSON lives
-  (`app/public/data/` now, CloudFront-fronted S3 later).
+  model on a page load, and the chat agent's tools read the precomputed
+  scores JSON, never the model. No FastAPI sidecars, no Next.js API routes
+  that hit a live model. The batch-score-to-JSON pattern (Python pipeline
+  writes `scores.parquet` → script writes `scores.json` → app reads the
+  precomputed JSON) is **permanent by design**; Phase 2 changed *where* the
+  JSON lives (CloudFront-fronted S3, with a committed fallback for builds),
+  not the pattern.
 
-If a teammate proposes any of the above, the answer is "Phase 2, after demo."
-Do not write a `# TODO: AWS later` comment. Do not import then comment-out a
+If a teammate proposes any of the above, the answer is "not this phase."
+Do not write a `# TODO: later` comment. Do not import then comment-out a
 dep. Just don't write the seam.
 
 ### Roadmap (acknowledged, not now)
@@ -149,18 +142,18 @@ These are likely Phase 2 work. They are NOT in current scope — same rules
 as the OUT list above (no stubs, no seams, no TODO comments). Listed here so
 when someone asks "what about X?" the answer is "noted, post-demo."
 
-- **Periodic incremental ingestion (Airflow / Prefect / scheduled job)** —
-  daily or weekly pulls of new inspection, complaint, and license records.
-  Note: `fetch_soda_keyset` is already cursor-based, so when this comes back
-  it can resume from a stored `created_date` / `inspection_date` watermark
-  without re-pulling the world. No scheduling code lives in this repo for
-  this iteration.
+- **Scheduling periodic ingestion (Airflow / Prefect / Fargate timer)** — the
+  incremental ingestion *mode* is now in scope (`ingest_raw.py --incremental`:
+  reads a watermark from the existing parquet, re-pulls a lookback window via the
+  cursor-based `fetch_soda_keyset`, upserts on the natural key). What remains
+  roadmap is the scheduler that runs it on a daily / weekly timer — no scheduling
+  code lives in this repo.
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
 - NOAA weather features, Yelp Open Dataset + fuzzy join
-- LLM-based violation-text classification or NLP search
 - Production fairness audit (disparate-impact tests, reweighting)
 - Multi-city support beyond Chicago
-- Deployment (Vercel, Docker, K8s, etc.)
+- Auth on the chat endpoint (the Cognito upgrade path is noted in
+  `app/src/lib/agent-api.ts`)
 
 ---
 
@@ -189,11 +182,22 @@ model + writes `scores.parquet`; a small Python script converts that to
 - **lucide-react** for icons
 - **Map**: `react-map-gl` + `maplibre-gl` with OpenStreetMap-style raster
   tiles (no API key needed). Can swap to Mapbox vector tiles later if we
-  want, but only after demo.
+  want, but only with a PR justifying it.
 - **Charts**: Recharts. No plotly in the web app.
 - **Server components by default**. Use `"use client"` only when the
   component needs interactivity, state, or browser-only APIs.
 - No new top-level deps without a PR comment justifying it.
+
+### AWS (in `agents/` + `agentcore-deploy/`)
+
+- **S3** for raw data + served JSON, fronted by **CloudFront**;
+  `FOODSAFETY_DATA_DIR` + `foodsafety.io.storage` is the local-vs-S3 seam
+- **Bedrock AgentCore** (Strands Agents + Amazon Nova 2 Lite) for the chat
+  agent, with a proxy **Lambda** behind ALB/CloudFront at `/api/agent`
+- **CDK** (TypeScript, in `agentcore-deploy/`) for the agent runtime stack
+- **GitHub Actions OIDC deploys**: `deploy-web.yml` (static export → S3 +
+  CloudFront invalidation) and `deploy-agent.yml` (CDK + Lambda + a
+  post-deploy scoring smoke test) — both fire on merge to `main`
 
 Notably absent: Streamlit (replaced), Mapbox (deferred), Google Maps (no
 billing), Redux/Zustand (small state, use React hooks).
@@ -211,6 +215,9 @@ billing), Redux/Zustand (small state, use React hooks).
   (App Router with src/ directory). The web app reads only from
   `app/public/data/*.json` — never from `data/raw/` or `data/processed/`
   directly, never from the Python side, never from a live API.
+- `agents/` — the Bedrock chat agent: entrypoint, system prompt, tools,
+  Lambda proxy, and the eval harness (`agents/eval/`).
+- `agentcore-deploy/` — CDK app for the AgentCore runtime stack.
 - `data/` — fully gitignored. Subfolders: `raw/`, `interim/`, `processed/`,
   `models/`, `predictions/`. Test fixtures live under `tests/fixtures/`, NOT `data/`.
 - `design/` — temporary design artifacts (HTML mockups, screenshots,
@@ -404,7 +411,7 @@ Process:
 - Python pipeline runnable end-to-end via `make all` on a fresh clone after
   `uv sync`. Web app runnable via `cd app && pnpm install && pnpm dev`.
 - Cache dir configurable via `FOODSAFETY_DATA_DIR` env var (defaults to `./data/`).
-  This is the **only** future-proofing seam we leave for AWS.
+  This is the seam that lets the same pipeline run against local disk or S3.
 
 ## Experiment tracking
 

@@ -167,6 +167,24 @@ def test_fetch_soda_keyset_applies_where_extra(mock_get, _sleep):
 
 @patch("foodsafety.io.soda.time.sleep")
 @patch("foodsafety.io.soda.requests.get")
+def test_fetch_soda_keyset_applies_select(mock_get, _sleep):
+    # select lets the caller request Socrata system columns (e.g. ":id") that
+    # aren't returned by default.
+    mock_get.side_effect = [_resp([{"created_date": "2019-01-01", ":id": "row-a"}])]
+    soda.fetch_soda_keyset(
+        "ds",
+        cursor_col="created_date",
+        cursor_start="2019-01-01",
+        select="*,:id",
+        page_size=2,
+        verbose=False,
+    )
+
+    assert mock_get.call_args_list[0].kwargs["params"]["$select"] == "*,:id"
+
+
+@patch("foodsafety.io.soda.time.sleep")
+@patch("foodsafety.io.soda.requests.get")
 def test_fetch_soda_keyset_writes_and_cleans_shards(mock_get, _sleep, tmp_path):
     # With shard_dir set, each page is persisted as a parquet shard and the final
     # result is read back from those shards; on a clean exit the shards are removed.
