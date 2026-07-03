@@ -19,6 +19,10 @@
 # to commit (over GitHub's 100MB file cap). S3 is the source of truth; written
 # locally only so `next build`/dev can read them without AWS creds.
 /app/public/data/comments/
+# Per-license detail bundles (~23.6k small JSONs, regenerated each build by
+# scripts/build-detail-data.mjs) — the client-rendered detail page fetches these.
+# detail-globals.json is already covered by the /app/public/data/*.json rule above.
+/app/public/data/detail/
 **/_partial_*/
 
 # Saved model files

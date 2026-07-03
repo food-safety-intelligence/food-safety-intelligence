@@ -22,7 +22,8 @@ from __future__ import annotations
 
 import argparse
 
-from foodsafety.config import DATASETS, RAW_DIR, RELEVANT_SR_TYPES
+from foodsafety.config import DATASETS, INGEST_SPECS, RAW_DIR, RELEVANT_SR_TYPES
+from foodsafety.ingest import ingest_dataset
 from foodsafety.io import storage
 from foodsafety.io.cache import load_or_fetch
 from foodsafety.io.soda import fetch_soda, fetch_soda_keyset
@@ -121,10 +122,27 @@ def main() -> None:
         action="store_true",
         help="re-pull even if the raw parquet already exists at the target",
     )
+    ap.add_argument(
+        "--incremental",
+        action="store_true",
+        help="incremental mode: read watermark from existing data, fetch only "
+        "new/edited rows (with lookback), upsert on natural key",
+    )
     args = ap.parse_args()
 
     names = args.datasets or list(FETCHERS)
     print(f"Ingest target (RAW_DIR): {RAW_DIR}")
+
+    if args.incremental:
+        for name in names:
+            if name not in INGEST_SPECS:
+                print(f"  {name}: no INGEST_SPEC, skipping incremental")
+                continue
+            df = ingest_dataset(name, INGEST_SPECS[name])
+            target = storage.join(str(RAW_DIR), f"{name}.parquet")
+            print(f"  {name}: {len(df):,} rows -> {target}")
+        return
+
     for name in names:
         target = storage.join(str(RAW_DIR), f"{name}.parquet")
         if args.force and storage.exists(target):

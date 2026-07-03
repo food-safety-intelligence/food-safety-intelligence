@@ -73,7 +73,8 @@ experiment per commit boundary.
 
 ## Step 4 — Train + evaluate both models
 - LogReg: `notebooks/04_baseline_logreg.ipynb`; XGBoost: `notebooks/05_xgboost_model.ipynb`.
-  Each writes `reports/metrics/<model>_<run>.json` with provenance.
+  Each writes `reports/metrics/<model>/<model>_<run>.json` with provenance
+  (metrics are organized into per-model-type subfolders).
 - **Judge on lift over base rate**, not raw PR-AUC (a rarer label mechanically
   lowers raw PR-AUC). The **promotion gate is BOTH PR-AUC AND precision@10%**
   (both metrics), and a feature clears if **at least one model** — LogReg or
@@ -114,7 +115,7 @@ a residual-risk bullet + revision date) rather than spawning a new record.
   served model + `data/predictions/scores.parquet` → `app/public/data/scores.json`
   (schema `0.5.0`: **5** `top_drivers` per row + a top-level `calibration
   {a, b, intercept}` Platt triple — both written automatically) +
-  `reports/metrics/xgb_monotone_sigmoid_<run>.json`; then
+  `reports/metrics/xgb/xgb_monotone_sigmoid_<run>.json`; then
   `PYTHONPATH=src .venv/bin/python scripts/build_methodology_json.py` →
   `app/public/data/methodology.json` (also carries the **global feature-impact**
   ranking + the worked **calibrated-waterfall** example). A new feature flows into

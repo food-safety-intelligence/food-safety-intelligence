@@ -184,7 +184,7 @@ export function MapView({
                 </div>
               )}
               <Link
-                href={`/restaurant/${selected.license_id}`}
+                href={`/restaurant/?id=${selected.license_id}`}
                 className="text-xs text-teal underline mt-2 inline-block"
               >
                 Open profile →

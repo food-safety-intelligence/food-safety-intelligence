@@ -127,6 +127,52 @@ direct-load path exercises the first render. Also account for **`trailingSlash`*
 that the show/hide actually holds, don't trust the code reading correct. None of
 this is caught by `tsc`/lint/`next build`; it only shows up in the running app.
 
+## Verifying chat content rendering (`/chat`)
+
+The chat renders agent replies from a live backend (`queryAgent` → AgentCore),
+which is NOT reachable from a static-export build. To screenshot how a specific
+reply renders (bold, links, lists, long/edge-case content) **without** a backend,
+**seed the transcript**: `ChatInterface` persists messages to `sessionStorage`
+under `fsi_chat_messages` and hydrates them on mount. The floating launcher reuses
+the same component, so the same seed renders there too.
+
+Two things to get right:
+
+- A browser **reload** starts a fresh conversation — the chat drops the saved
+  transcript when Navigation Timing reports `type === "reload"`; a soft
+  navigation keeps it. Playwright `page.goto(url)` is a `"navigate"`, so the seed
+  survives — **do not use `page.reload()`** (it would clear the seed).
+- **Seed with `addInitScript`** so the values are set before the page's own
+  scripts run. Set both keys: `fsi_chat_messages` (a JSON array of
+  `{role: "user" | "agent", content: string}`) and `fsi_chat_session` (any
+  33+ char id). The renderer is markdown-lite: `**bold**`, lists, newlines, and
+  `[label](url)` links (http(s) only — other schemes render as plain text).
+
+```js
+const messages = [
+  { role: "user", content: "How common is food poisoning in the US?" },
+  { role: "agent", content:
+      "About **1 in 6 Americans** get sick each year.\nSources:\n" +
+      "- [CDC](https://www.cdc.gov/food-safety/about/index.html)" },
+];
+await page.addInitScript((msgs) => {
+  sessionStorage.setItem("fsi_chat_messages", JSON.stringify(msgs));
+  sessionStorage.setItem("fsi_chat_session", "00000000-0000-4000-8000-000000000000");
+}, messages);
+await page.goto("http://localhost:4100/chat/", { waitUntil: "networkidle" });
+await page.waitForTimeout(1000);
+await page.screenshot({ path: "/tmp/chat.png", fullPage: true });
+```
+
+Confirm the **DOM**, not only the pixels — e.g. that source links became real
+anchors (correct `href`, `target="_blank"`, `rel="noopener noreferrer"`) and that
+an unsafe-scheme link is NOT an anchor:
+
+```js
+const anchors = await page.$$eval("a", (els) =>
+  els.map((a) => ({ text: a.textContent, href: a.href, rel: a.rel })));
+```
+
 ## Put the screenshots in the PR (this repo is private)
 
 Capture **every state and viewport** the change affects (desktop + mobile 390px,
