@@ -105,6 +105,9 @@ export function InspectionTimeline({
           const key = `${e.date}-${i}`;
           const isOpen = open.has(key);
           const panelId = `inspection-comments-${key}`;
+          // Count of cited violations for this inspection. Derived from the same
+          // parse the expanded panel uses, so the collapsed "N violations" label
+          // always matches the number of items revealed on expand.
           const violations = e.comments ? parseViolations(e.comments) : [];
           // Collapsed teaser names the top violation only — the inspector's
           // comment text stays hidden until the row is expanded.
@@ -138,12 +141,19 @@ export function InspectionTimeline({
                     }`}
                   >
                     {e.type}
-                    {teaser && (
+                    {violations.length > 0 && (
                       <>
                         {" · "}
                         <span className={isFail ? "font-medium" : ""}>
-                          {teaser}
+                          {violations.length} violation
+                          {violations.length === 1 ? "" : "s"}
                         </span>
+                      </>
+                    )}
+                    {teaser && (
+                      <>
+                        {" · "}
+                        {teaser}
                       </>
                     )}
                   </div>

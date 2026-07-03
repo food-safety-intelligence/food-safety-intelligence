@@ -141,6 +141,30 @@ export interface ScoresPayload {
   inspection_history?: Record<string, InspectionEvent[]>;
 }
 
+/**
+ * Per-license bundle the client-rendered detail page fetches from
+ * `/data/detail/<license_id>.json` (written by scripts/build-detail-data.mjs).
+ * `restaurant.percentile_rank` is precomputed at build time; `comments` is
+ * index-aligned to `history`.
+ */
+export interface DetailBundle {
+  restaurant: RestaurantScore;
+  history: InspectionEvent[];
+  comments: string[];
+}
+
+/**
+ * Globals the detail page needs once, fetched from `/data/detail-globals.json`:
+ * the demo-mode flag, the Platt-calibration triple (for the waterfall), and the
+ * population aggregate stats (for the score percentile). Mirrors what the server
+ * detail page used to derive from `loadScores()` + `getPopulationStats()`.
+ */
+export interface DetailGlobals {
+  is_mock: boolean;
+  calibration: Calibration | null;
+  populationStats: PopulationStats;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers — safe to call from server or client.
 // ---------------------------------------------------------------------------
@@ -324,6 +348,26 @@ export function matchesQuery(
   return `${row.dba_name} ${row.address}`.toLowerCase().includes(needle);
 }
 
+/**
+ * "A–Z" comparator. Two quirks of raw `dba_name` values break a naive
+ * `localeCompare` sort:
+ *   - names starting with a digit or symbol ("7-Eleven", "#1 Wok") sort ahead
+ *     of the letters, so the list opens on numbers instead of "A";
+ *   - some names carry leading whitespace ("  JIMMY FAMOUS BURGER"), and
+ *     localeCompare orders a leading space ahead of letters too — floating
+ *     those names above the "A"s.
+ * Compare on the trimmed name: group letter-initial names first, the rest
+ * after, then sort alphabetically within each group.
+ */
+export function compareByName(a: string, b: string): number {
+  const at = a.trimStart();
+  const bt = b.trimStart();
+  const aLetter = /^\p{L}/u.test(at);
+  const bLetter = /^\p{L}/u.test(bt);
+  if (aLetter !== bLetter) return aLetter ? -1 : 1;
+  return at.localeCompare(bt);
+}
+
 /** Validate a raw `?sort=` value into a {@link HomeSort}; default "risk". */
 export function parseSort(raw: string | null | undefined): HomeSort {
   return raw === "name" ? "name" : raw === "low" ? "low" : "risk";
@@ -391,7 +435,7 @@ export function computeHomeView(
 
   const byScore = (a: SearchIndexRow, b: SearchIndexRow) =>
     sort === "name"
-      ? a.dba_name.localeCompare(b.dba_name)
+      ? compareByName(a.dba_name, b.dba_name)
       : sort === "low"
         ? a.risk_score - b.risk_score
         : b.risk_score - a.risk_score;

@@ -18,7 +18,7 @@ Inputs:
 Run:
   PYTHONPATH=src uv run python scripts/run_text_embedding_experiment.py
 
-Writes reports/metrics/text_embedding_experiment_<date>.json. No model artifact,
+Writes reports/metrics/experiments/text_embedding_experiment_<date>.json. No model artifact,
 no contract change — wiring into ALL_FEATURES only happens if this clears.
 """
 
@@ -236,8 +236,9 @@ def main() -> None:
         "results": results,
         "fairness_vulnerable_groups": fairness,
     }
-    METRICS_DIR.mkdir(parents=True, exist_ok=True)
-    out_path = METRICS_DIR / f"text_embedding_experiment_{date.today().isoformat()}.json"
+    experiments_dir = METRICS_DIR / "experiments"
+    experiments_dir.mkdir(parents=True, exist_ok=True)
+    out_path = experiments_dir / f"text_embedding_experiment_{date.today().isoformat()}.json"
     out_path.write_text(json.dumps(out, indent=2))
     print(f"\nwrote {out_path}")
 

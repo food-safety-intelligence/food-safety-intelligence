@@ -1,58 +1,72 @@
+"use client";
+
 import { ArrowLeft, Heart } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
 import { InspectionTimeline } from "@/components/InspectionTimeline";
+import { RegisterChatEstablishment } from "@/components/RegisterChatEstablishment";
 import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
-import { SiteFooter } from "@/components/SiteFooter";
-import { SiteHeader } from "@/components/SiteHeader";
 import { Waterfall } from "@/components/Waterfall";
-import {
-  getInspectionComments,
-  getInspectionHistory,
-  getPopulationStats,
-  getRestaurant,
-  loadScores,
-} from "@/lib/scores-server";
+import type { DetailBundle, DetailGlobals } from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
 
-// Required for `output: 'export'` — pre-generates pages for the top-N restaurants
-// by risk score. Capping at 500 keeps the static build to a manageable size;
-// lower-risk restaurants simply return 404 from the deployed static site.
-export async function generateStaticParams() {
-  const payload = await loadScores();
-  return payload.scores
-    .slice()
-    .sort((a, b) => b.risk_score - a.risk_score)
-    .slice(0, 500)
-    .map((s) => ({ id: s.license_id }));
+type LoadState =
+  | { status: "loading" }
+  | { status: "notfound" }
+  | { status: "ready"; bundle: DetailBundle; globals: DetailGlobals };
+
+/**
+ * Client-rendered detail page. The route is a single statically-exported shell
+ * (`/restaurant/?id=`); this component reads the `id` and fetches that one
+ * establishment's bundle + the shared globals from same-origin static JSON
+ * (scripts/build-detail-data.mjs), so every establishment is reachable without
+ * pre-rendering a page each.
+ */
+export function RestaurantDetail() {
+  const id = useSearchParams().get("id");
+  // No id → nothing to load; render not-found during render (not via an effect).
+  // Key the loader on id so a new id remounts it back to the loading state,
+  // keeping the effect's setState calls confined to async callbacks.
+  if (!id) return <DetailNotFound />;
+  return <DetailLoader key={id} id={id} />;
 }
 
-// In Next.js 16 with the App Router, `params` is a Promise that must be awaited.
-// See node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/page.md.
-export default async function RestaurantDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
+function DetailLoader({ id }: { id: string }) {
+  const [state, setState] = useState<LoadState>({ status: "loading" });
 
-  const [restaurant, history, comments, payload, populationStats] =
-    await Promise.all([
-      getRestaurant(id),
-      getInspectionHistory(id),
-      getInspectionComments(id),
-      loadScores(),
-      getPopulationStats(),
-    ]);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      fetch(`/data/detail/${encodeURIComponent(id)}.json`).then((r) =>
+        r.ok ? (r.json() as Promise<DetailBundle>) : Promise.reject(r.status),
+      ),
+      fetch(`/data/detail-globals.json`).then((r) =>
+        r.ok ? (r.json() as Promise<DetailGlobals>) : Promise.reject(r.status),
+      ),
+    ])
+      .then(([bundle, globals]) => {
+        if (!cancelled) setState({ status: "ready", bundle, globals });
+      })
+      .catch(() => {
+        if (!cancelled) setState({ status: "notfound" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
 
-  if (!restaurant) notFound();
+  if (state.status === "loading") return <DetailSkeleton />;
+  if (state.status === "notfound") return <DetailNotFound />;
+
+  const { restaurant, history, comments } = state.bundle;
+  const { is_mock, calibration, populationStats } = state.globals;
 
   // Attach each inspection's full comment text (index-aligned sidecar) so the
-  // timeline can expand a row to show it. Carried on the event object so it
-  // survives the timeline's re-sort.
+  // timeline can expand a row to show it.
   const historyWithComments = history.map((e, i) => ({
     ...e,
     comments: comments[i] ?? "",
@@ -60,10 +74,8 @@ export default async function RestaurantDetailPage({
 
   const lastInspection = history[0]?.date;
 
-  // Location line — join only the parts we actually have so a missing
-  // neighborhood or zip doesn't leave orphaned "·" separators (these fields
-  // ship empty for every establishment in the current data). "Chicago, IL" is
-  // always shown; the zip rides along with it when present.
+  // Location line — join only the parts we have so a missing neighborhood/zip
+  // doesn't leave orphaned "·" separators.
   const cityLine = `Chicago, IL${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
   const locationLine = [
     restaurant.address.trim(),
@@ -71,14 +83,19 @@ export default async function RestaurantDetailPage({
     cityLine,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" · ");
 
   const facilityType = restaurant.facility_type.trim();
 
   return (
     <>
-      <SiteHeader activeNav="search" />
-
+      {/* Registers this establishment into the chat scope so the floating chat
+          can answer "tell me about this restaurant" about it. Clears on unmount
+          (navigating away). Renders nothing. */}
+      <RegisterChatEstablishment
+        licenseId={restaurant.license_id}
+        name={restaurant.dba_name}
+      />
       <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
         <Link
           href="/"
@@ -89,7 +106,7 @@ export default async function RestaurantDetailPage({
         </Link>
       </div>
 
-      {payload.is_mock && <DemoBanner />}
+      {is_mock && <DemoBanner />}
 
       {/* max-w-full on mobile (capped to the viewport) so content wraps instead
           of forcing a horizontal scroll; overflow-x-clip trims any small residual
@@ -125,7 +142,11 @@ export default async function RestaurantDetailPage({
             </div>
           </div>
 
-          <ScoreCard restaurant={restaurant} populationStats={populationStats} history={history} />
+          <ScoreCard
+            restaurant={restaurant}
+            populationStats={populationStats}
+            history={history}
+          />
         </section>
 
         {/* Drivers */}
@@ -138,14 +159,12 @@ export default async function RestaurantDetailPage({
               <h2 className="text-3xl font-light leading-tight tracking-tight">
                 {restaurant.top_drivers.length === 1
                   ? "One factor is doing most of the work."
-                  : `${
-                      restaurant.top_drivers.length
-                    } factors are doing most of the work.`}
+                  : `${restaurant.top_drivers.length} factors are doing most of the work.`}
               </h2>
               <p className="text-md text-muted leading-relaxed mt-3 max-w-[60ch]">
                 The model attributes the score to the items below, sorted from
-                most to least influential. Positive contributions push the
-                score up; negative contributions push it down.
+                most to least influential. Positive contributions push the score
+                up; negative contributions push it down.
               </p>
             </div>
             <div className="col-span-12 lg:col-span-5 lg:text-right">
@@ -161,9 +180,9 @@ export default async function RestaurantDetailPage({
           <DriverList drivers={restaurant.top_drivers} />
 
           {/* How the score adds up — the same drivers as an additive,
-              reconciling waterfall (calibrated log-odds). Only when the payload
-              ships the calibration triple. */}
-          {payload.calibration && (
+              reconciling waterfall (calibrated log-odds). Only when the globals
+              ship the calibration triple. */}
+          {calibration && (
             <div className="mt-8">
               <div className="flex items-baseline justify-between gap-4 flex-wrap mb-3">
                 <h3 className="text-xl font-medium tracking-tight">
@@ -184,7 +203,7 @@ export default async function RestaurantDetailPage({
                 sigmoid turns into the probability on the gauge — so this column
                 reconciles exactly with the score.
               </p>
-              <Waterfall restaurant={restaurant} calibration={payload.calibration} />
+              <Waterfall restaurant={restaurant} calibration={calibration} />
             </div>
           )}
         </section>
@@ -203,9 +222,9 @@ export default async function RestaurantDetailPage({
               </p>
               <p className="text-lg leading-relaxed text-ink/90">
                 Drivers tied to recurring violations or nearby pest complaints
-                are the patterns your care team would most want you to
-                consider. Administrative drivers like &quot;long since last
-                inspection&quot; don&apos;t tell you about the kitchen itself.
+                are the patterns your care team would most want you to consider.
+                Administrative drivers like &quot;long since last inspection&quot;
+                don&apos;t tell you about the kitchen itself.
               </p>
             </div>
           </div>
@@ -232,8 +251,8 @@ export default async function RestaurantDetailPage({
               </span>
             </h2>
             <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
-              Real Chicago Department of Public Health records, independent of
-              the predicted risk score above.
+              Real Chicago Department of Public Health records, independent of the
+              predicted risk score above.
             </p>
           </div>
 
@@ -267,17 +286,17 @@ export default async function RestaurantDetailPage({
               <p className="font-medium mb-2">It is a prediction.</p>
               <p>
                 A model estimate, drawn from the public record, of whether this
-                establishment will fail an inspection or be cited for a
-                priority violation in the next 180 days.
+                establishment will fail an inspection or be cited for a priority
+                violation in the next 180 days.
               </p>
             </div>
             <div className="col-span-12 md:col-span-6">
               <p className="font-medium mb-2">It is not a verdict.</p>
               <p>
-                A &quot;{restaurant.risk_tier}&quot; prediction does not mean
-                this food establishment is unsafe to eat at today. It means the
-                patterns in the record resemble those that historically precede
-                a failed inspection.
+                A &quot;{restaurant.risk_tier}&quot; prediction does not mean this
+                food establishment is unsafe to eat at today. It means the
+                patterns in the record resemble those that historically precede a
+                failed inspection.
               </p>
             </div>
           </div>
@@ -293,8 +312,44 @@ export default async function RestaurantDetailPage({
           </Link>
         </div>
       </main>
-
-      <SiteFooter />
     </>
+  );
+}
+
+/** Shown while the bundle is fetching. Mirrors the main column width. */
+function DetailSkeleton() {
+  return (
+    <main className="w-full max-w-[1240px] mx-auto px-8 pt-16 pb-24 flex-1">
+      <div className="animate-pulse space-y-6" aria-busy="true" aria-live="polite">
+        <span className="sr-only">Loading establishment details…</span>
+        <div className="h-4 w-40 rounded bg-line" />
+        <div className="h-14 w-2/3 rounded bg-line" />
+        <div className="h-5 w-1/3 rounded bg-line" />
+        <div className="h-64 w-full rounded-3xl bg-line/60" />
+        <div className="h-40 w-full rounded-3xl bg-line/60" />
+      </div>
+    </main>
+  );
+}
+
+/** Shown when the id is missing or its bundle doesn't exist. */
+function DetailNotFound() {
+  return (
+    <main className="w-full max-w-[1240px] mx-auto px-8 pt-24 pb-24 flex-1 text-center">
+      <h1 className="text-3xl font-light tracking-tight mb-3">
+        Establishment not found
+      </h1>
+      <p className="text-muted mb-8 max-w-[48ch] mx-auto leading-relaxed">
+        We couldn&apos;t find a food establishment for this link. It may have been
+        removed from the dataset, or the link may be incomplete.
+      </p>
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
+      >
+        <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
+        Back to search
+      </Link>
+    </main>
   );
 }

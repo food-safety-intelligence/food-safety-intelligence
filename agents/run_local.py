@@ -40,6 +40,7 @@ for _tool_dir in [
     os.path.join(_AGENTS_DIR, "tools", "get_safety_score"),
     os.path.join(_AGENTS_DIR, "tools", "explain_restaurant"),
     os.path.join(_AGENTS_DIR, "tools", "find_reviews"),
+    os.path.join(_AGENTS_DIR, "tools", "food_safety_info"),
 ]:
     if _tool_dir not in sys.path:
         sys.path.insert(0, _tool_dir)
@@ -79,6 +80,7 @@ _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
 _reviews_handler = _load_handler("find_reviews")
+_info_handler = _load_handler("food_safety_info")
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +176,28 @@ def find_reviews(name: str, address: str = "", topics: list | None = None) -> di
     )
 
 
+@tool
+def food_safety_info(query: str, topics: list | None = None) -> dict:
+    """
+    Answer a GENERAL food-safety or foodborne-illness question (what a germ is,
+    how common illness is, safe cooking temperatures, who is most at risk, how to
+    prevent it) with short vetted facts AND a citation to an authoritative public
+    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or Chicago/Illinois
+    public health). Use this for general questions that are NOT about one specific
+    Chicago restaurant's score.
+
+    Base any statistic you state on the returned `summary`, and cite the returned
+    `sources` links so the user can verify them. This is education, not medical
+    advice — never use it to tell someone what is safe for them personally.
+
+    Args:
+        query: The user's general food-safety question, passed through verbatim
+        topics: Optional explicit subset of topic keys (e.g. ["salmonella",
+                "cooking_temperatures"]); omit to match on the query text
+    """
+    return _info_handler.handler({"query": query, "topics": topics or []}, None)
+
+
 # ---------------------------------------------------------------------------
 # System prompt — single source of truth in system_prompt.txt (shared with
 # entrypoint.py, which reads the same file for the deployed agent).
@@ -227,7 +251,13 @@ def build_agent() -> Agent:
     )
     return Agent(
         model=model,
-        tools=[find_restaurants, get_safety_score, explain_restaurant, find_reviews],
+        tools=[
+            find_restaurants,
+            get_safety_score,
+            explain_restaurant,
+            find_reviews,
+            food_safety_info,
+        ],
         system_prompt=SYSTEM_PROMPT,
     )
 

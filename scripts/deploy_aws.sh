@@ -81,12 +81,16 @@ npm run cdk -- deploy \
     2>&1 | tail -10
 
 # Extract Agent Runtime ARN — retry, since the stack output can lag the deploy.
+# The AgentCore L3 construct names its outputs from the construct path, so the key
+# is e.g. ApplicationAgentFoodsafetyagentRuntimeArnOutput<hash>, not a fixed name.
+# Match on the stable "RuntimeArnOutput" suffix (uniquely the runtime ARN — distinct
+# from the Role and RuntimeId outputs) instead of a literal key that never existed.
 echo "Waiting for stack outputs..."
 AGENT_RUNTIME_ARN=""
 for attempt in 1 2 3 4 5 6; do
     AGENT_RUNTIME_ARN=$(aws cloudformation describe-stacks \
         --stack-name "$STACK_NAME" \
-        --query 'Stacks[0].Outputs[?OutputKey==`AgentCoreRuntimeArn`].OutputValue' \
+        --query "Stacks[0].Outputs[?contains(OutputKey, 'RuntimeArnOutput')].OutputValue | [0]" \
         --output text \
         --region "$REGION" 2>/dev/null || echo "")
     if [ -n "$AGENT_RUNTIME_ARN" ] && [ "$AGENT_RUNTIME_ARN" != "None" ]; then
@@ -210,6 +214,12 @@ if [ -z "$LAMBDA_EXISTS" ]; then
         --environment "Variables={AGENT_RUNTIME_ARN=$AGENT_RUNTIME_ARN,DATA_BUCKET=$DATA_BUCKET}" \
         --region "$REGION" \
         --output text > /dev/null
+
+    # A new function starts in Pending; block until it is Active so the post-deploy
+    # smoke test can invoke it.
+    aws lambda wait function-active-v2 \
+        --function-name "$LAMBDA_FUNC_NAME" \
+        --region "$REGION"
 else
     echo "Updating existing Lambda function..."
     aws lambda update-function-code \
@@ -217,7 +227,14 @@ else
         --zip-file "fileb://lambda_proxy.zip" \
         --region "$REGION" \
         --output text > /dev/null
-    
+
+    # update-function-code leaves the function in LastUpdateStatus=InProgress; the
+    # very next update-function-configuration call races it and fails with
+    # ResourceConflictException. Wait for the code update to finish first.
+    aws lambda wait function-updated-v2 \
+        --function-name "$LAMBDA_FUNC_NAME" \
+        --region "$REGION"
+
     aws lambda update-function-configuration \
         --function-name "$LAMBDA_FUNC_NAME" \
         --handler handler.handler \

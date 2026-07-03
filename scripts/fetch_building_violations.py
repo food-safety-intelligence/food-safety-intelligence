@@ -1,5 +1,8 @@
 """Fetch Chicago Building Violations (22u3-xenr) → data/raw/building_violations.parquet.
 
+DEPRECATED: prefer ``ingest_raw.py --incremental`` which uses the table-driven
+INGEST_SPECS path with watermark + upsert. This script is kept for back-compat.
+
 Pulls violation_date, latitude, longitude, department_bureau — the four columns
 needed by add_building_features for aggregate + bureau-specific spatial joins.
 

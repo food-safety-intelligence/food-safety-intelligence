@@ -12,7 +12,8 @@ Environment variables (set in Lambda config):
 Request (from ALB):
     POST /
     Content-Type: application/json
-    { "query": "safe sushi near Wicker Park", "session_id": "abc123" }
+    { "query": "safe sushi near Wicker Park", "session_id": "abc123",
+      "history": [{"role": "user"|"agent", "content": "..."}, ...] }  # optional
 
 Response:
     200 OK
@@ -32,6 +33,34 @@ REGION = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-w
 
 # Re-use the client across warm invocations.
 _client = boto3.client("bedrock-agentcore", region_name=REGION)
+
+# Bound the prior conversation turns we forward to the agent. The agent runtime
+# does the authoritative validation and replay (entrypoint._coerce_history:
+# roles, strict alternation, trimming); these caps only stop a client from
+# pushing an oversized body through the proxy, so keep them in step with the
+# runtime's own limits (_MAX_HISTORY_MESSAGES / _MAX_MESSAGE_CHARS there).
+_MAX_HISTORY_MESSAGES = 20
+_MAX_MESSAGE_CHARS = 8000
+
+
+def _bounded_history(raw: object) -> list[dict]:
+    """The last N prior turns, each length-capped, as plain {role, content} dicts.
+
+    Returns [] for anything that isn't a list of non-empty text turns. We don't
+    validate roles/alternation here — the runtime re-validates on the way in;
+    this is purely a size guard on untrusted client input.
+    """
+    if not isinstance(raw, list):
+        return []
+    out: list[dict] = []
+    for turn in raw[-_MAX_HISTORY_MESSAGES:]:
+        if not isinstance(turn, dict):
+            continue
+        content = turn.get("content")
+        if not isinstance(content, str) or not content.strip():
+            continue
+        out.append({"role": str(turn.get("role", "")), "content": content[:_MAX_MESSAGE_CHARS]})
+    return out
 
 
 def handler(event: dict, _ctx) -> dict:
@@ -58,7 +87,14 @@ def handler(event: dict, _ctx) -> dict:
         # str(uuid4()) is 36 chars (with hyphens); uuid4().hex is only 32 (below min).
         session_id = f"{session_id}-{uuid.uuid4()}" if session_id else str(uuid.uuid4())
 
-    payload = json.dumps({"query": query}).encode("utf-8")
+    # Forward the prior turns so multi-turn / cross-entity follow-ups have
+    # context. Without this the agent runtime always sees an empty history and
+    # can't resolve references like "is the second one safe too?".
+    forwarded = {"query": query}
+    history = _bounded_history(body.get("history"))
+    if history:
+        forwarded["history"] = history
+    payload = json.dumps(forwarded).encode("utf-8")
 
     try:
         resp = _client.invoke_agent_runtime(

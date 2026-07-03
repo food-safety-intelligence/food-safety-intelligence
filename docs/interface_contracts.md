@@ -371,6 +371,18 @@ to the committed/locally-generated copies under `app/public/data/`).
   the same md5 scheme. Regenerate and upload `inspection_history.json` and the
   shards **together** so the index alignment holds.
 
+- **`detail/<license_id>.json` + `detail-globals.json`** (build artifacts, #119,
+  decision 0013) — since #119 the detail page is **client-rendered**
+  (`/restaurant/?id=<id>`) and fetches one **per-license bundle**
+  `{ restaurant, history, comments }` plus a shared `detail-globals.json`
+  `{ is_mock, calibration, populationStats }`, instead of a server-pre-rendered
+  page per establishment. Composed by `app/scripts/build-detail-data.mjs` from
+  `scores.json` + `inspection_history.json` + the comment shards in one pass
+  (`restaurant.percentile_rank` is precomputed there; `comments[i]` index-aligned
+  to `history[i]`). Regenerated every build, **gitignored**, served same-origin
+  from `out/data/`. Keeps the build O(1) in establishment count (the old per-page
+  static export capped at the top-500 by risk → lower-risk establishments 404'd).
+
 ---
 
 ## S3 deploy layout (publish pipeline)
