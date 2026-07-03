@@ -118,6 +118,11 @@ Three layers, in this order — A and B are required, C is a stretch:
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
 - Real-time ingestion, authentication, multi-city support
+- **A scheduler for periodic ingestion (Airflow, Prefect, cron, Fargate timer)**
+  — the incremental ingestion *capability* (`ingest_raw.py --incremental`:
+  watermark + lookback + upsert on the natural key) is now in scope for Phase 2.
+  What stays out is the scheduling layer that runs it on a timer. See "Roadmap"
+  below.
 - **Live model inference at request time** — the web app never calls the
   model on a page load, and the chat agent's tools read the precomputed
   scores JSON, never the model. No FastAPI sidecars, no Next.js API routes
@@ -133,13 +138,17 @@ dep. Just don't write the seam.
 
 ### Roadmap (acknowledged, not now)
 
-Likely later-phase work. NOT in current scope — same rules as the OUT list
-above (no stubs, no seams, no TODO comments). Listed here so when someone
-asks "what about X?" the answer is "noted, later."
+These are likely Phase 2 work. They are NOT in current scope — same rules
+as the OUT list above (no stubs, no seams, no TODO comments). Listed here so
+when someone asks "what about X?" the answer is "noted, post-demo."
 
-- Per-restaurant-per-day rolling scoring (`as_of_date = inspection_date +
-  1d`, one row per license per day) — the original Phase 4 design; the
-  latest-inspection-per-license simplification stands for now
+- **Scheduling periodic ingestion (Airflow / Prefect / Fargate timer)** — the
+  incremental ingestion *mode* is now in scope (`ingest_raw.py --incremental`:
+  reads a watermark from the existing parquet, re-pulls a lookback window via the
+  cursor-based `fetch_soda_keyset`, upserts on the natural key). What remains
+  roadmap is the scheduler that runs it on a daily / weekly timer — no scheduling
+  code lives in this repo.
+- AWS (Bedrock, SageMaker, S3) for hosted training / inference
 - NOAA weather features, Yelp Open Dataset + fuzzy join
 - Production fairness audit (disparate-impact tests, reweighting)
 - Multi-city support beyond Chicago
