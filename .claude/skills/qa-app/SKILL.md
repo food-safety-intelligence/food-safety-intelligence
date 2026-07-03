@@ -66,7 +66,8 @@ The script:
   generic crawler wouldn't trigger.
 - Takes one screenshot per route (initial + final state) and saves them to
   `/tmp/qa-app-<timestamp>/`.
-- Emits a markdown report to stdout.
+- Emits a markdown report to stdout, and writes a machine-readable
+  `findings.json` (same dir as the screenshots) for the issue-filing step.
 
 ## Output shape
 
@@ -94,6 +95,80 @@ screenshots → /tmp/qa-app-2026-06-27-14-32-00
 
 If the report is empty or short, the route may have rendered but had
 nothing interactive; mention that explicitly rather than passing silently.
+
+## Filing GitHub issues for what broke
+
+**Opt-in, not automatic.** Only file issues when the user asks ("file
+issues for the failures", "open tickets for what's broken"). A QA run that
+finds nothing should never open an issue.
+
+The driver writes `findings.json` next to the screenshots. Each route has
+`hasFailures`, its `errors` / `networkFailures` / `failedActions`, and the
+`screenshots` paths. File **one issue per run** that lists every failing
+route, and attach the failing routes' screenshots.
+
+This repo is **private**, so an image URL pointing at repo content does not
+render inline (GitHub's proxy fetches it unauthenticated and 404s). The
+automated path is **commit the screenshot, then link it** — the link opens
+the image (one click), it is not embedded. The commit and the issue both go
+through the GitHub REST API; `gh` is not installed in this space, so read the
+OAuth token from `~/.config/gh/hosts.yml` and call the API with `curl`:
+
+```bash
+TOK=$(python3 -c "import yaml,os; h=yaml.safe_load(open(os.path.expanduser('~/.config/gh/hosts.yml'))); k=list(h)[0]; print(h[k]['oauth_token'])")
+REPO=food-safety-intelligence/food-safety-intelligence
+API=https://api.github.com/repos/$REPO
+```
+
+Steps (only for routes with `hasFailures: true`):
+
+1. **Ensure the label exists** (ignore the 422 if it already does):
+
+   ```bash
+   curl -s -X POST -H "Authorization: token $TOK" "$API/labels" \
+     -d '{"name":"qa-app","color":"d73a4a","description":"qa-app skill findings"}' >/dev/null
+   ```
+
+2. **Ensure a screenshots branch exists.** Keep QA screenshots off feature
+   branches and `main` — commit them to a dedicated `qa-app-screenshots`
+   branch. If `GET $API/git/ref/heads/qa-app-screenshots` 404s, create it
+   from `main`'s SHA via `POST $API/git/refs`
+   (`{"ref":"refs/heads/qa-app-screenshots","sha":"<main sha>"}`).
+
+3. **Upload each failing route's screenshots** to that branch under
+   `design/qa-app/<run-timestamp>/<route>-<state>.png` using the Contents
+   API (base64, no local git needed):
+
+   ```bash
+   B64=$(base64 -w0 /tmp/qa-app-<ts>/home-final.png)
+   curl -s -X PUT -H "Authorization: token $TOK" \
+     "$API/contents/design/qa-app/<ts>/home-final.png" \
+     -d "{\"message\":\"qa-app screenshot\",\"branch\":\"qa-app-screenshots\",\"content\":\"$B64\"}"
+   ```
+
+   The link to put in the issue is the blob view (renders a clickable image
+   for any logged-in teammate):
+   `https://github.com/$REPO/blob/qa-app-screenshots/design/qa-app/<ts>/home-final.png`
+
+4. **Build the issue body** — one section per failing route: its
+   `failedActions`, `errors`, and `networkFailures` as bullets, then the
+   screenshot link(s). Head it with the run's app URL and viewport.
+
+5. **De-dupe before creating.** `GET $API/issues?state=open&labels=qa-app`.
+   Use a stable title: `qa-app: failures on <comma-separated routes> (<viewport>)`.
+   - If an open issue has that exact title, **POST a comment** to it with the
+     new run's body (`POST $API/issues/<n>/comments`) instead of opening a
+     duplicate.
+   - Otherwise **create** it: `POST $API/issues` with
+     `{"title":..., "body":..., "labels":["qa-app"]}`.
+
+6. **Report back** the issue URL(s) you created or commented on, and the
+   `qa-app-screenshots` paths you pushed. Screenshots on that branch are
+   disposable QA artifacts — prune the branch when it gets large.
+
+Honest reporting applies here too: only file the failures the run actually
+caught. A spurious click timeout on a hidden control is not a bug — judge
+before filing (see "Honest reporting" below).
 
 ## What this skill is NOT
 

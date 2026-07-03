@@ -23,6 +23,11 @@ Follow the skill's instructions exactly. In short:
    failures). Note the screenshot path.
 5. If the report flags broken components, point at the screenshot for that
    route so the user can see what happened.
+6. Only if the user asks, file GitHub issues for the failures. Follow the
+   "Filing GitHub issues" section in SKILL.md — it reads `findings.json`,
+   commits the failing screenshots to the `qa-app-screenshots` branch, and
+   opens (or comments on) one `qa-app`-labelled issue per run. Never file
+   issues automatically.
 
 Honest reporting: if a route timed out or you couldn't reach the server,
 say which one and why. Don't pass silently.
