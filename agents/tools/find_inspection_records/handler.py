@@ -107,10 +107,15 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
 
 
 def _dedupe_ids(raw: Any) -> list[str]:
-    """Normalise ids to a de-duplicated list of non-empty strings; order preserved."""
+    """Normalise ids to a de-duplicated list of non-empty strings; order preserved.
+
+    A bare scalar (the model emitting one id as a number/string instead of a list)
+    is treated as a single id, not iterated — so a malformed float can't crash the
+    tool; None / a mapping yields no ids so the caller degrades to a filter error.
+    """
     if raw is None or isinstance(raw, dict):
         return []
-    if isinstance(raw, (str, int)):
+    if not isinstance(raw, (list, tuple)):
         raw = [raw]
     seen: list[str] = []
     for item in raw:
@@ -139,9 +144,10 @@ def _soql_literal(s: str) -> str:
 
 def _in_clause(column: str, ids: list[str]) -> str:
     # The portal's query builder quotes IN values with double quotes; match that
-    # form (verified to render). Ids are license numbers, but drop any stray
-    # double quote defensively so a value can't break out of the string.
-    values = ", ".join(f'"{i.replace(chr(34), "")}"' for i in ids)
+    # form (verified to render). Ids are license numbers; strip any stray double
+    # quote or backslash defensively so a value can't break out of the string
+    # regardless of how the SoQL parser treats escapes.
+    values = ", ".join(f'"{i.replace(chr(34), "").replace(chr(92), "")}"' for i in ids)
     return f"`{column}` IN ({values})"
 
 

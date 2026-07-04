@@ -59,6 +59,24 @@ def test_dedupe_and_stringify_ids():
     assert 'WHERE `license_` IN ("1334073", "2163775")' in _decoded_query(out["url"])
 
 
+def test_scalar_license_ids_do_not_crash():
+    # A single id emitted as a bare scalar instead of a list (esp. a float, which
+    # used to raise TypeError) must not crash — it degrades to a one-id link.
+    for scalar in (1334073, "1334073", 1334073.0):
+        out = handler({"license_ids": scalar}, None)
+        assert out["mode"] == "license_ids"
+        assert out["url"].endswith("/page/filter")
+    # An unusable mapping yields no ids, so the caller degrades to a filter error.
+    assert handler({"license_ids": {}}, None)["reason"] == "missing_filter"
+
+
+def test_in_clause_strips_quote_and_backslash():
+    # A value can never break out of the double-quoted IN literal: embedded double
+    # quotes and backslashes are dropped before quoting.
+    soql = _decoded_query(handler({"license_ids": ['1"x', "y\\z"]}, None)["url"])
+    assert 'IN ("1x", "yz")' in soql
+
+
 def test_truncates_long_id_list():
     ids = [str(i) for i in range(MAX_IDS + 10)]
     out = handler({"license_ids": ids}, None)
