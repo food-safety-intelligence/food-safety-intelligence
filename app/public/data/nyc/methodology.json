@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T07:37:55.035192+00:00",
+  "generated_at": "2026-07-04T14:55:36.120518+00:00",
   "model_version": "nyc_logreg_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
@@ -7,7 +7,7 @@
   "train_window": "post-COVID, 2022-07-01 onward (inspections halted Mar 2020)",
   "provenance": {
     "model_version": "nyc_logreg_sigmoid",
-    "note": "feasibility build, DR 0014"
+    "note": "feasibility build, DR 0016"
   },
   "test": {
     "n": 9456,
@@ -25,24 +25,24 @@
     {
       "label": "Low",
       "min": 0.0,
-      "max": 0.2813,
-      "share": 0.4001
+      "max": 0.2816,
+      "share": 0.4
     },
     {
       "label": "Moderate",
-      "min": 0.2813,
+      "min": 0.2816,
       "max": 0.4805,
-      "share": 0.4499
+      "share": 0.45
     },
     {
       "label": "Elevated",
       "min": 0.4805,
-      "max": 0.682,
+      "max": 0.6817,
       "share": 0.13
     },
     {
       "label": "High",
-      "min": 0.682,
+      "min": 0.6817,
       "max": null,
       "share": 0.02
     }
