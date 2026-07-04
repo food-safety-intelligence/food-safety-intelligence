@@ -37,7 +37,7 @@ export const GLOSSARY = {
     id: "inspection-types",
     term: "Inspection type",
     short:
-      "Why a visit happened: Canvass (routine, risk-based schedule), Complaint (triggered by a 311 report), License (before a new business opens), or Re-Inspection (follow-up to confirm earlier violations were fixed).",
+      "Why a visit happened: Canvass (routine, risk-based schedule), Complaint (triggered by a public complaint), License (before a new business opens), or Re-Inspection (follow-up to confirm earlier violations were fixed).",
   },
   "chicago-risk": {
     id: "chicago-risk",

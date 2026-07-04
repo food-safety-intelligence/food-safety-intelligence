@@ -151,7 +151,7 @@ def find_restaurants(
     city — see ACTIVE CITY) using OpenStreetMap (free, no API key). Filters by
     cuisine when provided. ALWAYS call this first before get_safety_score.
     """
-    ev: dict = {"radius_km": radius_km, "limit": limit}
+    ev: dict = {"radius_km": radius_km, "limit": limit, "city": _ACTIVE_CITY.get()}
     if neighborhood:
         ev["neighborhood"] = neighborhood
     if lat and lon:

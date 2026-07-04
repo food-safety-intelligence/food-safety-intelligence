@@ -11,13 +11,13 @@ import {
   BookOpen,
   type LucideIcon,
   Target,
-  TriangleAlert,
   Wrench,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
+import { ModelCard, DataGovernance, MethodologyHero, articleFor } from "@/components/HowItWorksCards";
 import { cn } from "@/lib/utils";
 
 interface LaMethodology {
@@ -76,7 +76,8 @@ const NAV = [
   ["reading-the-score", "Reading the score"],
   ["how-its-built", "How it's built"],
   ["how-well-it-works", "How well it works"],
-  ["limits", "Limits"],
+  ["model-card", "Model card"],
+  ["data-governance", "Data governance"],
   ["reference", "Reference"],
 ];
 
@@ -86,7 +87,8 @@ const LA_GLOSSARY: { id: string; term: string; short: string }[] = [
   { id: "letter-grade", term: "Letter grade (A / B / C)", short: "Los Angeles County's public restaurant grade. It's a threshold on the 0–100 inspection score: A = 90–100, B = 80–89, C = 70–79. Higher is cleaner — the opposite of New York's scale." },
   { id: "inspection-score", term: "Inspection score", short: "100 minus the points deducted for violations at one inspection (major and critical violations deduct more). The score maps to the letter grade; a place is 'bad' next time if it drops below 90 (a B or C)." },
   { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to LA's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the violation crosswalk." },
+  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the shared violation dictionary." },
+  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
   { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare LA (~0.74) with NYC (~0.66) and Chicago (~0.78)." },
   { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 2.1× means that slice has 2.1× the B/C rate of the whole population." },
   { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
@@ -111,24 +113,24 @@ export function HowItWorksLa() {
 
   return (
     <div>
-      {/* Hero */}
-      <header>
-        <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · Los Angeles</p>
-        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — Los Angeles</h1>
-        <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
-          Los Angeles County is a third city, added to show the same tool works
-          beyond Chicago and New York. Each score is a calibrated probability that
-          an establishment&apos;s{" "}
-          <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
-          under LA&apos;s letter-grade system — the same batch-scored-to-JSON
-          pipeline, calibrated model, and SHAP drivers as Chicago, on LA data.
-        </p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="top-decile lift over the base rate" />
-          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC on the held-out test set" />
-          <HeroStat value={m ? `${prevPct}%` : "—"} label="of next inspections are B or C (base rate)" />
-        </dl>
-      </header>
+      <MethodologyHero
+        eyebrow="Research preview · Los Angeles"
+        title="How this works — Los Angeles"
+        stats={
+          <>
+            <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
+            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
+            <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
+          </>
+        }
+      >
+        Los Angeles County is a third city, added to show the same tool works
+        beyond Chicago and New York. Each score is a calibrated probability that
+        an establishment&apos;s{" "}
+        <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
+        under LA&apos;s letter-grade system — the same batch-scored-to-JSON
+        pipeline, calibrated model, and SHAP drivers as Chicago, on LA data.
+      </MethodologyHero>
 
       {/* Sticky jump-nav */}
       <nav
@@ -236,10 +238,11 @@ export function HowItWorksLa() {
             Leak-free history features — prior inspection count, prior B/C count,
             average and previous score, prior critical-violation counts, days since
             the last inspection — plus the current inspection&apos;s own outcome
-            (score, violation counts). Violations are mapped through a shared
-            crosswalk into severity tiers (imminent-hazard / critical / general) and
-            themes (temperature, pest, hygiene, contamination, …) so the same
-            vocabulary describes all three cities. No cuisine or demographic proxy is
+            (score, violation counts). LA&apos;s inspections and violations arrive as
+            two feeds, joined on the inspection&apos;s serial number; those violations
+            are mapped through a shared violation dictionary into severity tiers
+            (imminent-hazard / critical / general) and themes (temperature, pest,
+            hygiene, contamination, …) so the same vocabulary describes all three cities. No cuisine or demographic proxy is
             used. LA&apos;s feed carries no coordinates, so map pins are geocoded from
             each establishment&apos;s address.
           </p>
@@ -260,6 +263,26 @@ export function HowItWorksLa() {
               For context, Chicago reaches ROC-AUC ~0.78 and lift ~3.4×, and NYC ~0.66
               — LA sits between them, still a preview rather than a production model.
             </p>
+          )}
+          {m && (
+            <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">ROC-AUC {m.headline.roc_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above a clean one. Base-rate-independent, so it&apos;s the fair way to compare LA with Chicago and NYC.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">PR-AUC {m.headline.pr_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">Ranking quality for the rare B/C class. Its floor is the {prevPct}% base rate, so it only compares fairly to cities with a similar base rate — not to NYC&apos;s ~40%.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Top-decile lift {m.headline.top_decile_lift.toFixed(1)}×</dt>
+                <dd className="text-muted leading-snug mt-0.5">Work the top 10% by predicted risk and you find {m.headline.top_decile_lift.toFixed(1)}× as many B/C inspections as picking at random.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Base rate {prevPct}%</dt>
+                <dd className="text-muted leading-snug mt-0.5">Share of next inspections that are actually B/C — what &ldquo;random&rdquo; and the PR-AUC floor are measured against.</dd>
+              </div>
+            </dl>
           )}
           {m && (
             <div className="mt-5 overflow-x-auto">
@@ -326,12 +349,13 @@ export function HowItWorksLa() {
         </article>
       </div>
 
-      {/* 04 — Limits */}
-      <div className="mt-10 space-y-8">
-        <SectionLabel id="limits" number="04" icon={TriangleAlert}>Limits</SectionLabel>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What to keep in mind</h2>
-          <div className="mt-3 max-w-[62ch] space-y-4 text-muted leading-[1.7]">
+      {/* 04 — Model card (Limitations folded in, like Chicago) */}
+      <ModelCard
+        city="la"
+        m={m}
+        number="04"
+        limitations={
+          <div className="space-y-4 text-muted leading-[1.7]">
             <p>
               <strong className="text-ink">LA is a coverage feature, not a quality
               upgrade.</strong> Its signal is weaker than Chicago&apos;s
@@ -358,12 +382,15 @@ export function HowItWorksLa() {
               it for prioritisation, not judgement.
             </p>
           </div>
-        </article>
-      </div>
+        }
+      />
 
-      {/* 05 — Reference */}
+      {/* 05 — Data governance */}
+      <DataGovernance city="la" m={m} number="05" />
+
+      {/* 06 — Reference */}
       <div className="mt-10 space-y-8">
-        <SectionLabel id="reference" number="05" icon={BookMarked}>Reference</SectionLabel>
+        <SectionLabel id="reference" number="06" icon={BookMarked}>Reference</SectionLabel>
         <article>
           <h2 className="text-2xl font-medium tracking-tight">Definitions</h2>
           <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">

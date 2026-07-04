@@ -384,7 +384,24 @@ def main():
     # ---- score EVERY establishment's latest scored inspection (serving anchor)
     ev["risk_score"] = cal1.predict_proba(ev[FEATS_M1])[:, 1]
     ev["forecast_risk"] = cal2.predict_proba(ev[PRIOR])[:, 1]
-    latest = ev.sort_values("inspection_date").drop_duplicates("license_id", keep="last").copy()
+    # Collapse reopened establishments: a reopen mints a new record id at the same
+    # name+address, which would otherwise render as duplicate map/search pins. Dedup
+    # on a normalised name+address key, keeping the most recently inspected; mirrors
+    # Chicago serving.
+    latest = ev.sort_values("inspection_date").copy()
+
+    def _norm(col: str) -> pd.Series:
+        return (
+            latest[col]
+            .fillna("")
+            .astype(str)
+            .str.upper()
+            .str.replace(r"[^A-Z0-9]+", " ", regex=True)
+            .str.strip()
+        )
+
+    _estab = _norm("dba_name") + " @ " + _norm("address")
+    latest = latest[~_estab.duplicated(keep="last")].copy()
     print(f"serving rows (latest per establishment): {len(latest):,}")
 
     # SHAP drivers via the reused linear-contributions machinery + NYC labels

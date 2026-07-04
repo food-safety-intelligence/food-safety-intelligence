@@ -1,8 +1,9 @@
 """
 Lambda handler: find_restaurants
 ---------------------------------
-Queries OpenStreetMap via the public Overpass API to find restaurants in
-Chicago matching the agent's parsed intent (neighborhood, cuisine, radius).
+Queries OpenStreetMap via the public Overpass API to find restaurants in the
+active city (Chicago / NYC / LA — see the event's `city`) matching the agent's
+parsed intent (neighborhood, cuisine, radius).
 
 No API key required. Free public endpoint.
 Endpoint: https://overpass-api.de/api/interpreter
@@ -16,7 +17,18 @@ import urllib.error
 import urllib.request
 from typing import Any
 
-from chicago_neighborhoods import BBOX, CENTROIDS, CHICAGO_BBOX, CHICAGO_CENTROID
+import chicago_neighborhoods as chi
+import la_neighborhoods as la
+import nyc_neighborhoods as nyc
+
+# Per-city geography: (neighborhood bbox table, neighborhood centroids, whole-city
+# bbox, whole-city centroid, display label). The handler selects the active city's
+# tables so a NYC/LA lookup resolves against that city rather than Chicago (DR 0016).
+CITY_GEO: dict[str, tuple] = {
+    "chicago": (chi.BBOX, chi.CENTROIDS, chi.CHICAGO_BBOX, chi.CHICAGO_CENTROID, "Chicago"),
+    "nyc": (nyc.BBOX, nyc.CENTROIDS, nyc.NYC_BBOX, nyc.NYC_CENTROID, "New York City"),
+    "la": (la.BBOX, la.CENTROIDS, la.LA_BBOX, la.LA_CENTROID, "Los Angeles"),
+}
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -87,12 +99,13 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
         "lon":          float | None,
         "radius_km":    float,        # default 1.0
         "cuisine":      str | None,   # e.g. "sushi", "ramen"
-        "limit":        int           # default 20, max 50
+        "limit":        int,          # default 20, max 50
+        "city":         str           # "chicago" (default) | "nyc" | "la"
     }
 
     Returns list[RestaurantStub] sorted by distance from query centroid, or a
     top-level {"error": ..., "reason": ...} object when the requested location is
-    not a recognised Chicago area or the Overpass directory is unreachable.
+    not a recognised area of the active city or the Overpass directory is unreachable.
     """
     neighborhood: str | None = event.get("neighborhood")
     lat: float | None = event.get("lat")
@@ -101,27 +114,37 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
     cuisine: str | None = event.get("cuisine")
     limit: int = min(int(event.get("limit", 20)), 50)
 
-    # Keep the explicit-coordinate path Chicago-scoped too (the neighborhood path
-    # already is). Out-of-area coordinates would otherwise return non-Chicago
-    # results that the agent isn't meant to cover.
-    if lat is not None and lon is not None and not _within_chicago(lat, lon):
+    # Resolve the active city's geography (default Chicago). Bbox validation, the
+    # neighborhood table, and the whole-city fallback are all scoped to it.
+    city = str(event.get("city", "chicago")).lower()
+    bbox_table, centroids, city_bbox, city_centroid, city_label = CITY_GEO.get(
+        city, CITY_GEO["chicago"]
+    )
+
+    # Keep the explicit-coordinate path city-scoped too (the neighborhood path
+    # already is). Out-of-area coordinates would otherwise return results outside
+    # the city the agent is meant to cover.
+    if lat is not None and lon is not None and not _within_bbox(lat, lon, city_bbox):
         return {
             "error": (
-                f"Coordinates ({lat}, {lon}) are outside the Chicago area this assistant covers."
+                f"Coordinates ({lat}, {lon}) are outside the {city_label} area "
+                "this assistant covers."
             ),
             "reason": "location_not_recognized",
         }
 
-    geometry = _resolve_geometry(neighborhood, lat, lon, radius_km)
+    geometry = _resolve_geometry(
+        neighborhood, lat, lon, radius_km, bbox_table, centroids, city_bbox, city_centroid
+    )
     if geometry is None:
         # The neighborhood table covers only the major named areas, so a real
-        # Chicago place can still miss. Returning a whole-Chicago fallback would
-        # silently answer a different question, so surface it instead — but the
-        # message must not claim the place isn't in Chicago (it might be); ask
-        # for a major neighborhood name or coordinates rather than asserting.
+        # place can still miss. Returning a whole-city fallback would silently
+        # answer a different question, so surface it instead — but the message
+        # must not claim the place isn't in the city (it might be); ask for a
+        # major neighborhood name or coordinates rather than asserting.
         return {
             "error": (
-                f"Couldn't pinpoint '{neighborhood}'. Try a major Chicago "
+                f"Couldn't pinpoint '{neighborhood}'. Try a major {city_label} "
                 "neighborhood name or latitude/longitude."
             ),
             "reason": "location_not_recognized",
@@ -150,12 +173,9 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
 # ---------------------------------------------------------------------------
 
 
-def _within_chicago(lat: float, lon: float) -> bool:
-    """Return True when the coordinate falls inside the Chicago bounding box."""
-    return (
-        CHICAGO_BBOX["south"] <= lat <= CHICAGO_BBOX["north"]
-        and CHICAGO_BBOX["west"] <= lon <= CHICAGO_BBOX["east"]
-    )
+def _within_bbox(lat: float, lon: float, bbox: dict[str, float]) -> bool:
+    """Return True when the coordinate falls inside the given bounding box."""
+    return bbox["south"] <= lat <= bbox["north"] and bbox["west"] <= lon <= bbox["east"]
 
 
 def _resolve_geometry(
@@ -163,12 +183,16 @@ def _resolve_geometry(
     lat: float | None,
     lon: float | None,
     radius_km: float,
+    bbox_table: dict[str, dict[str, float]],
+    centroids: dict[str, tuple[float, float]],
+    city_bbox: dict[str, float],
+    city_centroid: tuple[float, float],
 ) -> tuple[dict[str, float], tuple[float, float]] | None:
-    """Return (bbox dict, centroid tuple) for the query.
+    """Return (bbox dict, centroid tuple) for the query in the given city's tables.
 
-    Returns ``None`` when a neighborhood was given but is not a recognised
-    Chicago area (and no explicit coordinates were supplied) so the caller can
-    report it rather than silently falling back to a whole-Chicago search.
+    Returns ``None`` when a neighborhood was given but is not a recognised area of
+    the city (and no explicit coordinates were supplied) so the caller can report
+    it rather than silently falling back to a whole-city search.
     """
     # Explicit coordinates take priority.
     if lat is not None and lon is not None:
@@ -181,22 +205,22 @@ def _resolve_geometry(
     if neighborhood:
         # Try exact match first, then case-insensitive.
         key = neighborhood.strip().title()
-        entry = BBOX.get(key)
+        entry = bbox_table.get(key)
         if not entry:
             key_lower = neighborhood.strip().lower()
-            for k, v in BBOX.items():
+            for k, v in bbox_table.items():
                 if k.lower() == key_lower:
                     entry = v
                     key = k
                     break
         if entry:
-            return entry, CENTROIDS[key]
-        # Neighborhood given but unrecognised — signal the caller, don't fall
-        # back to all-Chicago (that would answer a different question).
+            return entry, centroids[key]
+        # Neighborhood given but unrecognised — signal the caller, don't fall back
+        # to a whole-city search (that would answer a different question).
         return None
 
-    # Nothing specified — default to a whole-Chicago search.
-    return CHICAGO_BBOX, CHICAGO_CENTROID
+    # Nothing specified — default to a whole-city search.
+    return city_bbox, city_centroid
 
 
 def _cuisine_filter(cuisine: str | None) -> str:

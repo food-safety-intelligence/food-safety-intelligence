@@ -67,7 +67,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place will see a failed inspection or priority violation in the next six months",
     sourceBlurb:
-      "Chicago publishes every food establishment inspection it conducts. We pair that record with nearby 311 complaints and license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
+      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
     cityState: "Chicago, IL",
     healthDept: "Chicago Department of Public Health",
     riskLabel: "Predicted 180-day risk",
@@ -76,8 +76,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     outcomeSentence:
       "fail an inspection or be cited for a priority violation in the next 180 days",
     footerBlurb:
-      "Open-data project pairing Chicago Food Inspections with 311 and license records to estimate forward-window food-safety risk. Not affiliated with the City of Chicago.",
-    sources: ["Chicago Food Inspections", "Chicago 311 Service Requests", "Chicago Business Licenses"],
+      "Open-data project pairing Chicago Food Inspections with license records to estimate forward-window food-safety risk. Not affiliated with the City of Chicago.",
+    sources: ["Chicago Food Inspections", "Chicago Business Licenses"],
     historyResults: [
       { key: "Pass", label: "Pass", bg: "bg-sage", badge: "P", match: (r) => r === "Pass" },
       { key: "PassCond", label: "Pass w/ Conditions", bg: "bg-amber", badge: "!", match: (r) => r === "Pass w/ Conditions" },
@@ -169,11 +169,11 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
     // same honest Worsening / Stable / Improving split.
     trendStableBand: 0.0003,
-    // Chat backend is Chicago+NYC only until Deepak deploys the LA-aware agent and
-    // publishes LA data to S3 (cross-account). Until then keep this false so the UI
-    // shows the honest "chat not available for this city" notice rather than every
-    // LA lookup returning "no record".
-    chatSupported: false,
+    // Enabled: LA data is in S3 and merging this PR redeploys the agent LA-aware
+    // (city routing + city-aware find_restaurants). If a post-merge check shows LA
+    // lookups returning "no record", the runtime role is missing s3:GetObject on
+    // web-app-data/la/ (Issue #79 class, Deepak's account) — set back to false until fixed.
+    chatSupported: true,
   },
 };
 

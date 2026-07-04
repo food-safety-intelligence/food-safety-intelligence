@@ -21,8 +21,10 @@ judgement calls are called out.
 >
 > Everything else ported cleanly: the flipped A/B/C direction (step 0.2), the
 > shared crosswalk, the calibrated-LogReg served model, `city.ts` `CITY_CONFIG`,
-> `CityGate`/`HowItWorksLa`, and the city-aware agent code. LA `chatSupported` is
-> **false** until Deepak deploys the LA-aware agent (cross-account).
+> `CityGate`/`HowItWorksLa`, and the city-aware agent code (incl. city-aware
+> `find_restaurants`). LA `chatSupported` is **true**; it goes live when the agent
+> redeploys on merge (cross-account, Deepak's) — revert the flag if a post-merge
+> lookup returns "no record".
 
 The guiding principle from NYC: **the web app is one static build with a runtime
 city switch; every per-city difference lives in `app/src/lib/city.ts`; the model
@@ -180,11 +182,50 @@ deploy to Deepak.
   with the new city; the loaders are `lru_cache`-keyed by city. Make
   `explain_restaurant`'s `_classify_result` + `model_note` city-aware (NYC maps
   A/B/C → pass/pass-w-conditions/fail and emits a next-inspection note).
-- **`agents/create_guardrail.py`** — add the city to the allowed scope (it
-  currently allows Chicago + NYC; other cities are denied as "off-topic").
-- **Flip `chatSupported: true`** in `city.ts` once Deepak deploys + publishes the
-  city's data to S3. Until then keep it `false` (the honest in-chat notice) OR
-  accept graceful "no record" (DR 0010).
+- **`agents/tools/find_restaurants/handler.py`** — the discovery tool is city-aware
+  via `CITY_GEO`. Add a **`<city>_neighborhoods.py`** (mirror `chicago_neighborhoods.py`:
+  a `BBOX` name→`{south,west,north,east}` dict, the `CENTROIDS` midpoint comprehension,
+  and whole-city `<CITY>_BBOX` / `<CITY>_CENTROID`), then register it in `CITY_GEO`.
+  Cover the neighborhoods your `ChatInterface` `FIND_QUERIES_BY_CITY` names, plus a few
+  coarse whole-region fallbacks (boroughs / big districts) so a broad query like "pizza
+  in Brooklyn" resolves instead of being declined. **Without this the tool falls back to
+  Chicago and rejects the new city's neighborhoods** (the "Astoria not in scope" bug).
+  `entrypoint.py` already passes `_ACTIVE_CITY` in. **Two** suites test `_resolve_geometry`
+  — `agents/tools/find_restaurants/test_handler.py` AND `tests/test_agent_tools.py`
+  (the Python job's main suite) — update both.
+- **`agents/create_guardrail.py`** — **no per-city change needed.** The guardrail
+  is city-agnostic: it denies only *personalised medical* + *legal* advice. The old
+  `OffTopicNonFoodSafety` catch-all (which listed cities) was removed on purpose — a
+  negative catch-all over-matched and blocked ~100% of queries (see the file's
+  docstring + the DR 0012 update note). Off-topic + uncovered-city requests are
+  declined by the *system prompt*, not the guardrail. So adding a city does **not**
+  require reprovisioning the guardrail.
+- **Flip `chatSupported: true`** in `city.ts` only after the steps below land.
+
+### Deploying the agent for a new city
+
+The runtime lives in AWS account `991500268971` (Deepak's), us-west-2. The agent
+**code** auto-deploys on merge to `main` (`deploy-agent.yml`, OIDC role). What still
+needs doing per city:
+
+1. **Push the city's data to S3.** The agent reads `web-app-data/<city>/scores.json`
+   + `inspection_history.json` from `food-safety-intelligence-data` (us-east-1) at
+   cold start (`_warm_data_files` optional). `publish.py` only pushes Chicago, so
+   copy the committed JSONs manually (Bella's creds — the bucket is her account):
+   `aws s3 cp app/public/data/<city>/{scores,inspection_history}.json s3://food-safety-intelligence-data/web-app-data/<city>/`.
+   Ensure the runtime role has `s3:GetObject` on those keys (Issue #79 class).
+   *(As of 2026-07-04 both `nyc/` and `la/` were empty — NYC lookups returned
+   "no record" despite `chatSupported: true`. Don't assume prior cities were pushed.)*
+2. **Merge** — the agent redeploys with the new city's code.
+3. **Verify** (see `la-chat-deploy-cloudshell.md` for the exact commands):
+   `apply-guardrail` on a food-safety query for the new city → `NONE` (the
+   deploy-agent guardrail gate now checks one per covered city); and
+   `run_local.py "[[city:<city>]] …"` returns that city's results.
+4. **Flip `chatSupported: true`** in `city.ts` once 1–3 pass.
+
+The wired guardrail id/version is tracked only in
+`agentcore-deploy/agentcore/agentcore.json` (`FSI_BEDROCK_GUARDRAIL_VERSION`) — the
+single source of truth the deploy reads.
 - Run the handler unit tests (`agents/tools/*/test_handler.py`) — they default to
   Chicago, so they keep passing; add a city case if you want coverage.
 

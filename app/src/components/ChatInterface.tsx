@@ -349,10 +349,11 @@ export function ChatInterface({
       sessionIdRef.current = getOrCreateSessionId();
     }
     const saved = loadMessages();
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city));
+    // Starter chips are set by the city effect below, which also runs on mount —
+    // setting them here too would only duplicate that and pull `city` into this
+    // mount-only effect (a stale-closure trap the exhaustive-deps rule flags).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved.length) setMessages(saved);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   // Re-pick the starter chips when the city changes — the "find" prompts name
