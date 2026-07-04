@@ -121,27 +121,37 @@ export function MapView({
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
-  // Recenter imperatively when the city (center) changes — rather than remount
-  // the map via key, which races maplibre's container init. Skip the first run:
-  // initialViewState already frames the starting city.
+  // Recenter imperatively on city change — rather than remount the map via key,
+  // which races maplibre's container init. Two paths because the city can
+  // resolve either before OR after the map's tiles finish loading:
+  //   • already loaded  → flyTo when the center prop changes (e.g. a header toggle)
+  //   • not yet loaded  → onLoad jumps to whatever the latest center is (e.g. a
+  //     direct visit to /?city=nyc, where the flyTo would otherwise fire on an
+  //     unloaded map and be lost — leaving NYC data over a Chicago map).
   const mapRef = useRef<MapRef>(null);
-  const firstFrame = useRef(true);
+  const loadedRef = useRef(false);
+  const centerRef = useRef(center);
+  centerRef.current = center;
   useEffect(() => {
-    if (firstFrame.current) {
-      firstFrame.current = false;
-      return;
+    if (loadedRef.current) {
+      mapRef.current?.flyTo({
+        center: [center.lon, center.lat],
+        zoom: center.zoom,
+        duration: 800,
+      });
     }
-    mapRef.current?.flyTo({
-      center: [center.lon, center.lat],
-      zoom: center.zoom,
-      duration: 800,
-    });
   }, [center.lat, center.lon, center.zoom]);
+  const handleLoad = useCallback(() => {
+    loadedRef.current = true;
+    const c = centerRef.current;
+    mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
+  }, []);
 
   return (
     <div className={className}>
       <Map
         ref={mapRef}
+        onLoad={handleLoad}
         initialViewState={{
           latitude: center.lat,
           longitude: center.lon,
