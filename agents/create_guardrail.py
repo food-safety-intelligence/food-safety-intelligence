@@ -8,14 +8,19 @@ system prompt:
 
   - Denied topics — PERSONALISED medical advice and legal advice only. There is
     deliberately NO catch-all "off-topic" topic: a negatively-defined "anything
-    not about food safety" topic makes Bedrock's classifier over-match and block
-    legitimate food-safety queries. Off-topic requests (recipes, other cities,
-    chit-chat) are declined by the system prompt instead.
-  - Denied topics — genuinely off-topic requests (recipes, other-city
-    restaurant lookups, meal planning, chit-chat) plus PERSONALISED medical and
-    legal advice. General factual food-safety education (answered with cited
-    public health sources) is deliberately NOT denied — it is in scope.
+    not about food safety" topic makes Bedrock's classifier over-match — an earlier
+    broad version blocked ~100% of queries, including core risk lookups (commit
+    9c92ce7). Off-topic requests (recipes, other cities, chit-chat) are declined by
+    the system prompt instead, which the eval's off-topic/other-city cases verify.
+    General factual food-safety education (with cited public-health sources) is in
+    scope and must NOT be blocked.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
+
+  NOTE: decision record 0012 still describes an "OffTopicNonFoodSafety" guardrail
+  topic (re-scoped) as surviving — that text predates the 9c92ce7 removal and is
+  stale. The live guardrail (verified 2026-07-04: only PersonalisedMedicalAdvice +
+  LegalAdvice) reflects the removal; this file now matches it. Update 0012 to record
+  the removal + the over-blocking reason.
 
 The contextual-grounding + relevance policy is configured below but is NOT active
 as the agent is wired: Strands' BedrockModel does not tag the tool outputs as
@@ -53,30 +58,13 @@ _BLOCK_MESSAGE = (
 # Topics the agent must refuse. Bedrock matches on the definition + examples.
 #
 # Scope reminder: the agent does TWO jobs — (A) restaurant risk signals for the
-# cities it covers (Chicago, New York City, and Los Angeles) and (B) general
-# food-safety / foodborne-illness education with cited public health sources. The
-# deny topics below must NOT block job B, so they are scoped to genuinely
-# off-topic requests and to *personalised* medical advice only — general factual
-# food-safety education is allowed.
+# cities it covers (Chicago, New York City, Los Angeles) and (B) general food-safety
+# / foodborne-illness education with cited public health sources. Only *personalised*
+# medical advice and legal advice are denied here; general factual food-safety
+# education is allowed. Off-topic requests (recipes, other cities, chit-chat) are
+# NOT a guardrail topic — a negative catch-all over-matches and blocks legitimate
+# queries (see the module docstring) — so the system prompt declines them instead.
 _DENIED_TOPICS = [
-    {
-        "name": "OffTopicNonFoodSafety",
-        # Bedrock caps a topic definition at 200 chars, so this stays terse (the
-        # examples carry the specifics). Cities abbreviated to fit LA in.
-        "definition": (
-            "Requests not about food-safety risk for a covered-city establishment "
-            "(Chicago, NYC, LA), nor about general food safety or foodborne illness "
-            "— e.g. recipes, meal planning, or a city we don't cover."
-        ),
-        "examples": [
-            "Give me a recipe for deep dish pizza.",
-            "Find safe sushi in Houston.",
-            "What should I cook for dinner tonight?",
-            "Plan a week of healthy meals for me.",
-            "Tell me a joke.",
-        ],
-        "type": "DENY",
-    },
     {
         "name": "PersonalisedMedicalAdvice",
         "definition": (
