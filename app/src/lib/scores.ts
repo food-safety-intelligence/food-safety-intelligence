@@ -129,8 +129,8 @@ export interface ScoresPayload {
   totals: {
     establishments: number;
     tier_counts: Record<RiskTier, number>;
-    worsening_30d: number;
-    improving_30d: number;
+    worsening: number;
+    improving: number;
   };
   /** Absent in older JSON written before the per-profile waterfall was added. */
   calibration?: Calibration;
