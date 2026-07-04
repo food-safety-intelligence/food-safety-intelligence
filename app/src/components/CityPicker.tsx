@@ -23,7 +23,7 @@ export function CityEntryModal() {
     >
       {/* Dark scrim over the produce photo so the card stays readable (photo by
           Unsplash, self-hosted). */}
-      <div className="absolute inset-0 bg-ink/60" aria-hidden />
+      <div className="absolute inset-0 bg-ink/65" aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
         <h2 id="city-pick-title" className="text-2xl font-light tracking-tight">
           Choose a city
