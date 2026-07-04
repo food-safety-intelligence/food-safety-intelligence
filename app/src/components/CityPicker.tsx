@@ -13,12 +13,18 @@ export function CityEntryModal() {
   if (!needsPick) return null;
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/70 backdrop-blur-md px-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center px-4 bg-cover bg-center"
+      style={{
+        backgroundImage: `url(${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/images/popup-produce.jpg)`,
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="city-pick-title"
     >
-      <div className="w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
+      {/* Dark scrim over the produce photo so the card stays readable (photo by
+          Unsplash, self-hosted). */}
+      <div className="absolute inset-0 bg-ink/60" aria-hidden />
+      <div className="relative z-10 w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
         <h2 id="city-pick-title" className="text-2xl font-light tracking-tight">
           Choose a city
         </h2>
