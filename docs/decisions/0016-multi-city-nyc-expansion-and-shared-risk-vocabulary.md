@@ -313,19 +313,21 @@ assumptions and are the substance of this extension:
 post-COVID); mean score is flat ~94.5 across 2023–2026 with no step-change (only a
 gradual B/C-rate drift the temporal split handles honestly).
 
-**Measured (2026-07-04).** 103,474 inspections / 43,053 facilities; B/C base rate
-~4.9%. Temporal split **train 36,900 (2023-04→2024-06) / val 7,374 / test 7,197**
-(test base 8.2%). Served Model 1 (calibrated LogReg): **PR-AUC 0.167, ROC-AUC
-0.737, top-decile lift 2.06×** — an honest coverage feature that sits **between
-NYC (~0.66) and Chicago (~0.78)** on base-rate-free ROC-AUC. Tiers recalibrated to
-LA's own distribution → Low 40% / Moderate 45% / Elevated 13% / High 2%.
+**Measured (2026-07-04, regenerated after the same-day-B/C label fix + reopened-
+establishment dedup).** 103,474 inspections / 43,053 facilities (42,270 served after
+collapsing reopened establishments); B/C base rate ~4.9%. Temporal split **train 36,900
+(2023-04→2024-06) / val 7,374 / test 7,197** (test base 8.7%). Served Model 1 (calibrated
+LogReg): **PR-AUC 0.167, ROC-AUC 0.720, top-decile lift 2.12×** — an honest coverage
+feature that sits **between NYC (~0.66) and Chicago (~0.78)** on base-rate-free ROC-AUC.
+Tiers recalibrated to LA's own distribution → Low 40% / Moderate 45% / Elevated 13% / High 2%.
 Crosswalk: **128 LA codes** added (T3 91 / T2 32 / T1 5), now 348 rows total.
 
 **Consequences specific to LA.** Data lives under the `la/` prefix; every per-city
 difference is in `CITY_CONFIG.la` (incl. the flipped `isBadOutcome` and A/B/C
-badges) + a `HowItWorksLa` page. The chat agent code is LA-aware but
-`chatSupported` stays **false** until Deepak deploys the LA-aware agent and
-publishes LA data to S3 (cross-account). **Residual risks:** low ~5% base rate
+badges) + a `HowItWorksLa` page. The chat agent is LA-aware (city routing +
+city-aware `find_restaurants`) and `chatSupported` is **true**: LA data is in S3
+and merging this PR redeploys the agent (cross-account, Deepak's account); revert
+the flag if a post-merge lookup returns "no record" (runtime-role S3 read gap). **Residual risks:** low ~5% base rate
 (small High tier), a shallow 3-year window (thin history, 71% get a trend slope),
 and geocoded (approximate) coordinates.
 
