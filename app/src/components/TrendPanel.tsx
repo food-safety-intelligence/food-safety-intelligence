@@ -10,9 +10,8 @@ import {
   trendDirection,
 } from "@/lib/scores";
 import { applyTrendZoom } from "@/lib/utils";
-import { DefineTerm } from "@/components/DefineTerm";
 import { Tooltip } from "@/components/Tooltip";
-import { TrendChart, type TrendPoint } from "@/components/TrendChart";
+import { TrendCaptionLead, TrendChart, type TrendPoint } from "@/components/TrendChart";
 import { TrendChartModal } from "@/components/TrendChartModal";
 
 const TREND_META = {
@@ -185,15 +184,13 @@ export function TrendPanel({
         </div>
       )}
 
-      <p className="text-2xs text-muted mt-2 text-center leading-snug">
-        Each point is the trend estimate
-        <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" /> — the model&apos;s
-        read with each visit&apos;s own result removed, so the line shows direction. The dashed line
-        is the risk score
-        <DefineTerm termKey="risk-score" className="align-middle mx-0.5" />, which counts the latest
-        result and can differ.
-        {hasTrend ? " Click a point to jump to it below." : ""}
-      </p>
+      {/* Only describe the dots + dashed line when they're actually drawn; the
+          chart renders its own "not enough history" message otherwise. */}
+      {hasTrend && (
+        <p className="text-2xs text-muted mt-2 text-center leading-snug">
+          <TrendCaptionLead /> Click a point to jump to it below.
+        </p>
+      )}
 
       {hasTrend && open && (
         <TrendChartModal

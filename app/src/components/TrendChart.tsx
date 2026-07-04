@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { trendDirection } from "@/lib/scores";
 import { dateAxisTicks } from "@/lib/utils";
+import { DefineTerm } from "@/components/DefineTerm";
 
 /**
  * Detail-page trend chart. Plots the establishment's recent FORECAST-MODEL scores
@@ -183,9 +184,13 @@ export function TrendChart({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Predicted-risk trajectory across ${pts.length} inspections${
-          bandLeft !== null ? `, recent ${windowSize} highlighted as the trend window` : ""
-        }, ${direction}`}
+        aria-label={`Trend-estimate trajectory across ${pts.length} inspections${
+          bandLeft !== null ? `, recent ${windowSize} set the trend window` : ""
+        }, ${direction}${
+          referenceScore != null
+            ? `. Dashed line marks the headline risk score, ${Math.round(referenceScore * 100)}`
+            : ""
+        }`}
       >
         {/* y-axis: 0..100 to match the gauge's "/100" (most establishments sit low). */}
         {[0, 1].map((t) => (
@@ -291,7 +296,10 @@ export function TrendChart({
             />
             <text
               x={padL + 3}
-              y={yFor(referenceScore) - 3}
+              // Sit the label above the line, but flip below when the line is
+              // near the top edge so it doesn't collide with the "100" tick or
+              // the band label (a high-risk establishment — the case to get right).
+              y={yFor(referenceScore) < padTop + 12 ? yFor(referenceScore) + 9 : yFor(referenceScore) - 3}
               fontSize={7}
               fill={REFERENCE}
               fillOpacity={0.9}
@@ -420,4 +428,24 @@ function clamp01(v: number): number {
   if (v < 0) return 0;
   if (v > 1) return 1;
   return v;
+}
+
+/**
+ * The shared lead sentence for the chart caption — what a dot is (trend
+ * estimate) and what the dashed line is (risk score), each with an in-context
+ * definition. Rendered inline in a caption `<p>`; callers append their own
+ * action hint (inline: "jump to it below"; modal: zoom + new-tab). Kept in one
+ * place so the inline chart and the enlarge modal never drift.
+ */
+export function TrendCaptionLead() {
+  return (
+    <>
+      Each point is the trend estimate
+      <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" /> — the model&apos;s read
+      with each visit&apos;s own result removed, so the line shows direction. The dashed line is the
+      risk score
+      <DefineTerm termKey="risk-score" className="align-middle mx-0.5" />, which counts the latest
+      result and can differ.
+    </>
+  );
 }
