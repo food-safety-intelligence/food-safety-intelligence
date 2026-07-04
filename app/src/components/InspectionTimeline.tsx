@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { type Dispatch, type SetStateAction, useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
 
@@ -55,8 +55,9 @@ function parseViolations(comments: string): Violation[] {
 /**
  * Vertical timeline of inspection events. The leftmost rail is implied by
  * absolute-positioning a 2px line behind the colored dots. Renders the most
- * recent event first. Each row is a button that expands to show the full
- * violation comments for that inspection (or a note when there were none).
+ * recent event first. Two nested expand layers: a row expands to list that
+ * inspection's cited violations (titles only), and each violation expands to
+ * show the inspector's comment for it.
  */
 export function InspectionTimeline({
   events,
@@ -67,8 +68,12 @@ export function InspectionTimeline({
 }) {
   // Whether the older inspections (past maxVisible) are revealed.
   const [expanded, setExpanded] = useState(false);
-  // Which rows are expanded to show their comments, keyed by row's stable key.
+  // Layer 1: which inspection rows are expanded to show their violation list,
+  // keyed by the row's stable key.
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Layer 2: which individual violations are expanded to show their comment,
+  // keyed by `${rowKey}-${violationIndex}`.
+  const [openViolations, setOpenViolations] = useState<Set<string>>(new Set());
 
   if (events.length === 0) {
     return (
@@ -78,13 +83,17 @@ export function InspectionTimeline({
     );
   }
 
-  const toggle = (key: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  // Add/remove a key from a Set-valued toggle state. Shared by both layers.
+  const makeToggle =
+    (setter: Dispatch<SetStateAction<Set<string>>>) => (key: string) =>
+      setter((prev) => {
+        const next = new Set(prev);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+  const toggle = makeToggle(setOpen);
+  const toggleViolation = makeToggle(setOpenViolations);
 
   // Most recent first
   const sorted = events.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -109,9 +118,6 @@ export function InspectionTimeline({
           // parse the expanded panel uses, so the collapsed "N violations" label
           // always matches the number of items revealed on expand.
           const violations = e.comments ? parseViolations(e.comments) : [];
-          // Collapsed teaser names the top violation only — the inspector's
-          // comment text stays hidden until the row is expanded.
-          const teaser = e.headline?.split(COMMENTS_MARKER)[0].trim();
           return (
             <li key={key}>
               <button
@@ -150,12 +156,6 @@ export function InspectionTimeline({
                         </span>
                       </>
                     )}
-                    {teaser && (
-                      <>
-                        {" · "}
-                        {teaser}
-                      </>
-                    )}
                   </div>
                 </div>
                 <ChevronDown
@@ -174,18 +174,58 @@ export function InspectionTimeline({
                 >
                   {violations.length === 0 ? (
                     <p className="text-ink/75 italic">
-                      No comments were recorded for this inspection.
+                      No violations were recorded for this inspection.
                     </p>
                   ) : (
-                    <ul className="space-y-3">
-                      {violations.map((v, vi) => (
-                        <li key={vi}>
-                          <p className="font-medium text-ink/90">{v.title}</p>
-                          {v.note && (
-                            <p className="text-ink/80 mt-0.5">{v.note}</p>
-                          )}
-                        </li>
-                      ))}
+                    <ul className="divide-y divide-line/60">
+                      {violations.map((v, vi) => {
+                        const vKey = `${key}-${vi}`;
+                        const vOpen = openViolations.has(vKey);
+                        const vPanelId = `violation-note-${vKey}`;
+                        const hasNote = Boolean(v.note);
+                        return (
+                          <li key={vi} className="py-2 first:pt-0 last:pb-0">
+                            {hasNote ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleViolation(vKey)}
+                                aria-expanded={vOpen}
+                                aria-controls={vPanelId}
+                                className="group/v flex items-start gap-2 w-full text-left rounded cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
+                              >
+                                <ChevronRight
+                                  className={`shrink-0 w-4 h-4 mt-0.5 text-muted group-hover/v:text-ink transition-transform ${
+                                    vOpen ? "rotate-90" : ""
+                                  }`}
+                                  strokeWidth={2}
+                                  aria-hidden="true"
+                                />
+                                <span className="font-medium text-ink/90">
+                                  {v.title}
+                                </span>
+                              </button>
+                            ) : (
+                              <div className="flex items-start gap-2">
+                                <span
+                                  className="shrink-0 w-4 h-4 mt-0.5"
+                                  aria-hidden="true"
+                                />
+                                <span className="font-medium text-ink/90">
+                                  {v.title}
+                                </span>
+                              </div>
+                            )}
+                            {hasNote && vOpen && (
+                              <p
+                                id={vPanelId}
+                                className="text-ink/80 mt-1 ml-6"
+                              >
+                                {v.note}
+                              </p>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
                 </div>
