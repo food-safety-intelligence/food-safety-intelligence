@@ -15,6 +15,8 @@
  *   3. Pass it as `Authorization: Bearer <jwt>` below.
  */
 
+import type { City } from "@/lib/city";
+
 // Relative /api/agent hits CloudFront which proxies to ALB (avoids mixed-content).
 // Override with NEXT_PUBLIC_ALB_URL for local dev.
 const AGENT_URL =
@@ -104,7 +106,7 @@ export async function queryAgent(
   sessionId: string,
   history: AgentHistoryTurn[] = [],
   establishment?: AgentEstablishment,
-  city: "chicago" | "nyc" = "chicago",
+  city: City = "chicago",
 ): Promise<string> {
   // Scope the agent to the selected city (multi-city, DR 0016). The deployed
   // proxy reliably forwards only the query string, so the city rides as a
