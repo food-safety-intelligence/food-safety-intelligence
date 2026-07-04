@@ -21,8 +21,10 @@ judgement calls are called out.
 >
 > Everything else ported cleanly: the flipped A/B/C direction (step 0.2), the
 > shared crosswalk, the calibrated-LogReg served model, `city.ts` `CITY_CONFIG`,
-> `CityGate`/`HowItWorksLa`, and the city-aware agent code. LA `chatSupported` is
-> **false** until Deepak deploys the LA-aware agent (cross-account).
+> `CityGate`/`HowItWorksLa`, and the city-aware agent code (incl. city-aware
+> `find_restaurants`). LA `chatSupported` is **true**; it goes live when the agent
+> redeploys on merge (cross-account, Deepak's) — revert the flag if a post-merge
+> lookup returns "no record".
 
 The guiding principle from NYC: **the web app is one static build with a runtime
 city switch; every per-city difference lives in `app/src/lib/city.ts`; the model
@@ -180,6 +182,17 @@ deploy to Deepak.
   with the new city; the loaders are `lru_cache`-keyed by city. Make
   `explain_restaurant`'s `_classify_result` + `model_note` city-aware (NYC maps
   A/B/C → pass/pass-w-conditions/fail and emits a next-inspection note).
+- **`agents/tools/find_restaurants/handler.py`** — the discovery tool is city-aware
+  via `CITY_GEO`. Add a **`<city>_neighborhoods.py`** (mirror `chicago_neighborhoods.py`:
+  a `BBOX` name→`{south,west,north,east}` dict, the `CENTROIDS` midpoint comprehension,
+  and whole-city `<CITY>_BBOX` / `<CITY>_CENTROID`), then register it in `CITY_GEO`.
+  Cover the neighborhoods your `ChatInterface` `FIND_QUERIES_BY_CITY` names, plus a few
+  coarse whole-region fallbacks (boroughs / big districts) so a broad query like "pizza
+  in Brooklyn" resolves instead of being declined. **Without this the tool falls back to
+  Chicago and rejects the new city's neighborhoods** (the "Astoria not in scope" bug).
+  `entrypoint.py` already passes `_ACTIVE_CITY` in. **Two** suites test `_resolve_geometry`
+  — `agents/tools/find_restaurants/test_handler.py` AND `tests/test_agent_tools.py`
+  (the Python job's main suite) — update both.
 - **`agents/create_guardrail.py`** — **no per-city change needed.** The guardrail
   is city-agnostic: it denies only *personalised medical* + *legal* advice. The old
   `OffTopicNonFoodSafety` catch-all (which listed cities) was removed on purpose — a
