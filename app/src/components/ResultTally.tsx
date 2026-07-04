@@ -3,37 +3,29 @@
 import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import type { InspectionEvent } from "@/lib/scores";
+import { CITY_CONFIG } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { formatInspectionDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
-const RESULTS = ["Pass", "Pass w/ Conditions", "Fail"] as const;
-type ResultKey = (typeof RESULTS)[number];
-
-const STYLE: Record<ResultKey, { bg: string; label: string }> = {
-  Pass: { bg: "bg-sage", label: "P" },
-  "Pass w/ Conditions": { bg: "bg-amber", label: "!" },
-  Fail: { bg: "bg-terra", label: "×" },
-};
-
 /**
- * Tally card for the result counts. Each row is clickable: selecting a result
- * expands the inspections of that type (most recent first) inline, so a reader
- * can see *which* visits passed or failed without scanning the whole timeline.
+ * Tally card for the inspection-outcome counts. Categories are city-specific —
+ * Pass / Pass w/ Conditions / Fail for Chicago, letter grades A / B / C for NYC
+ * (from CITY_CONFIG.historyResults). Each row expands its inspections inline.
  */
 export function ResultTally({ events }: { events: InspectionEvent[] }) {
-  const [open, setOpen] = useState<ResultKey | null>(null);
+  const { city } = useCity();
+  const categories = CITY_CONFIG[city].historyResults;
+  const [open, setOpen] = useState<string | null>(null);
 
-  const byResult: Record<ResultKey, InspectionEvent[]> = {
-    Pass: [],
-    "Pass w/ Conditions": [],
-    Fail: [],
-  };
+  const byResult: Record<string, InspectionEvent[]> = {};
+  for (const c of categories) byResult[c.key] = [];
   for (const e of events) {
-    if (e.result in byResult) byResult[e.result as ResultKey].push(e);
+    const cat = categories.find((c) => c.match(e.result));
+    if (cat) byResult[cat.key].push(e);
   }
-  // Most recent first within each result group.
-  for (const r of RESULTS) {
-    byResult[r].sort((a, b) => (a.date < b.date ? 1 : -1));
+  for (const c of categories) {
+    byResult[c.key].sort((a, b) => (a.date < b.date ? 1 : -1));
   }
 
   return (
@@ -42,17 +34,16 @@ export function ResultTally({ events }: { events: InspectionEvent[] }) {
         Result tally
       </div>
       <div className="space-y-1.5">
-        {RESULTS.map((r) => {
-          const s = STYLE[r];
-          const list = byResult[r];
+        {categories.map((c) => {
+          const list = byResult[c.key];
           const count = list.length;
-          const isOpen = open === r;
+          const isOpen = open === c.key;
           const disabled = count === 0;
           return (
-            <div key={r}>
+            <div key={c.key}>
               <button
                 type="button"
-                onClick={() => setOpen(isOpen ? null : r)}
+                onClick={() => setOpen(isOpen ? null : c.key)}
                 disabled={disabled}
                 aria-expanded={isOpen}
                 className={cn(
@@ -63,11 +54,11 @@ export function ResultTally({ events }: { events: InspectionEvent[] }) {
                 )}
               >
                 <span
-                  className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${s.bg}`}
+                  className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${c.bg}`}
                 >
-                  {s.label}
+                  {c.badge}
                 </span>
-                <span className="flex-1 text-base">{r}</span>
+                <span className="flex-1 text-base">{c.label}</span>
                 <span className="num font-medium">{count}</span>
                 {!disabled && (
                   <ChevronDown

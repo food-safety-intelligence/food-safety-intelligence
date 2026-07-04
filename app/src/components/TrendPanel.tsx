@@ -4,6 +4,8 @@ import { useRef, useState } from "react";
 import { Info, Maximize2, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { InspectionEvent } from "@/lib/scores";
 import { trendDirection } from "@/lib/scores";
+import { CITY_CONFIG } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 import { TrendChart } from "@/components/TrendChart";
 import { TrendChartModal } from "@/components/TrendChartModal";
@@ -32,10 +34,11 @@ export function TrendPanel({
   /** Inspection history (newest-first); the scored events become chart points. */
   history: InspectionEvent[];
 }) {
+  const { city } = useCity();
   const [open, setOpen] = useState(false);
   const enlargeRef = useRef<HTMLButtonElement>(null);
 
-  const dir = trendDirection(slope);
+  const dir = trendDirection(slope, CITY_CONFIG[city].trendStableBand);
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
 

@@ -13,6 +13,8 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
+import { CityGate } from "@/components/CityGate";
+import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -189,6 +191,7 @@ export default async function HowItWorksPage() {
           residual overhang from intrinsic-width content (operating-points table)
           without clipping text. Desktop keeps the 820 reading cap. */}
       <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
+        <CityGate nyc={<HowItWorksNyc />}>
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-xs text-teal hover:underline"
@@ -804,6 +807,7 @@ export default async function HowItWorksPage() {
             </dl>
           </article>
         </section>
+        </CityGate>
       </main>
 
       <SiteFooter />

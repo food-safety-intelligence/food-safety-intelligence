@@ -1,5 +1,9 @@
+"use client";
+
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { trendDirection, type TrendDirection } from "@/lib/scores";
+import { CITY_CONFIG } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { cn } from "@/lib/utils";
 
 const STYLES: Record<
@@ -23,6 +27,7 @@ export function TrendIndicator({
   compact = false,
   className,
 }: TrendIndicatorProps) {
+  const { city } = useCity();
   if (slope === null) {
     return (
       <span
@@ -35,7 +40,7 @@ export function TrendIndicator({
       </span>
     );
   }
-  const direction = trendDirection(slope);
+  const direction = trendDirection(slope, CITY_CONFIG[city].trendStableBand);
   const { label, color, Icon } = STYLES[direction];
   const sign = slope > 0 ? "+" : slope < 0 ? "−" : "";
   const formatted = `${sign}${Math.abs(slope).toFixed(4)}`;

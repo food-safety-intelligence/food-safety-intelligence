@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, RotateCcw, AlertCircle, MapPin, Store, X } from "lucide-react";
 import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
 import type { ChatEstablishment } from "@/components/ChatScopeContext";
+import { CITY_CONFIG } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -279,6 +281,7 @@ export function ChatInterface({
   /** Establishment whose detail page is in view; scopes "this restaurant". */
   establishment?: ChatEstablishment | null;
 } = {}) {
+  const { city } = useCity();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -439,6 +442,20 @@ export function ChatInterface({
               <X className="w-4 h-4" strokeWidth={2} />
             </button>
           </Tooltip>
+        </div>
+      )}
+
+      {/* NYC notice — the agent backend only has Chicago data (DR 0014). Be
+          honest: general food-safety questions work, establishment lookups don't. */}
+      {!CITY_CONFIG[city].chatSupported && (
+        <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
+          <span>
+            You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
+            assistant currently has data for <strong>Chicago</strong> establishments
+            only — general food-safety questions work, but it can&apos;t look up a
+            specific {CITY_CONFIG[city].label} place yet.
+          </span>
         </div>
       )}
 

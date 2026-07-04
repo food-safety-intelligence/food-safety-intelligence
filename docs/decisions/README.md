@@ -11,6 +11,13 @@ file per decision; the log is **append-only** — don't renumber existing record
   — what we predict (forward-180-day fail-or-priority), the window, the 2019
   burn-in cutoff, the label universe/exclusions, and why fail-only was rejected.
   (Recorded retroactively; mostly a project-start decision.)
+- [0014 — Multi-city expansion (NYC) and a shared risk vocabulary](0014-multi-city-nyc-expansion-and-shared-risk-vocabulary.md)
+  — **Proposed** (feasibility, measured): separate per-city models over one shared
+  pipeline/vocabulary (not pooled); NYC predicts next-inspection B/C (event-anchored).
+  Measured 2026-07-04 — shared vocabulary works (`reference/violation_crosswalk.csv`,
+  220 codes), but no accuracy win: NYC weaker than Chicago (ROC-AUC 0.66 vs 0.78),
+  score-regression doesn't beat binary, Chicago themes add nothing. Chicago model
+  unchanged.
 
 ## Methodology & experiment tracking
 - [0001 — Experiment tracking and served-model reconcile](0001-experiment-tracking-and-reconcile.md)

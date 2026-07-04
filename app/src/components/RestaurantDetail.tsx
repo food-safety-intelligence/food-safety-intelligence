@@ -12,6 +12,8 @@ import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
 import type { DetailBundle, DetailGlobals } from "@/lib/scores";
+import { useCity } from "@/components/CityContext";
+import { CITY_CONFIG, dataUrl } from "@/lib/city";
 import { formatInspectionDate } from "@/lib/utils";
 
 type LoadState =
@@ -36,15 +38,17 @@ export function RestaurantDetail() {
 }
 
 function DetailLoader({ id }: { id: string }) {
+  const { city } = useCity();
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
+    setState({ status: "loading" });
     Promise.all([
-      fetch(`/data/detail/${encodeURIComponent(id)}.json`).then((r) =>
+      fetch(dataUrl(city, `detail/${encodeURIComponent(id)}.json`)).then((r) =>
         r.ok ? (r.json() as Promise<DetailBundle>) : Promise.reject(r.status),
       ),
-      fetch(`/data/detail-globals.json`).then((r) =>
+      fetch(dataUrl(city, "detail-globals.json")).then((r) =>
         r.ok ? (r.json() as Promise<DetailGlobals>) : Promise.reject(r.status),
       ),
     ])
@@ -57,7 +61,7 @@ function DetailLoader({ id }: { id: string }) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, city]);
 
   if (state.status === "loading") return <DetailSkeleton />;
   if (state.status === "notfound") return <DetailNotFound />;
@@ -76,7 +80,7 @@ function DetailLoader({ id }: { id: string }) {
 
   // Location line — join only the parts we have so a missing neighborhood/zip
   // doesn't leave orphaned "·" separators.
-  const cityLine = `Chicago, IL${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
+  const cityLine = `${CITY_CONFIG[city].cityState}${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
   const locationLine = [
     restaurant.address.trim(),
     restaurant.neighborhood.trim(),
@@ -243,15 +247,12 @@ function DetailLoader({ id }: { id: string }) {
                 className="serif italic text-terra"
                 style={{ fontSize: "1.05em" }}
               >
-                {history.filter((e) => e.result === "Fail").length} failure
-                {history.filter((e) => e.result === "Fail").length === 1
-                  ? ""
-                  : "s"}
-                .
+                {history.filter((e) => CITY_CONFIG[city].isBadOutcome(e.result)).length}{" "}
+                {CITY_CONFIG[city].outcomeNoun}.
               </span>
             </h2>
             <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
-              Real Chicago Department of Public Health records, independent of the
+              Real {CITY_CONFIG[city].healthDept} records, independent of the
               predicted risk score above.
             </p>
           </div>
@@ -286,8 +287,7 @@ function DetailLoader({ id }: { id: string }) {
               <p className="font-medium mb-2">It is a prediction.</p>
               <p>
                 A model estimate, drawn from the public record, of whether this
-                establishment will fail an inspection or be cited for a priority
-                violation in the next 180 days.
+                establishment will {CITY_CONFIG[city].outcomeSentence}.
               </p>
             </div>
             <div className="col-span-12 md:col-span-6">

@@ -2,6 +2,7 @@
 
 import {
   Map,
+  type MapRef,
   Marker,
   Popup,
   NavigationControl,
@@ -9,7 +10,7 @@ import {
 } from "react-map-gl/maplibre";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
@@ -111,20 +112,40 @@ function pinCapForZoom(zoom: number): number {
 export function MapView({
   pins,
   className = "",
+  center = CHICAGO_CENTER,
 }: {
   pins: PinSummary[];
   className?: string;
+  center?: { lat: number; lon: number; zoom: number };
 }) {
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // Recenter imperatively when the city (center) changes — rather than remount
+  // the map via key, which races maplibre's container init. Skip the first run:
+  // initialViewState already frames the starting city.
+  const mapRef = useRef<MapRef>(null);
+  const firstFrame = useRef(true);
+  useEffect(() => {
+    if (firstFrame.current) {
+      firstFrame.current = false;
+      return;
+    }
+    mapRef.current?.flyTo({
+      center: [center.lon, center.lat],
+      zoom: center.zoom,
+      duration: 800,
+    });
+  }, [center.lat, center.lon, center.zoom]);
+
   return (
     <div className={className}>
       <Map
+        ref={mapRef}
         initialViewState={{
-          latitude: CHICAGO_CENTER.lat,
-          longitude: CHICAGO_CENTER.lon,
-          zoom: CHICAGO_CENTER.zoom,
+          latitude: center.lat,
+          longitude: center.lon,
+          zoom: center.zoom,
         }}
         mapStyle={VOYAGER_STYLE as never}
         style={{ width: "100%", height: "100%" }}

@@ -17,6 +17,8 @@ import {
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
+import { useCity } from "@/components/CityContext";
+import { CITY_CONFIG, dataUrl } from "@/lib/city";
 import { cn } from "@/lib/utils";
 
 // How long to wait after the last keystroke before pushing `?q=` to the URL.
@@ -67,10 +69,14 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
   // Fetch the slim index of every establishment ONCE, then filter client-side
   // (the page is statically exported, so the server can't filter per request).
   // Until it loads we render the server's default `initialView`.
+  const { city } = useCity();
   const [index, setIndex] = useState<SearchIndex | null>(null);
+  // Refetch the selected city's index whenever the city changes; clear the old
+  // one first so we don't render Chicago pins while NYC loads.
   useEffect(() => {
     let alive = true;
-    fetch("/data/search-index.json")
+    setIndex(null);
+    fetch(dataUrl(city, "search-index.json"))
       .then((r) =>
         r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
       )
@@ -83,7 +89,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [city]);
 
   const indexLoading = index === null;
   const view = index
@@ -229,7 +235,15 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
             "lg:block relative h-[calc(100vh-220px)] lg:h-[calc(100vh-140px)] min-h-[480px] rounded-3xl overflow-hidden border border-line bg-card soft-shadow",
           )}
         >
-          <MapView pins={pins} className="absolute inset-0" />
+          <MapView
+            pins={pins}
+            className="absolute inset-0"
+            center={{
+              lat: CITY_CONFIG[city].center.lat,
+              lon: CITY_CONFIG[city].center.lon,
+              zoom: CITY_CONFIG[city].zoom,
+            }}
+          />
 
           {/* Floating search + filter overlay */}
           <div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
@@ -269,7 +283,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
 
           {/* Bottom-left attribution-ish chip */}
           <div className="absolute bottom-3 left-3 z-10 text-2xs text-muted/80 bg-card/80 backdrop-blur rounded px-2 py-1 pointer-events-none">
-            Chicago · 41.88, −87.63
+            {CITY_CONFIG[city].centerLabel}
           </div>
         </div>
 
