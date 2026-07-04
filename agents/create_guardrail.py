@@ -101,44 +101,67 @@ _DENIED_TOPICS = [
 ]
 
 
-def create() -> tuple[str, str]:
-    """Create the guardrail and publish a numbered version. Returns (id, version)."""
+# The full policy, shared by create and update so a re-run can't drift.
+_DESCRIPTION = (
+    "Food Safety agent (Chicago + NYC + LA): denied off-topic/medical/legal "
+    "topics, contextual grounding + relevance, and prompt-attack filtering."
+)
+_POLICY = {
+    "topicPolicyConfig": {"topicsConfig": _DENIED_TOPICS},
+    "contentPolicyConfig": {
+        # PROMPT_ATTACK only supports an input strength (output must be NONE).
+        "filtersConfig": [
+            {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"},
+        ]
+    },
+    "contextualGroundingPolicyConfig": {
+        "filtersConfig": [
+            {"type": "GROUNDING", "threshold": 0.7},
+            {"type": "RELEVANCE", "threshold": 0.7},
+        ]
+    },
+    "blockedInputMessaging": _BLOCK_MESSAGE,
+    "blockedOutputsMessaging": _BLOCK_MESSAGE,
+}
+
+
+def _existing_id(client) -> str | None:
+    """The id of the guardrail named GUARDRAIL_NAME, if one already exists."""
+    for g in client.list_guardrails().get("guardrails", []):
+        if g.get("name") == GUARDRAIL_NAME:
+            return g["id"]
+    return None
+
+
+def create() -> tuple[str, str, bool]:
+    """Create the guardrail (or update it in place if the name already exists), then
+    publish a new immutable version. Returns (id, version, updated). Idempotent — a
+    re-run adopts the existing guardrail so the agent's wired id is unchanged (only
+    the version bumps), instead of failing on the unique-name constraint."""
     region = os.environ.get("AWS_REGION", "us-east-1")
     client = boto3.client("bedrock", region_name=region)
 
-    created = client.create_guardrail(
-        name=GUARDRAIL_NAME,
-        description=(
-            "Food Safety agent (Chicago + NYC + LA): denied off-topic/medical/legal "
-            "topics, contextual grounding + relevance, and prompt-attack filtering."
-        ),
-        topicPolicyConfig={"topicsConfig": _DENIED_TOPICS},
-        contentPolicyConfig={
-            # PROMPT_ATTACK only supports an input strength (output must be NONE).
-            "filtersConfig": [
-                {"type": "PROMPT_ATTACK", "inputStrength": "HIGH", "outputStrength": "NONE"},
-            ]
-        },
-        contextualGroundingPolicyConfig={
-            "filtersConfig": [
-                {"type": "GROUNDING", "threshold": 0.7},
-                {"type": "RELEVANCE", "threshold": 0.7},
-            ]
-        },
-        blockedInputMessaging=_BLOCK_MESSAGE,
-        blockedOutputsMessaging=_BLOCK_MESSAGE,
-    )
-    guardrail_id = created["guardrailId"]
+    existing = _existing_id(client)
+    if existing:
+        # Adopt the existing guardrail: overwrite its working draft with the current
+        # policy (adds LA to scope), keeping the same id so no re-wire is needed.
+        client.update_guardrail(guardrailIdentifier=existing, name=GUARDRAIL_NAME, **_POLICY)
+        guardrail_id = existing
+    else:
+        guardrail_id = client.create_guardrail(
+            name=GUARDRAIL_NAME, description=_DESCRIPTION, **_POLICY
+        )["guardrailId"]
 
-    # create_guardrail leaves the working copy as DRAFT; publish an immutable
-    # numbered version to pin the agent to.
+    # create/update leaves the working copy as DRAFT; publish an immutable numbered
+    # version to pin the agent to.
     version = client.create_guardrail_version(guardrailIdentifier=guardrail_id)["version"]
-    return guardrail_id, version
+    return guardrail_id, version, bool(existing)
 
 
 def main() -> None:
-    guardrail_id, version = create()
-    print(f"Created guardrail '{GUARDRAIL_NAME}': id={guardrail_id} version={version}\n")
+    guardrail_id, version, updated = create()
+    verb = "Updated" if updated else "Created"
+    print(f"{verb} guardrail '{GUARDRAIL_NAME}': id={guardrail_id} version={version}\n")
     print("Wire it into the agent:")
     print(f"    export FSI_BEDROCK_GUARDRAIL_ID={guardrail_id}")
     print(f"    export FSI_BEDROCK_GUARDRAIL_VERSION={version}")
