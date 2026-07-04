@@ -16,12 +16,6 @@ system prompt:
     scope and must NOT be blocked.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
 
-  NOTE: decision record 0012 still describes an "OffTopicNonFoodSafety" guardrail
-  topic (re-scoped) as surviving — that text predates the 9c92ce7 removal and is
-  stale. The live guardrail (verified 2026-07-04: only PersonalisedMedicalAdvice +
-  LegalAdvice) reflects the removal; this file now matches it. Update 0012 to record
-  the removal + the over-blocking reason.
-
 The contextual-grounding + relevance policy is configured below but is NOT active
 as the agent is wired: Strands' BedrockModel does not tag the tool outputs as
 grounding sources and per-message grounding is off, so this policy has no
@@ -38,7 +32,9 @@ Then wire the printed id + version into the agent via env vars (see
 
 Usage:
     python agents/create_guardrail.py            # create + publish a version
-    AWS_REGION=us-east-1 python agents/create_guardrail.py
+    # Defaults to us-west-2 — the region the runtime + guardrail live in. Set
+    # AWS_REGION only to target a different account/region; pointing it at the wrong
+    # region creates a DUPLICATE guardrail instead of updating the live one.
 """
 
 from __future__ import annotations
@@ -67,20 +63,23 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "PersonalisedMedicalAdvice",
-        # Kept under Bedrock's ~200-char topic-definition cap. Scope narrowed
-        # (followup): the old "whether a food is safe given their health condition"
-        # clause blocked legit caregiver queries ("safest options for an
-        # immunocompromised diner") — a food-safety recommendation, not medical
-        # advice. Deny only a personal medical RULING for the speaker.
+        # Bedrock topic classifiers key on the EXAMPLES, not just the definition.
+        # An "immune system" example (previously here) trained the classifier to
+        # match ANY immune-system mention, which blocked legit caregiver food-safety
+        # queries ("safest options for an immunocompromised diner"). So every example
+        # is now a clear diagnosis/treatment/medication request, and the definition
+        # targets the same — vulnerable-diner *risk* questions pass the guardrail and
+        # are handled by the system prompt (which still declines a personal safety
+        # verdict). ≤200-char definition cap.
         "definition": (
-            "Personal medical advice for the speaker — diagnosis, treatment, "
-            "medication, or an individual ruling on what THEY may eat given their "
-            "condition. Ranking restaurants by food-safety risk is allowed."
+            "Seeking a medical diagnosis, treatment, or medication for oneself "
+            "(e.g. do I have food poisoning; what medicine do I take). Ranking "
+            "restaurants by food-safety risk is allowed."
         ),
         "examples": [
-            "Is it safe for ME to eat here with my weak immune system?",
             "Do I have food poisoning, and what medicine should I take?",
-            "I'm pregnant — tell me exactly what I can and cannot eat.",
+            "What antibiotics should I take for a stomach bug after eating out?",
+            "Diagnose my symptoms and tell me how to treat them.",
         ],
         "type": "DENY",
     },
@@ -141,7 +140,10 @@ def create() -> tuple[str, str, bool]:
     publish a new immutable version. Returns (id, version, updated). Idempotent — a
     re-run adopts the existing guardrail so the agent's wired id is unchanged (only
     the version bumps), instead of creating a duplicate guardrail each run."""
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    # Default to the region the runtime + guardrail actually live in. Overriding to
+    # the wrong region makes _existing_id miss the live guardrail and create a
+    # duplicate there instead of updating it.
+    region = os.environ.get("AWS_REGION", "us-west-2")
     client = boto3.client("bedrock", region_name=region)
 
     existing = _existing_id(client)
