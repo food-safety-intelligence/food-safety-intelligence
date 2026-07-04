@@ -12,7 +12,7 @@ import {
   Target,
   Wrench,
 } from "lucide-react";
-import { ModelCard, DataGovernance, articleFor } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, MethodologyHero, articleFor } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
@@ -85,7 +85,8 @@ const NYC_GLOSSARY: { id: string; term: string; short: string }[] = [
   { id: "letter-grade", term: "Letter grade (A / B / C)", short: "New York's public restaurant grade. It's a threshold on the inspection score: A = 0–13 points, B = 14–27, C = 28+. Lower is cleaner." },
   { id: "inspection-score", term: "Inspection score", short: "The sum of violation points at one inspection — public-health hazards ≥ 7 points, critical ≥ 5, general ≥ 2. The score maps to the letter grade." },
   { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to NYC's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across both cities — imminent-hazard, critical, or general — mapped from each city's own codes via the violation crosswalk." },
+  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the shared violation dictionary." },
+  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
   { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare NYC (~0.66) with Chicago (~0.78)." },
   { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 1.6× means that slice has 1.6× the B/C rate of the whole population." },
   { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
@@ -110,23 +111,23 @@ export function HowItWorksNyc() {
 
   return (
     <div>
-      {/* Hero */}
-      <header>
-        <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · New York City</p>
-        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — New York City</h1>
-        <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
-          New York City is a second city, added to show the same tool works beyond
-          Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
-          <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
-          under New York&apos;s letter-grade system — the same batch-scored-to-JSON
-          pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
-        </p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
-          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
-          <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
-        </dl>
-      </header>
+      <MethodologyHero
+        eyebrow="Research preview · New York City"
+        title="How this works — New York City"
+        stats={
+          <>
+            <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
+            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
+            <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
+          </>
+        }
+      >
+        New York City is a second city, added to show the same tool works beyond
+        Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
+        <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
+        under New York&apos;s letter-grade system — the same batch-scored-to-JSON
+        pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
+      </MethodologyHero>
 
       {/* Sticky jump-nav */}
       <nav
@@ -233,9 +234,10 @@ export function HowItWorksNyc() {
             average and previous score, prior critical-violation counts, days since
             the last inspection — plus the current inspection&apos;s own outcome
             (score, violation counts). Violations are mapped through a shared
-            crosswalk into severity tiers (imminent-hazard / critical / general) and
-            themes (temperature, pest, hygiene, contamination, …) so the same
-            vocabulary describes both cities. No cuisine or demographic proxy is used.
+            violation dictionary into severity tiers (imminent-hazard / critical /
+            general) and themes (temperature, pest, hygiene, contamination, …) so the
+            same vocabulary describes all three cities. Everything comes from a single
+            DOHMH feed, so there is no cross-dataset join. No cuisine or demographic proxy is used.
           </p>
         </article>
       </div>

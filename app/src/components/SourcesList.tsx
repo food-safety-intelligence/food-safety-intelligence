@@ -24,12 +24,6 @@ const SOURCES_BY_CITY: Record<City, Source[]> = {
         "Every food establishment inspection the Chicago Department of Public Health has conducted since 2010. Used for both the label and most prior-history features.",
     },
     {
-      name: "Chicago 311 Service Requests",
-      href: "https://data.cityofchicago.org/Service-Requests/311-Service-Requests/v6vf-nfxy",
-      summary:
-        "All 311 requests since 2018. We filter to eight food-relevant request types (rodent, garbage carts, sanitation-code violations, …) and join by spatial proximity.",
-    },
-    {
       name: "Chicago Business Licenses (current + historical)",
       href: "https://data.cityofchicago.org/Community-Economic-Development/Business-Licenses-Current-Active/uupf-x98q",
       summary:
@@ -55,7 +49,7 @@ const SOURCES_BY_CITY: Record<City, Source[]> = {
       name: "LA County Restaurant and Market Violations",
       href: "https://data.lacounty.gov/datasets/5eaea9f89b7549ee841da7617d3a9cba",
       summary:
-        "Per-violation records joined to inspections on serial number — the source for the shared crosswalk's theme and severity-tier features.",
+        "Per-violation records joined to inspections on serial number — the source for the shared violation dictionary's theme and severity-tier features.",
     },
   ],
 };

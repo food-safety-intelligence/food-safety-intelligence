@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
-import { ModelCard, DataGovernance, articleFor } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, MethodologyHero, articleFor } from "@/components/HowItWorksCards";
 import { cn } from "@/lib/utils";
 
 interface LaMethodology {
@@ -87,7 +87,8 @@ const LA_GLOSSARY: { id: string; term: string; short: string }[] = [
   { id: "letter-grade", term: "Letter grade (A / B / C)", short: "Los Angeles County's public restaurant grade. It's a threshold on the 0–100 inspection score: A = 90–100, B = 80–89, C = 70–79. Higher is cleaner — the opposite of New York's scale." },
   { id: "inspection-score", term: "Inspection score", short: "100 minus the points deducted for violations at one inspection (major and critical violations deduct more). The score maps to the letter grade; a place is 'bad' next time if it drops below 90 (a B or C)." },
   { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to LA's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the violation crosswalk." },
+  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the shared violation dictionary." },
+  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
   { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare LA (~0.74) with NYC (~0.66) and Chicago (~0.78)." },
   { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 2.1× means that slice has 2.1× the B/C rate of the whole population." },
   { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
@@ -112,24 +113,24 @@ export function HowItWorksLa() {
 
   return (
     <div>
-      {/* Hero */}
-      <header>
-        <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · Los Angeles</p>
-        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — Los Angeles</h1>
-        <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
-          Los Angeles County is a third city, added to show the same tool works
-          beyond Chicago and New York. Each score is a calibrated probability that
-          an establishment&apos;s{" "}
-          <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
-          under LA&apos;s letter-grade system — the same batch-scored-to-JSON
-          pipeline, calibrated model, and SHAP drivers as Chicago, on LA data.
-        </p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
-          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
-          <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
-        </dl>
-      </header>
+      <MethodologyHero
+        eyebrow="Research preview · Los Angeles"
+        title="How this works — Los Angeles"
+        stats={
+          <>
+            <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
+            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
+            <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
+          </>
+        }
+      >
+        Los Angeles County is a third city, added to show the same tool works
+        beyond Chicago and New York. Each score is a calibrated probability that
+        an establishment&apos;s{" "}
+        <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
+        under LA&apos;s letter-grade system — the same batch-scored-to-JSON
+        pipeline, calibrated model, and SHAP drivers as Chicago, on LA data.
+      </MethodologyHero>
 
       {/* Sticky jump-nav */}
       <nav
@@ -237,10 +238,11 @@ export function HowItWorksLa() {
             Leak-free history features — prior inspection count, prior B/C count,
             average and previous score, prior critical-violation counts, days since
             the last inspection — plus the current inspection&apos;s own outcome
-            (score, violation counts). Violations are mapped through a shared
-            crosswalk into severity tiers (imminent-hazard / critical / general) and
-            themes (temperature, pest, hygiene, contamination, …) so the same
-            vocabulary describes all three cities. No cuisine or demographic proxy is
+            (score, violation counts). LA&apos;s inspections and violations arrive as
+            two feeds, joined on the inspection&apos;s serial number; those violations
+            are mapped through a shared violation dictionary into severity tiers
+            (imminent-hazard / critical / general) and themes (temperature, pest,
+            hygiene, contamination, …) so the same vocabulary describes all three cities. No cuisine or demographic proxy is
             used. LA&apos;s feed carries no coordinates, so map pins are geocoded from
             each establishment&apos;s address.
           </p>

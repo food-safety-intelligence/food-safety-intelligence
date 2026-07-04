@@ -19,6 +19,44 @@ export function articleFor(pct: number): "a" | "an" {
   return vowelSound ? "an" : "a";
 }
 
+// Shared hero band for the how-it-works pages: the soft cream→white gradient
+// card with a faint sage glow that Chicago's methodology page uses, so all three
+// cities open identically. `eyebrow`/`title` are the header text, the intro
+// paragraph is `children`, and `stats` holds the row of <HeroStat> cards (each
+// city keeps its own HeroStat + values).
+export function MethodologyHero({
+  eyebrow,
+  title,
+  stats,
+  children,
+}: {
+  eyebrow: string;
+  title: ReactNode;
+  stats: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <header
+      className="relative mt-6 overflow-hidden rounded-3xl border border-line p-7 sm:p-10 soft-shadow"
+      style={{
+        background: "linear-gradient(135deg, #EFE9DC 0%, #F6F1E9 48%, #FFFFFF 100%)",
+      }}
+    >
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full blur-3xl"
+        style={{ background: "rgba(122, 143, 106, 0.16)" }}
+      />
+      <div className="relative">
+        <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">{eyebrow}</p>
+        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">{title}</h1>
+        <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">{children}</p>
+        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">{stats}</dl>
+      </div>
+    </header>
+  );
+}
+
 // Friendly labels for the served model slug (mirrors the Chicago page's map).
 const MODEL_TYPE_LABELS: Record<string, string> = {
   la_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",
