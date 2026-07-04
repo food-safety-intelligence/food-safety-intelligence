@@ -42,7 +42,7 @@ file per decision; the log is **append-only** — don't renumber existing record
   — why the chat agent reports only precomputed batch scores and returns an
   explicit "no record" (not an estimate) for OSM venues the batch run doesn't cover.
 - [0011 — Trend signal: forecast-only model + last-K-visits slope](0011-trend-signal-forecast-model-last-k-visits.md)
-  — **Proposed** (contract change): replaces the broken `trend_slope_90d` with a
+  — **Accepted** (contract change): replaces the broken `trend_slope_90d` with a
   last-K-visits slope of a forecast-only model; descriptive trend + additive
   early-warning watch-list, not a verdict.
 

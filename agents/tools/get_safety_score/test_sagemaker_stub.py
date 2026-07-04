@@ -239,7 +239,7 @@ class TestMatchedVenueUsesPrecomputedScore:
                     "address": "1132 N Ashland Ave, Chicago, IL",
                     "risk_score": 0.42,
                     "risk_tier": "Elevated",
-                    "trend_slope_90d": 0.01,
+                    "trend_slope": 0.01,
                     "neighborhood": "West Town",
                     "top_drivers": [
                         {

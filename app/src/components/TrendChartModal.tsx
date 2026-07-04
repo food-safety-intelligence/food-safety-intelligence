@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Minus, Plus, RotateCcw, X } from "lucide-react";
-import { TrendChart, type TrendPoint } from "@/components/TrendChart";
+import { TrendCaptionLead, TrendChart, type TrendPoint } from "@/components/TrendChart";
+import { applyTrendPan, applyTrendZoom, clampFrac } from "@/lib/utils";
 
 /**
  * Enlarged, zoomable view of the detail-page trend chart. The inline ScoreCard
@@ -17,47 +18,17 @@ import { TrendChart, type TrendPoint } from "@/components/TrendChart";
  * slope is fit over.
  *
  * Interaction: scroll wheel / pinch zooms (toward the pointer); dragging pans;
- * the +/- and reset buttons are the keyboard-and-touch-friendly equivalent.
- * Pointer/wheel handlers are attached natively so the wheel listener can be
- * non-passive (preventDefault the page scroll) and so the interaction surface
- * carries no JSX click handlers.
+ * clicking a dot opens that inspection's record in a new tab; the +/- and reset
+ * buttons are the keyboard-and-touch-friendly zoom equivalent. Pointer/wheel
+ * handlers are attached natively so the wheel listener can be non-passive
+ * (preventDefault the page scroll). A press only becomes a pan once it moves
+ * past a small threshold, so a plain click still reaches a dot; the trailing
+ * click after a real drag is swallowed so panning never navigates.
  */
 
-// Floor on the visible fraction of the full time span — caps zoom at ~25x so a
-// dense history can be opened up without zooming past a couple of points.
-const MIN_WIDTH = 0.04;
-
-function clamp(v: number, lo: number, hi: number): number {
-  return v < lo ? lo : v > hi ? hi : v;
-}
-
-// Narrow the [start,end] window (fractions of the full span) toward `focus`
-// (0..1 across the plot), keeping the focused instant fixed under the pointer.
-function applyZoom(
-  start: number,
-  end: number,
-  focus: number,
-  factor: number,
-): [number, number] {
-  const width = end - start;
-  const domainFrac = start + focus * width;
-  const nw = clamp(width * factor, MIN_WIDTH, 1);
-  const ns = clamp(domainFrac - focus * nw, 0, 1 - nw);
-  return [ns, ns + nw];
-}
-
-// Slide the window by a pixel delta, holding its width.
-function applyPan(
-  start: number,
-  end: number,
-  dxPx: number,
-  rectW: number,
-): [number, number] {
-  const width = end - start;
-  const dFrac = (dxPx / rectW) * width;
-  const ns = clamp(start - dFrac, 0, 1 - width);
-  return [ns, ns + width];
-}
+// A press must move this many pixels before it counts as a pan (below it, the
+// press is treated as a click so dots stay clickable).
+const DRAG_THRESHOLD = 5;
 
 export function TrendChartModal({
   onClose,
@@ -65,6 +36,7 @@ export function TrendChartModal({
   slope,
   windowSize,
   trendBadge,
+  referenceScore,
 }: {
   onClose: () => void;
   points: TrendPoint[];
@@ -72,10 +44,15 @@ export function TrendChartModal({
   windowSize?: number;
   /** The header Improving/Worsening/Stable badge, reused so direction matches. */
   trendBadge: ReactNode;
+  /** Headline production risk_score (Model 1) — the chart's reference line. */
+  referenceScore?: number;
 }) {
   const measureRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  // Set true when a drag happens so the trailing click (which the browser fires
+  // on pointerup) is swallowed instead of navigating from whatever dot it lands on.
+  const suppressClickRef = useRef(false);
 
   const [chartW, setChartW] = useState(640);
   // Visible window as [start, end] fractions of the full time span. [0,1] = all.
@@ -94,7 +71,15 @@ export function TrendChartModal({
     return t >= view.start - 1 && t <= view.end + 1;
   }).length;
 
-  const chartH = Math.round(clamp(chartW * 0.52, 240, 380));
+  const chartH = Math.round(clampFrac(chartW * 0.52, 240, 380));
+
+  // Open a clicked dot's inspection record in a NEW tab (deep-linked to the row
+  // via the URL hash; the detail page scrolls + highlights it on load).
+  const openRecord = (p: TrendPoint) => {
+    if (!p.anchorId || typeof window === "undefined") return;
+    const url = `${window.location.pathname}${window.location.search}#${p.anchorId}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
 
   // Move focus to the close button on open (the modal is only mounted while open).
   useEffect(() => {
@@ -133,6 +118,9 @@ export function TrendChartModal({
     if (!el) return;
 
     const pointers = new Map<number, { x: number; y: number }>();
+    let startX = 0;
+    let startY = 0;
+    let dragging = false;
     let lastPanX = 0;
     let lastDist = 0;
 
@@ -148,15 +136,28 @@ export function TrendChartModal({
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const rect = el.getBoundingClientRect();
-      const focus = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+      const focus = clampFrac((e.clientX - rect.left) / rect.width, 0, 1);
       const factor = e.deltaY < 0 ? 0.85 : 1 / 0.85;
-      setFrac(([s, end]) => applyZoom(s, end, focus, factor));
+      setFrac(([s, end]) => applyTrendZoom(s, end, focus, factor));
     };
     const onDown = (e: PointerEvent) => {
-      el.setPointerCapture(e.pointerId);
       pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-      if (pointers.size === 1) lastPanX = e.clientX;
-      else if (pointers.size === 2) lastDist = dist();
+      if (pointers.size === 1) {
+        // Don't capture yet — a plain click must still reach a dot. Capture only
+        // once the press crosses the drag threshold (in onMove).
+        startX = e.clientX;
+        startY = e.clientY;
+        lastPanX = e.clientX;
+        dragging = false;
+        suppressClickRef.current = false;
+      } else if (pointers.size === 2) {
+        // A pinch is a gesture, not a tap — swallow any trailing click so a
+        // finger lifting over a dot doesn't open its record.
+        dragging = true;
+        suppressClickRef.current = true;
+        lastDist = dist();
+        el.setPointerCapture(e.pointerId);
+      }
     };
     const onMove = (e: PointerEvent) => {
       if (!pointers.has(e.pointerId)) return;
@@ -165,20 +166,30 @@ export function TrendChartModal({
       if (pointers.size >= 2) {
         const d = dist();
         if (lastDist > 0) {
-          const focus = clamp((midX() - rect.left) / rect.width, 0, 1);
-          setFrac(([s, end]) => applyZoom(s, end, focus, lastDist / d));
+          const focus = clampFrac((midX() - rect.left) / rect.width, 0, 1);
+          setFrac(([s, end]) => applyTrendZoom(s, end, focus, lastDist / d));
         }
         lastDist = d;
-      } else if (pointers.size === 1) {
-        const dx = e.clientX - lastPanX;
-        lastPanX = e.clientX;
-        setFrac(([s, end]) => applyPan(s, end, dx, rect.width));
+        return;
       }
+      // Single pointer: promote to a pan only past the threshold, so short
+      // presses stay clicks. Once panning, suppress the trailing click.
+      if (!dragging) {
+        if (Math.hypot(e.clientX - startX, e.clientY - startY) < DRAG_THRESHOLD) return;
+        dragging = true;
+        suppressClickRef.current = true;
+        el.setPointerCapture(e.pointerId);
+        lastPanX = e.clientX;
+      }
+      const dx = e.clientX - lastPanX;
+      lastPanX = e.clientX;
+      setFrac(([s, end]) => applyTrendPan(s, end, dx, rect.width));
     };
     const onUp = (e: PointerEvent) => {
       pointers.delete(e.pointerId);
       if (pointers.size < 2) lastDist = 0;
       if (pointers.size === 1) lastPanX = [...pointers.values()][0].x;
+      if (pointers.size === 0) dragging = false;
     };
 
     el.addEventListener("wheel", onWheel, { passive: false });
@@ -230,6 +241,15 @@ export function TrendChartModal({
             ref={wrapRef}
             className="mx-auto select-none"
             style={{ width: chartW, touchAction: "none", cursor: "grab" }}
+            // Swallow the click the browser fires at the end of a drag so panning
+            // over a dot never navigates. Capture phase → runs before the dot.
+            onClickCapture={(e) => {
+              if (suppressClickRef.current) {
+                suppressClickRef.current = false;
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           >
             <TrendChart
               points={points}
@@ -238,6 +258,9 @@ export function TrendChartModal({
               view={view}
               width={chartW}
               height={chartH}
+              onPointActivate={openRecord}
+              activateHint="opens this inspection in a new tab"
+              referenceScore={referenceScore}
             />
           </div>
         </div>
@@ -246,14 +269,14 @@ export function TrendChartModal({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-1.5">
             <button
-              onClick={() => setFrac(([s, e]) => applyZoom(s, e, 0.5, 1 / 0.7))}
+              onClick={() => setFrac(([s, e]) => applyTrendZoom(s, e, 0.5, 1 / 0.7))}
               aria-label="Zoom out"
               className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-line text-ink hover:bg-ink/5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
             >
               <Minus className="w-4 h-4" strokeWidth={2} />
             </button>
             <button
-              onClick={() => setFrac(([s, e]) => applyZoom(s, e, 0.5, 0.7))}
+              onClick={() => setFrac(([s, e]) => applyTrendZoom(s, e, 0.5, 0.7))}
               aria-label="Zoom in"
               className="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-line text-ink hover:bg-ink/5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
             >
@@ -277,8 +300,8 @@ export function TrendChartModal({
         </div>
 
         <p className="text-2xs text-muted mt-3 leading-snug">
-          Predicted risk across all scored inspections; the shaded band is the recent window that
-          sets the trend. Zooming changes only what you see — not which visits set the direction.
+          <TrendCaptionLead /> Zooming changes only what you see — not which visits set the
+          direction. Select a point to open that inspection&apos;s record in a new tab.
         </p>
       </div>
     </div>

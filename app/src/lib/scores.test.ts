@@ -18,6 +18,9 @@ import {
   parseTiers,
   toPinDriver,
   trendDirection,
+  compareInspectionsNewestFirst,
+  inspectionAnchorId,
+  parseInspectionAnchor,
 } from "@/lib/scores";
 
 const driver = (over: Partial<Driver> = {}): Driver => ({
@@ -363,5 +366,42 @@ describe("computeHomeView", () => {
   it("drops rows without coordinates from the map pins", () => {
     const v = computeHomeView(INDEX, opts());
     expect(ids(v.pins)).toEqual(["1", "2", "4"]); // "3" has null lat/lon
+  });
+});
+
+describe("inspection anchors (trend-chart dot ↔ history row hardlink)", () => {
+  it("round-trips an id through parse", () => {
+    expect(parseInspectionAnchor(inspectionAnchorId(0))).toBe(0);
+    expect(parseInspectionAnchor(inspectionAnchorId(7))).toBe(7);
+  });
+
+  it("parses both the bare id and the URL-hash form", () => {
+    expect(parseInspectionAnchor("inspection-3")).toBe(3);
+    expect(parseInspectionAnchor("#inspection-3")).toBe(3);
+  });
+
+  it("rejects anything that isn't an inspection anchor", () => {
+    expect(parseInspectionAnchor("")).toBeNull();
+    expect(parseInspectionAnchor("#inspection-comments-2026-01-01-0")).toBeNull();
+    expect(parseInspectionAnchor("#section-2")).toBeNull();
+    expect(parseInspectionAnchor("inspection-")).toBeNull();
+  });
+
+  it("orders inspections newest-first", () => {
+    const events = [
+      { date: "2021-01-01" },
+      { date: "2026-06-01" },
+      { date: "2023-03-15" },
+    ];
+    const dates = [...events].sort(compareInspectionsNewestFirst).map((e) => e.date);
+    expect(dates).toEqual(["2026-06-01", "2023-03-15", "2021-01-01"]);
+  });
+
+  it("keeps same-date ties in input order so both sides index them identically", () => {
+    const a = { date: "2024-05-01", type: "Canvass" };
+    const b = { date: "2024-05-01", type: "Complaint" };
+    const sorted = [a, b].sort(compareInspectionsNewestFirst);
+    expect(sorted[0]).toBe(a);
+    expect(sorted[1]).toBe(b);
   });
 });

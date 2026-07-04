@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
-import { GLOSSARY, type GlossaryKey } from "@/lib/glossary";
+import { GLOSSARY, type GlossaryEntry, type GlossaryKey } from "@/lib/glossary";
 import { cn } from "@/lib/utils";
 
 // Popover ideal width; clamped to the viewport on open.
@@ -28,7 +28,7 @@ export function DefineTerm({
   termKey: GlossaryKey;
   className?: string;
 }) {
-  const entry = GLOSSARY[termKey];
+  const entry: GlossaryEntry = GLOSSARY[termKey];
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(
@@ -112,7 +112,7 @@ export function DefineTerm({
             {entry.short}
           </span>
           <Link
-            href={`/how-it-works#${entry.id}`}
+            href={entry.href ?? `/how-it-works#${entry.id}`}
             className="inline-block text-xs text-teal hover:underline mt-2"
           >
             Full definition →
