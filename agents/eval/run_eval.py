@@ -5,7 +5,8 @@ Layers:
 
 1. FAITHFULNESS (deterministic, no Bedrock) — does get_safety_score relay
    scores.json exactly? Samples published records, runs them through the tool,
-   and asserts the returned risk_score / risk_tier / license_id equal the JSON.
+   and asserts the returned risk_score / risk_tier / license_id / trend equal
+   the JSON.
    This is the hard, CI-able metric: a number, not a vibe. It checks the data
    path the agent depends on (the agent reports only precomputed batch scores;
    see decision record 0010).
@@ -92,9 +93,9 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
 
     # This gate relies on the no-record contract: on a match, get_safety_score
     # relays the precomputed scores.json record verbatim — same risk_score /
-    # risk_tier / license_id, no recompute, no rounding, same address-and-name
-    # match keying. We assert exactly that below, so if that relay-on-match
-    # behavior changes, this gate must be updated too.
+    # risk_tier / license_id / trend, no recompute, no rounding, same
+    # address-and-name match keying. We assert exactly that below, so if that
+    # relay-on-match behavior changes, this gate must be updated too.
     # A missing / empty / unparseable scores.json is a FAILURE, not a skip: a
     # broken data path must gate the (paid) Bedrock run, not silently pass it.
     try:
@@ -122,7 +123,22 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
         and r.get("risk_score") not in (None, -1.0)
         and seen.get(norm(r["address"])) == 1
     ]
-    sample_records = candidates[:sample]
+    # scores.json clusters insufficient-history records (null trend_slope) near
+    # the front, so a plain candidates[:sample] head would barely include a real
+    # slope — the trend relay check below would then have almost no teeth and a
+    # future field-rename regression could slip through again. Deterministically
+    # mix both trend regimes so the sample exercises a real slope AND the
+    # null -> "not enough inspection history" label. All candidates are equally
+    # valid for the score/tier/license_id checks; only which ones we pick changes.
+    with_trend = [r for r in candidates if r.get("trend_slope") is not None]
+    without_trend = [r for r in candidates if r.get("trend_slope") is None]
+    half = sample // 2
+    sample_records = with_trend[: sample - half] + without_trend[:half]
+    if len(sample_records) < sample:
+        # One regime was short (e.g. a mock file with no real slopes); backfill
+        # from the leftovers of both so the sample stays as full as the data allows.
+        leftover = with_trend[sample - half :] + without_trend[half:]
+        sample_records += leftover[: sample - len(sample_records)]
     if not sample_records:
         # Zero eligible records means there is nothing to verify, so the gate
         # cannot confirm the relay — treat it as a failure rather than a pass.
@@ -149,6 +165,17 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
             )
         elif o.get("license_id") != rec.get("license_id"):
             mismatches.append(f"{rec['address']}: license_id mismatch")
+        # Trend must relay from the record's own trend_slope. A handler that
+        # reads a stale/wrong field name gets None for every record and labels
+        # it identically, so compare against the label computed from the live
+        # field — this is the regression net for the decision 0011
+        # trend_slope_90d -> trend_slope rename that shipped everywhere but the
+        # handlers (silent "stable" for every venue in prod).
+        elif o.get("trend") != handler_mod._trend_label(rec.get("trend_slope")):
+            mismatches.append(
+                f"{rec['address']}: trend {o.get('trend')!r} != "
+                f"{handler_mod._trend_label(rec.get('trend_slope'))!r}"
+            )
 
     handler_mod._load_scores_index.cache_clear()
 

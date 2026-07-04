@@ -67,7 +67,9 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "facility_type": str,
         "risk_score":   float,
         "risk_tier":    str,
-        "trend":        str,
+        "trend":        str,          # "improving" | "stable" | "worsening"
+                                      #   | "not enough inspection history"
+        "trend_slope":  float | null, # forecast-only last-K-visits slope; null if <2 scored
         "percentile_rank": float | null,
         "top_drivers":  list[DriverDetail],
         "inspection_summary": {
@@ -117,8 +119,8 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "risk_score": record.get("risk_score"),
         "risk_tier": record.get("risk_tier"),
         "percentile_rank": record.get("percentile_rank"),
-        "trend": _trend_label(record.get("trend_slope_90d")),
-        "trend_slope_90d": record.get("trend_slope_90d"),
+        "trend": _trend_label(record.get("trend_slope")),
+        "trend_slope": record.get("trend_slope"),
         # SHAP drivers — full detail
         "top_drivers": _format_drivers(record.get("top_drivers", [])),
         # Inspection summary + history
@@ -139,8 +141,13 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
 
 
 def _trend_label(slope: float | None) -> str:
+    # Under scores schema 0.5.0 a null trend_slope means the venue has fewer
+    # than 2 scored inspections, so no forward slope can be fit — that is "we
+    # can't say", not a flat trend. Reporting it as "stable" is what let the
+    # trend_slope_90d->trend_slope rename miss (decision 0011) go silent in the
+    # deployed agent, so say so explicitly instead.
     if slope is None:
-        return "stable"
+        return "not enough inspection history"
     if slope > 0.001:
         return "worsening"
     if slope < -0.001:
