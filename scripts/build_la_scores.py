@@ -279,7 +279,11 @@ def build_events(raw: pd.DataFrame) -> tuple:
     agg = (
         raw.groupby(keys)
         .agg(
-            cur_score=("score", "max"),
+            # LA's scale is INVERTED (higher = cleaner), so the worst same-day result
+            # is the MIN score. NYC/Chicago use max because higher = worse there; keeping
+            # max here would hide a same-day B/C behind an A and mislabel it as the next
+            # inspection's outcome. Take the worst (lowest) score on the collapsed event.
+            cur_score=("score", "min"),
             cur_n_viol=("is_viol", "sum"),
             cur_n_critical=("is_critical", "sum"),
             dba_name=("facility_name", first),
@@ -499,13 +503,29 @@ def main():
     # score EVERY facility's latest inspection (serving anchor)
     ev["risk_score"] = cal1.predict_proba(ev[FEATS_M1])[:, 1]
     ev["forecast_risk"] = cal2.predict_proba(ev[PRIOR])[:, 1]
-    latest = ev.sort_values("inspection_date").drop_duplicates("license_id", keep="last").copy()
-    print(f"serving rows (latest per facility): {len(latest):,}")
+    # Collapse reopened establishments: LA mints a new facility_id when a place
+    # reopens at the same name+address, which would otherwise render as duplicate
+    # map/search pins. Dedup on a normalised name+address key, keeping the most
+    # recently inspected (the live establishment); mirrors Chicago serving.
+    latest = ev.sort_values("inspection_date").copy()
+
+    def _norm(col: str) -> pd.Series:
+        return (
+            latest[col]
+            .fillna("")
+            .astype(str)
+            .str.upper()
+            .str.replace(r"[^A-Z0-9]+", " ", regex=True)
+            .str.strip()
+        )
+
+    _estab = _norm("dba_name") + " @ " + _norm("address")
+    latest = latest[~_estab.duplicated(keep="last")].copy()
+    print(f"serving rows (latest per establishment): {len(latest):,}")
 
     # coordinates (LA feed has none) — geocode + cache + zip-centroid fallback
     fac = latest[["facility_id", "address", "city", "zip"]].copy()
     fac["state"] = "CA"
-    fac = fac.rename(columns={"city": "city", "zip": "zip"})
     coords = load_facility_coords(fac)
     latest = latest.merge(
         coords.rename(columns={"facility_id": "license_id"})[["license_id", "lat", "lon"]],
