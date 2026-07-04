@@ -21,6 +21,9 @@ import { dateAxisTicks } from "@/lib/utils";
 
 // Neutral ink-muted — the drawn trajectory carries no direction meaning of its own.
 const LINE = "#6B7280";
+// Teal accent (--color-teal) for the headline risk-score reference line, set
+// apart from the grey trend line so the two models don't read as one.
+const REFERENCE = "#486073";
 
 export interface TrendPoint {
   /** ISO yyyy-mm-dd inspection date. */
@@ -52,6 +55,7 @@ export function TrendChart({
   height = 116,
   onPointActivate,
   activateHint,
+  referenceScore,
 }: {
   points: TrendPoint[];
   /** Trend slope — only used for the chart's `aria-label` direction word. */
@@ -83,6 +87,13 @@ export function TrendChart({
    * "opens this inspection in a new tab"). Only used when `onPointActivate` is set.
    */
   activateHint?: string;
+  /**
+   * The headline production `risk_score` (Model 1). Drawn as a dashed reference
+   * line so the forecast trajectory (Model 2, which drops each visit's own
+   * result) can be read against the gauge value without mixing models into the
+   * line. Same 0..1 scale. Omitted = no marker.
+   */
+  referenceScore?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const clipId = useId();
@@ -262,6 +273,35 @@ export function TrendChart({
           strokeLinejoin="round"
         />
 
+        {/* Headline risk-score reference — a dashed teal line at the gauge's
+            Model-1 score, so the neutral forecast trajectory can be read against
+            it without the two being confused. Teal (the accent) sets it apart
+            from the grey trend line. */}
+        {referenceScore != null && (
+          <>
+            <line
+              x1={padL}
+              y1={yFor(referenceScore)}
+              x2={padL + w}
+              y2={yFor(referenceScore)}
+              stroke={REFERENCE}
+              strokeOpacity={0.55}
+              strokeWidth={1}
+              strokeDasharray="3 2"
+            />
+            <text
+              x={padL + 3}
+              y={yFor(referenceScore) - 3}
+              fontSize={7}
+              fill={REFERENCE}
+              fillOpacity={0.9}
+              fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+            >
+              risk score
+            </text>
+          </>
+        )}
+
         {/* Inspection dots — latest emphasised; hover/focus reveals the tooltip.
             When zoomed, dots outside the view are dropped (not just clipped) so
             there are no invisible keyboard-focus targets off-plot. */}
@@ -285,9 +325,11 @@ export function TrendChart({
               strokeWidth={2.5}
               tabIndex={0}
               role={linkable ? "link" : "button"}
-              aria-label={`${fmtFull(pts[i].date)}, predicted risk ${pts[i].score.toFixed(2)}${
-                pts[i].result ? `, inspection result ${pts[i].result}` : ""
-              }${linkable && activateHint ? `, ${activateHint}` : ""}`}
+              aria-label={`${fmtFull(pts[i].date)}, trend estimate ${pts[i].score.toFixed(2)}${
+                isLast ? " (latest — leaves out this visit's result, so it can differ from the risk score)" : ""
+              }${pts[i].result ? `, inspection result ${pts[i].result}` : ""}${
+                linkable && activateHint ? `, ${activateHint}` : ""
+              }`}
               style={{ cursor: "pointer", outline: "none" }}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
@@ -352,11 +394,20 @@ export function TrendChart({
           }}
         >
           <div>
-            {fmtFull(pts[hover].date)} · predicted risk {pts[hover].score.toFixed(2)}
+            {fmtFull(pts[hover].date)} · trend estimate {pts[hover].score.toFixed(2)}
           </div>
           {pts[hover].result && (
             <div className="opacity-70">
               At this inspection: {pts[hover].result}
+            </div>
+          )}
+          {/* Latest dot only: the one users compare to the gauge. Explain why it
+              can differ (the trend leaves out this visit's result; the gauge counts it).
+              whitespace-normal + max-width so the long note wraps instead of
+              widening the tooltip past the chart edge. */}
+          {hover === pts.length - 1 && (
+            <div className="opacity-70 whitespace-normal max-w-[190px] leading-tight mt-0.5">
+              Latest — leaves out this visit&apos;s result, so it can differ from the risk score.
             </div>
           )}
         </div>

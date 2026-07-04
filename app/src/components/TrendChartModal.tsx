@@ -36,6 +36,7 @@ export function TrendChartModal({
   slope,
   windowSize,
   trendBadge,
+  referenceScore,
 }: {
   onClose: () => void;
   points: TrendPoint[];
@@ -43,6 +44,8 @@ export function TrendChartModal({
   windowSize?: number;
   /** The header Improving/Worsening/Stable badge, reused so direction matches. */
   trendBadge: ReactNode;
+  /** Headline production risk_score (Model 1) — the chart's reference line. */
+  referenceScore?: number;
 }) {
   const measureRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -257,6 +260,7 @@ export function TrendChartModal({
               height={chartH}
               onPointActivate={openRecord}
               activateHint="opens this inspection in a new tab"
+              referenceScore={referenceScore}
             />
           </div>
         </div>
@@ -296,8 +300,10 @@ export function TrendChartModal({
         </div>
 
         <p className="text-2xs text-muted mt-3 leading-snug">
-          Predicted risk across all scored inspections; the shaded band is the recent window that
-          sets the trend. Zooming changes only what you see — not which visits set the direction.
+          Each point is the trend estimate — the model&apos;s risk read with that inspection&apos;s
+          own result removed, so the line shows direction, not a second risk number. The dashed line
+          marks the headline risk score, which does count the latest result and can differ. The
+          shaded band is the recent window that sets the trend; zooming changes only what you see.
           Select a point to open that inspection&apos;s record in a new tab.
         </p>
       </div>

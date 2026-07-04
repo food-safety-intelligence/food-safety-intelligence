@@ -390,16 +390,20 @@ export default async function HowItWorksPage() {
               </span>
             </div>
             <p className="text-sm text-muted leading-relaxed mt-3">
-              On the detail page this becomes a small chart. Each dot is a{" "}
-              <span className="font-medium text-ink/80">predicted</span>{" "}risk — the
-              model&apos;s 180-day-forward estimate{" "}
+              On the detail page this becomes a small chart. Each dot is the{" "}
+              <span className="font-medium text-ink/80">trend estimate</span> — the
+              forecast model&apos;s 180-day-forward read{" "}
               <span className="font-medium text-ink/80">as of that inspection&apos;s
-              date</span>, from 0 to 1, not the pass/fail result (that&apos;s in the
-              inspection list below). Hover a dot for its date and value. A 2019 dot
-              is what the model would have estimated back in 2019, not a guess made
-              in hindsight. Only inspections the model can score appear — 2019
-              onward, each with a usable result, up to the five most recent — so a
-              place may show just two or three dots.
+              date</span>, from 0 to 1, with that visit&apos;s own result removed
+              (the pass/fail is in the inspection list below). Hover a dot for its
+              date and value. A dashed line marks the headline{" "}
+              <span className="font-medium text-ink/80">risk score</span>; because
+              that score counts the latest inspection&apos;s result and the trend
+              does not, the last dot can sit above or below it. A 2019 dot is what
+              the model would have estimated back in 2019, not a guess made in
+              hindsight. Only inspections the model can score appear — 2019 onward,
+              each with a usable result, up to the five most recent — so a place may
+              show just two or three dots.
             </p>
             <p className="text-sm text-muted leading-relaxed mt-2">
               The score and the trend come from{" "}

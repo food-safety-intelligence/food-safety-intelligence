@@ -33,10 +33,13 @@ const TREND_POINTS = 5;
 export function TrendPanel({
   slope,
   history,
+  riskScore,
 }: {
   slope: number | null;
   /** Inspection history (newest-first); the scored events become chart points. */
   history: InspectionEvent[];
+  /** Headline production risk_score (Model 1) — drawn as the chart's reference line. */
+  riskScore: number;
 }) {
   const [open, setOpen] = useState(false);
   const enlargeRef = useRef<HTMLButtonElement>(null);
@@ -133,6 +136,7 @@ export function TrendPanel({
           view={hasTrend && isZoomed ? view : undefined}
           onPointActivate={jumpToRecord}
           activateHint="opens this inspection in the history below"
+          referenceScore={riskScore}
         />
       </div>
 
@@ -181,8 +185,11 @@ export function TrendPanel({
       )}
 
       <p className="text-2xs text-muted mt-2 text-center leading-snug">
-        Predicted risk across all scored inspections; the shaded band is the recent window that sets
-        the trend.{hasTrend ? " Select a point to jump to that inspection below." : ""}
+        Each point is the trend estimate — the model&apos;s risk read with that inspection&apos;s own
+        result removed, so the line shows direction, not a second risk number. The dashed line marks
+        the headline risk score, which does count the latest result and can differ. The shaded band
+        is the recent window that sets the trend.
+        {hasTrend ? " Select a point to jump to that inspection below." : ""}
       </p>
 
       {hasTrend && open && (
@@ -196,6 +203,7 @@ export function TrendPanel({
           slope={slope}
           windowSize={trendWindow}
           trendBadge={badge}
+          referenceScore={riskScore}
         />
       )}
     </div>
