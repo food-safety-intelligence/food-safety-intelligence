@@ -770,7 +770,9 @@ export default async function HowItWorksPage() {
               A model card gathers, in one place, who the model is for, how it was
               tested, where it falls short, and how it&apos;s kept up to date. The
               points below restate and link to the fuller detail elsewhere on this
-              page.
+              page. The product ships <span className="font-medium text-ink/80">two
+              models</span> — the risk score and a separate trend forecast; unless
+              noted, the version and evaluation below describe the risk-score model.
             </p>
 
             {/* Provenance strip — served model + when its metrics were built +
@@ -872,6 +874,37 @@ export default async function HowItWorksPage() {
                 How well it works
               </a>
               .
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              The trend forecast model
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The risk score is not the only model. The arrow and chart labelled{" "}
+              <span className="font-medium text-ink/80">trend</span> are driven by a
+              second model — a forecast that predicts the same 180-day risk but{" "}
+              <span className="font-medium text-ink/80">ignores the current
+              inspection&apos;s own pass/fail</span>, so a failed visit and its
+              mandated re-inspection don&apos;t read as a swing in either direction.
+              It is used only to draw the trajectory across an establishment&apos;s
+              recent inspections; it never sets the risk score. How it reads on the
+              page is covered under{" "}
+              <a href="#recent-trend" className="text-teal hover:underline">
+                The recent trend
+              </a>
+              .
+            </p>
+            <p className="text-sm text-muted leading-relaxed mt-2">
+              Its honesty bar is different from the score model&apos;s. We publish
+              the trend for <span className="font-medium text-ink/80">coverage and
+              transparency</span> — a real, forward-looking trajectory for most
+              establishments with a repeat inspection — but the loose{" "}
+              <span className="font-medium text-ink/80">improving / worsening /
+              stable</span> direction is descriptive, not a prediction: on its own
+              it barely beats chance. Only a strict slice — steeply rising{" "}
+              <span className="font-medium text-ink/80">and</span> currently clean —
+              carries a real forward signal, and that slice is treated as an
+              early-warning watch-list, never as a verdict.
             </p>
 
             <h3 className="text-lg font-medium tracking-tight mt-6">
