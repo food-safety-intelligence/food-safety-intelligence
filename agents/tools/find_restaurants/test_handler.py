@@ -21,7 +21,7 @@ if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
 
 import handler as h  # noqa: E402
-from chicago_neighborhoods import CENTROIDS, CHICAGO_BBOX  # noqa: E402
+from chicago_neighborhoods import BBOX, CENTROIDS, CHICAGO_BBOX, CHICAGO_CENTROID  # noqa: E402
 from handler import (  # noqa: E402
     _build_address,
     _build_overpass_query,
@@ -29,9 +29,12 @@ from handler import (  # noqa: E402
     _haversine,
     _parse_elements,
     _resolve_geometry,
-    _within_chicago,
+    _within_bbox,
     handler,
 )
+
+# Chicago geometry tables to pass into the now city-parameterised _resolve_geometry.
+_CHI = (BBOX, CENTROIDS, CHICAGO_BBOX, CHICAGO_CENTROID)
 
 # A point in the Loop (inside Chicago) and one in Manhattan (outside).
 LOOP_LAT, LOOP_LON = 41.8800, -87.6300
@@ -43,9 +46,9 @@ NYC_LAT, NYC_LON = 40.7128, -74.0060
 # ---------------------------------------------------------------------------
 
 
-def test_within_chicago():
-    assert _within_chicago(LOOP_LAT, LOOP_LON) is True
-    assert _within_chicago(NYC_LAT, NYC_LON) is False
+def test_within_bbox():
+    assert _within_bbox(LOOP_LAT, LOOP_LON, CHICAGO_BBOX) is True
+    assert _within_bbox(NYC_LAT, NYC_LON, CHICAGO_BBOX) is False
 
 
 def test_cuisine_filter():
@@ -119,23 +122,65 @@ def test_parse_elements_dedup_and_skips():
 
 
 def test_resolve_geometry_explicit_coords_win():
-    bbox, centroid = _resolve_geometry("Wicker Park", LOOP_LAT, LOOP_LON, 1.0)
+    bbox, centroid = _resolve_geometry("Wicker Park", LOOP_LAT, LOOP_LON, 1.0, *_CHI)
     assert centroid == (LOOP_LAT, LOOP_LON)
     assert bbox["south"] < LOOP_LAT < bbox["north"]
 
 
 def test_resolve_geometry_known_neighborhood_case_insensitive():
-    bbox, centroid = _resolve_geometry("wicker park", None, None, 1.0)
+    bbox, centroid = _resolve_geometry("wicker park", None, None, 1.0, *_CHI)
     assert centroid == CENTROIDS["Wicker Park"]
 
 
 def test_resolve_geometry_unknown_neighborhood_returns_none():
-    assert _resolve_geometry("Atlantis", None, None, 1.0) is None
+    assert _resolve_geometry("Atlantis", None, None, 1.0, *_CHI) is None
 
 
 def test_resolve_geometry_default_whole_city():
-    bbox, centroid = _resolve_geometry(None, None, None, 1.0)
+    bbox, centroid = _resolve_geometry(None, None, None, 1.0, *_CHI)
     assert bbox == CHICAGO_BBOX
+
+
+# ---------------------------------------------------------------------------
+# City scoping (multi-city, DR 0016)
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_geometry_nyc_neighborhood_and_borough():
+    import nyc_neighborhoods as nyc
+
+    nyc_tables = (nyc.BBOX, nyc.CENTROIDS, nyc.NYC_BBOX, nyc.NYC_CENTROID)
+    # Astoria (Queens) — the exact case that failed against the Chicago-only table.
+    _bbox, centroid = _resolve_geometry("Astoria", None, None, 1.0, *nyc_tables)
+    assert centroid == nyc.CENTROIDS["Astoria"]
+    # Whole-borough fallback also resolves ("pizza in Brooklyn").
+    assert _resolve_geometry("brooklyn", None, None, 1.0, *nyc_tables) is not None
+    # An LA neighborhood is NOT in the NYC table.
+    assert _resolve_geometry("Silver Lake", None, None, 1.0, *nyc_tables) is None
+
+
+def test_within_bbox_is_per_city():
+    import la_neighborhoods as la
+
+    # Chicago coords are outside the LA bounding box, and vice-versa.
+    assert _within_bbox(LOOP_LAT, LOOP_LON, la.LA_BBOX) is False
+    assert _within_bbox(34.09, -118.27, la.LA_BBOX) is True  # Silver Lake
+
+
+def test_handler_city_scopes_to_active_city(monkeypatch):
+    monkeypatch.setattr(
+        h,
+        "_fetch_overpass",
+        lambda _q: {
+            "elements": [
+                {"id": 1, "lat": 40.767, "lon": -73.921, "tags": {"name": "Astoria Slice"}}
+            ]
+        },
+    )
+    out = handler({"neighborhood": "Astoria", "city": "nyc"}, None)
+    assert isinstance(out, list) and out and out[0]["name"] == "Astoria Slice"
+    # Unknown city falls back to Chicago (default) rather than erroring.
+    assert isinstance(handler({"neighborhood": "Wicker Park", "city": "zzz"}, None), list)
 
 
 # ---------------------------------------------------------------------------

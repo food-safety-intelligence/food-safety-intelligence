@@ -42,6 +42,13 @@ BBOX: dict[str, dict[str, float]] = {
     "Elmhurst": {"south": 40.7330, "west": -73.8860, "north": 40.7470, "east": -73.8650},
     "Forest Hills": {"south": 40.7150, "west": -73.8530, "north": 40.7300, "east": -73.8330},
     "Jamaica": {"south": 40.6900, "west": -73.8080, "north": 40.7080, "east": -73.7830},
+    # --- Whole-borough fallbacks (coarse) — used when a user names a borough
+    #     rather than a specific neighborhood, e.g. "pizza in Brooklyn". ---
+    "Manhattan": {"south": 40.7000, "west": -74.0200, "north": 40.8800, "east": -73.9070},
+    "Brooklyn": {"south": 40.5700, "west": -74.0450, "north": 40.7390, "east": -73.8550},
+    "Queens": {"south": 40.5400, "west": -73.9620, "north": 40.8000, "east": -73.7000},
+    "Bronx": {"south": 40.7850, "west": -73.9350, "north": 40.9150, "east": -73.7650},
+    "Staten Island": {"south": 40.4900, "west": -74.2590, "north": 40.6520, "east": -74.0490},
 }
 
 # Centroids derived from bbox midpoints — used for distance sorting.

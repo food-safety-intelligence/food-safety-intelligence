@@ -44,6 +44,13 @@ BBOX: dict[str, dict[str, float]] = {
     # --- San Gabriel Valley ---
     "Pasadena": {"south": 34.1350, "west": -118.1600, "north": 34.1650, "east": -118.1200},
     "Glendale": {"south": 34.1350, "west": -118.2700, "north": 34.1650, "east": -118.2300},
+    # --- Coarse regions (borough-equivalents) — used when a user names a broad
+    #     LA area rather than a specific neighborhood, e.g. "the Valley". ---
+    "San Fernando Valley": {"south": 34.140, "west": -118.600, "north": 34.320, "east": -118.360},
+    "Westside": {"south": 33.980, "west": -118.520, "north": 34.100, "east": -118.360},
+    "South Bay": {"south": 33.780, "west": -118.420, "north": 33.900, "east": -118.280},
+    "San Gabriel Valley": {"south": 34.030, "west": -118.150, "north": 34.150, "east": -117.850},
+    "Eastside": {"south": 34.020, "west": -118.230, "north": 34.120, "east": -118.130},
 }
 
 # Centroids derived from bbox midpoints — used for distance sorting.
