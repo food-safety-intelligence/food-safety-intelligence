@@ -186,12 +186,14 @@ export function MergedRiskChart({
         </defs>
 
         <g clipPath={`url(#${clipId})`}>
+          {/* Trend window = the last K visits the direction is fit over. Marked
+              with a single dashed divider + label (NOT a grey fill) so it can't
+              be confused with the horizontal tier ramp. */}
           {bandLeft !== null && (
             <>
-              <rect x={bandLeft} y={padTop} width={padL + w - bandLeft} height={h} fill="#2A2724" fillOpacity={0.05} />
-              <line x1={bandLeft} y1={padTop} x2={bandLeft} y2={padTop + h} stroke="#2A2724" strokeOpacity={0.25} strokeWidth={1} strokeDasharray="2 2" />
-              <text x={padL + w - 3} y={padTop + 8} textAnchor="end" fontSize={8} fill="#2A2724" fillOpacity={0.5} fontFamily="var(--font-manrope), sans-serif">
-                trend
+              <line x1={bandLeft} y1={padTop} x2={bandLeft} y2={padTop + h} stroke={INK} strokeOpacity={0.3} strokeWidth={1} strokeDasharray="3 3" />
+              <text x={padL + w - 3} y={padTop + 8} textAnchor="end" fontSize={8} fill={INK} fillOpacity={0.5} fontFamily="var(--font-manrope), sans-serif">
+                trend window
               </text>
             </>
           )}
