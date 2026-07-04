@@ -70,6 +70,12 @@ TREND_K_VISITS = 5
 # live license closed.
 CLOSED_RESULTS = frozenset({"Out of Business", "Business Not Located"})
 
+# Slope magnitude below which a trend reads as "stable". Mirrors the web app's
+# TREND_STABLE_BAND (app/src/lib/scores.ts) so the totals worsening/improving
+# counts match the per-establishment direction the app labels and shows. Keep
+# the two in sync (DR 0011 retuned this from 0.001 to 0.0003).
+TREND_STABLE_BAND = 0.0003
+
 
 def out_of_business_status(labeled: pd.DataFrame) -> pd.DataFrame:
     """Per-license closure status from the full inspection event stream.
@@ -354,10 +360,16 @@ def write_scores_json(
                 "High": int(tier_counts.get("High", 0)),
             },
             "out_of_business": int(df["is_out_of_business"].sum()),
-            # Key names kept for app compatibility; the slope is now last-K-visits
-            # forecast (DR 0011), not a 30-day window. Threshold retune is PR-B.
-            "worsening_30d": int((active_slope > 0.001).sum()),
-            "improving_30d": int((active_slope < -0.001).sum()),
+            # Establishments trending worse / better by the last-K-visits
+            # forecast slope (DR 0011), among ACTIVE venues only — a closed
+            # business can't be "worsening" (DR 0014). No window in the key name:
+            # the slope is a visit-count trend, not a calendar window, and K is
+            # tunable, so a window/K suffix would go stale on a retune. The
+            # ±TREND_STABLE_BAND cutoff matches the web app's trendDirection so
+            # these counts equal the number of establishments the app labels
+            # worsening / improving.
+            "worsening": int((active_slope > TREND_STABLE_BAND).sum()),
+            "improving": int((active_slope < -TREND_STABLE_BAND).sum()),
         }
 
     payload = {

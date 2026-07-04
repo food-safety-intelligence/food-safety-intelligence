@@ -2,9 +2,11 @@ import {
   ArrowLeft,
   BookMarked,
   BookOpen,
+  ClipboardList,
   type LucideIcon,
+  MessageSquarePlus,
+  ShieldCheck,
   Target,
-  TriangleAlert,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
@@ -16,6 +18,17 @@ import { loadMethodology } from "@/lib/methodology-server";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
+
+/**
+ * Human labels for the internal model-family slug stored in methodology.json's
+ * `model_version`. An unrecognised slug falls back to the raw value, so the card
+ * stays correct — never blank or a stale friendly name — if the served model
+ * changes.
+ */
+const MODEL_TYPE_LABELS: Record<string, string> = {
+  xgb_monotone: "Gradient-boosted trees (XGBoost)",
+  baseline_logreg: "Logistic regression",
+};
 
 /**
  * One row of the worked-example waterfall: a label on the left and its signed
@@ -180,6 +193,20 @@ export default async function HowItWorksPage() {
       })()
     : null;
 
+  // Model-card provenance — the served model, when its metrics were last built,
+  // and the test window — read from methodology.json so the card can never drift
+  // from the numbers rendered above it. ISO date sliced to YYYY-MM-DD (the JSON
+  // stores a UTC timestamp) to avoid any locale/hydration formatting surprises.
+  const modelVersion = methodology.model_version || null;
+  const modelType = modelVersion
+    ? (MODEL_TYPE_LABELS[modelVersion] ?? modelVersion)
+    : null;
+  const metricsDate = methodology.generated_at
+    ? methodology.generated_at.slice(0, 10)
+    : null;
+  const testFrom = methodology.test.split_from || null;
+  const testN = methodology.test.n || null;
+
   return (
     <>
       <SiteHeader activeNav="how" />
@@ -274,10 +301,16 @@ export default async function HowItWorksPage() {
             How well it works
           </a>
           <a
-            href="#limits"
+            href="#model-card"
             className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
           >
-            Limits
+            Model card
+          </a>
+          <a
+            href="#data-governance"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
+            Data governance
           </a>
           <a
             href="#reference"
@@ -390,16 +423,20 @@ export default async function HowItWorksPage() {
               </span>
             </div>
             <p className="text-sm text-muted leading-relaxed mt-3">
-              On the detail page this becomes a small chart. Each dot is a{" "}
-              <span className="font-medium text-ink/80">predicted</span>{" "}risk — the
-              model&apos;s 180-day-forward estimate{" "}
+              On the detail page this becomes a small chart. Each dot is the{" "}
+              <span className="font-medium text-ink/80">trend estimate</span> — the
+              forecast model&apos;s 180-day-forward read{" "}
               <span className="font-medium text-ink/80">as of that inspection&apos;s
-              date</span>, from 0 to 1, not the pass/fail result (that&apos;s in the
-              inspection list below). Hover a dot for its date and value. A 2019 dot
-              is what the model would have estimated back in 2019, not a guess made
-              in hindsight. Only inspections the model can score appear — 2019
-              onward, each with a usable result, up to the five most recent — so a
-              place may show just two or three dots.
+              date</span>, from 0 to 100, with that visit&apos;s own result removed
+              (the pass/fail is in the inspection list below). Hover a dot for its
+              date and value. A dashed line marks the headline{" "}
+              <span className="font-medium text-ink/80">risk score</span>; because
+              that score counts the latest inspection&apos;s result and the trend
+              does not, the last dot can sit above or below it. A 2019 dot is what
+              the model would have estimated back in 2019, not a guess made in
+              hindsight. Only inspections the model can score appear — 2019 onward,
+              each with a usable result, up to the five most recent — so a place may
+              show just two or three dots.
             </p>
             <p className="text-sm text-muted leading-relaxed mt-2">
               The score and the trend come from{" "}
@@ -555,7 +592,7 @@ export default async function HowItWorksPage() {
                           {Math.round(p.frac * 100)}%
                         </td>
                         <td className="py-2.5 px-4">
-                          {p.n_flagged.toLocaleString()}
+                          {p.n_flagged.toLocaleString("en-US")}
                         </td>
                         <td className="py-2.5 px-4">
                           {Math.round(p.precision * 100)}%
@@ -577,7 +614,7 @@ export default async function HowItWorksPage() {
               inspecting a random 20%. Baseline model, time-held-out test from{" "}
               {methodology.test.split_from || "2025-07-01"} onward (n ≈{" "}
               {methodology.test.n
-                ? methodology.test.n.toLocaleString()
+                ? methodology.test.n.toLocaleString("en-US")
                 : "7,000"}{" "}
               inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
               with an event). &ldquo;Lift&rdquo; is precision divided by that
@@ -592,7 +629,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 5%</span>
                   {top5
-                    ? ` (~${top5.n_flagged.toLocaleString()} food establishments): about ${Math.round(
+                    ? ` (~${top5.n_flagged.toLocaleString("en-US")} food establishments): about ${Math.round(
                         top5.precision * 100,
                       )}% of those visits find a real problem — ${top5.lift.toFixed(
                         1,
@@ -604,7 +641,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 10%</span>
                   {top10
-                    ? ` (~${top10.n_flagged.toLocaleString()} food establishments): roughly ${Math.round(
+                    ? ` (~${top10.n_flagged.toLocaleString("en-US")} food establishments): roughly ${Math.round(
                         top10.precision * 100,
                       )}% of visits find a problem (${top10.lift.toFixed(
                         1,
@@ -741,14 +778,205 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <SectionLabel id="limits" number="04" icon={TriangleAlert}>
-            Limits
+          <SectionLabel id="model-card" number="04" icon={ClipboardList}>
+            Model card
           </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
-              What it doesn&apos;t do
+              What this model is for
             </h2>
-            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
+            <p className="text-md text-muted leading-relaxed mt-2">
+              A model card gathers, in one place, who the model is for, how it was
+              tested, where it falls short, and how it&apos;s kept up to date. The
+              points below restate and link to the fuller detail elsewhere on this
+              page. It covers <span className="font-medium text-ink/80">two
+              models</span> — the risk score and a separate trend forecast,
+              introduced just below.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              The two models
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The product ships two models, trained together. One produces the
+              headline score; the other drives the trend.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 1 · Risk score
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  The headline percentage — the chance of a Fail or priority
+                  violation in the next 180 days. It uses the current
+                  inspection&apos;s own outcome, the strongest near-term signal. The
+                  model details and evaluation on this card describe this model.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 2 · Trend forecast
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  Drives the trend arrow and chart. It predicts the same 180-day
+                  risk but <span className="font-medium text-ink/80">ignores the
+                  current inspection&apos;s own pass/fail</span>, so a failed visit
+                  and its mandated re-inspection don&apos;t read as a swing. It is
+                  used only to show direction over time; it never sets the risk
+                  score.
+                </p>
+              </div>
+            </div>
+
+            {/* Provenance strip — the served risk-score model's type, when its
+                metrics were built, and the test window, read from methodology.json
+                so the card can't drift from the numbers above it. The internal
+                model slug is mapped to a human label via MODEL_TYPE_LABELS. */}
+            {(modelType || metricsDate || testFrom) && (
+              <>
+                <p className="mt-6 text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Risk-score model
+                </p>
+                <dl className="mt-2 rounded-2xl border border-line bg-card overflow-hidden text-sm">
+                  {modelType && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Model type</dt>
+                      <dd className="text-ink/85">{modelType}</dd>
+                    </div>
+                  )}
+                  {metricsDate && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Metrics generated</dt>
+                      <dd className="num text-ink/85">{metricsDate}</dd>
+                    </div>
+                  )}
+                  {testFrom && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Tested on</dt>
+                      <dd className="num text-ink/85">
+                        inspections from {testFrom} onward
+                        {testN ? ` (n ${testN.toLocaleString("en-US")})` : ""}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </>
+            )}
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              Intended users
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The model is built for the people who plan food-safety inspections —
+              a public-health department or inspection team deciding where limited
+              inspector time should go. The web app opens the same signal to the
+              public for transparency, but the model is designed as decision
+              support for inspection planning, not a consumer safety rating.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Intended use
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Prioritisation. The score ranks food establishments by their risk of
+              failing an inspection or drawing a priority violation in the next 180
+              days, so a capacity-limited team can work the riskiest places first.
+              It is a triage signal that routes a human inspector — the value is in
+              the ranking, not in any single establishment&apos;s number.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Out-of-scope uses
+            </h3>
+            <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85">
+              <li>
+                <span className="font-medium">Not a verdict.</span> A high score is
+                not a finding that an establishment is unsafe or dirty — most
+                flagged places do not actually have an event in the window.
+              </li>
+              <li>
+                <span className="font-medium">Not an enforcement or licensing
+                input.</span> It should not be used on its own to fine, close, deny
+                a licence, or otherwise penalise a business without a human
+                inspection.
+              </li>
+              <li>
+                <span className="font-medium">Not a live diner guarantee.</span> It
+                does not tell a diner whether a specific meal is safe right now.
+              </li>
+              <li>
+                <span className="font-medium">Not another city.</span> It is trained
+                only on Chicago data and is not validated anywhere else.
+              </li>
+              <li>
+                <span className="font-medium">Not automated action.</span> No
+                decision should be taken from the score without a person in the
+                loop.
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              How the models are evaluated
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The <span className="font-medium text-ink/80">risk score</span> is
+              measured on a time-held-out test set, never a random shuffle: the
+              model is trained on the earliest inspections, calibrated on a later
+              held-out slice, and tested on the most recent window ({testFrom ||
+              "2025-07-01"} onward) — with every feature computed only from data
+              strictly before the inspection it describes.
+              We report ranked-work-list metrics at the operating points a team
+              would actually staff — precision, coverage, and lift by top-K —
+              rather than one headline number, and a retrained model is promoted
+              only if it holds up on <span className="font-medium">both</span>{" "}
+              precision–recall and ROC area, not just one. The full table and a
+              worked example are under{" "}
+              <a href="#how-well-it-works" className="text-teal hover:underline">
+                How well it works
+              </a>
+              .
+            </p>
+
+            <p className="text-sm text-muted leading-relaxed mt-2">
+              The <span className="font-medium text-ink/80">trend forecast</span> is
+              judged differently — as direction over time, not a second risk number.
+              We publish it for coverage and transparency, but the loose{" "}
+              <span className="font-medium text-ink/80">improving / worsening /
+              stable</span> direction is descriptive: on its own it barely beats
+              chance. Only a strict slice — steeply rising{" "}
+              <span className="font-medium text-ink/80">and</span> currently clean —
+              carries a real forward signal, and that slice is treated as an
+              early-warning watch-list, never a verdict. How it reads on the page is
+              under{" "}
+              <a href="#recent-trend" className="text-teal hover:underline">
+                The recent trend
+              </a>
+              .
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Fairness testing
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Group performance is checked across facility type and ZIP — precision,
+              coverage, and ranking quality per group — and the known proxy features
+              were removed: ZIP and facility type were dropped so the model keys on
+              an establishment&apos;s own conduct, not who-lives-where. Any
+              demographic data is used only to audit disparate impact, never as a
+              model input. Known residual risks — a detection feedback loop in the
+              prior-history and current-outcome signals, geographic miscalibration
+              where history is sparse, and unstable metrics for very small groups —
+              are documented, and a fuller demographic disparate-impact audit is
+              planned before any real deployment.
+            </p>
+
+            <h3
+              id="limits"
+              className="scroll-mt-24 text-lg font-medium tracking-tight mt-6"
+            >
+              Limitations
+            </h3>
+            <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85">
               <li>
                 Only six years of training data. The model can&apos;t recognise
                 patterns that pre-date 2019.
@@ -772,9 +1000,110 @@ export default async function HowItWorksPage() {
                 uneven calibration where training history is sparse.
               </li>
             </ul>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Retraining policy
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Both models are retrained together, on demand — when new data or a
+              feature change warrants it — not on a fixed automatic schedule; there
+              is no live or streaming update. Each training run is tied to the exact code that
+              produced it (its commit is recorded with the run), and a retrained
+              model replaces the served one only after it clears the promotion gate
+              on the held-out test set. Saved model files are versioned and never
+              overwritten, so any published score set can be traced back to the
+              model and data that produced it. The risk-score model&apos;s type and
+              the date its metrics were generated are shown at the top of this card.
+            </p>
           </article>
 
-          <SectionLabel id="reference" number="05" icon={BookMarked}>
+          <SectionLabel id="data-governance" number="05" icon={ShieldCheck}>
+            Data governance
+          </SectionLabel>
+          <article>
+            <h2 className="text-2xl font-medium tracking-tight">
+              Where the data comes from and how it&apos;s handled
+            </h2>
+            <p className="text-md text-muted leading-relaxed mt-2">
+              Every input is a public record from the Chicago Open Data portal.
+              The app itself collects nothing from the people who visit it — no
+              accounts, no login, no personal data — so the governance questions
+              below are mostly about public business records, not private user
+              data.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              Data sources &amp; retention
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The inputs are Chicago&apos;s public Food Inspections, Business
+              Licenses, and 311 service-request datasets. We keep a cached copy of
+              the fields needed to build features and scores for as long as the
+              product is maintained; it is refreshed in place rather than kept as a
+              growing archive of dated snapshots. Because no visitor data is
+              gathered, there is no personal information to retain.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Deletion policy
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The app stores no visitor or user data, so there is nothing personal
+              to delete. The establishment records it shows are public
+              business-inspection records — not ours to erase; they mirror the
+              city&apos;s source and change only when the city&apos;s record
+              changes. Cached working files and each published score set can be
+              regenerated from scratch from the public source at any time, and each
+              publish replaces the previous served score file rather than keeping a
+              back-history.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Storage &amp; security
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Scores are published as static JSON and served through a
+              content-delivery network. The website is read-only static pages with
+              no login and no server-side database, and it never runs the model on a
+              page load — it only ever reads the pre-computed JSON (the
+              batch-score-to-JSON contract). Source and working data sit in a
+              private cloud-storage bucket that is not publicly readable or
+              writable; access is limited to the project team&apos;s own
+              credentials. Because the site holds no user data and does no live
+              computation, its exposure surface is a set of public-record JSON
+              files.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Handling of updated source data
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Chicago updates its inspection, licence, and 311 records continuously
+              — new inspections, late-arriving results, and corrections to old ones.
+              We do not read the city&apos;s feed live; instead we re-pull it and
+              re-score in a batch job, then publish a fresh JSON. The scores you see
+              are a snapshot as of the last publish — the detail page shows each
+              establishment&apos;s &ldquo;as of&rdquo; date — not a live reading.
+              When the city corrects or adds a record, the next batch run picks it
+              up; the ingest resumes from where it left off rather than re-pulling
+              the whole history.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Use and retention of location data
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The only location data is the establishment&apos;s own address and map
+              coordinates, taken straight from the public inspection record — it
+              locates a business, not a person. We use it to place the establishment
+              on the map and include it in the published JSON. The app never asks
+              for, collects, or stores a visitor&apos;s location — there is no
+              geolocation prompt and no device tracking. Establishment coordinates
+              are retained on the same terms as the rest of the public record.
+            </p>
+          </article>
+
+          <SectionLabel id="reference" number="06" icon={BookMarked}>
             Reference
           </SectionLabel>
           <article id="definitions">
@@ -804,6 +1133,27 @@ export default async function HowItWorksPage() {
             </dl>
           </article>
         </section>
+
+        {/* Feedback CTA — readers who reach the end of the methodology are the
+            most engaged, so invite a note here alongside the footer link. */}
+        <aside className="mt-12 rounded-3xl border border-line bg-tint p-7 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
+          <div>
+            <h2 className="text-xl font-medium tracking-tight">
+              Was this useful?
+            </h2>
+            <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[52ch]">
+              If something here is wrong, unclear, or missing, tell us — it goes
+              straight to the team.
+            </p>
+          </div>
+          <Link
+            href="/feedback?source=how-it-works"
+            className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors min-h-[44px]"
+          >
+            <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+            Give feedback
+          </Link>
+        </aside>
       </main>
 
       <SiteFooter />

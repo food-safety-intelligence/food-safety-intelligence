@@ -138,8 +138,8 @@ export interface ScoresPayload {
   totals: {
     establishments: number;
     tier_counts: Record<RiskTier, number>;
-    worsening_30d: number;
-    improving_30d: number;
+    worsening: number;
+    improving: number;
   };
   /** Absent in older JSON written before the per-profile waterfall was added. */
   calibration?: Calibration;
@@ -303,6 +303,44 @@ export function trendDirection(slope: number | null): TrendDirection {
   if (slope < -TREND_STABLE_BAND) return "improving";
   return "stable";
 }
+
+// ---------------------------------------------------------------------------
+// Inspection hardlinks — the trend-chart dots link to their matching row in the
+// inspection-history timeline. Both sides compute the same `inspection-<n>`
+// anchor from an inspection's position in NEWEST-FIRST order, so they agree on
+// which row a dot points at without sharing object references (the detail page
+// hands the timeline a comment-merged copy of the history, not the same array).
+// ---------------------------------------------------------------------------
+
+/**
+ * Newest-first order (and the basis for the anchor index). Same-date ties keep
+ * input order (returns 0) so the ordering is stable and both sides index it
+ * identically.
+ */
+export function compareInspectionsNewestFirst(
+  a: { date: string },
+  b: { date: string },
+): number {
+  return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+}
+
+/** DOM id / URL fragment for the inspection row at newest-first position `n`. */
+export function inspectionAnchorId(n: number): string {
+  return `inspection-${n}`;
+}
+
+/** Newest-first index from an `inspection-<n>` id / `#inspection-<n>` fragment. */
+export function parseInspectionAnchor(hashOrId: string): number | null {
+  const m = /^#?inspection-(\d+)$/.exec(hashOrId);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * In-tab jump signal. The inline trend chart dispatches this on `window` when a
+ * dot is clicked (updating the URL hash alone wouldn't re-fire for the same
+ * target); the timeline listens for it to scroll + highlight the row.
+ */
+export const INSPECTION_JUMP_EVENT = "fsi:inspection-jump";
 
 // ---------------------------------------------------------------------------
 // Home search/sort — shared between the server loader and the client shell.

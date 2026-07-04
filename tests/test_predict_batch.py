@@ -24,6 +24,7 @@ import pandas as pd
 
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
 from foodsafety.serve.predict_batch import (
+    TREND_STABLE_BAND,
     _row_to_json,
     build_scores_table,
     out_of_business_status,
@@ -179,6 +180,30 @@ def test_write_scores_json_emits_app_payload(tmp_path):
     assert isinstance(first["as_of_date"], str)
 
 
+def test_totals_trend_counts_use_stable_band(tmp_path):
+    # totals.worsening / .improving must count with TREND_STABLE_BAND (the same
+    # cutoff the web app's trendDirection uses), so the header counts equal the
+    # number of establishments the app labels worsening / improving. A wider band
+    # (the pre-DR-0011 0.001) would silently undercount vs the displayed labels.
+    features = _make_features()
+    model = _fit_model(features)
+    scores = build_scores_table(model, features, ALL_FEATURES).copy()
+
+    b = TREND_STABLE_BAND
+    # Straddle the band: 2 clearly worsening, 1 clearly improving; a slope just
+    # inside the band, exactly 0, and null must all read as stable (uncounted).
+    controlled = [2 * b, 2 * b, -2 * b, b / 2, -b / 2, 0.0, None]
+    col = (controlled + [0.0] * len(scores))[: len(scores)]
+    scores["trend_slope"] = col
+
+    out = tmp_path / "scores.json"
+    write_scores_json(scores, str(out), calibration={"a": 1.0, "b": 0.0, "intercept": 0.0})
+    totals = json.loads(out.read_text())["totals"]
+
+    assert totals["worsening"] == 2
+    assert totals["improving"] == 1
+
+
 def test_row_to_json_strips_whitespace_on_display_strings():
     # Source data carries names like "  JIMMY FAMOUS BURGER" with leading
     # spaces; the JSON boundary must strip them so the app's A–Z sort doesn't
@@ -299,8 +324,8 @@ def test_write_scores_json_closure_fields_and_active_only_trend_counts(tmp_path)
 
     # Trend counts must cover active venues only: recompute from the rows.
     active = [r for r in payload["scores"] if not r["is_out_of_business"]]
-    expected_worsening = sum(1 for r in active if (r["trend_slope"] or 0) > 0.001)
-    assert payload["totals"]["worsening_30d"] == expected_worsening
+    expected_worsening = sum(1 for r in active if (r["trend_slope"] or 0) > TREND_STABLE_BAND)
+    assert payload["totals"]["worsening"] == expected_worsening
 
 
 def test_reopened_license_collapses_to_one_establishment_row():

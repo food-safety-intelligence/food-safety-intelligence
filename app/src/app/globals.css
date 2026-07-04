@@ -25,6 +25,10 @@
   --color-terra:  #B8634A;  /* High */
   --color-teal:   #486073;  /* links / accents */
 
+  /* Transient row wash when a trend-chart dot hardlinks to an inspection —
+     a soft highlighter yellow, warm enough to sit in the palette. */
+  --color-highlight: #F9EAB0;
+
   /* AA-contrast text variants of terra/sage (≥4.5:1 on white and on the
      terra/sage tints). Use these when terra/sage is TEXT, not a fill —
      the base tokens are too light for small text (terra 4.0:1, sage 3.3:1). */

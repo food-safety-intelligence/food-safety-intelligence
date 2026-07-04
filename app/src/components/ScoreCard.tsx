@@ -122,7 +122,11 @@ export function ScoreCard({
         </div>
 
         <div className="border-t border-line pt-7 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-8">
-          <TrendPanel slope={restaurant.trend_slope} history={history} />
+          <TrendPanel
+            slope={restaurant.trend_slope}
+            history={history}
+            riskScore={restaurant.risk_score}
+          />
         </div>
       </div>
     </div>

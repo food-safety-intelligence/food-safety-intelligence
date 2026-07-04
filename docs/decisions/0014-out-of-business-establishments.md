@@ -36,7 +36,7 @@ de-emphasise — but do not hide — closed venues in every surface.
      operate.
 2. **Contract.** Two new columns in `scores.parquet` / fields in `scores.json`:
    `is_out_of_business: bool`, `closed_since: date | null`. `totals` gains an
-   `out_of_business` count; `worsening_30d` / `improving_30d` now count
+   `out_of_business` count; the `worsening` / `improving` counts now cover
    **active venues only**.
 3. **Web app.** Closed venues stay searchable and clickable (a user who looks
    one up deserves an answer), but: grey map pin with an "×" centre (not

@@ -319,7 +319,7 @@ model inference happens in the app** — predictions are precomputed and written
 **Top-level JSON envelope** (`scores.json`, `schema_version` `0.6.0`): alongside
 `scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
 `label_window_days`, `totals` (which as of 0.6.0 includes an
-`out_of_business` count, and whose `worsening_30d` / `improving_30d` cover
+`out_of_business` count, and whose `worsening` / `improving` counts cover
 **active venues only** — a closed business can't be "worsening"), and
 **`calibration`**. `calibration` is the
 Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
