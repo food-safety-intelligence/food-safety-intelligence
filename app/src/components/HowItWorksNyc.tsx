@@ -1,12 +1,23 @@
 "use client";
 
 // NYC-specific "how it works" content, driven by nyc/methodology.json (DR 0014).
-// Mirrors the Chicago page's structure + formatting (hero + stat cards, numbered
-// section labels, worked sections, limits, reference) with NYC-accurate content.
+// Mirrors the Chicago page's structure + formatting (hero + stat cards, sticky
+// jump-nav, numbered sections, TierPill bands, a worked calibrated-log-odds
+// example, and a Reference/definitions list) with NYC-accurate content.
 
-import { BookOpen, type LucideIcon, Target, TriangleAlert, Wrench } from "lucide-react";
+import {
+  BookMarked,
+  BookOpen,
+  type LucideIcon,
+  Target,
+  TriangleAlert,
+  Wrench,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
+import type { RiskTier } from "@/lib/scores";
+import { TierPill } from "@/components/TierPill";
+import { cn } from "@/lib/utils";
 
 interface NycMethodology {
   data_source: string;
@@ -44,6 +55,43 @@ function HeroStat({ value, label, accent = false }: { value: string; label: stri
   );
 }
 
+// One row of the worked calibrated-log-odds waterfall (mirrors Chicago's).
+function WaterfallRow({ label, value, muted = false, strong = false }: {
+  label: string; value: number; muted?: boolean; strong?: boolean;
+}) {
+  const sign = value > 0 ? "+" : value < 0 ? "−" : "";
+  const color = muted ? "text-muted" : value > 0 ? "text-terra-strong" : value < 0 ? "text-sage-strong" : "text-muted";
+  return (
+    <div className={cn("flex items-center justify-between gap-3 px-4 py-2.5 border-b border-line", strong && "bg-tint/50")}>
+      <span className={cn("text-sm", strong ? "text-ink font-medium" : "text-ink/85")}>{label}</span>
+      <span className={cn("num tabular-nums shrink-0", strong ? "text-ink font-semibold" : color)}>
+        {sign}{Math.abs(value).toFixed(2)}
+      </span>
+    </div>
+  );
+}
+
+const NAV = [
+  ["reading-the-score", "Reading the score"],
+  ["how-its-built", "How it's built"],
+  ["how-well-it-works", "How well it works"],
+  ["limits", "Limits"],
+  ["reference", "Reference"],
+];
+
+// NYC-appropriate definitions (Chicago's glossary is Chicago-specific).
+const NYC_GLOSSARY: { id: string; term: string; short: string }[] = [
+  { id: "letter-grade", term: "Letter grade (A / B / C)", short: "New York's public restaurant grade. It's a threshold on the inspection score: A = 0–13 points, B = 14–27, C = 28+. Lower is cleaner." },
+  { id: "inspection-score", term: "Inspection score", short: "The sum of violation points at one inspection — public-health hazards ≥ 7 points, critical ≥ 5, general ≥ 2. The score maps to the letter grade." },
+  { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to NYC's own distribution." },
+  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across both cities — imminent-hazard, critical, or general — mapped from each city's own codes via the violation crosswalk." },
+  { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare NYC (~0.66) with Chicago (~0.78)." },
+  { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 1.6× means that slice has 1.6× the B/C rate of the whole population." },
+  { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
+  { id: "shap", term: "SHAP driver", short: "A per-establishment breakdown of which features pushed the score up or down, in log-odds — the signed list you see under 'what's driving the score' on a detail page." },
+  { id: "forecast-trend", term: "Forecast-only model / trend", short: "A second model that scores each past inspection without seeing its own outcome; the slope of its recent scores is the Improving / Worsening / Stable trend." },
+];
+
 export function HowItWorksNyc() {
   const [m, setM] = useState<NycMethodology | null>(null);
   useEffect(() => {
@@ -62,23 +110,37 @@ export function HowItWorksNyc() {
   return (
     <div>
       {/* Hero */}
-      <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · New York City</p>
-      <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — New York City</h1>
-      <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
-        New York City is a second city, added to show the same tool works beyond
-        Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
-        <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
-        under New York&apos;s letter-grade system — the same batch-scored-to-JSON
-        pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
-      </p>
-      <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="top-decile lift over the base rate" />
-        <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC on the held-out test set" />
-        <HeroStat value={m ? `${prevPct}%` : "—"} label="of next inspections are B or C (base rate)" />
-      </dl>
+      <header>
+        <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · New York City</p>
+        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — New York City</h1>
+        <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
+          New York City is a second city, added to show the same tool works beyond
+          Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
+          <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
+          under New York&apos;s letter-grade system — the same batch-scored-to-JSON
+          pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
+        </p>
+        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="top-decile lift over the base rate" />
+          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC on the held-out test set" />
+          <HeroStat value={m ? `${prevPct}%` : "—"} label="of next inspections are B or C (base rate)" />
+        </dl>
+      </header>
+
+      {/* Sticky jump-nav */}
+      <nav
+        aria-label="Sections"
+        className="sticky top-0 z-20 -mx-8 mt-8 px-8 py-2.5 bg-cream/85 backdrop-blur border-y border-line flex flex-wrap gap-x-1.5 gap-y-1 text-xs"
+      >
+        {NAV.map(([id, label]) => (
+          <a key={id} href={`#${id}`} className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors">
+            {label}
+          </a>
+        ))}
+      </nav>
 
       {/* 01 — Reading the score */}
-      <div className="mt-10 space-y-8">
+      <div className="mt-6 space-y-8">
         <SectionLabel id="reading-the-score" number="01" icon={BookOpen}>Reading the score</SectionLabel>
         <article>
           <h2 className="text-2xl font-medium tracking-tight">The letter-grade label</h2>
@@ -92,19 +154,31 @@ export function HowItWorksNyc() {
           </p>
         </article>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">Risk tiers</h2>
-          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            The score band is recalibrated to NYC&apos;s own distribution — NYC&apos;s
-            base rate is far higher than Chicago&apos;s, so Chicago&apos;s cutoffs
-            wouldn&apos;t transfer.
+          <h2 className="text-2xl font-medium tracking-tight">Risk bands</h2>
+          <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
+            The percentage is bucketed into four bands — the coloured badges on the
+            map, list, and detail pages. They&apos;re recalibrated to NYC&apos;s own
+            distribution: NYC&apos;s base rate is far higher than Chicago&apos;s, so
+            Chicago&apos;s cutoffs wouldn&apos;t transfer.
           </p>
           {m && (
-            <div className="mt-4 grid gap-2 max-w-[62ch]">
+            <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden max-w-[62ch]">
+              <div className="flex items-center justify-between gap-4 px-4 py-2 border-b border-line text-xs uppercase tracking-[0.08em] text-sage">
+                <span>Tier</span>
+                <span className="flex items-center gap-4">
+                  <span className="w-24 text-right">Score</span>
+                  <span className="w-14 text-right">Share</span>
+                </span>
+              </div>
               {m.risk_tiers.map((t) => (
-                <div key={t.label} className="flex items-center justify-between rounded-lg border border-line px-4 py-2 text-sm">
-                  <span className="font-medium">{t.label}</span>
-                  <span className="num text-muted">{t.min.toFixed(2)}–{t.max === null ? "1.00" : t.max.toFixed(2)}</span>
-                  <span className="num text-muted">{(t.share * 100).toFixed(0)}% of index</span>
+                <div key={t.label} className="flex items-center justify-between gap-4 px-4 py-3 border-b border-line last:border-b-0">
+                  <TierPill tier={t.label as RiskTier} />
+                  <span className="flex items-center gap-4 num tabular-nums">
+                    <span className="w-24 text-right text-sm text-ink/85">
+                      {t.min.toFixed(2)}–{t.max === null ? "1.00" : t.max.toFixed(2)}
+                    </span>
+                    <span className="w-14 text-right text-xs text-muted">{(t.share * 100).toFixed(0)}%</span>
+                  </span>
                 </div>
               ))}
             </div>
@@ -212,9 +286,39 @@ export function HowItWorksNyc() {
             </div>
           )}
         </article>
+        <article>
+          <h2 id="calibrated-log-odds" className="scroll-mt-24 text-2xl font-medium tracking-tight">
+            Why a score is what it is
+          </h2>
+          <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
+            Per-establishment SHAP attribution — signed log-odds contributions from
+            each feature, summed and squashed to recover the probability on the
+            gauge. The detail page surfaces the top drivers; here is how they add up
+            for one real high-risk establishment (score 99).
+          </p>
+          <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden max-w-[62ch]">
+            <WaterfallRow label="Base rate (model intercept)" value={-0.46} muted />
+            <WaterfallRow label="48 critical violations in prior inspections" value={6.32} />
+            <WaterfallRow label="8 prior inspections on record" value={-3.25} />
+            <WaterfallRow label="8 prior inspections graded B/C" value={-1.01} />
+            <WaterfallRow label="4 imminent-hazard-tier violations now" value={0.87} />
+            <WaterfallRow label="20 prior general-tier violations" value={0.62} />
+            <WaterfallRow label="Everything else (remaining features)" value={1.56} muted />
+            <WaterfallRow label="Total (calibrated log-odds)" value={4.65} strong />
+            <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-tint/50">
+              <span className="text-sm text-ink font-medium">Squashed to a probability (the gauge)</span>
+              <span className="num text-terra-strong font-semibold">99.1%</span>
+            </div>
+          </div>
+          <p className="text-xs text-muted leading-relaxed mt-3 max-w-[62ch]">
+            Rows are in <span className="font-medium text-ink/80">calibrated log-odds</span> —
+            additive in that space, so they sum exactly to the total, and a sigmoid
+            turns the total into the probability shown on the gauge.
+          </p>
+        </article>
       </div>
 
-      {/* 04 — Limits (the honest note lives here now) */}
+      {/* 04 — Limits */}
       <div className="mt-10 space-y-8">
         <SectionLabel id="limits" number="04" icon={TriangleAlert}>Limits</SectionLabel>
         <article>
@@ -240,6 +344,26 @@ export function HowItWorksNyc() {
               it for prioritisation, not judgement.
             </p>
           </div>
+        </article>
+      </div>
+
+      {/* 05 — Reference */}
+      <div className="mt-10 space-y-8">
+        <SectionLabel id="reference" number="05" icon={BookMarked}>Reference</SectionLabel>
+        <article>
+          <h2 className="text-2xl font-medium tracking-tight">Definitions</h2>
+          <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
+            The recurring terms used across the score, the drivers, and the
+            inspection history.
+          </p>
+          <dl className="mt-4 space-y-4 max-w-[62ch]">
+            {NYC_GLOSSARY.map((entry) => (
+              <div key={entry.id} id={entry.id} className="scroll-mt-24 rounded-2xl border border-line bg-card p-4">
+                <dt className="font-medium text-ink">{entry.term}</dt>
+                <dd className="text-sm text-muted leading-relaxed mt-1">{entry.short}</dd>
+              </div>
+            ))}
+          </dl>
         </article>
       </div>
     </div>
