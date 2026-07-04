@@ -388,7 +388,19 @@ def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> d
         g0 = grp.iloc[0]
         grade = str(g0.get("grade") or "").strip()
         score = g0.get("score")
-        result = f"Grade {grade}" if grade in ("A", "B", "C") else ""
+        # LA assigns a letter only down to C (70-79); an inspection scoring below 70
+        # has a blank grade in the feed. Rather than render a bare "(score 59)" that
+        # doesn't colour/tally, derive an honest display band from the score: A/B/C
+        # for 70+, and "Below C" for sub-70 (no letter exists lower). The model still
+        # treats anything below 90 as bad; the app buckets these by score.
+        if grade in ("A", "B", "C"):
+            result = f"Grade {grade}"
+        elif pd.notna(score):
+            s = float(score)
+            band = "A" if s >= 90 else "B" if s >= 80 else "C" if s >= 70 else ""
+            result = f"Grade {band}" if band else "Below C"
+        else:
+            result = ""
         if pd.notna(score):
             result = (result + f" (score {int(score)})").strip()
         desc = grp.loc[grp["violation_code"].notna(), "violation_description"].dropna()
