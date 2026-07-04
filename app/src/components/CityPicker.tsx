@@ -9,11 +9,11 @@ import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 
 export function CityEntryModal() {
-  const { needsPick, setCity, dismissPick } = useCity();
+  const { needsPick, setCity } = useCity();
   if (!needsPick) return null;
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-ink/70 backdrop-blur-md px-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="city-pick-title"
@@ -37,20 +37,13 @@ export function CityEntryModal() {
               <MapPin className="size-5 text-sage shrink-0" aria-hidden />
               <span>
                 <span className="block font-medium">{CITY_CONFIG[c].label}</span>
-                <span className="block text-xs text-muted">
+                <span className="block text-xs text-muted capitalize">
                   {CITY_CONFIG[c].nounPlural}
                 </span>
               </span>
             </button>
           ))}
         </div>
-        <button
-          type="button"
-          onClick={dismissPick}
-          className="mt-4 text-xs text-muted hover:text-ink underline underline-offset-2"
-        >
-          Not now — continue with {CITY_CONFIG.chicago.label}
-        </button>
       </div>
     </div>
   );

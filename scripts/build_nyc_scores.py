@@ -130,13 +130,17 @@ def _short_action(a: object) -> str:
     return "Inspection"
 
 
-def build_history(raw: pd.DataFrame) -> dict:
-    """dict keyed by camis -> [{date, type, result, headline}] most-recent first.
+def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> dict:
+    """dict keyed by camis -> [{date, type, result, headline, score}] newest-first.
 
     Mirrors Chicago's inspection_history.json shape. NYC `result` is the letter
     grade (A/B/C, derived from the score when the grade cell is blank on the
-    initial visit); `headline` is the inspection's most-severe violation text.
+    initial visit); `headline` is the inspection's most-severe violation text;
+    `score` is the forecast-only model's calibrated probability for that
+    inspection (drives the detail-page trend chart, DR 0011). null for events
+    that weren't scored.
     """
+    forecast_by_event = forecast_by_event or {}
     r = raw.copy()
     r["_crit_rank"] = (r["critical_flag"].astype("string") == "Critical").astype(int)
     r = r.sort_values(["camis", "inspection_date", "_crit_rank"], ascending=[True, False, False])
@@ -158,12 +162,15 @@ def build_history(raw: pd.DataFrame) -> dict:
         if len(desc):
             h = str(desc.iloc[0])
             headline = h[:100] + "…" if len(h) > 100 else h
+        date_str = pd.Timestamp(date).strftime("%Y-%m-%d")
+        fc = forecast_by_event.get((str(camis), date_str))
         hist.setdefault(str(camis), []).append(
             {
-                "date": pd.Timestamp(date).strftime("%Y-%m-%d"),
+                "date": date_str,
                 "type": _short_action(g0.get("action")),
                 "result": result,
                 "headline": headline,
+                "score": None if fc is None else round(float(fc), 6),
             }
         )
     for k in hist:
@@ -443,7 +450,12 @@ def main():
     print(f"\nWrote {OUT / 'scores.json'}  ({len(out):,} establishments)")
 
     # ---- inspection_history.json (detail page) ----
-    hist = build_history(raw)
+    # per-event forecast score powers the trend chart; key on (camis, YYYY-MM-DD)
+    forecast_by_event = {
+        (r.license_id, pd.Timestamp(r.inspection_date).strftime("%Y-%m-%d")): r.forecast_risk
+        for r in ev.itertuples(index=False)
+    }
+    hist = build_history(raw, forecast_by_event)
     (OUT / "inspection_history.json").write_text(json.dumps(hist, separators=(",", ":")))
     print(f"Wrote inspection_history.json ({len(hist):,} establishments)")
 

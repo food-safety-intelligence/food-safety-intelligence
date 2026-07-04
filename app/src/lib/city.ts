@@ -55,7 +55,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     center: { lat: 41.88, lon: -87.63 },
     zoom: 10,
     centerLabel: "Chicago · 41.88, −87.63",
-    nounPlural: "licensed food establishments",
+    nounPlural: "licensed food establishments",  // Chicago's feed covers all licensed food establishments
     predictionBlurb:
       "the chance a place will see a failed inspection or priority violation in the next six months",
     sourceBlurb:
@@ -87,7 +87,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     center: { lat: 40.71, lon: -74.0 },
     zoom: 10,
     centerLabel: "New York City · 40.71, −74.00",
-    nounPlural: "food service establishments",
+    nounPlural: "licensed restaurants",  // NYC's DOHMH feed is restaurant inspections
     predictionBlurb:
       "the chance a place's next inspection is graded B or C (a score of 14 or more points)",
     sourceBlurb:

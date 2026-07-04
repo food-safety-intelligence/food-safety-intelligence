@@ -3,22 +3,17 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
+import { CITY_CONFIG, type City } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { formatInspectionDate } from "@/lib/utils";
 
-const RESULT_STYLES = {
-  Pass: { bg: "bg-sage", label: "P", text: "" },
-  "Pass w/ Conditions": { bg: "bg-amber", label: "!", text: "" },
-  Fail: { bg: "bg-terra", label: "×", text: "text-terra" },
-} as const;
-
-type ResultKey = keyof typeof RESULT_STYLES;
-
-function styleFor(result: string) {
-  return RESULT_STYLES[result as ResultKey] ?? {
-    bg: "bg-muted",
-    label: "·",
-    text: "",
-  };
+// Dot colour + badge for an inspection outcome, per city (Pass/Fail for Chicago,
+// letter grade A/B/C for NYC — from CITY_CONFIG.historyResults).
+function styleFor(result: string, city: City) {
+  const cat = CITY_CONFIG[city].historyResults.find((c) => c.match(result));
+  return cat
+    ? { bg: cat.bg, label: cat.badge }
+    : { bg: "bg-muted", label: "·" };
 }
 
 /** One cited violation: the code + name, and the inspector's free-text note. */
@@ -65,6 +60,7 @@ export function InspectionTimeline({
   events: InspectionEvent[];
   maxVisible?: number;
 }) {
+  const { city } = useCity();
   // Whether the older inspections (past maxVisible) are revealed.
   const [expanded, setExpanded] = useState(false);
   // Which rows are expanded to show their comments, keyed by row's stable key.
@@ -100,8 +96,8 @@ export function InspectionTimeline({
       />
       <ul className="space-y-3 relative">
         {visible.map((e, i) => {
-          const s = styleFor(e.result);
-          const isFail = e.result === "Fail";
+          const s = styleFor(e.result, city);
+          const isFail = CITY_CONFIG[city].isBadOutcome(e.result);
           const key = `${e.date}-${i}`;
           const isOpen = open.has(key);
           const panelId = `inspection-comments-${key}`;
