@@ -124,9 +124,9 @@ export function HowItWorksLa() {
           pipeline, calibrated model, and SHAP drivers as Chicago, on LA data.
         </p>
         <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="top-decile lift over the base rate" />
-          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC on the held-out test set" />
-          <HeroStat value={m ? `${prevPct}%` : "—"} label="of next inspections are B or C (base rate)" />
+          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
+          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
+          <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against a ${prevPct}% base rate`} />
         </dl>
       </header>
 
@@ -260,6 +260,26 @@ export function HowItWorksLa() {
               For context, Chicago reaches ROC-AUC ~0.78 and lift ~3.4×, and NYC ~0.66
               — LA sits between them, still a preview rather than a production model.
             </p>
+          )}
+          {m && (
+            <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">ROC-AUC {m.headline.roc_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above a clean one. Base-rate-independent, so it&apos;s the fair way to compare LA with Chicago and NYC.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">PR-AUC {m.headline.pr_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">Ranking quality for the rare B/C class. Its floor is the {prevPct}% base rate, so it only compares fairly to cities with a similar base rate — not to NYC&apos;s ~40%.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Top-decile lift {m.headline.top_decile_lift.toFixed(1)}×</dt>
+                <dd className="text-muted leading-snug mt-0.5">Work the top 10% by predicted risk and you find {m.headline.top_decile_lift.toFixed(1)}× as many B/C inspections as picking at random.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Base rate {prevPct}%</dt>
+                <dd className="text-muted leading-snug mt-0.5">Share of next inspections that are actually B/C — what &ldquo;random&rdquo; and the PR-AUC floor are measured against.</dd>
+              </div>
+            </dl>
           )}
           {m && (
             <div className="mt-5 overflow-x-auto">
