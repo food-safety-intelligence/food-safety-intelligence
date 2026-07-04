@@ -1,9 +1,12 @@
-# 0016 — Multi-city expansion (NYC) and a shared risk vocabulary
+# 0016 — Multi-city expansion (NYC, then LA) and a shared risk vocabulary
 
 - **Status**: **Proposed** (feasibility record. A measured feasibility run
   (2026-07-04) now backs the shape below — see "Measured results". The one
   durable artifact produced is [`reference/violation_crosswalk.csv`](../../reference/violation_crosswalk.csv);
-  the NYC/Chicago modelling code stayed throwaway scratch.)
+  the NYC/Chicago modelling code stayed throwaway scratch.) **Los Angeles was
+  then built as a third city on this same shape — see the
+  [Los Angeles extension](#los-angeles-extension-2026-07-04) below; that section
+  is the durable LA record and its producer + data are committed, not scratch.**
 - **Date**: 2026-07-04
 - **Owner**: Bella (modeling / eval)
 - **Owners to ack if this proceeds to a build**: Bella + Deepak (modeling),
@@ -282,12 +285,60 @@ that says "NYC will improve accuracy" is contradicted by this run.
 - **Two cities to maintain.** Each retrain, schema change, or feature edit now
   has two targets; the shared pipeline mitigates but does not remove this.
 
+## Los Angeles extension (2026-07-04)
+
+LA was built as a **third city on exactly this shape** — separate model, one
+shared pipeline, shared crosswalk vocabulary, `scores.json` schema 0.5.0, calibrated
+LogReg served (XGBoost comparator only). Unlike the NYC/Chicago scratch above, the
+LA **producer** (`scripts/build_la_scores.py`), the **geocode cache**
+(`reference/la_facility_coords.csv`), and the LA data JSONs are **committed**, and
+the frontend/agent are LA-aware. Two things differed from the runbook's
+assumptions and are the substance of this extension:
+
+1. **Source is not Socrata — it's an ArcGIS Hub bulk CSV.** LA County left Socrata
+   (the `data.lacounty.gov` SODA endpoint 302s to a dead legacy page); the only
+   live *Socrata* LA feed (City of LA `29fd-3paw`) is frozen at 2018-07-31. The
+   fresh data is LA County Environmental Health's ArcGIS Hub items — inspections
+   `19b6607a…` + violations `5eaea9f8…` (2023-04-01 → 2026-03-31). The producer
+   downloads/caches both CSVs and joins violations to inspections on
+   `serial_number` to rebuild the per-violation frame the crosswalk needs.
+2. **Grade direction is FLIPPED, and there are no coordinates.** LA grades A/B/C on
+   **0–100 where HIGHER is cleaner** (A = 90–100), the opposite of Chicago and NYC.
+   The label is `next inspection graded B or C` = **next score < 90**. The feed
+   carries no lat/lon, so facilities are geocoded once via the free US Census batch
+   geocoder (95.7% matched, ZIP-centroid fallback), cached and committed so
+   rebuilds are offline.
+
+**No burn-in cutoff was needed:** the fresh feed starts 2023-04 (already
+post-COVID); mean score is flat ~94.5 across 2023–2026 with no step-change (only a
+gradual B/C-rate drift the temporal split handles honestly).
+
+**Measured (2026-07-04).** 103,474 inspections / 43,053 facilities; B/C base rate
+~4.9%. Temporal split **train 36,900 (2023-04→2024-06) / val 7,374 / test 7,197**
+(test base 8.2%). Served Model 1 (calibrated LogReg): **PR-AUC 0.167, ROC-AUC
+0.737, top-decile lift 2.06×** — an honest coverage feature that sits **between
+NYC (~0.66) and Chicago (~0.78)** on base-rate-free ROC-AUC. Tiers recalibrated to
+LA's own distribution → Low 40% / Moderate 45% / Elevated 13% / High 2%.
+Crosswalk: **128 LA codes** added (T3 91 / T2 32 / T1 5), now 348 rows total.
+
+**Consequences specific to LA.** Data lives under the `la/` prefix; every per-city
+difference is in `CITY_CONFIG.la` (incl. the flipped `isBadOutcome` and A/B/C
+badges) + a `HowItWorksLa` page. The chat agent code is LA-aware but
+`chatSupported` stays **false** until Deepak deploys the LA-aware agent and
+publishes LA data to S3 (cross-account). **Residual risks:** low ~5% base rate
+(small High tier), a shallow 3-year window (thin history, 71% get a trend slope),
+and geocoded (approximate) coordinates.
+
 ## References
 
 - NYC Open Data `43nn-pn8j` (DOHMH NYC Restaurant Inspection Results).
 - NYC Health — Letter Grading for Restaurants (score thresholds, severity tiers).
+- LA County Environmental Health — ArcGIS Hub items `19b6607a…` (inspections) and
+  `5eaea9f8…` (violations), 2023-04-01 → 2026-03-31.
 - [0004](0004-fairness-audit-and-proxy-feature-removal.md),
   [0005](0005-ethics-bias-and-responsible-ai.md) — proxy-feature exclusion
   (cuisine / facility type).
 - [0007](0007-target-label-definition-and-scope.md) — Chicago label definition
   (unchanged here).
+- [0011](0011-trend-signal-forecast-model-last-k-visits.md) — the forecast-only
+  trend model reused for LA.
