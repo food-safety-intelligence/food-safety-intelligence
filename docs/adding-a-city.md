@@ -121,9 +121,15 @@ detail-page trend chart, DR 0011) and the `result` string the app expects
   JSONs). Generalising to an N-city loop is a welcome cleanup; otherwise copy the
   NYC lines for `<city>`.
 - **Deploy** (`.github/workflows/deploy-web.yml`): exclude `data/<city>/detail/*`
-  from the plain `aws s3 sync` and add a per-city `sync-detail-s3.mjs` pass. NYC
-  runs off its **committed fallback** (`prebuild-sync-s3.mjs` already falls back
-  to committed files), so **no S3 push is needed for the web app**.
+  from the plain `aws s3 sync` and add a per-city `sync-detail-s3.mjs` pass. The
+  added city's data comes from the **committed `public/data/<city>/*.json`**
+  (`prebuild-sync-s3.mjs` only pulls *Chicago's* root data from the `web-app-data`
+  data bucket, with a committed fallback). The standard web deploy still
+  `aws s3 sync`s the built `out/` — including the city's data — into the **website
+  S3 bucket** (behind CloudFront) on every merge, so the data *is* served from S3;
+  what's not needed is a **separate manual publish** to the data bucket (that path
+  is only for Chicago's fresh batch output). The **agent** is the exception — it
+  reads its own copy from the data bucket, a separate cross-account push (Deepak).
 
 ---
 
