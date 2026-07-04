@@ -43,7 +43,7 @@ for _tool in [
 # ---------------------------------------------------------------------------
 os.environ.setdefault("SCORES_JSON_PATH", "/tmp/scores.json")
 os.environ.setdefault("HISTORY_JSON_PATH", "/tmp/inspection_history.json")
-# NYC (multi-city, DR 0014) — a second city under the nyc/ S3 prefix.
+# NYC (multi-city, DR 0016) — a second city under the nyc/ S3 prefix.
 os.environ.setdefault("SCORES_JSON_PATH_NYC", "/tmp/nyc_scores.json")
 os.environ.setdefault("HISTORY_JSON_PATH_NYC", "/tmp/nyc_inspection_history.json")
 os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
@@ -324,7 +324,7 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     ``messages`` seeds the new agent with the caller's prior turns so a follow-up
     question has context. It stays scoped to this one request, so isolation holds.
     """
-    # Tell the model which city this request is scoped to (multi-city, DR 0014).
+    # Tell the model which city this request is scoped to (multi-city, DR 0016).
     # The tools already read the right city's data; this keeps the model's
     # framing + "no record" wording aligned to the active city.
     city = _ACTIVE_CITY.get()
@@ -370,7 +370,7 @@ def invoke(payload: dict) -> dict:
     if not query:
         return {"error": "query is required"}
 
-    # City (multi-city, DR 0014): prefer an explicit payload field; else parse a
+    # City (multi-city, DR 0016): prefer an explicit payload field; else parse a
     # leading `[[city:nyc]]` marker the frontend prepends (the deployed proxy
     # reliably forwards only the query string, so the marker is the robust path).
     # The marker is stripped before the model sees the query.

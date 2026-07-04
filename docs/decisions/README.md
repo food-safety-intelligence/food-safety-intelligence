@@ -11,7 +11,7 @@ file per decision; the log is **append-only** — don't renumber existing record
   — what we predict (forward-180-day fail-or-priority), the window, the 2019
   burn-in cutoff, the label universe/exclusions, and why fail-only was rejected.
   (Recorded retroactively; mostly a project-start decision.)
-- [0014 — Multi-city expansion (NYC) and a shared risk vocabulary](0014-multi-city-nyc-expansion-and-shared-risk-vocabulary.md)
+- [0016 — Multi-city expansion (NYC) and a shared risk vocabulary](0016-multi-city-nyc-expansion-and-shared-risk-vocabulary.md)
   — **Proposed** (feasibility, measured): separate per-city models over one shared
   pipeline/vocabulary (not pooled); NYC predicts next-inspection B/C (event-anchored).
   Measured 2026-07-04 — shared vocabulary works (`reference/violation_crosswalk.csv`,

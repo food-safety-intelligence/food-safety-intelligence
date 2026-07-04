@@ -21,7 +21,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
-# Per-city data paths (multi-city, DR 0014); the entrypoint warms each city's
+# Per-city data paths (multi-city, DR 0016); the entrypoint warms each city's
 # files to separate /tmp paths. Default to Chicago.
 def _scores_path(city: str) -> str:
     if city == "nyc":

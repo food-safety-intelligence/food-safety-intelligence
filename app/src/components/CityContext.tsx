@@ -1,6 +1,6 @@
 "use client";
 
-// Client-side city selection (DR 0014). Source of truth precedence:
+// Client-side city selection (DR 0016). Source of truth precedence:
 //   URL `?city=` → localStorage → DEFAULT_CITY.
 // The choice is mirrored back to both the URL (shareable links) and
 // localStorage (sticky across visits). `needsPick` is true on a first visit

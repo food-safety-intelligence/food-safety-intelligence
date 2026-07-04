@@ -1,4 +1,4 @@
-# 0014 — Multi-city expansion (NYC) and a shared risk vocabulary
+# 0016 — Multi-city expansion (NYC) and a shared risk vocabulary
 
 - **Status**: **Proposed** (feasibility record. A measured feasibility run
   (2026-07-04) now backs the shape below — see "Measured results". The one

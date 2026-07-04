@@ -1,6 +1,6 @@
 "use client";
 
-// NYC-specific "how it works" content, driven by nyc/methodology.json (DR 0014).
+// NYC-specific "how it works" content, driven by nyc/methodology.json (DR 0016).
 // Mirrors the Chicago page's structure + formatting (hero + stat cards, sticky
 // jump-nav, numbered sections, TierPill bands, a worked calibrated-log-odds
 // example, and a Reference/definitions list) with NYC-accurate content.

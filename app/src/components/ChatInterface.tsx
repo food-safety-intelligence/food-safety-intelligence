@@ -147,7 +147,7 @@ function renderContent(text: string): React.ReactNode[] {
 // than reshuffling. Each "learn" entry maps to a topic the agent's food_safety_info
 // tool covers; each "find" to real neighborhoods.
 
-// "Find" prompts name real neighborhoods, so they're per-city (DR 0014).
+// "Find" prompts name real neighborhoods, so they're per-city (DR 0016).
 const FIND_QUERIES_BY_CITY: Record<"chicago" | "nyc", string[]> = {
   chicago: [
     "Safest sushi near Wicker Park",
@@ -466,7 +466,7 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* NYC notice — the agent backend only has Chicago data (DR 0014). Be
+      {/* NYC notice — the agent backend only has Chicago data (DR 0016). Be
           honest: general food-safety questions work, establishment lookups don't. */}
       {!CITY_CONFIG[city].chatSupported && (
         <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">

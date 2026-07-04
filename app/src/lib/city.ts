@@ -1,4 +1,4 @@
-// Multi-city support (DR 0014). One static build serves both cities; the
+// Multi-city support (DR 0016). One static build serves both cities; the
 // selected city is a client concern (URL `?city=` → localStorage → default).
 // Every per-city difference — data path, map framing, and the copy that names
 // the label/window/source — lives here so components stay city-agnostic.
@@ -114,7 +114,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // (forecast risk rises as prior B/C history accumulates), so "Improving"
     // is genuinely rare — widening the band only erases it, it doesn't balance.
     trendStableBand: 0.0003,
-    // Chat is city-scoped (DR 0014): the frontend sends city=nyc and the agent
+    // Chat is city-scoped (DR 0016): the frontend sends city=nyc and the agent
     // loads NYC data + scopes lookups. Requires the agent redeploy + NYC data in
     // S3 to answer NYC lookups; until then a NYC lookup returns "no record".
     chatSupported: true,

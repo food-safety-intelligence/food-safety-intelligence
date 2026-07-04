@@ -1,4 +1,4 @@
-"""Build NYC's scores.json in the exact Chicago schema (Phase 1, DR 0014).
+"""Build NYC's scores.json in the exact Chicago schema (Phase 1, DR 0016).
 
 NYC served model mirrors Chicago's production model: a LogisticRegression
 pipeline + sigmoid (Platt) calibration, so the SHAP-waterfall + calibration-
@@ -506,7 +506,7 @@ def main():
         "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
         "label": "Probability the establishment's NEXT inspection is graded B or C (score ≥ 14)",
         "train_window": f"post-COVID, {NYC_TRAIN_START} onward (inspections halted Mar 2020)",
-        "provenance": {"model_version": MODEL_VERSION, "note": "feasibility build, DR 0014"},
+        "provenance": {"model_version": MODEL_VERSION, "note": "feasibility build, DR 0016"},
         "test": {
             "n": int(len(y_test)),
             "prevalence": round(float(y_test.mean()), 4),

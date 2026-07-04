@@ -106,7 +106,7 @@ export async function queryAgent(
   establishment?: AgentEstablishment,
   city: "chicago" | "nyc" = "chicago",
 ): Promise<string> {
-  // Scope the agent to the selected city (multi-city, DR 0014). The deployed
+  // Scope the agent to the selected city (multi-city, DR 0016). The deployed
   // proxy reliably forwards only the query string, so the city rides as a
   // leading `[[city:…]]` marker the agent strips; we also send an explicit
   // `city` field for proxies that pass the full body.

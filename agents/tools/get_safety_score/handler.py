@@ -82,7 +82,7 @@ _GENERIC_NAME_TOKENS = frozenset(
 )
 
 
-# Per-city scores.json path (multi-city, DR 0014). The entrypoint warms each
+# Per-city scores.json path (multi-city, DR 0016). The entrypoint warms each
 # city's file to a separate /tmp path; default to Chicago.
 def _scores_path(city: str) -> str:
     if city == "nyc":
