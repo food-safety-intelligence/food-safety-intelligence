@@ -15,6 +15,7 @@ Your query
       → get_safety_score   — precomputed batch scores from scores.json
       → explain_restaurant — scores.json + inspection_history.json
       → find_reviews       — third-party review links (opt-in; not a score input)
+      → find_inspection_records — authoritative city-record links (compare/list/area)
       → food_safety_info   — general food-safety facts + authoritative citations
   → Plain-English ranked response
 ```
@@ -119,7 +120,8 @@ sequence). Each handler takes `handler(event, _ctx)`.
 - *Input*: `{"name": "...", "address": "...", "topics": [...]}` — `topics` is a
   subset of `cleanliness`, `pests`, `food_quality`, `illness` (empty = all).
 - *Output*: `{name, topics, review_links, disclaimer}`. `review_links` are
-  attributed Yelp / Google / web deep links the **user** clicks through to.
+  attributed Yelp / Google Maps / TripAdvisor deep links — each to that source's
+  own search for the business — the **user** clicks through to.
 - *Boundary — reviews are not a model feature*: the tool **never scrapes or
   stores** Yelp / Google pages (their Terms of Service forbid automated page
   access); it only builds links the user follows. Reviews are
@@ -127,7 +129,23 @@ sequence). Each handler takes `handler(event, _ctx)`.
   carries `disclaimer`, and the prompt forbids using a review to set or change a
   score or tier.
 
-**5. `food_safety_info`** — general food-safety education with cited sources.
+**5. `find_inspection_records`** — authoritative Chicago city-record link for a
+set of establishments (opt-in; compare / list / area).
+
+- *Input* (exactly one filter): `{"license_ids": [...]}` for named places (the
+  **non-null** `license_id`s that `get_safety_score` returned), `{"zip": "..."}`
+  for a ZIP, or `{"lat":…, "lon":…, "radius_m":…}` for a radius.
+- *Output*: `{url, mode, truncated, note}` — one deep link into the Chicago Data
+  Portal's query view, filtered to those records (`` `license_` IN (…) ``,
+  `` `zip`=… ``, or `within_circle(…)`). Enumerated id lists are capped at 25 (URL
+  length) → `truncated: true`; larger sets should use the ZIP / radius modes.
+- *Boundary — provenance, not a feature*: like `find_reviews` the tool **never
+  fetches** — it only builds a URL the user clicks. But this is the city's **own**
+  inspection data (the source behind the score), not third-party opinion, so it
+  carries no disclaimer. It complements the agent's own comparison; it does not
+  replace it.
+
+**6. `food_safety_info`** — general food-safety education with cited sources.
 
 - *Input*: `{"query": "...", "topics": [...]}` — `query` is the user's general
   question; `topics` is an optional explicit subset of the topic registry keys
