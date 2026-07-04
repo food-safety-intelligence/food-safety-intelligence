@@ -137,13 +137,21 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         # SHAP drivers — full detail
         "top_drivers": _format_drivers(record.get("top_drivers", [])),
         # Inspection summary + history
-        "inspection_summary": _summarise(events),
+        "inspection_summary": _summarise(events, city),
         "inspection_history": events[:10],  # most recent 10
         # Model context
         "model_note": (
-            "Risk score is a 180-day forward prediction "
-            "(probability of a failed inspection or priority violation), "
-            "not a real-time safety verdict."
+            (
+                "Risk score is the probability the establishment's next inspection "
+                "is graded B or C (a score of 14+ points), not a real-time safety "
+                "verdict."
+            )
+            if city == "nyc"
+            else (
+                "Risk score is a 180-day forward prediction "
+                "(probability of a failed inspection or priority violation), "
+                "not a real-time safety verdict."
+            )
         ),
     }
 
@@ -203,17 +211,28 @@ def _sort_events_desc(events: list[dict]) -> list[dict]:
     return sorted(events, key=_event_sort_key, reverse=True)
 
 
-def _classify_result(result: str) -> str:
-    """Map a Chicago inspection `result` string to a summary bucket.
+def _classify_result(result: str, city: str = "chicago") -> str:
+    """Map an inspection `result` string to a summary bucket, per city.
 
-    The feed is not just Pass / Fail / Pass w/ Conditions: it also carries
-    "Out of Business", "No Entry", "Not Ready" and "Business Not Located",
-    which are not inspection outcomes. They go to `other` so they are never
-    miscounted as passes (the old catch-all `else` inflated the pass count).
+    Chicago: the feed is not just Pass / Fail / Pass w/ Conditions — it also
+    carries "Out of Business", "No Entry", "Not Ready" and "Business Not
+    Located", which are not inspection outcomes and go to `other`.
+
+    NYC: results are letter grades ("Grade A (score 7)" …). They map onto the
+    same clean / middling / bad buckets: A -> pass, B -> pass_w_conditions,
+    C -> fail.
     """
     # Coerce defensively: the `result` key can be present but explicitly None,
     # which would crash on .strip()/.lower() — match the null-tolerant sort key.
     r = str(result).strip().lower()
+    if city == "nyc":
+        if r.startswith("grade a"):
+            return "pass"
+        if r.startswith("grade b"):
+            return "pass_w_conditions"
+        if r.startswith("grade c"):
+            return "fail"
+        return "other"
     if "fail" in r:
         return "fail"
     if "conditions" in r:  # "Pass w/ Conditions"
@@ -223,7 +242,7 @@ def _classify_result(result: str) -> str:
     return "other"
 
 
-def _summarise(events: list[dict]) -> dict[str, Any]:
+def _summarise(events: list[dict], city: str = "chicago") -> dict[str, Any]:
     """Compute aggregate stats over inspection history (expects newest-first)."""
     if not events:
         return {
@@ -238,7 +257,7 @@ def _summarise(events: list[dict]) -> dict[str, Any]:
 
     counts = {"pass": 0, "fail": 0, "pass_w_conditions": 0, "other": 0}
     for ev in events:
-        counts[_classify_result(ev.get("result", ""))] += 1
+        counts[_classify_result(ev.get("result", ""), city)] += 1
 
     last_date: str | None = events[0].get("date")
     days_since: int | None = None

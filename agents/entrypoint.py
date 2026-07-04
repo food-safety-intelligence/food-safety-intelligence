@@ -140,9 +140,9 @@ def find_restaurants(
     limit: int = 20,
 ) -> list:
     """
-    Find restaurants near a Chicago neighborhood or lat/lon coordinates using
-    OpenStreetMap (free, no API key). Filters by cuisine when provided.
-    ALWAYS call this first before get_safety_score.
+    Find restaurants near a neighborhood or lat/lon coordinates (in the active
+    city — see ACTIVE CITY) using OpenStreetMap (free, no API key). Filters by
+    cuisine when provided. ALWAYS call this first before get_safety_score.
     """
     ev: dict = {"radius_km": radius_km, "limit": limit}
     if neighborhood:
@@ -203,9 +203,9 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
     Answer a GENERAL food-safety / foodborne-illness question (what a germ is, how
     common illness is, safe cooking temperatures, who is most at risk, how to
     prevent it) with short vetted facts AND a citation to an authoritative public
-    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or Chicago/Illinois
-    public health). Use for general questions NOT about one Chicago restaurant's
-    score. Base any statistic on the returned summary and cite the returned source
+    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or a city/state
+    public health department). Use for general questions NOT about one specific
+    restaurant's score. Base any statistic on the returned summary and cite the returned source
     links. Education, not medical advice — never use it to judge what is safe for
     someone personally.
 
