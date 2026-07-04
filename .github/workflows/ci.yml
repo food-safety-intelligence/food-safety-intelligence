@@ -80,6 +80,7 @@ jobs:
           uv run coverage run -a agents/eval/run_eval.py --self-test
           uv run coverage run -a agents/eval/run_eval.py --faithfulness
           uv run coverage run -a agents/eval/run_eval.py --citations
+          uv run coverage run -a agents/eval/run_eval.py --link-checks
           uv run coverage report -m
           uv run coverage xml
 
