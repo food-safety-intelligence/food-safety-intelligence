@@ -79,7 +79,7 @@ export default function ProtoPage() {
                     <span className="inline-block w-4 h-[2px] bg-[#6B7280]" /> trend (forecast — ignores each visit&rsquo;s result)
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="inline-block w-2.5 h-2.5 rotate-45 bg-[#B8634A]" /> current assessment (includes latest result)
+                    <span className="inline-block w-5 h-3 rounded-sm bg-[#B8634A] align-middle" /> current assessment (includes latest result)
                   </span>
                 </div>
               </div>

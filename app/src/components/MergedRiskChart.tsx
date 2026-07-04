@@ -59,7 +59,7 @@ export function MergedRiskChart({
   const clipId = useId();
 
   const padL = 34;
-  const padR = 62; // right gutter for the "current" diamond marker
+  const padR = 56; // right gutter for the current-value tag
   const padTop = 14;
   const padBot = 24;
   const w = width - padL - padR;
@@ -95,11 +95,11 @@ export function MergedRiskChart({
   const winStart = Math.max(0, pts.length - windowSize);
   const bandLeft = winStart > 0 ? (xy[winStart - 1].x + xy[winStart].x) / 2 : null;
 
-  // Current marker sits in the right gutter (its own "now" slot past the last
-  // visit) so it reads as today's headline, distinct from the last dot.
-  const curX = padL + w + 22;
+  // Current assessment (Model 1) shown as a value tag pinned to the right axis
+  // at its risk level — no leader line. Clamped off the top/bottom gutters so
+  // the tag text never clips the axis labels.
   const curY = yFor(currentScore);
-  const lastY = xy.length ? xy[xy.length - 1].y : curY;
+  const tagY = clamp(curY, padTop + 9, padTop + h - 9);
 
   const fmtAxis = (ms: number) =>
     new Date(ms).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
@@ -215,27 +215,34 @@ export function MergedRiskChart({
           })}
         </g>
 
-        {/* Dotted connector from the last trajectory dot to the current marker —
-            "today's inspection moved the assessment off the underlying trend." */}
-        {xy.length > 0 && (
-          <line
-            x1={xy[xy.length - 1].x}
-            y1={lastY}
-            x2={curX}
-            y2={curY}
-            stroke={TIER_HEX[currentTier]}
-            strokeOpacity={0.5}
-            strokeWidth={1.5}
-            strokeDasharray="3 3"
-          />
-        )}
-
-        {/* Current (Model 1) marker — the headline number, in tier colour. The
-            numeric value is in the card headline, so the marker just says "now". */}
-        <g transform={`translate(${curX} ${curY})`}>
-          <path d="M 0 -6 L 6 0 L 0 6 L -6 0 Z" fill={TIER_HEX[currentTier]} stroke="#FFFFFF" strokeWidth={1.5} />
-          <text x={0} y={17} textAnchor="middle" fontSize={8.5} fill="#6B7280" fontFamily="var(--font-manrope), sans-serif">
-            now
+        {/* Current assessment (Model 1) — a faint horizontal guide marks the
+            current risk level across the trajectory + tier bands, and a value
+            tag sits on the right axis at that level. No leader line; the tag's
+            position vs the last trajectory dot shows how today's result moved
+            the assessment off the underlying trend. */}
+        <line
+          x1={padL}
+          y1={tagY}
+          x2={padL + w}
+          y2={tagY}
+          stroke={TIER_HEX[currentTier]}
+          strokeOpacity={0.3}
+          strokeWidth={1}
+          strokeDasharray="4 3"
+        />
+        <g transform={`translate(${padL + w} ${tagY})`}>
+          <path d="M 0 0 L 7 -5 L 7 5 Z" fill={TIER_HEX[currentTier]} />
+          <rect x={6} y={-9} width={40} height={18} rx={4} fill={TIER_HEX[currentTier]} />
+          <text
+            x={26}
+            y={4}
+            textAnchor="middle"
+            fontSize={11}
+            fontWeight={700}
+            fill="#FFFFFF"
+            fontFamily="var(--font-manrope), sans-serif"
+          >
+            {currentScore.toFixed(2)}
           </text>
         </g>
 

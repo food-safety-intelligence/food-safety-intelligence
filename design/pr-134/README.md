@@ -19,8 +19,9 @@ single **risk-trajectory chart**:
   carry the meaning the gauge's colour used to;
 - the neutral **Model 2 line** is the trajectory over past inspections
   (ignores each visit's own pass/fail, per decision 0011);
-- the **Model 1 `risk_score`** is a distinct "current" diamond in the tier
-  colour — the headline number, now shown in context.
+- the **Model 1 `risk_score`** is a tier-coloured value tag pinned to the right
+  axis at its risk level (with a faint horizontal "current level" guide) — the
+  headline number, shown in context, no leader line.
 
 No forward/extrapolated line: decision 0011 found the loose direction does not
 predict, so we don't draw a future line.
@@ -30,7 +31,7 @@ predict, so we don't draw a future line.
 Today the gauge (e.g. `0.23`) and the trend chart's last dot are two *different*
 numbers for "now" (Model 1 vs Model 2) sitting next to each other with nothing
 explaining the gap. The merge makes that relationship explicit — the small gap
-between the last line dot and the current diamond is "today's inspection nudged
+between the last line dot and the current-value tag is "today's inspection nudged
 the assessment off the underlying trend."
 
 ## Screenshots (real 0.5.0 data)
