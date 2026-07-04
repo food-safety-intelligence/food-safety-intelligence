@@ -301,3 +301,49 @@ def test_write_scores_json_closure_fields_and_active_only_trend_counts(tmp_path)
     active = [r for r in payload["scores"] if not r["is_out_of_business"]]
     expected_worsening = sum(1 for r in active if (r["trend_slope"] or 0) > 0.001)
     assert payload["totals"]["worsening_30d"] == expected_worsening
+
+
+def test_reopened_license_collapses_to_one_establishment_row():
+    """A physical establishment holding two license_ids appears once.
+
+    A reopen/renewal mints a new license_id at the same name + address, which a
+    license-only dedup would list twice (a stale ghost beside the live entry).
+    The most-recently-inspected license wins. A same-name chain at a *different*
+    address must stay a separate row, and normalisation (case + trailing space)
+    must not defeat the collapse.
+    """
+    features = _make_features()
+    model = _fit_model(features)
+
+    # Clone a single-inspection license into a NEW license_id at the SAME name +
+    # address but a later inspection date — the reopen case. Vary case and add a
+    # trailing space to prove normalisation collapses them.
+    old = features[features["license_id"] == "L5"].copy()
+    reopened = old.copy()
+    reopened["license_id"] = "L5_REOPEN"
+    reopened["inspection_date"] = old["inspection_date"].iloc[0] + pd.Timedelta(days=200)
+    reopened["dba_name"] = old["dba_name"].iloc[0].lower()
+    reopened["address"] = old["address"].iloc[0].upper() + "  "
+
+    # Same name, different address (a chain) — must NOT be merged.
+    chain = old.copy()
+    chain["license_id"] = "L5_CHAIN"
+    chain["address"] = "999 Other Ave"
+
+    combined = pd.concat([features, reopened, chain], ignore_index=True)
+    scores = build_scores_table(model, combined, ALL_FEATURES)
+    ids = set(scores["license_id"])
+
+    # Reopened pair collapses to the most-recently-inspected license.
+    assert "L5_REOPEN" in ids
+    assert "L5" not in ids
+    # The chain at a different address survives on its own.
+    assert "L5_CHAIN" in ids
+
+    # No physical establishment (normalised name + address) is listed twice.
+    est = (
+        scores["dba_name"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
+        + "|"
+        + scores["address"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
+    )
+    assert est.is_unique

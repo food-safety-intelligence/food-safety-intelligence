@@ -99,6 +99,27 @@ def score_to_tier(score: float) -> str:
     return "High"
 
 
+def _establishment_key(df: pd.DataFrame) -> pd.Series:
+    """A physical-establishment key: normalised ``dba_name`` + ``address``.
+
+    A single physical restaurant can hold several license_ids over time — a
+    renewal, an ownership change, or a close-then-reopen each mints a new
+    license. Those licenses share the same name and street address, so keying
+    on (name, address) collapses them to one establishment. Normalisation is
+    required: the raw strings differ by trailing whitespace and case (e.g.
+    "546 N WELLS ST " vs "546 N WELLS ST"), which a raw match would treat as
+    distinct. Rows with no name AND no address fall back to license_id so blank
+    records are never merged together.
+    """
+    name = df["dba_name"].fillna("").astype(str).str.upper().str.replace(r"\s+", " ", regex=True)
+    addr = df["address"].fillna("").astype(str).str.upper().str.replace(r"\s+", " ", regex=True)
+    name = name.str.strip()
+    addr = addr.str.strip()
+    key = name + "|" + addr
+    blank = (name == "") & (addr == "")
+    return key.mask(blank, "license:" + df["license_id"].astype(str))
+
+
 def build_scores_table(
     model,
     features: pd.DataFrame,
@@ -157,9 +178,20 @@ def build_scores_table(
         np.asarray(trend_scores) if trend_scores is not None else df["risk_score"].to_numpy()
     )
 
-    # Per-restaurant aggregation.
+    # Per-restaurant aggregation. First collapse each license to its most recent
+    # inspection, then collapse licenses that belong to the same physical
+    # establishment (name + address) — a reopen/renewal mints a new license_id,
+    # so a license-only dedup lists the same restaurant twice (a stale ghost next
+    # to the live entry). Sorted by inspection_date, so keep="last" keeps the
+    # most-recently-inspected license per establishment; the closure flag below
+    # then applies to that survivor (DR 0014).
+    latest = df.sort_values("inspection_date")
+    latest_per_license = latest.drop_duplicates("license_id", keep="last").copy()
+    latest_per_license["_establishment_key"] = _establishment_key(latest_per_license)
     latest_per_license = (
-        df.sort_values("inspection_date").drop_duplicates("license_id", keep="last").copy()
+        latest_per_license.drop_duplicates("_establishment_key", keep="last")
+        .drop(columns="_establishment_key")
+        .copy()
     )
 
     # SHAP attribution for the latest-anchor rows. Done in one batched call

@@ -286,9 +286,13 @@ Layer-C TF-IDF→SVD(50) violation-text embedding.
 
 ## 3. `data/predictions/scores.parquet`
 
-**Grain**: one row per `(license_id, as_of_date)`. The app reads the latest
-`as_of_date` per license for the current view, and earlier dates for the
-trend chart.
+**Grain**: one row per **physical establishment**, keyed by `license_id`. Each
+license is first anchored on its most recent inspection (`as_of_date`); licenses
+that share a normalised `dba_name` + `address` (a reopen/renewal that minted a
+new `license_id`) are then collapsed to the most-recently-inspected one, so a
+restaurant is served once rather than as a live entry beside a stale ghost. Rows
+stay uniquely keyed by `license_id`; the trend chart reads earlier `as_of_date`s
+for that surviving license.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `src/foodsafety/serve/predict_batch.py` (Bella).
 **Consumer**: the Next.js web app, via the exported `app/public/data/scores.json`.

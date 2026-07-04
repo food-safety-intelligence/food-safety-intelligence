@@ -26,9 +26,12 @@ de-emphasise — but do not hide — closed venues in every surface.
    `inspections_labeled.parquet`, the only artifact carrying non-scoreable
    events) has result **`Out of Business`** or **`Business Not Located`**.
    - Latest-event-only: Chicago re-licenses reopened venues under a new
-     `license_id`, so an old closure event never marks a live license closed
-     (verified: PISTORES PIZZA & PASTRY exists as both a closed old license and
-     an active new one at the same address).
+     `license_id`, so an old closure event never marks a live license closed.
+     (Reopened/renewed licenses are also collapsed to one served row per
+     physical establishment *before* this flag is applied — see the dedup note
+     below — so PISTORES PIZZA & PASTRY, which held two `license_id`s at 546 N
+     Wells St, is served once as its most-recently-inspected license and flagged
+     closed, rather than as a live entry beside a stale ghost.)
    - `No Entry` / `Not Ready` are **not** closure signals — the venue may
      operate.
 2. **Contract.** Two new columns in `scores.parquet` / fields in `scores.json`:
@@ -48,6 +51,18 @@ de-emphasise — but do not hide — closed venues in every surface.
    prompt directs the agent to disclose closure and frame the score as
    historical. Until that lands the agent keeps scoring closed venues as open —
    tracked below.
+
+**Reopened-license dedup (folded in).** A reopen/renewal mints a new
+`license_id` at the same name + address, so a license-only anchor lists the same
+restaurant twice — a stale "Low" ghost beside the live entry (~2,620
+establishments, ~3,700 duplicate rows in the served set). Scoring now collapses
+to one row per physical establishment (normalised name + address;
+most-recently-inspected license wins) *before* the closure flag, so the survivor
+carries the closure status. This shrinks the served row count (~23.6k → ~19.9k)
+and shifts the closed-count numbers in "Problem" above — recount them on
+regeneration. A same-name chain at different addresses is not merged; a
+shared-address venue with an identical name (food hall / terminal) can
+over-merge (rare, accepted).
 
 ## Alternatives rejected
 
@@ -75,7 +90,8 @@ de-emphasise — but do not hide — closed venues in every surface.
 (The 0011 half-landing taught us to track this per surface — keep it updated.)
 
 - [ ] PR-A (this PR): pipeline (`out_of_business_status`, contract columns,
-      totals), web app (pin/list/detail/sort), contract doc, this record
+      totals, reopened-license dedup), web app (pin/list/detail/sort), contract
+      doc, this record
 - [ ] Regenerate + `make publish` + commit the refreshed
       `app/public/data/scores.json` fallback (bundle with the 0011
       `trend_slope` fallback regen — one regen fixes both)
