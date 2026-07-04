@@ -123,7 +123,22 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
         and r.get("risk_score") not in (None, -1.0)
         and seen.get(norm(r["address"])) == 1
     ]
-    sample_records = candidates[:sample]
+    # scores.json clusters insufficient-history records (null trend_slope) near
+    # the front, so a plain candidates[:sample] head would barely include a real
+    # slope — the trend relay check below would then have almost no teeth and a
+    # future field-rename regression could slip through again. Deterministically
+    # mix both trend regimes so the sample exercises a real slope AND the
+    # null -> "not enough inspection history" label. All candidates are equally
+    # valid for the score/tier/license_id checks; only which ones we pick changes.
+    with_trend = [r for r in candidates if r.get("trend_slope") is not None]
+    without_trend = [r for r in candidates if r.get("trend_slope") is None]
+    half = sample // 2
+    sample_records = with_trend[: sample - half] + without_trend[:half]
+    if len(sample_records) < sample:
+        # One regime was short (e.g. a mock file with no real slopes); backfill
+        # from the leftovers of both so the sample stays as full as the data allows.
+        leftover = with_trend[sample - half :] + without_trend[half:]
+        sample_records += leftover[: sample - len(sample_records)]
     if not sample_records:
         # Zero eligible records means there is nothing to verify, so the gate
         # cannot confirm the relay — treat it as a failure rather than a pass.
