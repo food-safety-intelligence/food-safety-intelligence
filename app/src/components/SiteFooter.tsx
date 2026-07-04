@@ -1,7 +1,6 @@
 "use client";
 
-import { MessageSquarePlus } from "lucide-react";
-import Link from "next/link";
+import { FeedbackFooterLink } from "@/components/FeedbackFooterLink";
 
 import { CITY_CONFIG } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
@@ -17,13 +16,7 @@ export function SiteFooter() {
             A research preview · UC Berkeley MIDS Capstone
           </div>
           <p className="mt-2 leading-relaxed max-w-[40ch]">{cfg.footerBlurb}</p>
-          <Link
-            href="/feedback?source=footer"
-            className="mt-3 inline-flex items-center gap-1.5 text-teal hover:underline"
-          >
-            <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
-            Give feedback
-          </Link>
+          <FeedbackFooterLink />
         </div>
         <div className="col-span-6 md:col-span-3">
           <div className="text-2xs tracking-widest uppercase text-muted mb-2">
