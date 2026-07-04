@@ -41,7 +41,7 @@
 | src/foodsafety/models/evaluate.py                        |      108 |        3 |       20 |        3 |     95% |72, 122, 275 |
 | src/foodsafety/models/xgb.py                             |       33 |        0 |       10 |        0 |    100% |           |
 | src/foodsafety/serve/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/serve/predict\_batch.py                   |       78 |       11 |       20 |        6 |     83% |72, 115, 117, 145, 204-206, 218-219, 224-225, 261-\>277 |
+| src/foodsafety/serve/predict\_batch.py                   |       78 |       11 |       20 |        6 |     83% |72, 115, 117, 145, 204-206, 218-219, 224-225, 261-\>284 |
 | src/foodsafety/tracking.py                               |       20 |       20 |        0 |        0 |      0% |     18-62 |
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
