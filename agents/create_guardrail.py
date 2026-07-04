@@ -61,11 +61,12 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "OffTopicNonFoodSafety",
+        # Bedrock caps a topic definition at 200 chars, so this stays terse (the
+        # examples carry the specifics). Cities abbreviated to fit LA in.
         "definition": (
-            "Requests neither about food-safety risk for Chicago, New York City, or "
-            "Los Angeles establishments nor general food safety or foodborne illness "
-            "— e.g. recipes, cooking, meal planning, restaurants in cities we don't "
-            "cover, or unrelated chat."
+            "Requests not about food-safety risk for a covered-city establishment "
+            "(Chicago, NYC, LA), nor about general food safety or foodborne illness "
+            "— e.g. recipes, meal planning, or a city we don't cover."
         ),
         "examples": [
             "Give me a recipe for deep dish pizza.",
