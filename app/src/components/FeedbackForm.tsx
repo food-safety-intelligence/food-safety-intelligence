@@ -16,27 +16,16 @@ import { cn } from "@/lib/utils";
 type Status = "idle" | "submitting" | "success" | "error";
 
 /**
- * Resolve the submitter's role WITHOUT asking on the form. The role is captured
- * once at site entry (a future onboarding step) and carried forward; this form
- * only reads the prefilled value. Order: an explicit `?role=` link param first
- * (lets a future entry step deep-link a role in), then a `fsi_role` value that
- * step will persist, else "unknown". Kept hidden so submissions are already
- * role-tagged the day the entry step lands — nothing here has to change then.
+ * Resolve the submitter's role WITHOUT asking on the form. Role is meant to be
+ * prefilled from a future site-entry onboarding step; this form only reads it.
+ * For now the sole source is an explicit `?role=` link param (that step can
+ * deep-link one in) — absent or unrecognised, it's "unknown". Kept as a hidden
+ * field so submissions are already role-tagged the day the step ships.
  */
 function resolveRole(param: string | null): FeedbackRole {
-  const candidate = param ?? readStoredRole();
-  return FEEDBACK_ROLES.includes(candidate as FeedbackRole)
-    ? (candidate as FeedbackRole)
+  return FEEDBACK_ROLES.includes(param as FeedbackRole)
+    ? (param as FeedbackRole)
     : "unknown";
-}
-
-function readStoredRole(): string | null {
-  try {
-    return window.localStorage.getItem("fsi_role");
-  } catch {
-    // localStorage can throw in private-mode / blocked-storage browsers.
-    return null;
-  }
 }
 
 export function FeedbackForm() {
