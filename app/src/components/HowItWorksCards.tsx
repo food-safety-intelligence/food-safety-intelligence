@@ -55,9 +55,15 @@ export function ModelCard({ city, m, number, limitations }: {
         <h2 className="text-2xl font-medium tracking-tight">What this model is for</h2>
         <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
           A model card gathers, in one place, who the model is for, how it was tested,
-          where it falls short, and how it&apos;s kept up to date. It covers{" "}
-          <span className="font-medium text-ink/80">two models</span> — the risk score
-          and a separate trend forecast — the same pair as Chicago, retrained on {c.label} data.
+          where it falls short, and how it&apos;s kept up to date. The mechanics and
+          numbers restate and link to{" "}
+          <a href="#how-its-built" className="text-teal hover:underline">How it&apos;s built</a>{" "}
+          and{" "}
+          <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>
+          {" "}above; the intended-use, limits, and retraining points below are what the
+          card adds. It covers <span className="font-medium text-ink/80">two models</span> —
+          the risk score and a separate trend forecast — the same pair as Chicago,
+          retrained on {c.label} data.
         </p>
 
         <h3 className="text-lg font-medium tracking-tight mt-8">The two models</h3>
@@ -132,14 +138,11 @@ export function ModelCard({ city, m, number, limitations }: {
 
         <h3 className="text-lg font-medium tracking-tight mt-6">How it&apos;s evaluated</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
-          On a strictly time-held-out split — trained on the earliest inspections,
-          calibrated on a later slice, tested on the most recent window
-          ({testFrom ?? "the latest window"} onward) — with every feature computed only
-          from data before the inspection it describes. We report ranked-work-list
-          metrics (precision, coverage, lift by top-K) and compare cities by ROC-AUC,
-          the base-rate-independent number, under{" "}
+          On a strictly time-held-out split, with every feature computed only from data
+          before the inspection it describes (no leakage) and no cuisine or demographic
+          proxy as an input; cities are compared by ROC-AUC (base-rate-independent). The
+          full metrics table + operating points are under{" "}
           <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>.
-          No cuisine or demographic proxy is used as a model input.
         </p>
 
         {limitations && (
