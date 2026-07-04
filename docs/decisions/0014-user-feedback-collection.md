@@ -31,7 +31,7 @@ app only renders a form and POSTs to it.
   (`NEXT_PUBLIC_FEEDBACK_ENDPOINT`), baked in at build time like
   `NEXT_PUBLIC_ALB_URL`. It's append-only and public, so committing it is fine.
 - **Payload / Sheet schema**: `timestamp | role | source | venue_id |
-  venue_name | message | topic`. `message` and `topic` are user-entered;
+  venue_name | topic | message`. `message` and `topic` are user-entered;
   `source` records the entry point (`footer` / `how-it-works` /
   `restaurant-detail` / `site`); `venue_id`/`venue_name` are present only when
   opened from a restaurant page **and** not cleared by the user.

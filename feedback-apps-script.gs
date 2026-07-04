@@ -13,7 +13,7 @@
  * ── One-time setup ────────────────────────────────────────────────────────────
  * 1. Create a Google Sheet. In the first tab, add this header row (row 1):
  *
- *        timestamp | role | source | venue_id | venue_name | message | topic
+ *        timestamp | role | source | venue_id | venue_name | topic | message
  *
  * 2. In that Sheet: Extensions → Apps Script. Delete the default code, paste
  *    this whole file, and Save.
@@ -69,8 +69,8 @@ function doPost(e) {
     data.source || "",
     data.venueId || "",
     data.venueName || "",
-    data.message || "",
     data.topic || "General",
+    data.message || "",
   ]);
 
   MailApp.sendEmail(
