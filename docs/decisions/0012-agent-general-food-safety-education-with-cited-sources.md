@@ -12,6 +12,18 @@
 > kept. The decision reverses part of the earlier tight scope, so it is not
 > recoverable from the diff.
 
+> **Update (2026-07-04) — the `OffTopicNonFoodSafety` guardrail topic was later
+> REMOVED, superseding what this record says below.** Same day this DR was written,
+> a follow-up found that the negatively-defined off-topic topic made Bedrock's
+> classifier over-match and **block ~100% of queries** (including core risk
+> lookups), so commit `9c92ce7` dropped it: the guardrail now denies only
+> **personalised medical + legal advice**, and off-topic requests (recipes, other
+> cities, chit-chat) are declined by the **system prompt** instead (verified by the
+> eval's off-topic / other-city cases). Confirmed live 2026-07-04: the deployed
+> guardrail has only `PersonalisedMedicalAdvice` + `LegalAdvice`. The "re-scoped
+> off-topic topic survives" wording in the sections below is stale — read it as
+> historical.
+
 ## Decision
 
 1. **The agent now answers general food-safety / foodborne-illness questions**
@@ -69,7 +81,8 @@
   guardrail's denied topics would still block general food-safety questions at the
   platform layer, so the feature would not actually work in the deployed agent.
   The guardrail's `OffTopicNonFoodSafety` / `PersonalisedMedicalAdvice` topics
-  were re-scoped to match.
+  were re-scoped to match. *(Stale — the `OffTopicNonFoodSafety` topic was removed
+  the same day; see the Update note at the top.)*
 
 ## Consequences
 
@@ -84,6 +97,9 @@
   general food-safety education is not blocked, only genuinely off-topic requests
   and *personalised* medical/legal advice. **Re-provision** the guardrail (re-run
   the script, publish a new version, update the env vars) for the deployed agent.
+  *(Superseded — the off-topic topic was dropped the same day (over-blocking); the
+  live guardrail denies only personalised medical + legal advice, and off-topic is
+  handled by the system prompt. See the Update note at the top.)*
 - **Eval** (`agents/eval/run_eval.py`) gains a deterministic citation **allow-list
   gate**, an opt-in **live link-resolution** check (`--links`), and two guardrail
   cases (a general stat must be answered with a cited source; a personal medical

@@ -47,6 +47,9 @@ os.environ.setdefault("HISTORY_JSON_PATH", "/tmp/inspection_history.json")
 # NYC (multi-city, DR 0016) — a second city under the nyc/ S3 prefix.
 os.environ.setdefault("SCORES_JSON_PATH_NYC", "/tmp/nyc_scores.json")
 os.environ.setdefault("HISTORY_JSON_PATH_NYC", "/tmp/nyc_inspection_history.json")
+# LA (multi-city, DR 0016) — a third city under the la/ S3 prefix.
+os.environ.setdefault("SCORES_JSON_PATH_LA", "/tmp/la_scores.json")
+os.environ.setdefault("HISTORY_JSON_PATH_LA", "/tmp/la_inspection_history.json")
 os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 os.environ.setdefault("DATA_BUCKET", "food-safety-intelligence-data")
@@ -71,10 +74,10 @@ def _warm_data_files() -> None:
     prefix = os.environ["DATA_PREFIX"]
     s3 = boto3.client("s3", region_name=os.environ["AWS_REGION"])
 
-    # Chicago is required; NYC (nyc/ prefix) is best-effort so the agent still
-    # serves Chicago if NYC data hasn't been published to S3 yet — a NYC lookup
-    # then finds no scores and the tool returns "no record" (DR 0010), rather
-    # than failing the whole request.
+    # Chicago is required; the extra cities (nyc/, la/ prefixes) are best-effort so
+    # the agent still serves Chicago if a city's data hasn't been published to S3
+    # yet — that city's lookup then finds no scores and the tool returns "no
+    # record" (DR 0010), rather than failing the whole request.
     required = {
         os.environ["SCORES_JSON_PATH"]: f"{prefix}/scores.json",
         os.environ["HISTORY_JSON_PATH"]: f"{prefix}/inspection_history.json",
@@ -82,6 +85,8 @@ def _warm_data_files() -> None:
     optional = {
         os.environ["SCORES_JSON_PATH_NYC"]: f"{prefix}/nyc/scores.json",
         os.environ["HISTORY_JSON_PATH_NYC"]: f"{prefix}/nyc/inspection_history.json",
+        os.environ["SCORES_JSON_PATH_LA"]: f"{prefix}/la/scores.json",
+        os.environ["HISTORY_JSON_PATH_LA"]: f"{prefix}/la/inspection_history.json",
     }
     for local_path, s3_key in required.items():
         if not os.path.exists(local_path):
@@ -92,9 +97,9 @@ def _warm_data_files() -> None:
         if not os.path.exists(local_path):
             try:
                 s3.download_file(bucket, s3_key, local_path)
-                print(f"[warm-up] Done (nyc): {os.path.getsize(local_path):,} bytes")
-            except Exception as e:  # noqa: BLE001 — NYC data is optional
-                print(f"[warm-up] NYC data not available ({s3_key}): {e}")
+                print(f"[warm-up] Done ({s3_key}): {os.path.getsize(local_path):,} bytes")
+            except Exception as e:  # noqa: BLE001 — extra-city data is optional
+                print(f"[warm-up] extra-city data not available ({s3_key}): {e}")
 
 
 # NOTE: _warm_data_files() is intentionally NOT called here at import time. The
@@ -146,7 +151,7 @@ def find_restaurants(
     city — see ACTIVE CITY) using OpenStreetMap (free, no API key). Filters by
     cuisine when provided. ALWAYS call this first before get_safety_score.
     """
-    ev: dict = {"radius_km": radius_km, "limit": limit}
+    ev: dict = {"radius_km": radius_km, "limit": limit, "city": _ACTIVE_CITY.get()}
     if neighborhood:
         ev["neighborhood"] = neighborhood
     if lat and lon:
@@ -372,7 +377,7 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     # The tools already read the right city's data; this keeps the model's
     # framing + "no record" wording aligned to the active city.
     city = _ACTIVE_CITY.get()
-    city_label = "New York City" if city == "nyc" else "Chicago"
+    city_label = {"nyc": "New York City", "la": "Los Angeles"}.get(city, "Chicago")
     city_prefix = (
         f"ACTIVE CITY: {city_label}. Scope every restaurant lookup and every "
         f"'no record' statement to {city_label}; do not mention or use the other "
@@ -429,7 +434,7 @@ def invoke(payload: dict) -> dict:
     return {"result": str(result)}
 
 
-_CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc)\]\]\s*")
+_CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc|la)\]\]\s*")
 
 
 def _extract_city(query: str, field: object) -> tuple[str, str]:
@@ -438,7 +443,7 @@ def _extract_city(query: str, field: object) -> tuple[str, str]:
     Precedence: an explicit `city` payload field, else a leading `[[city:...]]`
     marker in the query. Unknown / missing → Chicago.
     """
-    if isinstance(field, str) and field.lower() in ("chicago", "nyc"):
+    if isinstance(field, str) and field.lower() in ("chicago", "nyc", "la"):
         return _CITY_MARKER.sub("", query), field.lower()
     m = _CITY_MARKER.match(query)
     if m:

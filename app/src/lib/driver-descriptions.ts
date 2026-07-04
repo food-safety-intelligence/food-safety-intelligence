@@ -50,7 +50,7 @@ const EXACT: Record<string, string> = {
   prior_pass_w_conditions:
     "Past 'Pass with conditions' results — borderline passes that needed follow-up.",
   prior_complaint_inspections:
-    "How many past inspections were triggered by 311 complaints rather than routine schedule.",
+    "How many past inspections were triggered by a complaint rather than routine schedule.",
   prior_reinspections:
     "How many past visits were re-inspections to confirm earlier problems were fixed.",
 };

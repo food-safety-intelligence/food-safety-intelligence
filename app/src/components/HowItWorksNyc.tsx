@@ -10,9 +10,9 @@ import {
   BookOpen,
   type LucideIcon,
   Target,
-  TriangleAlert,
   Wrench,
 } from "lucide-react";
+import { ModelCard, DataGovernance, MethodologyHero, articleFor } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
@@ -75,7 +75,8 @@ const NAV = [
   ["reading-the-score", "Reading the score"],
   ["how-its-built", "How it's built"],
   ["how-well-it-works", "How well it works"],
-  ["limits", "Limits"],
+  ["model-card", "Model card"],
+  ["data-governance", "Data governance"],
   ["reference", "Reference"],
 ];
 
@@ -84,7 +85,8 @@ const NYC_GLOSSARY: { id: string; term: string; short: string }[] = [
   { id: "letter-grade", term: "Letter grade (A / B / C)", short: "New York's public restaurant grade. It's a threshold on the inspection score: A = 0–13 points, B = 14–27, C = 28+. Lower is cleaner." },
   { id: "inspection-score", term: "Inspection score", short: "The sum of violation points at one inspection — public-health hazards ≥ 7 points, critical ≥ 5, general ≥ 2. The score maps to the letter grade." },
   { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to NYC's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across both cities — imminent-hazard, critical, or general — mapped from each city's own codes via the violation crosswalk." },
+  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities — imminent-hazard, critical, or general — mapped from each city's own codes via the shared violation dictionary." },
+  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
   { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare NYC (~0.66) with Chicago (~0.78)." },
   { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 1.6× means that slice has 1.6× the B/C rate of the whole population." },
   { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
@@ -109,23 +111,23 @@ export function HowItWorksNyc() {
 
   return (
     <div>
-      {/* Hero */}
-      <header>
-        <p className="text-sage text-xs tracking-[0.2em] uppercase mb-3">Research preview · New York City</p>
-        <h1 className="text-5xl font-light leading-[1.05] tracking-tight">How this works — New York City</h1>
-        <p className="text-lg text-muted leading-[1.6] mt-5 max-w-[62ch]">
-          New York City is a second city, added to show the same tool works beyond
-          Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
-          <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
-          under New York&apos;s letter-grade system — the same batch-scored-to-JSON
-          pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
-        </p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
-          <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="top-decile lift over the base rate" />
-          <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC on the held-out test set" />
-          <HeroStat value={m ? `${prevPct}%` : "—"} label="of next inspections are B or C (base rate)" />
-        </dl>
-      </header>
+      <MethodologyHero
+        eyebrow="Research preview · New York City"
+        title="How this works — New York City"
+        stats={
+          <>
+            <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
+            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
+            <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
+          </>
+        }
+      >
+        New York City is a second city, added to show the same tool works beyond
+        Chicago. Each score is a calibrated probability that an establishment&apos;s{" "}
+        <strong className="text-ink font-medium">next inspection is graded B or C</strong>{" "}
+        under New York&apos;s letter-grade system — the same batch-scored-to-JSON
+        pipeline, calibrated model, and SHAP drivers as Chicago, on New York data.
+      </MethodologyHero>
 
       {/* Sticky jump-nav */}
       <nav
@@ -232,9 +234,10 @@ export function HowItWorksNyc() {
             average and previous score, prior critical-violation counts, days since
             the last inspection — plus the current inspection&apos;s own outcome
             (score, violation counts). Violations are mapped through a shared
-            crosswalk into severity tiers (imminent-hazard / critical / general) and
-            themes (temperature, pest, hygiene, contamination, …) so the same
-            vocabulary describes both cities. No cuisine or demographic proxy is used.
+            violation dictionary into severity tiers (imminent-hazard / critical /
+            general) and themes (temperature, pest, hygiene, contamination, …) so the
+            same vocabulary describes all three cities. Everything comes from a single
+            DOHMH feed, so there is no cross-dataset join. No cuisine or demographic proxy is used.
           </p>
         </article>
       </div>
@@ -253,6 +256,26 @@ export function HowItWorksNyc() {
               For context, Chicago reaches ROC-AUC ~0.78 and lift ~3.4× — NYC is
               meaningfully weaker, which is why it&apos;s labelled a preview.
             </p>
+          )}
+          {m && (
+            <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">ROC-AUC {m.headline.roc_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above a clean one. Base-rate-independent, so it&apos;s the fair way to compare NYC with Chicago and LA — and it shows NYC is the weakest of the three.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">PR-AUC {m.headline.pr_auc.toFixed(2)}</dt>
+                <dd className="text-muted leading-snug mt-0.5">Ranking quality for the B/C class. Its floor is the {prevPct}% base rate — NYC&apos;s is high, so this number looks strong but mostly reflects how common B/C is, not skill. Don&apos;t compare it to Chicago&apos;s PR-AUC.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Top-decile lift {m.headline.top_decile_lift.toFixed(1)}×</dt>
+                <dd className="text-muted leading-snug mt-0.5">Work the top 10% by predicted risk and you find {m.headline.top_decile_lift.toFixed(1)}× as many B/C inspections as picking at random.</dd>
+              </div>
+              <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
+                <dt className="font-medium text-ink">Base rate {prevPct}%</dt>
+                <dd className="text-muted leading-snug mt-0.5">Share of next inspections that are actually B/C — what &ldquo;random&rdquo; and the PR-AUC floor are measured against.</dd>
+              </div>
+            </dl>
           )}
           {m && (
             <div className="mt-5 overflow-x-auto">
@@ -318,12 +341,13 @@ export function HowItWorksNyc() {
         </article>
       </div>
 
-      {/* 04 — Limits */}
-      <div className="mt-10 space-y-8">
-        <SectionLabel id="limits" number="04" icon={TriangleAlert}>Limits</SectionLabel>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What to keep in mind</h2>
-          <div className="mt-3 max-w-[62ch] space-y-4 text-muted leading-[1.7]">
+      {/* 04 — Model card (Limitations folded in, like Chicago) */}
+      <ModelCard
+        city="nyc"
+        m={m}
+        number="04"
+        limitations={
+          <div className="space-y-4 text-muted leading-[1.7]">
             <p>
               <strong className="text-ink">NYC is a coverage feature, not a quality
               upgrade.</strong> Its signal is weaker than Chicago&apos;s
@@ -344,12 +368,15 @@ export function HowItWorksNyc() {
               it for prioritisation, not judgement.
             </p>
           </div>
-        </article>
-      </div>
+        }
+      />
 
-      {/* 05 — Reference */}
+      {/* 05 — Data governance */}
+      <DataGovernance city="nyc" m={m} number="05" />
+
+      {/* 06 — Reference */}
       <div className="mt-10 space-y-8">
-        <SectionLabel id="reference" number="05" icon={BookMarked}>Reference</SectionLabel>
+        <SectionLabel id="reference" number="06" icon={BookMarked}>Reference</SectionLabel>
         <article>
           <h2 className="text-2xl font-medium tracking-tight">Definitions</h2>
           <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">

@@ -174,12 +174,17 @@ def test_unrecognised_neighborhood_returns_location_error(monkeypatch):
     assert "osm_id" not in result
 
 
+# Chicago geometry tables for the now city-parameterised _resolve_geometry
+# (bbox_table, centroids, city_bbox, city_centroid) — DR 0016 made it per-city.
+_CHI_TABLES = find_restaurants.CITY_GEO["chicago"][:4]
+
+
 def test_no_location_still_searches_whole_chicago():
     """No neighborhood and no coordinates → a whole-Chicago search, not an error."""
-    geom = find_restaurants._resolve_geometry(None, None, None, 1.0)
+    geom = find_restaurants._resolve_geometry(None, None, None, 1.0, *_CHI_TABLES)
     assert geom is not None  # falls back to Chicago, does not short-circuit
 
 
 def test_unrecognised_neighborhood_resolves_to_none():
     """An unknown area resolves to None so the handler can report it."""
-    assert find_restaurants._resolve_geometry("Atlantis", None, None, 1.0) is None
+    assert find_restaurants._resolve_geometry("Atlantis", None, None, 1.0, *_CHI_TABLES) is None

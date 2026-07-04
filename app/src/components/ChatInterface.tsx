@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, RotateCcw, AlertCircle, MapPin, Store, X } from "lucide-react";
 import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
 import type { ChatEstablishment } from "@/components/ChatScopeContext";
-import { CITY_CONFIG } from "@/lib/city";
+import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 
@@ -148,7 +148,7 @@ function renderContent(text: string): React.ReactNode[] {
 // tool covers; each "find" to real neighborhoods.
 
 // "Find" prompts name real neighborhoods, so they're per-city (DR 0016).
-const FIND_QUERIES_BY_CITY: Record<"chicago" | "nyc", string[]> = {
+const FIND_QUERIES_BY_CITY: Record<City, string[]> = {
   chicago: [
     "Safest sushi near Wicker Park",
     "Best options for someone with a compromised immune system near River North",
@@ -164,6 +164,14 @@ const FIND_QUERIES_BY_CITY: Record<"chicago" | "nyc", string[]> = {
     "Low-risk pizza in Astoria",
     "Dumplings in Flushing with a Low risk tier",
     "Safest Thai food near Midtown",
+  ],
+  la: [
+    "Safest sushi near Silver Lake",
+    "Best options for someone with a compromised immune system near Koreatown",
+    "Any High-risk restaurants in Downtown LA?",
+    "Low-risk pizza in Santa Monica",
+    "Taquerias in Boyle Heights with a Low risk tier",
+    "Safest Thai food near Hollywood",
   ],
 };
 
@@ -201,7 +209,7 @@ function seededSample(pool: readonly string[], n: number, rng: () => number): st
 }
 
 // 3 "find a place" + 3 "learn", interleaved so both jobs show at a glance.
-function pickSuggestions(seed: number, city: "chicago" | "nyc"): string[] {
+function pickSuggestions(seed: number, city: City): string[] {
   const rng = mulberry32(seed);
   const find = seededSample(FIND_QUERIES_BY_CITY[city], 3, rng);
   const learn = seededSample(LEARN_QUERIES, 3, rng);
@@ -341,10 +349,11 @@ export function ChatInterface({
       sessionIdRef.current = getOrCreateSessionId();
     }
     const saved = loadMessages();
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city));
+    // Starter chips are set by the city effect below, which also runs on mount —
+    // setting them here too would only duplicate that and pull `city` into this
+    // mount-only effect (a stale-closure trap the exhaustive-deps rule flags).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved.length) setMessages(saved);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   // Re-pick the starter chips when the city changes — the "find" prompts name
@@ -466,16 +475,16 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* NYC notice — the agent backend only has Chicago data (DR 0016). Be
-          honest: general food-safety questions work, establishment lookups don't. */}
+      {/* Notice for a city whose chat backend isn't live yet (chatSupported:false,
+          currently LA — DR 0016). Be honest: general food-safety questions work,
+          establishment lookups for this city don't. */}
       {!CITY_CONFIG[city].chatSupported && (
         <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
           <span>
             You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
-            assistant currently has data for <strong>Chicago</strong> establishments
-            only — general food-safety questions work, but it can&apos;t look up a
-            specific {CITY_CONFIG[city].label} place yet.
+            assistant can&apos;t look up a specific {CITY_CONFIG[city].label} place
+            yet — general food-safety questions still work.
           </span>
         </div>
       )}
@@ -579,7 +588,9 @@ export function ChatInterface({
           <p className="text-2xs text-muted/70 text-center mt-2">
             {city === "nyc"
               ? "Next-inspection model predictions from public New York City data"
-              : "180-day model predictions from public Chicago data"}
+              : city === "la"
+                ? "Next-inspection model predictions from public Los Angeles County data"
+                : "180-day model predictions from public Chicago data"}
             , not a safety verdict or city inspection{" "}
             (
             <a

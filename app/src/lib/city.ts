@@ -1,11 +1,11 @@
-// Multi-city support (DR 0016). One static build serves both cities; the
+// Multi-city support (DR 0016). One static build serves all three cities; the
 // selected city is a client concern (URL `?city=` → localStorage → default).
 // Every per-city difference — data path, map framing, and the copy that names
 // the label/window/source — lives here so components stay city-agnostic.
 
-export type City = "chicago" | "nyc";
+export type City = "chicago" | "nyc" | "la";
 
-export const CITIES: City[] = ["chicago", "nyc"];
+export const CITIES: City[] = ["chicago", "nyc", "la"];
 export const DEFAULT_CITY: City = "chicago";
 
 export interface CityConfig {
@@ -47,6 +47,14 @@ export interface CityConfig {
   chatSupported: boolean;
 }
 
+/** Parse the numeric inspection score out of an LA history `result` string —
+ * "Grade A (score 95)" or a bare "(score 59)" for a sub-70 (ungraded) inspection.
+ * Returns null when no score is present. Used by LA's score-driven history buckets. */
+function laScore(result: string): number | null {
+  const m = /score (\d+)/.exec(result);
+  return m ? Number(m[1]) : null;
+}
+
 export const CITY_CONFIG: Record<City, CityConfig> = {
   chicago: {
     id: "chicago",
@@ -59,7 +67,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place will see a failed inspection or priority violation in the next six months",
     sourceBlurb:
-      "Chicago publishes every food establishment inspection it conducts. We pair that record with nearby 311 complaints and license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
+      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
     cityState: "Chicago, IL",
     healthDept: "Chicago Department of Public Health",
     riskLabel: "Predicted 180-day risk",
@@ -68,8 +76,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     outcomeSentence:
       "fail an inspection or be cited for a priority violation in the next 180 days",
     footerBlurb:
-      "Open-data project pairing Chicago Food Inspections with 311 and license records to estimate forward-window food-safety risk. Not affiliated with the City of Chicago.",
-    sources: ["Chicago Food Inspections", "Chicago 311 Service Requests", "Chicago Business Licenses"],
+      "Open-data project pairing Chicago Food Inspections with license records to estimate forward-window food-safety risk. Not affiliated with the City of Chicago.",
+    sources: ["Chicago Food Inspections", "Chicago Business Licenses"],
     historyResults: [
       { key: "Pass", label: "Pass", bg: "bg-sage", badge: "P", match: (r) => r === "Pass" },
       { key: "PassCond", label: "Pass w/ Conditions", bg: "bg-amber", badge: "!", match: (r) => r === "Pass w/ Conditions" },
@@ -119,10 +127,58 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // S3 to answer NYC lookups; until then a NYC lookup returns "no record".
     chatSupported: true,
   },
+  la: {
+    id: "la",
+    label: "Los Angeles",
+    dataPrefix: "la/",
+    // LA County is large; frame the dense core and zoom out one step from
+    // Chicago/NYC so more of the county is in view on load.
+    center: { lat: 34.02, lon: -118.29 },
+    zoom: 9,
+    centerLabel: "Los Angeles County · 34.02, −118.29",
+    nounPlural: "restaurants and markets", // LA County's feed covers restaurants + retail food markets
+    predictionBlurb:
+      "the chance a place's next inspection is graded B or C (a score below 90 out of 100)",
+    sourceBlurb:
+      "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C — and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
+    cityState: "Los Angeles, CA",
+    healthDept: "Los Angeles County Department of Public Health",
+    riskLabel: "Predicted next-inspection risk",
+    typicalNoun: "Los Angeles County food establishment",
+    comparedNoun: "inspected establishments",
+    outcomeSentence: "be graded B or C at its next inspection (a score below 90)",
+    footerBlurb:
+      "Open-data project using LA County Environmental Health restaurant and market inspection records to estimate the risk of a B or C grade at the next inspection. A research preview; not affiliated with the County of Los Angeles.",
+    sources: ["LA County Restaurant and Market Inspections"],
+    // LA grades run the OPPOSITE way to NYC (A = 90-100, higher is cleaner). Bucket
+    // by the parsed SCORE, not the letter: a sub-70 inspection carries no letter
+    // grade in the feed (LA has no grade below C) and would otherwise render as a
+    // bare "(score 59)" that never colours, tallies, or counts — even though the
+    // model treats it as bad. Score-driven buckets fold those in. A = 90-100,
+    // B = 80-89, C-or-below = under 80.
+    historyResults: [
+      { key: "A", label: "Grade A", bg: "bg-sage", badge: "A", match: (r) => (laScore(r) ?? -1) >= 90 },
+      { key: "B", label: "Grade B", bg: "bg-amber", badge: "B", match: (r) => { const s = laScore(r); return s !== null && s >= 80 && s < 90; } },
+      { key: "C", label: "Grade C or below", bg: "bg-terra", badge: "C", match: (r) => { const s = laScore(r); return s !== null && s < 80; } },
+    ],
+    outcomeNoun: "B or C grades",
+    // Bad = score below 90 (a B or C, or a sub-70 ungraded inspection), read from
+    // the score so ungraded-but-low inspections still count toward the headline.
+    isBadOutcome: (r) => { const s = laScore(r); return s !== null ? s < 90 : /^Grade [BC]/.test(r); },
+    // LA's forecast-slope magnitudes sit on the same scale as Chicago's and NYC's
+    // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
+    // same honest Worsening / Stable / Improving split.
+    trendStableBand: 0.0003,
+    // Enabled: LA data is in S3 and merging this PR redeploys the agent LA-aware
+    // (city routing + city-aware find_restaurants). If a post-merge check shows LA
+    // lookups returning "no record", the runtime role is missing s3:GetObject on
+    // web-app-data/la/ (Issue #79 class, Deepak's account) — set back to false until fixed.
+    chatSupported: true,
+  },
 };
 
 export function isCity(v: unknown): v is City {
-  return v === "chicago" || v === "nyc";
+  return v === "chicago" || v === "nyc" || v === "la";
 }
 
 /** Resolve a data file URL for a city (e.g. dataUrl("nyc", "scores.json")).

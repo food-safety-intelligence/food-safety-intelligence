@@ -29,8 +29,8 @@ export function CityEntryModal() {
           Choose a city
         </h2>
         <p className="text-sm text-muted mt-2 leading-[1.6]">
-          This tool covers two cities. Pick one to start — you can switch any
-          time from the header.
+          This tool covers {CITIES.length} cities. Pick one to start — you can
+          switch any time from the header.
         </p>
         <div className="mt-5 grid gap-3">
           {CITIES.map((c) => (

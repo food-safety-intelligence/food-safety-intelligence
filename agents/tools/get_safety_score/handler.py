@@ -87,10 +87,12 @@ _GENERIC_NAME_TOKENS = frozenset(
 def _scores_path(city: str) -> str:
     if city == "nyc":
         return os.environ.get("SCORES_JSON_PATH_NYC", "/opt/nyc_scores.json")
+    if city == "la":
+        return os.environ.get("SCORES_JSON_PATH_LA", "/opt/la_scores.json")
     return os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
 
 
-@functools.lru_cache(maxsize=2)
+@functools.lru_cache(maxsize=3)
 def _load_scores_index(city: str = "chicago") -> dict[str, list[dict]]:
     """
     Load a city's scores.json and index it by normalised address for fuzzy
@@ -113,7 +115,7 @@ def _load_scores_index(city: str = "chicago") -> dict[str, list[dict]]:
     return index
 
 
-@functools.lru_cache(maxsize=2)
+@functools.lru_cache(maxsize=3)
 def _load_scores_records(city: str = "chicago") -> list[dict]:
     """Flat list of every score record, for the name + proximity fallback.
 

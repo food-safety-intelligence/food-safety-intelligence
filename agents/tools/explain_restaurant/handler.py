@@ -26,16 +26,20 @@ from typing import Any
 def _scores_path(city: str) -> str:
     if city == "nyc":
         return os.environ.get("SCORES_JSON_PATH_NYC", "/opt/nyc_scores.json")
+    if city == "la":
+        return os.environ.get("SCORES_JSON_PATH_LA", "/opt/la_scores.json")
     return os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
 
 
 def _history_path(city: str) -> str:
     if city == "nyc":
         return os.environ.get("HISTORY_JSON_PATH_NYC", "/opt/nyc_inspection_history.json")
+    if city == "la":
+        return os.environ.get("HISTORY_JSON_PATH_LA", "/opt/la_inspection_history.json")
     return os.environ.get("HISTORY_JSON_PATH", "/opt/inspection_history.json")
 
 
-@functools.lru_cache(maxsize=2)
+@functools.lru_cache(maxsize=3)
 def _load_scores(city: str = "chicago") -> dict[str, dict]:
     """Load a city's scores.json indexed by license_id."""
     try:
@@ -46,7 +50,7 @@ def _load_scores(city: str = "chicago") -> dict[str, dict]:
         return {}
 
 
-@functools.lru_cache(maxsize=2)
+@functools.lru_cache(maxsize=3)
 def _load_history(city: str = "chicago") -> dict[str, list[dict]]:
     """Load a city's inspection_history.json indexed by license_id."""
     try:
@@ -140,20 +144,29 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "inspection_summary": _summarise(events, city),
         "inspection_history": events[:10],  # most recent 10
         # Model context
-        "model_note": (
-            (
-                "Risk score is the probability the establishment's next inspection "
-                "is graded B or C (a score of 14+ points), not a real-time safety "
-                "verdict."
-            )
-            if city == "nyc"
-            else (
-                "Risk score is a 180-day forward prediction "
-                "(probability of a failed inspection or priority violation), "
-                "not a real-time safety verdict."
-            )
-        ),
+        "model_note": _model_note(city),
     }
+
+
+def _model_note(city: str) -> str:
+    """One-line description of what the risk score means, per city."""
+    if city == "nyc":
+        return (
+            "Risk score is the probability the establishment's next inspection "
+            "is graded B or C (a score of 14+ points), not a real-time safety verdict."
+        )
+    if city == "la":
+        # LA grades run the opposite way to NYC: A = 90-100 (higher is cleaner),
+        # so a "bad" next inspection is a B or C, i.e. a score BELOW 90.
+        return (
+            "Risk score is the probability the establishment's next inspection "
+            "is graded B or C (a score below 90 out of 100), not a real-time safety verdict."
+        )
+    return (
+        "Risk score is a 180-day forward prediction "
+        "(probability of a failed inspection or priority violation), "
+        "not a real-time safety verdict."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -218,14 +231,15 @@ def _classify_result(result: str, city: str = "chicago") -> str:
     carries "Out of Business", "No Entry", "Not Ready" and "Business Not
     Located", which are not inspection outcomes and go to `other`.
 
-    NYC: results are letter grades ("Grade A (score 7)" …). They map onto the
-    same clean / middling / bad buckets: A -> pass, B -> pass_w_conditions,
-    C -> fail.
+    NYC and LA: results are letter grades ("Grade A (score 7)" …). They map onto
+    the same clean / middling / bad buckets: A -> pass, B -> pass_w_conditions,
+    C -> fail. (The grade *direction* differs — NYC A is a low score, LA A is a
+    high score — but the letter-to-bucket mapping is identical.)
     """
     # Coerce defensively: the `result` key can be present but explicitly None,
     # which would crash on .strip()/.lower() — match the null-tolerant sort key.
     r = str(result).strip().lower()
-    if city == "nyc":
+    if city in ("nyc", "la"):
         if r.startswith("grade a"):
             return "pass"
         if r.startswith("grade b"):
