@@ -169,11 +169,11 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
     // same honest Worsening / Stable / Improving split.
     trendStableBand: 0.0003,
-    // Chat backend is Chicago+NYC only until Deepak deploys the LA-aware agent and
-    // publishes LA data to S3 (cross-account). Until then keep this false so the UI
-    // shows the honest "chat not available for this city" notice rather than every
-    // LA lookup returning "no record".
-    chatSupported: false,
+    // Enabled: LA data is in S3 and merging this PR redeploys the agent LA-aware
+    // (city routing + city-aware find_restaurants). If a post-merge check shows LA
+    // lookups returning "no record", the runtime role is missing s3:GetObject on
+    // web-app-data/la/ (Issue #79 class, Deepak's account) — set back to false until fixed.
+    chatSupported: true,
   },
 };
 
