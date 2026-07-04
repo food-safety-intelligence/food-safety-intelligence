@@ -1,8 +1,14 @@
 "use client";
 
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { type Dispatch, type SetStateAction, useState } from "react";
+import { type Dispatch, type SetStateAction, useEffect, useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
+import {
+  compareInspectionsNewestFirst,
+  INSPECTION_JUMP_EVENT,
+  inspectionAnchorId,
+  parseInspectionAnchor,
+} from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
 
 const RESULT_STYLES = {
@@ -74,6 +80,56 @@ export function InspectionTimeline({
   // Layer 2: which individual violations are expanded to show their comment,
   // keyed by `${rowKey}-${violationIndex}`.
   const [openViolations, setOpenViolations] = useState<Set<string>>(new Set());
+  // The row a trend-chart dot linked to (null = none), held as a fresh object per
+  // jump — re-clicking the SAME dot makes a new reference so React re-runs the
+  // scroll/highlight effect instead of bailing on an unchanged value. `n` is the
+  // newest-first index. Cleared after the flash.
+  const [highlight, setHighlight] = useState<{ n: number } | null>(null);
+
+  // React to a hardlink from the trend chart: the URL hash (a fresh deep link or
+  // the enlarged chart's new tab) or the in-tab jump event (the inline chart).
+  // Expand the collapsed tail if the target is hidden; the effect below then
+  // scrolls to and highlights the row.
+  useEffect(() => {
+    function jumpTo(n: number | null) {
+      if (n === null || n < 0 || n >= events.length) return;
+      if (n >= maxVisible) setExpanded(true);
+      setHighlight({ n });
+    }
+    jumpTo(parseInspectionAnchor(window.location.hash));
+    const onHash = () => jumpTo(parseInspectionAnchor(window.location.hash));
+    const onJump = (e: Event) =>
+      jumpTo(parseInspectionAnchor((e as CustomEvent<string>).detail ?? ""));
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener(INSPECTION_JUMP_EVENT, onJump as EventListener);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener(INSPECTION_JUMP_EVENT, onJump as EventListener);
+    };
+  }, [events.length, maxVisible]);
+
+  // Once the target row is in the DOM (after any auto-expand), scroll it into
+  // view, move focus to it (keyboard + screen-reader cue), and clear the
+  // highlight after a moment so it reads as a brief flash.
+  useEffect(() => {
+    if (highlight === null) return;
+    const el = document.getElementById(inspectionAnchorId(highlight.n));
+    const raf = requestAnimationFrame(() => {
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // Focus the row itself (tabIndex -1, outline-none) rather than its button,
+      // so screen-reader/keyboard users land here without drawing a focus box.
+      el?.focus({ preventScroll: true });
+    });
+    // Hold long enough to stay visible after the ~1s smooth scroll settles.
+    const timer = setTimeout(() => setHighlight(null), 3600);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+    // Depends on `highlight` only: an auto-expand is batched with the highlight
+    // (same render), so the row is present on first run; keeping `expanded` out
+    // avoids re-scrolling if the user manually expands while the flash is up.
+  }, [highlight]);
 
   if (events.length === 0) {
     return (
@@ -95,10 +151,10 @@ export function InspectionTimeline({
   const toggle = makeToggle(setOpen);
   const toggleViolation = makeToggle(setOpenViolations);
 
-  // Most recent first. localeCompare returns 0 on equal dates, so the sort stays
-  // stable — same-date inspections keep their input order instead of an
-  // engine-defined one (a license can have two inspections on one day).
-  const sorted = events.slice().sort((a, b) => b.date.localeCompare(a.date));
+  // Most recent first, and stable on equal dates (a license can have two
+  // inspections in one day). This is the SAME comparator the trend-chart dots
+  // index their anchors by, so `inspection-<n>` lands on the matching row.
+  const sorted = events.slice().sort(compareInspectionsNewestFirst);
   const visible = expanded ? sorted : sorted.slice(0, maxVisible);
   const hidden = sorted.length - visible.length;
 
@@ -116,6 +172,10 @@ export function InspectionTimeline({
           const key = `${e.date}-${i}`;
           const isOpen = open.has(key);
           const panelId = `inspection-comments-${key}`;
+          // `i` is the newest-first index (visible is a prefix of sorted), so
+          // this matches the anchor the trend-chart dots link to.
+          const anchorId = inspectionAnchorId(i);
+          const isHighlighted = highlight?.n === i;
           // Count of cited violations for this inspection. Derived from the same
           // parse the expanded panel uses, so the collapsed "N violations" label
           // always matches the number of items revealed on expand.
@@ -170,7 +230,20 @@ export function InspectionTimeline({
             </>
           );
           return (
-            <li key={key}>
+            <li
+              key={key}
+              id={anchorId}
+              // Focusable (programmatically only) so a hardlink can move focus
+              // here for screen-reader users; outline-none keeps it from drawing
+              // a box — the pale-yellow wash is the visual cue instead. No
+              // scroll-margin: the jump uses scrollIntoView(block:"center") and a
+              // margin would shift that centred target off-centre.
+              tabIndex={-1}
+              data-highlighted={isHighlighted || undefined}
+              className={`rounded-xl outline-none transition-colors duration-500 ${
+                isHighlighted ? "bg-highlight" : ""
+              }`}
+            >
               {hasViolations ? (
                 <button
                   type="button"
