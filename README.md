@@ -110,8 +110,12 @@ The fallback chain: remote `scores.json` via `DATA_BASE_URL` → local
 `public/data/scores.json` → committed `scores_mock.json` (which flips on a demo
 banner). There are **no API routes** — the app reads precomputed JSON only and
 never runs the model. Routes: the map home, restaurant detail (gauge + driver
-waterfall + inspection timeline), how-it-works (methodology), caregivers, and
-sources.
+waterfall + inspection timeline), how-it-works (methodology), caregivers,
+sources, and a feedback form. The app's one outbound write is that feedback
+form, which POSTs to an external Google Apps Script endpoint
+(`scripts/feedback-apps-script.gs` → a private Google Sheet + team email) — not
+model inference, so the batch-score-to-JSON contract still holds (decision
+record 0014).
 
 **The agent (`agents/`).** A standalone Strands agent on Amazon Nova 2 Lite
 (Bedrock) with three tools — find restaurants (OpenStreetMap/Overpass), score
@@ -238,7 +242,7 @@ when a change lands on `main`.
 | `app/` | Next.js web app (App Router + TypeScript + Tailwind + shadcn/ui). Reads `app/public/data/*.json` only |
 | `design/` | UI mockups + design references (pre-build exploration) |
 | `data/` | Local cache (gitignored). `raw/`, `interim/`, `processed/`, `models/`, `predictions/` |
-| `scripts/` | Python CLI entry points used by the Makefile |
+| `scripts/` | Python CLI entry points (Makefile) + ops/deploy scripts (`deploy_aws.sh`, `feedback-apps-script.gs`) |
 | `tests/` | pytest, mirrors `src/foodsafety/` |
 | `docs/` | Data dictionary, label definition, interface contracts, weekly check-ins |
 | `reports/` | Figures + per-run metrics JSON + final writeup |
