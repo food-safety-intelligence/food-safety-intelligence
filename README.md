@@ -41,12 +41,12 @@
 | src/foodsafety/models/evaluate.py                        |      108 |        3 |       20 |        3 |     95% |72, 122, 275 |
 | src/foodsafety/models/xgb.py                             |       33 |        0 |       10 |        0 |    100% |           |
 | src/foodsafety/serve/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
-| src/foodsafety/serve/predict\_batch.py                   |       78 |       11 |       20 |        6 |     83% |72, 115, 117, 145, 204-206, 218-219, 224-225, 261-\>284 |
+| src/foodsafety/serve/predict\_batch.py                   |       79 |       11 |       20 |        6 |     83% |78, 121, 123, 151, 210-212, 224-225, 230-231, 267-\>287 |
 | src/foodsafety/tracking.py                               |       20 |       20 |        0 |        0 |      0% |     18-62 |
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **1834** |  **165** |  **512** |   **68** | **89%** |           |
+| **TOTAL**                                                | **1835** |  **165** |  **512** |   **68** | **89%** |           |
 
 
 ## Setup coverage badge
