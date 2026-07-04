@@ -29,6 +29,18 @@ const TIER_BANDS: { tier: RiskTier; lo: number; hi: number }[] = [
   { tier: "High", lo: 0.3, hi: 1.0 },
 ];
 
+// Bands are a NEUTRAL grey ramp (higher tier = slightly darker) rather than the
+// tier colours — a wall of coral/terra reads as alarm, which DR 0011 says the
+// risk surface must avoid. Colour is kept only for the current-tier label, the
+// current-level guide, and the value tag (the one meaningful accent).
+const INK = "#2A2724";
+const TIER_BAND_SHADE: Record<RiskTier, number> = {
+  Low: 0.025,
+  Moderate: 0.05,
+  Elevated: 0.08,
+  High: 0.11,
+};
+
 export interface TrendPoint {
   date: string;
   score: number;
@@ -133,16 +145,16 @@ export function MergedRiskChart({
                 y={top}
                 width={w}
                 height={Math.max(0, bot - top)}
-                fill={TIER_HEX[b.tier]}
-                fillOpacity={isCur ? 0.16 : 0.07}
+                fill={INK}
+                fillOpacity={TIER_BAND_SHADE[b.tier] + (isCur ? 0.025 : 0)}
               />
               <text
                 x={padL + 5}
                 y={labelY}
                 textAnchor="start"
                 fontSize={9}
-                fill={TIER_HEX[b.tier]}
-                fillOpacity={0.9}
+                fill={isCur ? TIER_HEX[b.tier] : "#6B7280"}
+                fillOpacity={isCur ? 0.95 : 0.7}
                 fontFamily="var(--font-manrope), sans-serif"
                 fontWeight={isCur ? 700 : 500}
               >

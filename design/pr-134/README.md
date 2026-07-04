@@ -16,12 +16,15 @@ next 180 days — so they share one 0–1 scale. This prototype folds them into 
 single **risk-trajectory chart**:
 
 - horizontal **tier bands** (Low / Moderate / Elevated / High, per decision 0008)
-  carry the meaning the gauge's colour used to;
+  as a **neutral grey ramp** (higher tier = slightly darker), with tier labels —
+  colour is deliberately kept off the bands so the chart never reads as alarm
+  (decision 0011);
 - the neutral **Model 2 line** is the trajectory over past inspections
   (ignores each visit's own pass/fail, per decision 0011);
 - the **Model 1 `risk_score`** is a tier-coloured value tag pinned to the right
   axis at its risk level (with a faint horizontal "current level" guide) — the
-  headline number, shown in context, no leader line.
+  headline number, shown in context, no leader line. The tag (plus the
+  current-tier label) is the **only** colour on the chart.
 
 No forward/extrapolated line: decision 0011 found the loose direction does not
 predict, so we don't draw a future line.
