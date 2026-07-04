@@ -70,18 +70,19 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
   // (the page is statically exported, so the server can't filter per request).
   // Until it loads we render the server's default `initialView`.
   const { city } = useCity();
-  const [index, setIndex] = useState<SearchIndex | null>(null);
-  // Refetch the selected city's index whenever the city changes; clear the old
-  // one first so we don't render Chicago pins while NYC loads.
+  // Refetch the selected city's index whenever the city changes. Tag the loaded
+  // index with its city so `index` derives to null until the new city's fetch
+  // resolves — we never render Chicago pins while NYC loads, without resetting
+  // state from the effect body.
+  const [loaded, setLoaded] = useState<{ city: string; index: SearchIndex } | null>(null);
   useEffect(() => {
     let alive = true;
-    setIndex(null);
     fetch(dataUrl(city, "search-index.json"))
       .then((r) =>
         r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
       )
       .then((d: SearchIndex) => {
-        if (alive) setIndex(d);
+        if (alive) setLoaded({ city, index: d });
       })
       .catch(() => {
         /* keep initialView as the fallback if the index can't load */
@@ -91,6 +92,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
     };
   }, [city]);
 
+  const index = loaded?.city === city ? loaded.index : null;
   const indexLoading = index === null;
   const view = index
     ? computeHomeView(index, {

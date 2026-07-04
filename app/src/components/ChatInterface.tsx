@@ -349,7 +349,10 @@ export function ChatInterface({
 
   // Re-pick the starter chips when the city changes — the "find" prompts name
   // real neighborhoods, so they're city-specific (same seed → stable per session).
+  // The seed comes from sessionStorage (browser-only), so this can't be derived
+  // during render; the setState here mirrors the mount effect above.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city));
   }, [city]);
 

@@ -130,8 +130,12 @@ export function MapView({
   //     unloaded map and be lost — leaving NYC data over a Chicago map).
   const mapRef = useRef<MapRef>(null);
   const loadedRef = useRef(false);
+  // Keep the latest center in a ref so `handleLoad` can read it without being
+  // re-created on every center change. Updated in an effect (not during render).
   const centerRef = useRef(center);
-  centerRef.current = center;
+  useEffect(() => {
+    centerRef.current = center;
+  });
   useEffect(() => {
     if (loadedRef.current) {
       mapRef.current?.flyTo({

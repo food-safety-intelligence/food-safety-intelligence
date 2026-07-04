@@ -16,18 +16,19 @@ interface Totals {
 
 export function CityIntro({ initialTotals }: { initialTotals: Totals }) {
   const { city } = useCity();
-  const [totals, setTotals] = useState<Totals>(initialTotals);
+  // Only the non-default city is fetched; the default's totals come from the
+  // server via `initialTotals`. Tag the fetched result with its city so we can
+  // derive `totals` during render without resetting state from the effect body.
+  const [fetched, setFetched] = useState<{ city: string; totals: Totals } | null>(null);
 
   useEffect(() => {
+    if (city === DEFAULT_CITY) return;
     let alive = true;
-    if (city === DEFAULT_CITY) {
-      setTotals(initialTotals);
-      return;
-    }
     fetch(dataUrl(city, "search-index.json"))
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d: { total: number; tier_counts: { High: number } }) => {
-        if (alive) setTotals({ establishments: d.total, high: d.tier_counts.High });
+        if (alive)
+          setFetched({ city, totals: { establishments: d.total, high: d.tier_counts.High } });
       })
       .catch(() => {
         /* keep whatever we have */
@@ -35,7 +36,10 @@ export function CityIntro({ initialTotals }: { initialTotals: Totals }) {
     return () => {
       alive = false;
     };
-  }, [city, initialTotals]);
+  }, [city]);
+
+  const totals: Totals =
+    city === DEFAULT_CITY || fetched?.city !== city ? initialTotals : fetched.totals;
 
   const pct =
     totals.establishments > 0

@@ -161,9 +161,7 @@ def get_safety_score(restaurants: list) -> list:
     Score restaurants using the XGBoost model (stub or real SageMaker endpoint).
     Call after find_restaurants with the full restaurant list.
     """
-    return _score_handler.handler(
-        {"restaurants": restaurants, "city": _ACTIVE_CITY.get()}, None
-    )
+    return _score_handler.handler({"restaurants": restaurants, "city": _ACTIVE_CITY.get()}, None)
 
 
 @tool
@@ -172,9 +170,7 @@ def explain_restaurant(license_id: str) -> dict:
     Get full SHAP driver breakdown and inspection history for one restaurant.
     Call for the 2-3 lowest predicted-risk results.
     """
-    return _explain_handler.handler(
-        {"license_id": license_id, "city": _ACTIVE_CITY.get()}, None
-    )
+    return _explain_handler.handler({"license_id": license_id, "city": _ACTIVE_CITY.get()}, None)
 
 
 @tool
@@ -401,7 +397,7 @@ def _extract_city(query: str, field: object) -> tuple[str, str]:
         return _CITY_MARKER.sub("", query), field.lower()
     m = _CITY_MARKER.match(query)
     if m:
-        return query[m.end():], m.group(1)
+        return query[m.end() :], m.group(1)
     return query, "chicago"
 
 

@@ -35,10 +35,16 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
   const [city, setCityState] = useState<City>(DEFAULT_CITY);
   const [needsPick, setNeedsPick] = useState(false);
 
+  // Hydration read: URL/localStorage are browser-only, so the real choice can
+  // only be applied after mount (a lazy initializer would diverge from the
+  // server's DEFAULT_CITY paint and cause a hydration mismatch). This one-shot
+  // post-mount setState is the intended use, not a cascading-render smell.
   useEffect(() => {
     const { city: c, needsPick: np } = readInitial();
+    /* eslint-disable react-hooks/set-state-in-effect */
     setCityState(c);
     setNeedsPick(np);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
   const setCity = useCallback((c: City) => {

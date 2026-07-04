@@ -13,7 +13,7 @@ import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
 import type { DetailBundle, DetailGlobals } from "@/lib/scores";
 import { useCity } from "@/components/CityContext";
-import { CITY_CONFIG, dataUrl } from "@/lib/city";
+import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
 import { formatInspectionDate } from "@/lib/utils";
 
 type LoadState =
@@ -30,20 +30,20 @@ type LoadState =
  */
 export function RestaurantDetail() {
   const id = useSearchParams().get("id");
+  const { city } = useCity();
   // No id → nothing to load; render not-found during render (not via an effect).
-  // Key the loader on id so a new id remounts it back to the loading state,
-  // keeping the effect's setState calls confined to async callbacks.
+  // Key the loader on city+id so either change remounts it back to the initial
+  // loading state, keeping the effect's setState calls confined to async
+  // callbacks (no synchronous setState in the effect body).
   if (!id) return <DetailNotFound />;
-  return <DetailLoader key={id} id={id} />;
+  return <DetailLoader key={`${city}:${id}`} id={id} city={city} />;
 }
 
-function DetailLoader({ id }: { id: string }) {
-  const { city } = useCity();
+function DetailLoader({ id, city }: { id: string; city: City }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
-    setState({ status: "loading" });
     Promise.all([
       fetch(dataUrl(city, `detail/${encodeURIComponent(id)}.json`)).then((r) =>
         r.ok ? (r.json() as Promise<DetailBundle>) : Promise.reject(r.status),

@@ -483,9 +483,7 @@ def main():
                 "lon": None if pd.isna(r.lon) else float(r.lon),
                 "risk_score": round(float(r.risk_score), 4),
                 "risk_tier": r.risk_tier,
-                "trend_slope": None
-                if pd.isna(r.trend_slope)
-                else round(float(r.trend_slope), 6),
+                "trend_slope": None if pd.isna(r.trend_slope) else round(float(r.trend_slope), 6),
                 "top_driver": top_driver(r.top_drivers),
             }
             for r in out.itertuples(index=False)
