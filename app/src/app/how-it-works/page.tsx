@@ -770,10 +770,45 @@ export default async function HowItWorksPage() {
               A model card gathers, in one place, who the model is for, how it was
               tested, where it falls short, and how it&apos;s kept up to date. The
               points below restate and link to the fuller detail elsewhere on this
-              page. The product ships <span className="font-medium text-ink/80">two
-              models</span> — the risk score and a separate trend forecast; unless
-              noted, the version and evaluation below describe the risk-score model.
+              page. It covers <span className="font-medium text-ink/80">two
+              models</span> — the risk score and a separate trend forecast,
+              introduced just below.
             </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              The two models
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The product ships two models, trained together. One produces the
+              headline score; the other drives the trend.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 1 · Risk score
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  The headline percentage — the chance of a Fail or priority
+                  violation in the next 180 days. It uses the current
+                  inspection&apos;s own outcome, the strongest near-term signal. The
+                  served version and the evaluation on this card describe this
+                  model.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 2 · Trend forecast
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  Drives the trend arrow and chart. It predicts the same 180-day
+                  risk but <span className="font-medium text-ink/80">ignores the
+                  current inspection&apos;s own pass/fail</span>, so a failed visit
+                  and its mandated re-inspection don&apos;t read as a swing. It is
+                  used only to show direction over time; it never sets the risk
+                  score.
+                </p>
+              </div>
+            </div>
 
             {/* Provenance strip — served model + when its metrics were built +
                 the test window, read straight from methodology.json so this card
@@ -857,10 +892,11 @@ export default async function HowItWorksPage() {
             </ul>
 
             <h3 className="text-lg font-medium tracking-tight mt-6">
-              Evaluation methodology
+              How the models are evaluated
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              Measured on a time-held-out test set, never a random shuffle: the
+              The <span className="font-medium text-ink/80">risk score</span> is
+              measured on a time-held-out test set, never a random shuffle: the
               model is trained on the earliest inspections, calibrated on a later
               held-out slice, and tested on the most recent window ({testFrom ||
               "2025-07-01"} onward) — with every feature computed only from data
@@ -877,35 +913,21 @@ export default async function HowItWorksPage() {
               .
             </p>
 
-            <h3 className="text-lg font-medium tracking-tight mt-6">
-              The trend forecast model
-            </h3>
-            <p className="text-sm text-muted leading-relaxed mt-1.5">
-              The risk score is not the only model. The arrow and chart labelled{" "}
-              <span className="font-medium text-ink/80">trend</span> are driven by a
-              second model — a forecast that predicts the same 180-day risk but{" "}
-              <span className="font-medium text-ink/80">ignores the current
-              inspection&apos;s own pass/fail</span>, so a failed visit and its
-              mandated re-inspection don&apos;t read as a swing in either direction.
-              It is used only to draw the trajectory across an establishment&apos;s
-              recent inspections; it never sets the risk score. How it reads on the
-              page is covered under{" "}
+            <p className="text-sm text-muted leading-relaxed mt-2">
+              The <span className="font-medium text-ink/80">trend forecast</span> is
+              judged differently — as direction over time, not a second risk number.
+              We publish it for coverage and transparency, but the loose{" "}
+              <span className="font-medium text-ink/80">improving / worsening /
+              stable</span> direction is descriptive: on its own it barely beats
+              chance. Only a strict slice — steeply rising{" "}
+              <span className="font-medium text-ink/80">and</span> currently clean —
+              carries a real forward signal, and that slice is treated as an
+              early-warning watch-list, never a verdict. How it reads on the page is
+              under{" "}
               <a href="#recent-trend" className="text-teal hover:underline">
                 The recent trend
               </a>
               .
-            </p>
-            <p className="text-sm text-muted leading-relaxed mt-2">
-              Its honesty bar is different from the score model&apos;s. We publish
-              the trend for <span className="font-medium text-ink/80">coverage and
-              transparency</span> — a real, forward-looking trajectory for most
-              establishments with a repeat inspection — but the loose{" "}
-              <span className="font-medium text-ink/80">improving / worsening /
-              stable</span> direction is descriptive, not a prediction: on its own
-              it barely beats chance. Only a strict slice — steeply rising{" "}
-              <span className="font-medium text-ink/80">and</span> currently clean —
-              carries a real forward signal, and that slice is treated as an
-              early-warning watch-list, never as a verdict.
             </p>
 
             <h3 className="text-lg font-medium tracking-tight mt-6">
@@ -959,9 +981,9 @@ export default async function HowItWorksPage() {
               Retraining policy
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              The model is retrained on demand — when new data or a feature change
-              warrants it — not on a fixed automatic schedule; there is no live or
-              streaming update. Each training run is tied to the exact code that
+              Both models are retrained together, on demand — when new data or a
+              feature change warrants it — not on a fixed automatic schedule; there
+              is no live or streaming update. Each training run is tied to the exact code that
               produced it (its commit is recorded with the run), and a retrained
               model replaces the served one only after it clears the promotion gate
               on the held-out test set. Saved model files are versioned and never
