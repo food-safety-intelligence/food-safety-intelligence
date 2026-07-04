@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Heart } from "lucide-react";
+import { ArrowLeft, Heart, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -299,6 +299,23 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
                 failed inspection.
               </p>
             </div>
+          </div>
+
+          {/* Contextual feedback — carries this establishment's id + name to the
+              feedback form so a data correction is tied to the right listing. */}
+          <div className="mt-6 pt-5 border-t border-line flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span className="text-muted">
+              Something look wrong with this listing?
+            </span>
+            <Link
+              href={`/feedback?venue=${encodeURIComponent(
+                restaurant.license_id,
+              )}&name=${encodeURIComponent(restaurant.dba_name)}`}
+              className="inline-flex items-center gap-1.5 text-teal font-medium hover:underline"
+            >
+              <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+              Tell us
+            </Link>
           </div>
         </section>
 

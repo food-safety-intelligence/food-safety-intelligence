@@ -40,6 +40,7 @@ for _tool_dir in [
     os.path.join(_AGENTS_DIR, "tools", "get_safety_score"),
     os.path.join(_AGENTS_DIR, "tools", "explain_restaurant"),
     os.path.join(_AGENTS_DIR, "tools", "find_reviews"),
+    os.path.join(_AGENTS_DIR, "tools", "find_inspection_records"),
     os.path.join(_AGENTS_DIR, "tools", "food_safety_info"),
 ]:
     if _tool_dir not in sys.path:
@@ -80,6 +81,7 @@ _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
 _reviews_handler = _load_handler("find_reviews")
+_records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
 
 
@@ -177,6 +179,48 @@ def find_reviews(name: str, address: str = "", topics: list | None = None) -> di
 
 
 @tool
+def find_inspection_records(
+    license_ids: list | None = None,
+    zip_code: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    radius_m: float | None = None,
+) -> dict:
+    """
+    Build a link to the AUTHORITATIVE Chicago Food Inspections records for a SET of
+    establishments — a comparison, a short list, or an area. This is the city's own
+    data (the source behind the risk score), so it needs no disclaimer. Use it when
+    the user compares/lists several places, or asks about an area, and would want to
+    see or verify the underlying city records. Returns a {url, mode, note} link the
+    user clicks through to — nothing is fetched.
+
+    Provide EXACTLY ONE filter:
+      license_ids: the establishments to compare/list. Use the license_id values
+        get_safety_score returned, and pass ONLY non-null ones (a place with no
+        inspection record has none). Preferred for named places.
+      zip_code: a Chicago ZIP, for "records in <ZIP>".
+      lat + lon + radius_m: a point and radius in metres, for "records near here".
+
+    Args:
+        license_ids: license_id strings from get_safety_score (non-null only)
+        zip_code: Chicago ZIP code (area mode)
+        lat: latitude of the area centre (with lon + radius_m)
+        lon: longitude of the area centre (with lat + radius_m)
+        radius_m: search radius in metres (with lat + lon)
+    """
+    return _records_handler.handler(
+        {
+            "license_ids": license_ids or [],
+            "zip": zip_code,
+            "lat": lat,
+            "lon": lon,
+            "radius_m": radius_m,
+        },
+        None,
+    )
+
+
+@tool
 def food_safety_info(query: str, topics: list | None = None) -> dict:
     """
     Answer a GENERAL food-safety or foodborne-illness question (what a germ is,
@@ -256,6 +300,7 @@ def build_agent() -> Agent:
             get_safety_score,
             explain_restaurant,
             find_reviews,
+            find_inspection_records,
             food_safety_info,
         ],
         system_prompt=SYSTEM_PROMPT,

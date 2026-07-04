@@ -9,7 +9,16 @@ import { CityToggle } from "@/components/CityPicker";
  * navigation is fine for this iteration; we'll lift to a config when more
  * routes land.
  */
-export type NavItem = "search" | "chat" | "caregivers" | "how" | "sources";
+// "feedback" is a valid active target (so the feedback page can pass it) but is
+// intentionally NOT in NAV below — feedback is a secondary action reached from
+// the footer / in-page links, not a top-nav destination, so no pill highlights.
+export type NavItem =
+  | "search"
+  | "chat"
+  | "caregivers"
+  | "how"
+  | "sources"
+  | "feedback";
 
 const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "search", label: "Search", href: "/" },
