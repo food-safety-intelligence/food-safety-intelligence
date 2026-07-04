@@ -63,6 +63,12 @@ RISK_TIER_THRESHOLDS = [
 # as ``trend_scores``), not the production risk score.
 TREND_K_VISITS = 5
 
+# Slope magnitude below which a trend reads as "stable". Mirrors the web app's
+# TREND_STABLE_BAND (app/src/lib/scores.ts) so the totals worsening/improving
+# counts match the per-establishment direction the app labels and shows. Keep
+# the two in sync (DR 0011 retuned this from 0.001 to 0.0003).
+TREND_STABLE_BAND = 0.0003
+
 
 def score_to_tier(score: float) -> str:
     """Discretise a probability into Low / Moderate / Elevated / High."""
@@ -271,14 +277,11 @@ def write_scores_json(
             # Establishments trending worse / better by the last-K-visits
             # forecast slope (DR 0011). No window in the key name: the slope is
             # a visit-count trend, not a calendar window, and K is tunable, so a
-            # window/K suffix would go stale on a retune.
-            # NOTE: this ±0.001 band predates DR 0011's app-side retune — the web
-            # app's trendDirection now labels at TREND_STABLE_BAND = 0.0003, so
-            # these counts are a stricter "worsening"/"improving" than the labels
-            # the app shows. They are currently unused by the app; align the band
-            # to the app's when a consumer needs the count to match the labels.
-            "worsening": int((df["trend_slope"].fillna(0) > 0.001).sum()),
-            "improving": int((df["trend_slope"].fillna(0) < -0.001).sum()),
+            # window/K suffix would go stale on a retune. The ±TREND_STABLE_BAND
+            # cutoff matches the web app's trendDirection so these counts equal
+            # the number of establishments the app labels worsening / improving.
+            "worsening": int((df["trend_slope"].fillna(0) > TREND_STABLE_BAND).sum()),
+            "improving": int((df["trend_slope"].fillna(0) < -TREND_STABLE_BAND).sum()),
         }
 
     payload = {
