@@ -63,23 +63,23 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "PersonalisedMedicalAdvice",
-        # Bedrock topic classifiers key on the EXAMPLES, not just the definition.
-        # An "immune system" example (previously here) trained the classifier to
-        # match ANY immune-system mention, which blocked legit caregiver food-safety
-        # queries ("safest options for an immunocompromised diner"). So every example
-        # is now a clear diagnosis/treatment/medication request, and the definition
-        # targets the same — vulnerable-diner *risk* questions pass the guardrail and
-        # are handled by the system prompt (which still declines a personal safety
-        # verdict). ≤200-char definition cap.
+        # Bedrock topic classifiers key on the EXAMPLES. Two lessons learned by
+        # apply-guardrail testing: (1) an "immune system" example blocked caregiver
+        # food-safety queries; (2) examples that name an ILLNESS ("food poisoning",
+        # "stomach bug") made the classifier trip on the illness term, blocking
+        # general education ("how common is food poisoning?"). So examples target only
+        # PERSONAL treatment-seeking ("what should I take", "diagnose me") with no
+        # generic disease terms, and the definition explicitly allows general
+        # education + ranking. ≤200-char definition cap.
         "definition": (
-            "Seeking a medical diagnosis, treatment, or medication for oneself "
-            "(e.g. do I have food poisoning; what medicine do I take). Ranking "
-            "restaurants by food-safety risk is allowed."
+            "Seeking a personal medical diagnosis, treatment, or medication for "
+            "oneself. General food-safety education and ranking restaurants by risk "
+            "are allowed."
         ),
         "examples": [
-            "Do I have food poisoning, and what medicine should I take?",
-            "What antibiotics should I take for a stomach bug after eating out?",
+            "What medicine should I take for how I feel after eating here?",
             "Diagnose my symptoms and tell me how to treat them.",
+            "Should I take antibiotics or see a doctor for my stomach pain?",
         ],
         "type": "DENY",
     },
