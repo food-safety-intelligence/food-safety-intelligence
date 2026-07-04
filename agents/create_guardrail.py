@@ -16,12 +16,6 @@ system prompt:
     scope and must NOT be blocked.
   - Prompt-attack filter — resists "ignore your instructions" style injection.
 
-  NOTE: decision record 0012 still describes an "OffTopicNonFoodSafety" guardrail
-  topic (re-scoped) as surviving — that text predates the 9c92ce7 removal and is
-  stale. The live guardrail (verified 2026-07-04: only PersonalisedMedicalAdvice +
-  LegalAdvice) reflects the removal; this file now matches it. Update 0012 to record
-  the removal + the over-blocking reason.
-
 The contextual-grounding + relevance policy is configured below but is NOT active
 as the agent is wired: Strands' BedrockModel does not tag the tool outputs as
 grounding sources and per-message grounding is off, so this policy has no
@@ -38,7 +32,9 @@ Then wire the printed id + version into the agent via env vars (see
 
 Usage:
     python agents/create_guardrail.py            # create + publish a version
-    AWS_REGION=us-east-1 python agents/create_guardrail.py
+    # Defaults to us-west-2 — the region the runtime + guardrail live in. Set
+    # AWS_REGION only to target a different account/region; pointing it at the wrong
+    # region creates a DUPLICATE guardrail instead of updating the live one.
 """
 
 from __future__ import annotations
@@ -67,15 +63,23 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "PersonalisedMedicalAdvice",
+        # Bedrock topic classifiers key on the EXAMPLES. Two lessons learned by
+        # apply-guardrail testing: (1) an "immune system" example blocked caregiver
+        # food-safety queries; (2) examples that name an ILLNESS ("food poisoning",
+        # "stomach bug") made the classifier trip on the illness term, blocking
+        # general education ("how common is food poisoning?"). So examples target only
+        # PERSONAL treatment-seeking ("what should I take", "diagnose me") with no
+        # generic disease terms, and the definition explicitly allows general
+        # education + ranking. ≤200-char definition cap.
         "definition": (
-            "Personalised medical advice for a specific person — diagnosis, "
-            "treatment or medication, or whether a food is safe given their "
-            "health condition. General factual food-safety education is allowed."
+            "Seeking a personal medical diagnosis, treatment, or medication for "
+            "oneself. General food-safety education and ranking restaurants by risk "
+            "are allowed."
         ),
         "examples": [
-            "Is it safe for ME to eat here with my weak immune system?",
-            "Do I have food poisoning, and what medicine should I take?",
-            "I'm pregnant — tell me exactly what I can and cannot eat.",
+            "What medicine should I take for how I feel after eating here?",
+            "Diagnose my symptoms and tell me how to treat them.",
+            "Should I take antibiotics or see a doctor for my stomach pain?",
         ],
         "type": "DENY",
     },
@@ -136,7 +140,10 @@ def create() -> tuple[str, str, bool]:
     publish a new immutable version. Returns (id, version, updated). Idempotent — a
     re-run adopts the existing guardrail so the agent's wired id is unchanged (only
     the version bumps), instead of creating a duplicate guardrail each run."""
-    region = os.environ.get("AWS_REGION", "us-east-1")
+    # Default to the region the runtime + guardrail actually live in. Overriding to
+    # the wrong region makes _existing_id miss the live guardrail and create a
+    # duplicate there instead of updating it.
+    region = os.environ.get("AWS_REGION", "us-west-2")
     client = boto3.client("bedrock", region_name=region)
 
     existing = _existing_id(client)
