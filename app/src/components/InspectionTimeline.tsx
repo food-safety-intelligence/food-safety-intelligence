@@ -1,8 +1,14 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { InspectionEvent } from "@/lib/scores";
+import {
+  compareInspectionsNewestFirst,
+  INSPECTION_JUMP_EVENT,
+  inspectionAnchorId,
+  parseInspectionAnchor,
+} from "@/lib/scores";
 import { formatInspectionDate } from "@/lib/utils";
 
 const RESULT_STYLES = {
@@ -69,6 +75,48 @@ export function InspectionTimeline({
   const [expanded, setExpanded] = useState(false);
   // Which rows are expanded to show their comments, keyed by row's stable key.
   const [open, setOpen] = useState<Set<string>>(new Set());
+  // Newest-first index of the row a trend-chart dot linked to (null = none). The
+  // row is scrolled to and briefly highlighted; cleared after a moment.
+  const [highlight, setHighlight] = useState<number | null>(null);
+
+  // React to a hardlink from the trend chart: the URL hash (a fresh deep link or
+  // the enlarged chart's new tab) or the in-tab jump event (the inline chart).
+  // Expand the collapsed tail if the target is hidden; the effect below then
+  // scrolls to and highlights the row.
+  useEffect(() => {
+    function jumpTo(n: number | null) {
+      if (n === null || n < 0 || n >= events.length) return;
+      if (n >= maxVisible) setExpanded(true);
+      setHighlight(n);
+    }
+    jumpTo(parseInspectionAnchor(window.location.hash));
+    const onHash = () => jumpTo(parseInspectionAnchor(window.location.hash));
+    const onJump = (e: Event) =>
+      jumpTo(parseInspectionAnchor((e as CustomEvent<string>).detail ?? ""));
+    window.addEventListener("hashchange", onHash);
+    window.addEventListener(INSPECTION_JUMP_EVENT, onJump as EventListener);
+    return () => {
+      window.removeEventListener("hashchange", onHash);
+      window.removeEventListener(INSPECTION_JUMP_EVENT, onJump as EventListener);
+    };
+  }, [events.length, maxVisible]);
+
+  // Once the target row is in the DOM (after any auto-expand), scroll it into
+  // view, move focus to it (keyboard + screen-reader cue), and clear the
+  // highlight after a moment so it reads as a brief flash.
+  useEffect(() => {
+    if (highlight === null) return;
+    const el = document.getElementById(inspectionAnchorId(highlight));
+    const raf = requestAnimationFrame(() => {
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      el?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+    });
+    const timer = setTimeout(() => setHighlight(null), 2600);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(timer);
+    };
+  }, [highlight, expanded]);
 
   if (events.length === 0) {
     return (
@@ -86,8 +134,9 @@ export function InspectionTimeline({
       return next;
     });
 
-  // Most recent first
-  const sorted = events.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  // Most recent first — the same order the trend-chart dots index their anchors
+  // by, so `inspection-<n>` lands on the matching row.
+  const sorted = events.slice().sort(compareInspectionsNewestFirst);
   const visible = expanded ? sorted : sorted.slice(0, maxVisible);
   const hidden = sorted.length - visible.length;
 
@@ -105,6 +154,10 @@ export function InspectionTimeline({
           const key = `${e.date}-${i}`;
           const isOpen = open.has(key);
           const panelId = `inspection-comments-${key}`;
+          // `i` is the newest-first index (visible is a prefix of sorted), so
+          // this matches the anchor the trend-chart dots link to.
+          const anchorId = inspectionAnchorId(i);
+          const isHighlighted = highlight === i;
           // Count of cited violations for this inspection. Derived from the same
           // parse the expanded panel uses, so the collapsed "N violations" label
           // always matches the number of items revealed on expand.
@@ -113,7 +166,13 @@ export function InspectionTimeline({
           // comment text stays hidden until the row is expanded.
           const teaser = e.headline?.split(COMMENTS_MARKER)[0].trim();
           return (
-            <li key={key}>
+            <li
+              key={key}
+              id={anchorId}
+              className={`scroll-mt-28 rounded-xl transition-colors ${
+                isHighlighted ? "ring-2 ring-teal bg-teal/5" : "ring-0"
+              }`}
+            >
               <button
                 type="button"
                 onClick={() => toggle(key)}
