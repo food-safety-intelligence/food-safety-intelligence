@@ -115,18 +115,27 @@ _POLICY = {
 
 
 def _existing_id(client) -> str | None:
-    """The id of the guardrail named GUARDRAIL_NAME, if one already exists."""
-    for g in client.list_guardrails().get("guardrails", []):
-        if g.get("name") == GUARDRAIL_NAME:
-            return g["id"]
-    return None
+    """The id of the guardrail named GUARDRAIL_NAME, if one already exists.
+
+    Pages through list_guardrails: the response is page-limited, and Bedrock does
+    NOT enforce unique guardrail names — so missing the guardrail on a single page
+    would create a duplicate on the next run and break idempotency."""
+    token: str | None = None
+    while True:
+        resp = client.list_guardrails(**({"nextToken": token} if token else {}))
+        for g in resp.get("guardrails", []):
+            if g.get("name") == GUARDRAIL_NAME:
+                return g["id"]
+        token = resp.get("nextToken")
+        if not token:
+            return None
 
 
 def create() -> tuple[str, str, bool]:
     """Create the guardrail (or update it in place if the name already exists), then
     publish a new immutable version. Returns (id, version, updated). Idempotent — a
     re-run adopts the existing guardrail so the agent's wired id is unchanged (only
-    the version bumps), instead of failing on the unique-name constraint."""
+    the version bumps), instead of creating a duplicate guardrail each run."""
     region = os.environ.get("AWS_REGION", "us-east-1")
     client = boto3.client("bedrock", region_name=region)
 
@@ -134,7 +143,12 @@ def create() -> tuple[str, str, bool]:
     if existing:
         # Adopt the existing guardrail: overwrite its working draft with the current
         # policy (adds LA to scope), keeping the same id so no re-wire is needed.
-        client.update_guardrail(guardrailIdentifier=existing, name=GUARDRAIL_NAME, **_POLICY)
+        client.update_guardrail(
+            guardrailIdentifier=existing,
+            name=GUARDRAIL_NAME,
+            description=_DESCRIPTION,
+            **_POLICY,
+        )
         guardrail_id = existing
     else:
         guardrail_id = client.create_guardrail(
