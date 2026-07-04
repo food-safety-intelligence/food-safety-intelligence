@@ -47,6 +47,14 @@ export interface CityConfig {
   chatSupported: boolean;
 }
 
+/** Parse the numeric inspection score out of an LA history `result` string —
+ * "Grade A (score 95)" or a bare "(score 59)" for a sub-70 (ungraded) inspection.
+ * Returns null when no score is present. Used by LA's score-driven history buckets. */
+function laScore(result: string): number | null {
+  const m = /score (\d+)/.exec(result);
+  return m ? Number(m[1]) : null;
+}
+
 export const CITY_CONFIG: Record<City, CityConfig> = {
   chicago: {
     id: "chicago",
@@ -142,15 +150,21 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     footerBlurb:
       "Open-data project using LA County Environmental Health restaurant and market inspection records to estimate the risk of a B or C grade at the next inspection. A research preview; not affiliated with the County of Los Angeles.",
     sources: ["LA County Restaurant and Market Inspections"],
-    // LA grades run the OPPOSITE way to NYC (A = 90-100, higher is cleaner), but
-    // the letter → colour mapping is the same: A clean, B middling, C worst.
+    // LA grades run the OPPOSITE way to NYC (A = 90-100, higher is cleaner). Bucket
+    // by the parsed SCORE, not the letter: a sub-70 inspection carries no letter
+    // grade in the feed (LA has no grade below C) and would otherwise render as a
+    // bare "(score 59)" that never colours, tallies, or counts — even though the
+    // model treats it as bad. Score-driven buckets fold those in. A = 90-100,
+    // B = 80-89, C-or-below = under 80.
     historyResults: [
-      { key: "A", label: "Grade A", bg: "bg-sage", badge: "A", match: (r) => r.startsWith("Grade A") },
-      { key: "B", label: "Grade B", bg: "bg-amber", badge: "B", match: (r) => r.startsWith("Grade B") },
-      { key: "C", label: "Grade C", bg: "bg-terra", badge: "C", match: (r) => r.startsWith("Grade C") },
+      { key: "A", label: "Grade A", bg: "bg-sage", badge: "A", match: (r) => (laScore(r) ?? -1) >= 90 },
+      { key: "B", label: "Grade B", bg: "bg-amber", badge: "B", match: (r) => { const s = laScore(r); return s !== null && s >= 80 && s < 90; } },
+      { key: "C", label: "Grade C or below", bg: "bg-terra", badge: "C", match: (r) => { const s = laScore(r); return s !== null && s < 80; } },
     ],
     outcomeNoun: "B or C grades",
-    isBadOutcome: (r) => r.startsWith("Grade B") || r.startsWith("Grade C"),
+    // Bad = score below 90 (a B or C, or a sub-70 ungraded inspection), read from
+    // the score so ungraded-but-low inspections still count toward the headline.
+    isBadOutcome: (r) => { const s = laScore(r); return s !== null ? s < 90 : /^Grade [BC]/.test(r); },
     // LA's forecast-slope magnitudes sit on the same scale as Chicago's and NYC's
     // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
     // same honest Worsening / Stable / Improving split.
