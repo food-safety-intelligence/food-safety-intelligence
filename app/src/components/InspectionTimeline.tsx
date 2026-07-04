@@ -109,7 +109,9 @@ export function InspectionTimeline({
     const el = document.getElementById(inspectionAnchorId(highlight));
     const raf = requestAnimationFrame(() => {
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      el?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+      // Focus the row itself (tabIndex -1, outline-none) rather than its button,
+      // so screen-reader/keyboard users land here without drawing a focus box.
+      el?.focus({ preventScroll: true });
     });
     const timer = setTimeout(() => setHighlight(null), 2600);
     return () => {
@@ -169,8 +171,13 @@ export function InspectionTimeline({
             <li
               key={key}
               id={anchorId}
-              className={`scroll-mt-28 rounded-xl transition-colors ${
-                isHighlighted ? "ring-2 ring-teal bg-teal/5" : "ring-0"
+              // Focusable (programmatically only) so a hardlink can move focus
+              // here for screen-reader users; outline-none keeps it from drawing
+              // a box — the pale-yellow wash is the visual cue instead.
+              tabIndex={-1}
+              data-highlighted={isHighlighted || undefined}
+              className={`scroll-mt-28 rounded-xl outline-none transition-colors duration-500 ${
+                isHighlighted ? "bg-highlight" : ""
               }`}
             >
               <button
