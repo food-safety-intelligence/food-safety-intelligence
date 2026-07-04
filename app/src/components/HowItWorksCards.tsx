@@ -11,6 +11,14 @@ import type { ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
 import { CITY_CONFIG, type City } from "@/lib/city";
 
+// "a" vs "an" for a percentage read aloud (e.g. "an 8%", "a 41%"). For whole
+// percents 0–100 the vowel-sound-initial numbers are 8, 11, 18, and the 80s.
+export function articleFor(pct: number): "a" | "an" {
+  const n = Math.round(pct);
+  const vowelSound = n === 8 || n === 11 || n === 18 || (n >= 80 && n <= 89);
+  return vowelSound ? "an" : "a";
+}
+
 // Friendly labels for the served model slug (mirrors the Chicago page's map).
 const MODEL_TYPE_LABELS: Record<string, string> = {
   la_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",

@@ -17,7 +17,7 @@ import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
-import { ModelCard, DataGovernance } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, articleFor } from "@/components/HowItWorksCards";
 import { cn } from "@/lib/utils";
 
 interface LaMethodology {
@@ -127,7 +127,7 @@ export function HowItWorksLa() {
         <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
           <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
           <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC — how well it ranks a B/C above a clean inspection (comparable across cities)" />
-          <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against a ${prevPct}% base rate`} />
+          <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
         </dl>
       </header>
 

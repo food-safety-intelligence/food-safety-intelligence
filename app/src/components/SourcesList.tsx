@@ -71,8 +71,8 @@ export function SourcesList() {
         <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">Sources</p>
         <h1 className="text-5xl font-light leading-[1.05] tracking-tight">Public data, attributed.</h1>
         <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
-          Every score for <strong className="text-ink font-medium">{c.label}</strong> is computed
-          from the public datasets below. We don&apos;t scrape, buy, or combine private data — and
+          Every score for <strong className="text-ink font-medium">{c.label}</strong>{" "}
+          is computed from the public datasets below. We don&apos;t scrape, buy, or combine private data — and
           the app collects nothing from the people who visit it.
         </p>
       </header>
