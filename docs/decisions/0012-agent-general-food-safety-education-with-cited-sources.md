@@ -117,3 +117,25 @@
 - `agents/README.md` — the tool contract for `food_safety_info` and the safety
   layers.
 - `docs/agent-experiments.md` — eval runs covering the new cases.
+
+## Update (2026-07-04) — narrow the medical topic so caregiver queries pass
+
+Live chat over-blocked a core use case: "Best options for someone with a
+compromised immune system near Harlem" was denied by the `PersonalisedMedicalAdvice`
+guardrail topic, whose definition included "whether a food is safe given their
+health condition." That's the exact caregiver/immunocompromised food-safety
+recommendation the app is built to answer (the "For caregivers" page + the
+system-prompt CAREGIVER section). Narrowed the topic to deny only a **personal
+medical ruling for the speaker** (diagnosis, treatment, medication, "is it safe
+for ME given my condition") and to explicitly allow **ranking restaurants by
+food-safety risk** — including for a vulnerable diner. The deny examples are
+unchanged, so "safe for ME with my weak immune system" / "what medicine should I
+take" stay blocked. Also fixed a self-inflicted **output** block: the system
+prompt told the model to append "consult your care team's guidance," which the
+output guardrail then treated as personalised medical advice and blocked —
+truncating otherwise-good answers; that instruction was removed.
+
+**Deploy:** the guardrail is not reprovisioned on merge — Deepak must re-run
+`agents/create_guardrail.py` (publishes a new version; also picks up the already-
+updated Chicago+NYC+LA block message) and re-wire the version. The system-prompt
+change deploys with the agent on merge.

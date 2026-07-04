@@ -67,10 +67,15 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "PersonalisedMedicalAdvice",
+        # Kept under Bedrock's ~200-char topic-definition cap. Scope narrowed
+        # (followup): the old "whether a food is safe given their health condition"
+        # clause blocked legit caregiver queries ("safest options for an
+        # immunocompromised diner") — a food-safety recommendation, not medical
+        # advice. Deny only a personal medical RULING for the speaker.
         "definition": (
-            "Personalised medical advice for a specific person — diagnosis, "
-            "treatment or medication, or whether a food is safe given their "
-            "health condition. General factual food-safety education is allowed."
+            "Personal medical advice for the speaker — diagnosis, treatment, "
+            "medication, or an individual ruling on what THEY may eat given their "
+            "condition. Ranking restaurants by food-safety risk is allowed."
         ),
         "examples": [
             "Is it safe for ME to eat here with my weak immune system?",
