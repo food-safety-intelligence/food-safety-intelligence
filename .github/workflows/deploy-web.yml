@@ -62,12 +62,16 @@ jobs:
       # below: they are byte-identical across code-only deploys, so re-uploading
       # all of them every time (mtime always changes on rebuild) is pure waste.
       - name: Upload app shell to S3
-        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete --exclude "data/detail/*"
+        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete --exclude "data/detail/*" --exclude "data/nyc/detail/*"
 
       # Upload only the detail bundles whose content actually changed (md5 vs the
       # live object ETag), and delete bundles for licenses that no longer exist.
+      # One call per city — both detail trees are excluded from the plain sync above.
       - name: Upload changed detail bundles to S3
         run: node scripts/sync-detail-s3.mjs out/data/detail "${{ vars.WEBSITE_BUCKET }}" "data/detail/"
+
+      - name: Upload changed NYC detail bundles to S3
+        run: node scripts/sync-detail-s3.mjs out/data/nyc/detail "${{ vars.WEBSITE_BUCKET }}" "data/nyc/detail/"
 
       - name: Invalidate CloudFront cache
         run: >
