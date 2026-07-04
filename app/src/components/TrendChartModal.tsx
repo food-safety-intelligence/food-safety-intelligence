@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Minus, Plus, RotateCcw, X } from "lucide-react";
+import { DefineTerm } from "@/components/DefineTerm";
 import { TrendChart, type TrendPoint } from "@/components/TrendChart";
 import { applyTrendPan, applyTrendZoom, clampFrac } from "@/lib/utils";
 
@@ -300,11 +301,12 @@ export function TrendChartModal({
         </div>
 
         <p className="text-2xs text-muted mt-3 leading-snug">
-          Each point is the trend estimate — the model&apos;s risk read with that inspection&apos;s
-          own result removed, so the line shows direction, not a second risk number. The dashed line
-          marks the headline risk score, which does count the latest result and can differ. The
-          shaded band is the recent window that sets the trend; zooming changes only what you see.
-          Select a point to open that inspection&apos;s record in a new tab.
+          Each point is the trend estimate
+          <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" /> — the model&apos;s
+          read with each visit&apos;s own result removed, so the line shows direction. The dashed line
+          is the risk score
+          <DefineTerm termKey="risk-score" className="align-middle mx-0.5" />, which counts the latest
+          result and can differ. Select a point to open that inspection&apos;s record in a new tab.
         </p>
       </div>
     </div>

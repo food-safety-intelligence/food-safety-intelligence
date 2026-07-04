@@ -394,7 +394,7 @@ export default async function HowItWorksPage() {
               <span className="font-medium text-ink/80">trend estimate</span> — the
               forecast model&apos;s 180-day-forward read{" "}
               <span className="font-medium text-ink/80">as of that inspection&apos;s
-              date</span>, from 0 to 1, with that visit&apos;s own result removed
+              date</span>, from 0 to 100, with that visit&apos;s own result removed
               (the pass/fail is in the inspection list below). Hover a dot for its
               date and value. A dashed line marks the headline{" "}
               <span className="font-medium text-ink/80">risk score</span>; because

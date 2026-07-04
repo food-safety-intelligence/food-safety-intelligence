@@ -187,7 +187,7 @@ export function TrendChart({
           bandLeft !== null ? `, recent ${windowSize} highlighted as the trend window` : ""
         }, ${direction}`}
       >
-        {/* y-axis: 0..1 risk scale (most establishments sit low). */}
+        {/* y-axis: 0..100 to match the gauge's "/100" (most establishments sit low). */}
         {[0, 1].map((t) => (
           <text
             key={t}
@@ -198,7 +198,7 @@ export function TrendChart({
             fill="#6B7280"
             fontFamily="var(--font-manrope), 'Manrope', sans-serif"
           >
-            {t.toFixed(1)}
+            {t * 100}
           </text>
         ))}
         <text
@@ -248,7 +248,7 @@ export function TrendChart({
             />
             {/* Right-anchored so it always sits inside the band (which ends at
                 the right plot edge) — a centred label clips when the band is
-                narrow. The caption below the chart carries the full wording. */}
+                narrow. Names the K it covers; the caption carries the full wording. */}
             <text
               x={padL + w - 2}
               y={padTop + 7}
@@ -258,7 +258,7 @@ export function TrendChart({
               fillOpacity={0.55}
               fontFamily="var(--font-manrope), 'Manrope', sans-serif"
             >
-              trend
+              last {windowSize} visits
             </text>
           </>
         )}
@@ -325,7 +325,7 @@ export function TrendChart({
               strokeWidth={2.5}
               tabIndex={0}
               role={linkable ? "link" : "button"}
-              aria-label={`${fmtFull(pts[i].date)}, trend estimate ${pts[i].score.toFixed(2)}${
+              aria-label={`${fmtFull(pts[i].date)}, trend estimate ${Math.round(pts[i].score * 100)}${
                 isLast ? " (latest — leaves out this visit's result, so it can differ from the risk score)" : ""
               }${pts[i].result ? `, inspection result ${pts[i].result}` : ""}${
                 linkable && activateHint ? `, ${activateHint}` : ""
@@ -394,7 +394,7 @@ export function TrendChart({
           }}
         >
           <div>
-            {fmtFull(pts[hover].date)} · trend estimate {pts[hover].score.toFixed(2)}
+            {fmtFull(pts[hover].date)} · trend estimate {Math.round(pts[hover].score * 100)}
           </div>
           {pts[hover].result && (
             <div className="opacity-70">
