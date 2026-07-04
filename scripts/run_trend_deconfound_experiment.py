@@ -1,9 +1,9 @@
 """Trend de-confound experiment — last-K-visits slope on a forecast-only model.
 
-`scores.parquet`'s ``trend_slope_90d`` (see
-``foodsafety.serve.predict_batch._compute_trend_slopes``) is an OLS slope of the
-production model's ``risk_score`` over the 90 days before each license's latest
-inspection. Two known failures:
+`scores.parquet`'s original trend field — ``trend_slope_90d``, since renamed to
+``trend_slope`` (decision 0011) — was an OLS slope of the production model's
+``risk_score`` over the 90 days before each license's latest inspection. This
+experiment motivated that replacement; the 90-day field had two known failures:
 
   * **coverage** — it needs >=2 inspections inside a 90-day window, so it is null
     for most licenses (they are not inspected twice in 90 days); the field then

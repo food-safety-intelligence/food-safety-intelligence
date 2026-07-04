@@ -36,6 +36,7 @@ from handler import (  # noqa: E402
     _fuzzy_lookup,
     _load_scores_index,
     _normalise_name,
+    _trend_label,
 )
 
 # ---------------------------------------------------------------------------
@@ -156,7 +157,7 @@ _GEO_SCORES = {
             "lon": -87.62935,
             "risk_score": 0.0352,
             "risk_tier": "Low",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "Loop",
             "top_drivers": [],
         },
@@ -168,7 +169,7 @@ _GEO_SCORES = {
             "lon": -87.63410,
             "risk_score": 0.11,
             "risk_tier": "Moderate",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "River North",
             "top_drivers": [],
         },
@@ -180,7 +181,7 @@ _GEO_SCORES = {
             "lon": -87.63100,
             "risk_score": 0.20,
             "risk_tier": "Moderate",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "Loop",
             "top_drivers": [],
         },
@@ -223,6 +224,20 @@ def test_geo_fallback_recovers_venue_with_no_osm_address(_geo_scores):
     assert out["status"] == "scored"
     assert out["license_id"] == "1801618"
     assert out["risk_tier"] == "Low"
+    # Guards the field name: the fixture record carries trend_slope (0.0 ->
+    # "stable"). Reading the wrong key would silently yield None ->
+    # "not enough inspection history" — the exact prod bug from decision 0011's
+    # trend_slope_90d -> trend_slope rename half-landing.
+    assert out["trend"] == "stable"
+
+
+def test_trend_label_maps_slope_including_null():
+    assert _trend_label(0.0) == "stable"
+    assert _trend_label(0.5) == "worsening"
+    assert _trend_label(-0.5) == "improving"
+    # Null slope = <2 scored inspections under scores schema 0.5.0: reported as
+    # "we can't say", not a confident flat trend (see decision 0011).
+    assert _trend_label(None) == "not enough inspection history"
 
 
 def test_geo_fallback_token_subset_name(_geo_scores):
