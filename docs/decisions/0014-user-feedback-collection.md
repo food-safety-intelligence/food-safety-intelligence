@@ -21,7 +21,7 @@ app only renders a form and POSTs to it.
   On each POST it appends a row and emails the team (`MailApp`). Deployed with
   access "Anyone" (visitors are not logged in) and `@OnlyCurrentDoc` (Sheets
   scope limited to the one bound Sheet). Script committed at
-  `feedback-apps-script.gs` (paste-source + backend contract).
+  `scripts/feedback-apps-script.gs` (paste-source + backend contract).
 - **App → endpoint**: a client-side `fetch` with `mode: "no-cors"` and
   `Content-Type: text/plain` — the same client-posts-to-an-external-endpoint
   pattern as the chat agent (`agent-api.ts`). `text/plain` keeps it a CORS-simple
