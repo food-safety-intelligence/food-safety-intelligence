@@ -10,9 +10,9 @@ import {
   BookOpen,
   type LucideIcon,
   Target,
-  TriangleAlert,
   Wrench,
 } from "lucide-react";
+import { ModelCard, DataGovernance } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
@@ -75,7 +75,8 @@ const NAV = [
   ["reading-the-score", "Reading the score"],
   ["how-its-built", "How it's built"],
   ["how-well-it-works", "How well it works"],
-  ["limits", "Limits"],
+  ["model-card", "Model card"],
+  ["data-governance", "Data governance"],
   ["reference", "Reference"],
 ];
 
@@ -338,12 +339,13 @@ export function HowItWorksNyc() {
         </article>
       </div>
 
-      {/* 04 — Limits */}
-      <div className="mt-10 space-y-8">
-        <SectionLabel id="limits" number="04" icon={TriangleAlert}>Limits</SectionLabel>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What to keep in mind</h2>
-          <div className="mt-3 max-w-[62ch] space-y-4 text-muted leading-[1.7]">
+      {/* 04 — Model card (Limitations folded in, like Chicago) */}
+      <ModelCard
+        city="nyc"
+        m={m}
+        number="04"
+        limitations={
+          <div className="space-y-4 text-muted leading-[1.7]">
             <p>
               <strong className="text-ink">NYC is a coverage feature, not a quality
               upgrade.</strong> Its signal is weaker than Chicago&apos;s
@@ -364,12 +366,15 @@ export function HowItWorksNyc() {
               it for prioritisation, not judgement.
             </p>
           </div>
-        </article>
-      </div>
+        }
+      />
 
-      {/* 05 — Reference */}
+      {/* 05 — Data governance */}
+      <DataGovernance city="nyc" m={m} number="05" />
+
+      {/* 06 — Reference */}
       <div className="mt-10 space-y-8">
-        <SectionLabel id="reference" number="05" icon={BookMarked}>Reference</SectionLabel>
+        <SectionLabel id="reference" number="06" icon={BookMarked}>Reference</SectionLabel>
         <article>
           <h2 className="text-2xl font-medium tracking-tight">Definitions</h2>
           <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
