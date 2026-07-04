@@ -1,3 +1,6 @@
+import { MessageSquarePlus } from "lucide-react";
+import Link from "next/link";
+
 export function SiteFooter() {
   return (
     <footer className="border-t border-line bg-cream/70 mt-auto">
@@ -11,6 +14,13 @@ export function SiteFooter() {
             license records to estimate forward-window food-safety risk. Not
             affiliated with the City of Chicago.
           </p>
+          <Link
+            href="/feedback"
+            className="mt-3 inline-flex items-center gap-1.5 text-teal hover:underline"
+          >
+            <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+            Give feedback
+          </Link>
         </div>
         <div className="col-span-6 md:col-span-3">
           <div className="text-2xs tracking-widest uppercase text-muted mb-2">
