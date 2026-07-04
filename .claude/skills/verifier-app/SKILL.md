@@ -41,6 +41,36 @@ raise `NODE_OPTIONS` — Next's static-gen workers don't inherit it (they cap at
 regardless). The cause is a server loader holding too much data per worker; fix the loader
 to read per-page slices.
 
+### Fast re-verify for a JS-only change (skip the ~13-min detail regen)
+
+`npm run build`'s `postbuild` regenerates **every** establishment's detail bundle
+(Chicago ~23.6k + NYC ~27.7k + LA ~43k tiny files). That dominates the build and is
+pure waste when you only changed client code (`.tsx`/`.ts`) and the data JSONs are
+unchanged. Two consequences on **this box specifically**: the worktree lives on
+**EFS/NFS**, so writing ~94k small files — and even Next's own "Collecting build
+traces" step reading `node_modules` — is pathologically slow (many minutes). On CI's
+local SSD the same build is far quicker, so this is a local-verify problem, not a CI one.
+
+For a UI-only change you need the rebuilt JS plus only the handful of test bundles you
+screenshot:
+
+```bash
+cd app
+rm -f .next/lock                     # a killed prior build can leave a stale lock
+npx next build --webpack             # JS + page shells only, no postbuild (~1 min)
+# generate ONLY the venues you screenshot (per city) — seconds, not minutes:
+FSI_DETAIL_ONLY="FA0275664,FA0222484" \
+  node scripts/build-detail-data.mjs public/data/la/scores.json \
+  public/data/la/inspection_history.json "" out/data/la
+python3 -m http.server 4137 --directory out   # unique port, isolated
+```
+
+`FSI_DETAIL_ONLY=<id,id,…>` writes just those bundles (+ `detail-globals.json` with
+percentiles still computed over the FULL population) into the target dir without wiping
+it. Do a full `npm run build` when you change the **data** or need every venue reachable;
+`--only` is for observing a code change. Note `next build` wipes `out/`, so run the
+`FSI_DETAIL_ONLY` step **after** it, and re-run it if you rebuild.
+
 ## Capture pixels
 
 No browser ships by default. Install Chromium WITHOUT touching `package.json`,
