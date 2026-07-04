@@ -13,7 +13,7 @@
  * ── One-time setup ────────────────────────────────────────────────────────────
  * 1. Create a Google Sheet. In the first tab, add this header row (row 1):
  *
- *        timestamp | role | source | venue_id | venue_name | message
+ *        timestamp | role | source | venue_id | venue_name | message | topic
  *
  * 2. In that Sheet: Extensions → Apps Script. Delete the default code, paste
  *    this whole file, and Save.
@@ -34,11 +34,14 @@
  *
  * ── Payload contract (must match app/src/lib/feedback.ts) ─────────────────────
  *   message    string   required — the user's free text
+ *   topic      string   self-selected topic ("General" | "Data or listing error"
+ *                        | "Confusing or unclear" | "Site bug" | "Feature idea"
+ *                        | "Other"); "General" if left at the default
  *   role       string   "resident" | "operator" | "inspector" | "unknown"
  *                        (prefilled by the app; "unknown" until the site-entry
  *                        role step ships)
- *   source     string   where it came from: "site" | "how-it-works" |
- *                        "restaurant-detail"
+ *   source     string   entry point: "footer" | "how-it-works" |
+ *                        "restaurant-detail" | "site" (direct)
  *   venueId    string   optional — license id, only when sent from a listing
  *   venueName  string   optional — establishment name, only when sent from a listing
  *   company    string   honeypot — always empty for real users; bots fill it
@@ -67,12 +70,15 @@ function doPost(e) {
     data.venueId || "",
     data.venueName || "",
     data.message || "",
+    data.topic || "General",
   ]);
 
   MailApp.sendEmail(
     NOTIFY_EMAIL,
-    "New Food Safety feedback (" + (data.role || "unknown") + ")",
-    "Role: " + (data.role || "unknown") +
+    "New Food Safety feedback: " + (data.topic || "General") +
+      " (" + (data.role || "unknown") + ")",
+    "Topic: " + (data.topic || "General") +
+      "\nRole: " + (data.role || "unknown") +
       "\nSource: " + (data.source || "") +
       "\nVenue: " + (data.venueName || "") +
       (data.venueId ? " (#" + data.venueId + ")" : "") +

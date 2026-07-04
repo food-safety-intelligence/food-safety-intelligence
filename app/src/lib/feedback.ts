@@ -41,9 +41,40 @@ export const FEEDBACK_ROLES: readonly FeedbackRole[] = [
 /** Upper bound on the free-text message, mirrored as the textarea maxLength. */
 export const MAX_FEEDBACK_CHARS = 2000;
 
+/**
+ * Topic options offered on the form. "General" is the default (an unspecified
+ * topic), the rest let the submitter self-categorise so the Sheet is triage-able
+ * and the deferred summariser has a coarse label to cluster on.
+ */
+export const FEEDBACK_TOPICS = [
+  "General",
+  "Data or listing error",
+  "Confusing or unclear",
+  "Site bug",
+  "Feature idea",
+  "Other",
+] as const;
+
+/**
+ * Topic options for a given role. Universal for now — the same list for every
+ * persona, because role is "unknown" until the site-entry role step ships.
+ * This is the seam for later: once that step sets a real role, branch here to
+ * return a persona-specific list (e.g. operators see "Dispute my score",
+ * inspectors see "Methodology"). `topic` stays one free-text column, so that
+ * swap is options-only — no schema change.
+ */
+export function topicsForRole(role: FeedbackRole): readonly string[] {
+  switch (role) {
+    default:
+      return FEEDBACK_TOPICS;
+  }
+}
+
 export interface FeedbackPayload {
   /** The user's free-text message (required, already trimmed and capped). */
   message: string;
+  /** Self-selected topic (see FEEDBACK_TOPICS); "General" if left at the default. */
+  topic: string;
   /** Prefilled role (see FeedbackRole); "unknown" until the entry step lands. */
   role: FeedbackRole;
   /** Where the feedback was sent from: "site" | "how-it-works" | "restaurant-detail". */

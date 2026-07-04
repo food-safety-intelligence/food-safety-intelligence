@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, MessageSquare, Send } from "lucide-react";
+import { CheckCircle2, MessageSquare, Send, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
@@ -9,6 +9,7 @@ import {
   type FeedbackRole,
   MAX_FEEDBACK_CHARS,
   submitFeedback,
+  topicsForRole,
 } from "@/lib/feedback";
 import { cn } from "@/lib/utils";
 
@@ -42,16 +43,24 @@ export function FeedbackForm() {
   const params = useSearchParams();
   const venueId = params.get("venue") ?? undefined;
   const venueName = params.get("name") ?? undefined;
+  // The entry point (footer / how-it-works / restaurant-detail / direct) is
+  // recorded even if the user later clears the venue below.
   const source =
     params.get("source") ?? (venueId ? "restaurant-detail" : "site");
   const role = resolveRole(params.get("role"));
+  const topics = topicsForRole(role);
 
   const [message, setMessage] = useState("");
+  const [topic, setTopic] = useState<string>(topics[0]);
+  // Whether the user detached this feedback from the establishment it opened
+  // from (arrived via a listing's "tell us" link, but it's not about that venue).
+  const [venueCleared, setVenueCleared] = useState(false);
   // Honeypot state. A real user never sees or fills this; a non-empty value on
   // submit means a bot, and the server (Apps Script) drops the row.
   const [company, setCompany] = useState("");
   const [status, setStatus] = useState<Status>("idle");
 
+  const showVenue = Boolean(venueName) && !venueCleared;
   const enabled = feedbackEnabled();
   const trimmed = message.trim();
   const canSubmit = enabled && trimmed.length > 0 && status !== "submitting";
@@ -63,10 +72,12 @@ export function FeedbackForm() {
     try {
       await submitFeedback({
         message: trimmed.slice(0, MAX_FEEDBACK_CHARS),
+        topic,
         role,
         source,
-        venueId,
-        venueName,
+        // Drop the venue if the user detached it.
+        venueId: venueCleared ? undefined : venueId,
+        venueName: venueCleared ? undefined : venueName,
         company,
       });
       setStatus("success");
@@ -111,14 +122,41 @@ export function FeedbackForm() {
       className="rounded-3xl border border-line bg-card p-6 sm:p-8 soft-shadow"
       noValidate
     >
-      {venueName && (
-        <div className="mb-5 rounded-2xl bg-tint border border-line px-4 py-3 text-sm">
-          <span className="text-2xs tracking-widest uppercase text-muted block mb-0.5">
-            About this establishment
-          </span>
-          <span className="text-ink font-medium">{venueName}</span>
+      {showVenue && (
+        <div className="mb-5 rounded-2xl bg-tint border border-line px-4 py-3 text-sm flex items-start justify-between gap-3">
+          <div>
+            <span className="text-2xs tracking-widest uppercase text-muted block mb-0.5">
+              About this establishment
+            </span>
+            <span className="text-ink font-medium">{venueName}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setVenueCleared(true)}
+            className="shrink-0 inline-flex items-center gap-1 text-xs text-muted hover:text-ink rounded-full px-2 py-1 min-h-[32px] hover:bg-card transition-colors"
+          >
+            <X className="w-3.5 h-3.5" strokeWidth={2} />
+            Not about this
+          </button>
         </div>
       )}
+
+      <label htmlFor="feedback-topic" className="block">
+        <span className="text-sm font-medium text-ink">Topic</span>
+      </label>
+      <select
+        id="feedback-topic"
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+        disabled={!enabled || status === "submitting"}
+        className="mt-2 mb-5 w-full rounded-2xl border border-line bg-cream/40 px-4 py-3 text-md text-ink outline-none transition-colors focus:border-teal focus:bg-card disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {topics.map((t) => (
+          <option key={t} value={t}>
+            {t}
+          </option>
+        ))}
+      </select>
 
       <label htmlFor="feedback-message" className="block">
         <span className="text-sm font-medium text-ink">Your feedback</span>

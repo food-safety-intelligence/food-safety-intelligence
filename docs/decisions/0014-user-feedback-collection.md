@@ -31,8 +31,20 @@ app only renders a form and POSTs to it.
   (`NEXT_PUBLIC_FEEDBACK_ENDPOINT`), baked in at build time like
   `NEXT_PUBLIC_ALB_URL`. It's append-only and public, so committing it is fine.
 - **Payload / Sheet schema**: `timestamp | role | source | venue_id |
-  venue_name | message`. Only `message` is user-entered. `venue_id`/`venue_name`
-  are present only when the form is opened from a restaurant page.
+  venue_name | message | topic`. `message` and `topic` are user-entered;
+  `source` records the entry point (`footer` / `how-it-works` /
+  `restaurant-detail` / `site`); `venue_id`/`venue_name` are present only when
+  opened from a restaurant page **and** not cleared by the user.
+- **Topic**: a short optional dropdown (`General` default, plus data-error /
+  confusing / bug / feature-idea / other) so the Sheet is triage-able and the
+  deferred summarizer has a coarse label. The option list is role-keyed in code
+  (`topicsForRole`) but returns one universal list today; once the site-entry
+  role step sets a real role it can return persona-specific options with no
+  schema change (`topic` stays one free-text column).
+- **Venue is detachable**: if the user arrived from a listing's "tell us" link
+  but the feedback isn't about that venue, a clear control drops
+  `venue_id`/`venue_name` from the submission (the entry point in `source` is
+  still recorded).
 - **No personal data**: we deliberately **do not collect an email** (or name),
   so there is no PII to handle; the Sheet stays a private team log.
 - **Spam**: a hidden **honeypot** field (`company`) — invisible to humans, filled

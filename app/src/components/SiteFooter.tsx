@@ -15,7 +15,7 @@ export function SiteFooter() {
             affiliated with the City of Chicago.
           </p>
           <Link
-            href="/feedback"
+            href="/feedback?source=footer"
             className="mt-3 inline-flex items-center gap-1.5 text-teal hover:underline"
           >
             <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
