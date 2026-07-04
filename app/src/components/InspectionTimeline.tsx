@@ -95,8 +95,10 @@ export function InspectionTimeline({
   const toggle = makeToggle(setOpen);
   const toggleViolation = makeToggle(setOpenViolations);
 
-  // Most recent first
-  const sorted = events.slice().sort((a, b) => (a.date < b.date ? 1 : -1));
+  // Most recent first. localeCompare returns 0 on equal dates, so the sort stays
+  // stable — same-date inspections keep their input order instead of an
+  // engine-defined one (a license can have two inspections on one day).
+  const sorted = events.slice().sort((a, b) => b.date.localeCompare(a.date));
   const visible = expanded ? sorted : sorted.slice(0, maxVisible);
   const hidden = sorted.length - visible.length;
 
@@ -134,17 +136,18 @@ export function InspectionTimeline({
               >
                 {s.label}
               </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className={`font-semibold ${isFail ? "text-terra" : ""}`}>
+              {/* Spans (not divs) so this is valid inside the row <button>. */}
+              <span className="block flex-1 min-w-0">
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className={`font-semibold ${isFail ? "text-terra" : ""}`}>
                     {e.result}
-                  </div>
-                  <div className="num text-xs text-muted shrink-0">
+                  </span>
+                  <span className="num text-xs text-muted shrink-0">
                     {formatInspectionDate(e.date)}
-                  </div>
-                </div>
-                <div
-                  className={`text-sm mt-0.5 ${
+                  </span>
+                </span>
+                <span
+                  className={`block text-sm mt-0.5 ${
                     isFail ? "text-ink/90" : "text-muted"
                   }`}
                 >
@@ -153,8 +156,8 @@ export function InspectionTimeline({
                   </span>
                   {" · "}
                   {e.type}
-                </div>
-              </div>
+                </span>
+              </span>
               {hasViolations && (
                 <ChevronDown
                   className={`shrink-0 w-4 h-4 mt-1 text-muted group-hover:text-ink transition-transform ${
@@ -173,7 +176,9 @@ export function InspectionTimeline({
                   type="button"
                   onClick={() => toggle(key)}
                   aria-expanded={isOpen}
-                  aria-controls={panelId}
+                  // Only reference the panel while it's mounted (open); otherwise
+                  // aria-controls would point at a non-existent id.
+                  aria-controls={isOpen ? panelId : undefined}
                   className="group flex items-start gap-4 w-full text-left rounded-xl px-2 py-2 -mx-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
                 >
                   {rowInner}
@@ -202,7 +207,7 @@ export function InspectionTimeline({
                               type="button"
                               onClick={() => toggleViolation(vKey)}
                               aria-expanded={vOpen}
-                              aria-controls={vPanelId}
+                              aria-controls={vOpen ? vPanelId : undefined}
                               className="group/v flex items-start gap-2 w-full text-left rounded cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
                             >
                               <ChevronRight
@@ -244,6 +249,7 @@ export function InspectionTimeline({
       </ul>
       {hidden > 0 && (
         <button
+          type="button"
           onClick={() => setExpanded(true)}
           className="block w-full text-center text-sm mt-6 text-teal hover:underline"
         >
@@ -252,6 +258,7 @@ export function InspectionTimeline({
       )}
       {expanded && sorted.length > maxVisible && (
         <button
+          type="button"
           onClick={() => setExpanded(false)}
           className="block w-full text-center text-sm mt-6 text-teal hover:underline"
         >
