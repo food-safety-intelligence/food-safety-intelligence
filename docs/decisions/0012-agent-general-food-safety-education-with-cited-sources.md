@@ -125,17 +125,29 @@ compromised immune system near Harlem" was denied by the `PersonalisedMedicalAdv
 guardrail topic, whose definition included "whether a food is safe given their
 health condition." That's the exact caregiver/immunocompromised food-safety
 recommendation the app is built to answer (the "For caregivers" page + the
-system-prompt CAREGIVER section). Narrowed the topic to deny only a **personal
-medical ruling for the speaker** (diagnosis, treatment, medication, "is it safe
-for ME given my condition") and to explicitly allow **ranking restaurants by
-food-safety risk** — including for a vulnerable diner. The deny examples are
-unchanged, so "safe for ME with my weak immune system" / "what medicine should I
-take" stay blocked. Also fixed a self-inflicted **output** block: the system
-prompt told the model to append "consult your care team's guidance," which the
-output guardrail then treated as personalised medical advice and blocked —
-truncating otherwise-good answers; that instruction was removed.
+system-prompt CAREGIVER section). Fix: deny only a **personal medical ruling for the speaker** (diagnosis, treatment,
+medication) and explicitly allow **ranking restaurants by food-safety risk** —
+including for a vulnerable diner.
 
-**Deploy:** the guardrail is not reprovisioned on merge — Deepak must re-run
-`agents/create_guardrail.py` (publishes a new version; also picks up the already-
-updated Chicago+NYC+LA block message) and re-wire the version. The system-prompt
-change deploys with the agent on merge.
+**The classifier keys on the topic EXAMPLES, not the definition** — rewording the
+definition alone changed nothing; the fix was replacing the examples, found by live
+`apply-guardrail` testing across three reprovisions. Two traps: an "immune system"
+example made it match any immune-system mention (blocking caregiver queries), and
+examples that named an illness ("food poisoning") made it match the illness word
+(blocking general education like "how common is food poisoning?"). The final examples
+describe only personal treatment-seeking with no disease terms; the definition stays
+≤200 chars (Bedrock topic-definition cap). Verified live — caregiver / education /
+city-lookup → allowed; personal-ruling / medical / legal → blocked.
+
+Also fixed a self-inflicted **output** block: the system prompt told the model to
+append "consult your care team's guidance," which the output guardrail treated as
+personalised medical advice and blocked, truncating good answers; that instruction
+was removed. And `create_guardrail.py`'s default region was corrected to **us-west-2**
+(was us-east-1 → a re-run without `AWS_REGION` would create a duplicate guardrail).
+
+**Deploy (changed this iteration):** `deploy-agent.yml` now **auto-reprovisions** the
+guardrail on merge when `create_guardrail.py` changes — runs it (us-west-2), wires the
+new version into `agentcore.json` before deploy, and the guardrail gate verifies the
+new config. Requires the deploy role `github-agent-deploy` to hold the Bedrock
+control-plane guardrail permissions (attached out-of-band in `991500268971`). The
+3-city block message rides along in the same reprovision. No more manual run.
