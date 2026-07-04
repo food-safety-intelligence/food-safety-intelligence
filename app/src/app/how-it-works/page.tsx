@@ -573,7 +573,7 @@ export default async function HowItWorksPage() {
                           {Math.round(p.frac * 100)}%
                         </td>
                         <td className="py-2.5 px-4">
-                          {p.n_flagged.toLocaleString()}
+                          {p.n_flagged.toLocaleString("en-US")}
                         </td>
                         <td className="py-2.5 px-4">
                           {Math.round(p.precision * 100)}%
@@ -595,7 +595,7 @@ export default async function HowItWorksPage() {
               inspecting a random 20%. Baseline model, time-held-out test from{" "}
               {methodology.test.split_from || "2025-07-01"} onward (n ≈{" "}
               {methodology.test.n
-                ? methodology.test.n.toLocaleString()
+                ? methodology.test.n.toLocaleString("en-US")
                 : "7,000"}{" "}
               inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
               with an event). &ldquo;Lift&rdquo; is precision divided by that
@@ -610,7 +610,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 5%</span>
                   {top5
-                    ? ` (~${top5.n_flagged.toLocaleString()} food establishments): about ${Math.round(
+                    ? ` (~${top5.n_flagged.toLocaleString("en-US")} food establishments): about ${Math.round(
                         top5.precision * 100,
                       )}% of those visits find a real problem — ${top5.lift.toFixed(
                         1,
@@ -622,7 +622,7 @@ export default async function HowItWorksPage() {
                 <li>
                   <span className="font-medium">Top 10%</span>
                   {top10
-                    ? ` (~${top10.n_flagged.toLocaleString()} food establishments): roughly ${Math.round(
+                    ? ` (~${top10.n_flagged.toLocaleString("en-US")} food establishments): roughly ${Math.round(
                         top10.precision * 100,
                       )}% of visits find a problem (${top10.lift.toFixed(
                         1,
@@ -797,7 +797,7 @@ export default async function HowItWorksPage() {
                     <dt className="text-muted">Tested on</dt>
                     <dd className="num text-ink/85">
                       inspections from {testFrom} onward
-                      {testN ? ` (n ${testN.toLocaleString()})` : ""}
+                      {testN ? ` (n ${testN.toLocaleString("en-US")})` : ""}
                     </dd>
                   </div>
                 )}
