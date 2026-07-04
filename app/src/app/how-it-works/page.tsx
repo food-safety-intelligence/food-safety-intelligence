@@ -781,19 +781,19 @@ export default async function HowItWorksPage() {
             {(modelVersion || metricsDate || testFrom) && (
               <dl className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-sm">
                 {modelVersion && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line">
+                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
                     <dt className="text-muted">Served model</dt>
                     <dd className="num text-ink/85">{modelVersion}</dd>
                   </div>
                 )}
                 {metricsDate && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line">
+                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
                     <dt className="text-muted">Metrics generated</dt>
                     <dd className="num text-ink/85">{metricsDate}</dd>
                   </div>
                 )}
                 {testFrom && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5">
+                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
                     <dt className="text-muted">Tested on</dt>
                     <dd className="num text-ink/85">
                       inspections from {testFrom} onward
@@ -860,10 +860,11 @@ export default async function HowItWorksPage() {
               Evaluation methodology
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              Measured on a time-held-out test set, never a random shuffle: trained
-              on inspections before 2024-07, calibrated on the following year, and
-              tested on {testFrom || "2025-07-01"} onward — with every feature
-              computed only from data strictly before the inspection it describes.
+              Measured on a time-held-out test set, never a random shuffle: the
+              model is trained on the earliest inspections, calibrated on a later
+              held-out slice, and tested on the most recent window ({testFrom ||
+              "2025-07-01"} onward) — with every feature computed only from data
+              strictly before the inspection it describes.
               We report ranked-work-list metrics at the operating points a team
               would actually staff — precision, coverage, and lift by top-K —
               rather than one headline number, and a retrained model is promoted
