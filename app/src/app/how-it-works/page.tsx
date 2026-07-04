@@ -19,6 +19,17 @@ import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
 
 /**
+ * Human labels for the internal model-family slug stored in methodology.json's
+ * `model_version`. An unrecognised slug falls back to the raw value, so the card
+ * stays correct — never blank or a stale friendly name — if the served model
+ * changes.
+ */
+const MODEL_TYPE_LABELS: Record<string, string> = {
+  xgb_monotone: "Gradient-boosted trees (XGBoost)",
+  baseline_logreg: "Logistic regression",
+};
+
+/**
  * One row of the worked-example waterfall: a label on the left and its signed
  * calibrated log-odds on the right. Positive (raises risk) reads terra,
  * negative (lowers) reads sage; structural rows (base / other / total) are
@@ -186,6 +197,9 @@ export default async function HowItWorksPage() {
   // from the numbers rendered above it. ISO date sliced to YYYY-MM-DD (the JSON
   // stores a UTC timestamp) to avoid any locale/hydration formatting surprises.
   const modelVersion = methodology.model_version || null;
+  const modelType = modelVersion
+    ? (MODEL_TYPE_LABELS[modelVersion] ?? modelVersion)
+    : null;
   const metricsDate = methodology.generated_at
     ? methodology.generated_at.slice(0, 10)
     : null;
@@ -791,8 +805,7 @@ export default async function HowItWorksPage() {
                   The headline percentage — the chance of a Fail or priority
                   violation in the next 180 days. It uses the current
                   inspection&apos;s own outcome, the strongest near-term signal. The
-                  served version and the evaluation on this card describe this
-                  model.
+                  model details and evaluation on this card describe this model.
                 </p>
               </div>
               <div className="rounded-2xl border border-line bg-card p-4">
@@ -810,33 +823,39 @@ export default async function HowItWorksPage() {
               </div>
             </div>
 
-            {/* Provenance strip — served model + when its metrics were built +
-                the test window, read straight from methodology.json so this card
-                can't drift from the numbers above it. */}
-            {(modelVersion || metricsDate || testFrom) && (
-              <dl className="mt-4 rounded-2xl border border-line bg-card overflow-hidden text-sm">
-                {modelVersion && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
-                    <dt className="text-muted">Served model</dt>
-                    <dd className="num text-ink/85">{modelVersion}</dd>
-                  </div>
-                )}
-                {metricsDate && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
-                    <dt className="text-muted">Metrics generated</dt>
-                    <dd className="num text-ink/85">{metricsDate}</dd>
-                  </div>
-                )}
-                {testFrom && (
-                  <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
-                    <dt className="text-muted">Tested on</dt>
-                    <dd className="num text-ink/85">
-                      inspections from {testFrom} onward
-                      {testN ? ` (n ${testN.toLocaleString("en-US")})` : ""}
-                    </dd>
-                  </div>
-                )}
-              </dl>
+            {/* Provenance strip — the served risk-score model's type, when its
+                metrics were built, and the test window, read from methodology.json
+                so the card can't drift from the numbers above it. The internal
+                model slug is mapped to a human label via MODEL_TYPE_LABELS. */}
+            {(modelType || metricsDate || testFrom) && (
+              <>
+                <p className="mt-6 text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Risk-score model
+                </p>
+                <dl className="mt-2 rounded-2xl border border-line bg-card overflow-hidden text-sm">
+                  {modelType && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Model type</dt>
+                      <dd className="text-ink/85">{modelType}</dd>
+                    </div>
+                  )}
+                  {metricsDate && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Metrics generated</dt>
+                      <dd className="num text-ink/85">{metricsDate}</dd>
+                    </div>
+                  )}
+                  {testFrom && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Tested on</dt>
+                      <dd className="num text-ink/85">
+                        inspections from {testFrom} onward
+                        {testN ? ` (n ${testN.toLocaleString("en-US")})` : ""}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </>
             )}
 
             <h3 className="text-lg font-medium tracking-tight mt-8">
@@ -988,8 +1007,8 @@ export default async function HowItWorksPage() {
               model replaces the served one only after it clears the promotion gate
               on the held-out test set. Saved model files are versioned and never
               overwritten, so any published score set can be traced back to the
-              model and data that produced it. The current served model and the
-              date its metrics were generated are shown at the top of this card.
+              model and data that produced it. The risk-score model&apos;s type and
+              the date its metrics were generated are shown at the top of this card.
             </p>
           </article>
 
