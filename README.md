@@ -6,12 +6,12 @@
 |--------------------------------------------------------- | -------: | -------: | -------: | -------: | ------: | --------: |
 | agents/lambda\_proxy/handler.py                          |       70 |       21 |       24 |        3 |     70% |69, 74-75, 84, 88, 106-109, 119-122, 129-138 |
 | agents/lambda\_proxy/test\_handler.py                    |       51 |        1 |        6 |        1 |     96% |        25 |
-| agents/tools/explain\_restaurant/handler.py              |       79 |        6 |       24 |        1 |     93% |32-33, 43-44, 225-\>231, 228-229 |
+| agents/tools/explain\_restaurant/handler.py              |       79 |        6 |       24 |        1 |     93% |32-33, 43-44, 232-\>238, 235-236 |
 | agents/tools/find\_restaurants/chicago\_neighborhoods.py |        4 |        0 |        0 |        0 |    100% |           |
 | agents/tools/find\_restaurants/handler.py                |      108 |        7 |       36 |        2 |     94% |189-191, 236-247, 313 |
 | agents/tools/find\_reviews/handler.py                    |       34 |        0 |       10 |        0 |    100% |           |
 | agents/tools/food\_safety\_info/handler.py               |       40 |        1 |       14 |        3 |     93% |381, 383-\>386, 391-\>388 |
-| agents/tools/get\_safety\_score/handler.py               |      134 |        3 |       52 |        4 |     96% |250, 259-\>247, 318, 363 |
+| agents/tools/get\_safety\_score/handler.py               |      134 |        3 |       52 |        4 |     96% |250, 259-\>247, 319, 364 |
 | agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
 | src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/config.py                                 |       42 |        4 |        4 |        1 |     85% |     34-37 |
