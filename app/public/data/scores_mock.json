@@ -8,8 +8,8 @@
   "totals": {
     "establishments": 28047,
     "tier_counts": { "Low": 8302, "Moderate": 14891, "Elevated": 4442, "High": 412 },
-    "worsening_30d": 1108,
-    "improving_30d": 2237
+    "worsening": 1108,
+    "improving": 2237
   },
   "scores": [
     {

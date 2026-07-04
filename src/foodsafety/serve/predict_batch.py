@@ -268,10 +268,17 @@ def write_scores_json(
                 "Elevated": int(tier_counts.get("Elevated", 0)),
                 "High": int(tier_counts.get("High", 0)),
             },
-            # Key names kept for app compatibility; the slope is now last-K-visits
-            # forecast (DR 0011), not a 30-day window. Threshold retune is PR-B.
-            "worsening_30d": int((df["trend_slope"].fillna(0) > 0.001).sum()),
-            "improving_30d": int((df["trend_slope"].fillna(0) < -0.001).sum()),
+            # Establishments trending worse / better by the last-K-visits
+            # forecast slope (DR 0011). No window in the key name: the slope is
+            # a visit-count trend, not a calendar window, and K is tunable, so a
+            # window/K suffix would go stale on a retune.
+            # NOTE: this ±0.001 band predates DR 0011's app-side retune — the web
+            # app's trendDirection now labels at TREND_STABLE_BAND = 0.0003, so
+            # these counts are a stricter "worsening"/"improving" than the labels
+            # the app shows. They are currently unused by the app; align the band
+            # to the app's when a consumer needs the count to match the labels.
+            "worsening": int((df["trend_slope"].fillna(0) > 0.001).sum()),
+            "improving": int((df["trend_slope"].fillna(0) < -0.001).sum()),
         }
 
     payload = {
