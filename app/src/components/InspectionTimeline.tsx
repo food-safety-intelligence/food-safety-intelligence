@@ -75,9 +75,11 @@ export function InspectionTimeline({
   const [expanded, setExpanded] = useState(false);
   // Which rows are expanded to show their comments, keyed by row's stable key.
   const [open, setOpen] = useState<Set<string>>(new Set());
-  // Newest-first index of the row a trend-chart dot linked to (null = none). The
-  // row is scrolled to and briefly highlighted; cleared after a moment.
-  const [highlight, setHighlight] = useState<number | null>(null);
+  // The row a trend-chart dot linked to (null = none), held as a fresh object per
+  // jump — re-clicking the SAME dot makes a new reference so React re-runs the
+  // scroll/highlight effect instead of bailing on an unchanged value. `n` is the
+  // newest-first index. Cleared after the flash.
+  const [highlight, setHighlight] = useState<{ n: number } | null>(null);
 
   // React to a hardlink from the trend chart: the URL hash (a fresh deep link or
   // the enlarged chart's new tab) or the in-tab jump event (the inline chart).
@@ -87,7 +89,7 @@ export function InspectionTimeline({
     function jumpTo(n: number | null) {
       if (n === null || n < 0 || n >= events.length) return;
       if (n >= maxVisible) setExpanded(true);
-      setHighlight(n);
+      setHighlight({ n });
     }
     jumpTo(parseInspectionAnchor(window.location.hash));
     const onHash = () => jumpTo(parseInspectionAnchor(window.location.hash));
@@ -106,19 +108,23 @@ export function InspectionTimeline({
   // highlight after a moment so it reads as a brief flash.
   useEffect(() => {
     if (highlight === null) return;
-    const el = document.getElementById(inspectionAnchorId(highlight));
+    const el = document.getElementById(inspectionAnchorId(highlight.n));
     const raf = requestAnimationFrame(() => {
       el?.scrollIntoView({ behavior: "smooth", block: "center" });
       // Focus the row itself (tabIndex -1, outline-none) rather than its button,
       // so screen-reader/keyboard users land here without drawing a focus box.
       el?.focus({ preventScroll: true });
     });
-    const timer = setTimeout(() => setHighlight(null), 2600);
+    // Hold long enough to stay visible after the ~1s smooth scroll settles.
+    const timer = setTimeout(() => setHighlight(null), 3600);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(timer);
     };
-  }, [highlight, expanded]);
+    // Depends on `highlight` only: an auto-expand is batched with the highlight
+    // (same render), so the row is present on first run; keeping `expanded` out
+    // avoids re-scrolling if the user manually expands while the flash is up.
+  }, [highlight]);
 
   if (events.length === 0) {
     return (
@@ -159,7 +165,7 @@ export function InspectionTimeline({
           // `i` is the newest-first index (visible is a prefix of sorted), so
           // this matches the anchor the trend-chart dots link to.
           const anchorId = inspectionAnchorId(i);
-          const isHighlighted = highlight === i;
+          const isHighlighted = highlight?.n === i;
           // Count of cited violations for this inspection. Derived from the same
           // parse the expanded panel uses, so the collapsed "N violations" label
           // always matches the number of items revealed on expand.
@@ -176,7 +182,9 @@ export function InspectionTimeline({
               // a box — the pale-yellow wash is the visual cue instead.
               tabIndex={-1}
               data-highlighted={isHighlighted || undefined}
-              className={`scroll-mt-28 rounded-xl outline-none transition-colors duration-500 ${
+              // No scroll-margin: the jump uses scrollIntoView(block:"center"),
+              // and a scroll-margin would shift that centred target off-centre.
+              className={`rounded-xl outline-none transition-colors duration-500 ${
                 isHighlighted ? "bg-highlight" : ""
               }`}
             >

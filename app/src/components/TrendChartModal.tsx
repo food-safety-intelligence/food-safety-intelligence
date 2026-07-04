@@ -148,7 +148,10 @@ export function TrendChartModal({
         dragging = false;
         suppressClickRef.current = false;
       } else if (pointers.size === 2) {
+        // A pinch is a gesture, not a tap — swallow any trailing click so a
+        // finger lifting over a dot doesn't open its record.
         dragging = true;
+        suppressClickRef.current = true;
         lastDist = dist();
         el.setPointerCapture(e.pointerId);
       }

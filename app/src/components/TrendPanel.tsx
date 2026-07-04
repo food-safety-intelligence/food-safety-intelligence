@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Info, Maximize2, Minus, Plus, RotateCcw, TrendingDown, TrendingUp } from "lucide-react";
 import type { InspectionEvent } from "@/lib/scores";
 import {
@@ -49,36 +49,38 @@ export function TrendPanel({
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
 
-  // Newest-first index of every inspection → its timeline anchor. Computed on the
-  // same order the timeline sorts by, so a dot's `inspection-<n>` id lands on the
-  // matching history row even when dates repeat.
-  const anchorIndex = new Map<InspectionEvent, number>();
-  [...history]
-    .sort(compareInspectionsNewestFirst)
-    .forEach((e, i) => anchorIndex.set(e, i));
-
   // Plot the full forecast trajectory — every inspection carrying a forecast
   // score — oldest -> newest (history is newest-first). Each point carries its
-  // history-row anchor so clicking a dot can jump to that inspection.
-  const scoredPoints: TrendPoint[] = history
-    .filter((e): e is InspectionEvent & { score: number } => e.score != null)
-    .map((e) => ({
-      date: e.date,
-      score: e.score,
-      result: e.result,
-      anchorId: inspectionAnchorId(anchorIndex.get(e) ?? 0),
-    }))
-    .reverse();
+  // history-row anchor so clicking a dot can jump to that inspection. Memoised on
+  // `history` so the per-render zoom-button clicks don't rebuild the sort + Map.
+  const scoredPoints = useMemo<TrendPoint[]>(() => {
+    // Newest-first index of every inspection → its timeline anchor, on the same
+    // order the timeline sorts by, so a dot's `inspection-<n>` id lands on the
+    // matching history row even when dates repeat.
+    const anchorIndex = new Map<InspectionEvent, number>();
+    [...history].sort(compareInspectionsNewestFirst).forEach((e, i) => anchorIndex.set(e, i));
+    return history
+      .filter((e): e is InspectionEvent & { score: number } => e.score != null)
+      .map((e) => ({
+        date: e.date,
+        score: e.score,
+        result: e.result,
+        anchorId: inspectionAnchorId(anchorIndex.get(e) ?? 0),
+      }))
+      .reverse();
+  }, [history]);
   const trendWindow = Math.min(TREND_POINTS, scoredPoints.length);
 
   // One gate for the header label and the chart so they never disagree: a trend
   // needs a (forward-looking) slope AND at least two points to draw.
   const hasTrend = slope !== null && scoredPoints.length >= 2;
 
-  // Full time range of the trajectory (oldest -> newest) → the zoom window's
-  // fractions map onto this to a `view` for the chart.
-  const t0 = scoredPoints.length ? Date.parse(scoredPoints[0].date) : 0;
-  const t1 = scoredPoints.length ? Date.parse(scoredPoints[scoredPoints.length - 1].date) : 1;
+  // Full time range of the trajectory → the zoom window's fractions map onto this
+  // to a `view` for the chart. Use min/max of the dates (not the array ends) so
+  // this matches TrendChart's own domain regardless of input ordering.
+  const times = scoredPoints.map((p) => Date.parse(p.date));
+  const t0 = times.length ? Math.min(...times) : 0;
+  const t1 = times.length ? Math.max(...times) : 1;
   const fullSpan = t1 - t0 || 1;
   const view = { start: t0 + frac[0] * fullSpan, end: t0 + frac[1] * fullSpan };
   const isZoomed = frac[1] - frac[0] < 0.999;
