@@ -114,7 +114,10 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // (forecast risk rises as prior B/C history accumulates), so "Improving"
     // is genuinely rare — widening the band only erases it, it doesn't balance.
     trendStableBand: 0.0003,
-    chatSupported: false,
+    // Chat is city-scoped (DR 0014): the frontend sends city=nyc and the agent
+    // loads NYC data + scopes lookups. Requires the agent redeploy + NYC data in
+    // S3 to answer NYC lookups; until then a NYC lookup returns "no record".
+    chatSupported: true,
   },
 };
 

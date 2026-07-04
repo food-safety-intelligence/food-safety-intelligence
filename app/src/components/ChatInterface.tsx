@@ -375,6 +375,7 @@ export function ChatInterface({
         sessionIdRef.current,
         history,
         scoped ?? undefined,
+        city,
       );
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {

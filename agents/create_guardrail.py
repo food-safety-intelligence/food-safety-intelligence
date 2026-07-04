@@ -45,29 +45,31 @@ import boto3
 GUARDRAIL_NAME = "food-safety-agent"
 
 _BLOCK_MESSAGE = (
-    "I can't help with that. I can look up a Chicago food establishment's "
-    "predicted food-safety risk, or answer a general food-safety question with a "
-    "cited public health source — would you like me to?"
+    "I can't help with that. I can look up a Chicago or New York City food "
+    "establishment's predicted food-safety risk, or answer a general food-safety "
+    "question with a cited public health source — would you like me to?"
 )
 
 # Topics the agent must refuse. Bedrock matches on the definition + examples.
 #
-# Scope reminder: the agent does TWO jobs — (A) Chicago restaurant risk signals
-# and (B) general food-safety / foodborne-illness education with cited public
-# health sources. The deny topics below must NOT block job B, so they are scoped
-# to genuinely off-topic requests and to *personalised* medical advice only —
-# general factual food-safety education is allowed.
+# Scope reminder: the agent does TWO jobs — (A) restaurant risk signals for the
+# cities it covers (Chicago and New York City) and (B) general food-safety /
+# foodborne-illness education with cited public health sources. The deny topics
+# below must NOT block job B, so they are scoped to genuinely off-topic requests
+# and to *personalised* medical advice only — general factual food-safety
+# education is allowed.
 _DENIED_TOPICS = [
     {
         "name": "OffTopicNonFoodSafety",
         "definition": (
-            "Requests neither about food-safety risk for Chicago establishments "
-            "nor general food safety or foodborne illness — e.g. recipes, "
-            "cooking, meal planning, other-city restaurants, or unrelated chat."
+            "Requests neither about food-safety risk for Chicago or New York City "
+            "establishments nor general food safety or foodborne illness — e.g. "
+            "recipes, cooking, meal planning, restaurants in cities we don't cover, "
+            "or unrelated chat."
         ),
         "examples": [
             "Give me a recipe for deep dish pizza.",
-            "Find safe sushi in New York.",
+            "Find safe sushi in Los Angeles.",
             "What should I cook for dinner tonight?",
             "Plan a week of healthy meals for me.",
             "Tell me a joke.",
@@ -107,8 +109,8 @@ def create() -> tuple[str, str]:
     created = client.create_guardrail(
         name=GUARDRAIL_NAME,
         description=(
-            "Food Safety Chicago agent: denied off-topic/medical/legal topics, "
-            "contextual grounding + relevance, and prompt-attack filtering."
+            "Food Safety agent (Chicago + NYC): denied off-topic/medical/legal "
+            "topics, contextual grounding + relevance, and prompt-attack filtering."
         ),
         topicPolicyConfig={"topicsConfig": _DENIED_TOPICS},
         contentPolicyConfig={

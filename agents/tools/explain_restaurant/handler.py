@@ -21,24 +21,36 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
-@functools.lru_cache(maxsize=1)
-def _load_scores() -> dict[str, dict]:
-    """Load scores.json indexed by license_id."""
-    path = os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+# Per-city data paths (multi-city, DR 0014); the entrypoint warms each city's
+# files to separate /tmp paths. Default to Chicago.
+def _scores_path(city: str) -> str:
+    if city == "nyc":
+        return os.environ.get("SCORES_JSON_PATH_NYC", "/opt/nyc_scores.json")
+    return os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+
+
+def _history_path(city: str) -> str:
+    if city == "nyc":
+        return os.environ.get("HISTORY_JSON_PATH_NYC", "/opt/nyc_inspection_history.json")
+    return os.environ.get("HISTORY_JSON_PATH", "/opt/inspection_history.json")
+
+
+@functools.lru_cache(maxsize=2)
+def _load_scores(city: str = "chicago") -> dict[str, dict]:
+    """Load a city's scores.json indexed by license_id."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(_scores_path(city), encoding="utf-8") as f:
             payload = json.load(f)
         return {r["license_id"]: r for r in payload.get("scores", [])}
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
-@functools.lru_cache(maxsize=1)
-def _load_history() -> dict[str, list[dict]]:
-    """Load inspection_history.json indexed by license_id."""
-    path = os.environ.get("HISTORY_JSON_PATH", "/opt/inspection_history.json")
+@functools.lru_cache(maxsize=2)
+def _load_history(city: str = "chicago") -> dict[str, list[dict]]:
+    """Load a city's inspection_history.json indexed by license_id."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(_history_path(city), encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -83,13 +95,14 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "found": bool
     }
     """
+    city: str = str(event.get("city", "chicago"))
     license_id: str | None = event.get("license_id")
 
     if not license_id:
         return {"found": False, "error": "license_id is required"}
 
-    scores = _load_scores()
-    history = _load_history()
+    scores = _load_scores(city)
+    history = _load_history(city)
 
     record = scores.get(str(license_id))
     if not record:

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
 
 # ---------------------------------------------------------------------------
@@ -42,10 +43,20 @@ for _tool in [
 # ---------------------------------------------------------------------------
 os.environ.setdefault("SCORES_JSON_PATH", "/tmp/scores.json")
 os.environ.setdefault("HISTORY_JSON_PATH", "/tmp/inspection_history.json")
+# NYC (multi-city, DR 0014) — a second city under the nyc/ S3 prefix.
+os.environ.setdefault("SCORES_JSON_PATH_NYC", "/tmp/nyc_scores.json")
+os.environ.setdefault("HISTORY_JSON_PATH_NYC", "/tmp/nyc_inspection_history.json")
 os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 os.environ.setdefault("DATA_BUCKET", "food-safety-intelligence-data")
 os.environ.setdefault("DATA_PREFIX", "web-app-data")
+
+# The selected city rides through one request via a contextvar: the frontend
+# tags the query, invoke() sets it, and the @tool wrappers pass it to handlers
+# (the LLM never chooses the city). Defaults to Chicago.
+import contextvars  # noqa: E402
+
+_ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
 
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
@@ -59,15 +70,30 @@ def _warm_data_files() -> None:
     prefix = os.environ["DATA_PREFIX"]
     s3 = boto3.client("s3", region_name=os.environ["AWS_REGION"])
 
-    files = {
+    # Chicago is required; NYC (nyc/ prefix) is best-effort so the agent still
+    # serves Chicago if NYC data hasn't been published to S3 yet — a NYC lookup
+    # then finds no scores and the tool returns "no record" (DR 0010), rather
+    # than failing the whole request.
+    required = {
         os.environ["SCORES_JSON_PATH"]: f"{prefix}/scores.json",
         os.environ["HISTORY_JSON_PATH"]: f"{prefix}/inspection_history.json",
     }
-    for local_path, s3_key in files.items():
+    optional = {
+        os.environ["SCORES_JSON_PATH_NYC"]: f"{prefix}/nyc/scores.json",
+        os.environ["HISTORY_JSON_PATH_NYC"]: f"{prefix}/nyc/inspection_history.json",
+    }
+    for local_path, s3_key in required.items():
         if not os.path.exists(local_path):
             print(f"[warm-up] Downloading s3://{bucket}/{s3_key} → {local_path}")
             s3.download_file(bucket, s3_key, local_path)
             print(f"[warm-up] Done: {os.path.getsize(local_path):,} bytes")
+    for local_path, s3_key in optional.items():
+        if not os.path.exists(local_path):
+            try:
+                s3.download_file(bucket, s3_key, local_path)
+                print(f"[warm-up] Done (nyc): {os.path.getsize(local_path):,} bytes")
+            except Exception as e:  # noqa: BLE001 — NYC data is optional
+                print(f"[warm-up] NYC data not available ({s3_key}): {e}")
 
 
 # NOTE: _warm_data_files() is intentionally NOT called here at import time. The
@@ -135,7 +161,9 @@ def get_safety_score(restaurants: list) -> list:
     Score restaurants using the XGBoost model (stub or real SageMaker endpoint).
     Call after find_restaurants with the full restaurant list.
     """
-    return _score_handler.handler({"restaurants": restaurants}, None)
+    return _score_handler.handler(
+        {"restaurants": restaurants, "city": _ACTIVE_CITY.get()}, None
+    )
 
 
 @tool
@@ -144,7 +172,9 @@ def explain_restaurant(license_id: str) -> dict:
     Get full SHAP driver breakdown and inspection history for one restaurant.
     Call for the 2-3 lowest predicted-risk results.
     """
-    return _explain_handler.handler({"license_id": license_id}, None)
+    return _explain_handler.handler(
+        {"license_id": license_id, "city": _ACTIVE_CITY.get()}, None
+    )
 
 
 @tool
@@ -298,6 +328,16 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     ``messages`` seeds the new agent with the caller's prior turns so a follow-up
     question has context. It stays scoped to this one request, so isolation holds.
     """
+    # Tell the model which city this request is scoped to (multi-city, DR 0014).
+    # The tools already read the right city's data; this keeps the model's
+    # framing + "no record" wording aligned to the active city.
+    city = _ACTIVE_CITY.get()
+    city_label = "New York City" if city == "nyc" else "Chicago"
+    city_prefix = (
+        f"ACTIVE CITY: {city_label}. Scope every restaurant lookup and every "
+        f"'no record' statement to {city_label}; do not mention or use the other "
+        f"city's establishments for this request.\n\n"
+    )
     return Agent(
         model=model,
         messages=messages or [],
@@ -308,7 +348,7 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
             find_reviews,
             food_safety_info,
         ],
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=city_prefix + SYSTEM_PROMPT,
     )
 
 
@@ -334,11 +374,35 @@ def invoke(payload: dict) -> dict:
     if not query:
         return {"error": "query is required"}
 
+    # City (multi-city, DR 0014): prefer an explicit payload field; else parse a
+    # leading `[[city:nyc]]` marker the frontend prepends (the deployed proxy
+    # reliably forwards only the query string, so the marker is the robust path).
+    # The marker is stripped before the model sees the query.
+    query, city = _extract_city(query, payload.get("city"))
+    _ACTIVE_CITY.set(city)
+
     # Fresh, isolated agent per request, seeded with the caller's prior turns so
     # follow-up questions have context. History is client-supplied and validated.
     agent = _build_agent(_coerce_history(payload.get("history")))
     result = agent(query)
     return {"result": str(result)}
+
+
+_CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc)\]\]\s*")
+
+
+def _extract_city(query: str, field: object) -> tuple[str, str]:
+    """Resolve the request city and strip its marker from the query.
+
+    Precedence: an explicit `city` payload field, else a leading `[[city:...]]`
+    marker in the query. Unknown / missing → Chicago.
+    """
+    if isinstance(field, str) and field.lower() in ("chicago", "nyc"):
+        return _CITY_MARKER.sub("", query), field.lower()
+    m = _CITY_MARKER.match(query)
+    if m:
+        return query[m.end():], m.group(1)
+    return query, "chicago"
 
 
 # ---------------------------------------------------------------------------

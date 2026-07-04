@@ -104,14 +104,21 @@ export async function queryAgent(
   sessionId: string,
   history: AgentHistoryTurn[] = [],
   establishment?: AgentEstablishment,
+  city: "chicago" | "nyc" = "chicago",
 ): Promise<string> {
+  // Scope the agent to the selected city (multi-city, DR 0014). The deployed
+  // proxy reliably forwards only the query string, so the city rides as a
+  // leading `[[city:…]]` marker the agent strips; we also send an explicit
+  // `city` field for proxies that pass the full body.
+  const wire = buildWireQuery(query, establishment);
   const res = await fetch(AGENT_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      query: buildWireQuery(query, establishment),
+      query: city === "chicago" ? wire : `[[city:${city}]]${wire}`,
       session_id: sessionId,
       history,
+      city,
     }),
   });
 
