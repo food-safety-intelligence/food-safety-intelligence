@@ -1,6 +1,6 @@
 ---
 name: verifier-app
-description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers npm ci, the static-export build served from out/ (next dev is not faithful), a Playwright screenshot recipe, and the key routes / test restaurants.
+description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers the fast `next dev` path for client-rendered pages, the static-export build served from out/ for the home/detail routes, a Playwright screenshot recipe, and the key routes / test restaurants.
 ---
 
 # verifier-app
@@ -11,7 +11,52 @@ web UI, so running `/verify` on an `app/` change picks it up automatically.
 Goal: get the changed page rendering and capture a screenshot a reviewer can
 look at, not just inspect HTML.
 
-## Build + launch
+## Pick the surface first: `next dev` (fast) vs static build (faithful)
+
+Two page classes, two verify paths. Choose by what your change touches — don't
+pay for the 2-min static build when the page is client-rendered.
+
+- **Client-rendered pages → `next dev` (fast, always fresh).** `/how-it-works`,
+  `/sources`, and `/chat` render entirely in the browser (they read
+  `useCity()` / `sessionStorage`, not build-time-injected props), so `next dev`
+  renders them faithfully — and it has **no static cache to go stale**, which is
+  the whole failure mode below. This is the default for a copy/layout/component
+  change on those routes.
+
+  ```bash
+  cd app
+  npm ci                         # once, if node_modules is missing
+  npx next dev -p 4142           # UNIQUE port (not the 3000 default); background it
+  # then screenshot http://localhost:4142/how-it-works/?city=la etc. (Playwright recipe below)
+  ```
+
+  City switch is a query string: `/how-it-works/?city=nyc`, `/sources/?city=la`,
+  Chicago is the bare route. Kill the dev server by **PID** when done.
+
+- **Home + detail pages → static build served from `out/`.** `/` and
+  `/restaurant/<id>/` depend on `output: "export"` behaviour (`searchParams`,
+  `generateStaticParams`) that `next dev` does NOT reproduce (see next section),
+  so these MUST be verified against a real build. The detail-bundle gen is the
+  slow part (~13 min for all licenses); if you only need the home page or a
+  handful of detail pages, set `FSI_DETAIL_ONLY` to skip the full bundle sweep.
+
+### EFS / NFS build gotchas (static path only)
+
+The static build writes `.next` on EFS, which bites in two ways — `next dev`
+avoids both:
+
+- **Stale webpack cache serves OLD content.** A rebuild can reuse a stale
+  `.next` cache and emit the *previous* version of a page (e.g. showing a
+  removed section). If a static build shows content you already changed,
+  `rm -rf app/.next` and rebuild.
+- **`.nfs*` silly-rename busy files block the delete.** `rm -rf app/.next` can
+  fail with `EBUSY: unlink '.next/.nfs…'` while a `next` process still holds the
+  file. Kill the holder **by PID** (`ps aux | grep next`, then `kill <pid>`) —
+  do **NOT** `pkill -f 'next build'` / `kill $(pgrep -f 'next build')`: that
+  pattern matches your own shell's command line and self-kills the shell (the
+  process dies with exit 144). After the holder is gone, the `rm -rf` succeeds.
+
+## Build + launch (static export)
 
 The app is a **static export** (`app/next.config.ts` → `output: "export"`): it reads
 its data from S3 at **build** time and emits a fully pre-rendered site in `out/`. Two
