@@ -118,46 +118,44 @@ export function InspectionTimeline({
           // parse the expanded panel uses, so the collapsed "N violations" label
           // always matches the number of items revealed on expand.
           const violations = e.comments ? parseViolations(e.comments) : [];
-          return (
-            <li key={key}>
-              <button
-                type="button"
-                onClick={() => toggle(key)}
-                aria-expanded={isOpen}
-                aria-controls={panelId}
-                className="group flex items-start gap-4 w-full text-left rounded-xl px-2 py-2 -mx-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
+          const hasViolations = violations.length > 0;
+          // The row leads with the violation status so the counts line up down
+          // the column; the inspection type follows. Zero-violation rows read
+          // "No violations" and aren't expandable — there's nothing to reveal.
+          const violationLabel = hasViolations
+            ? `${violations.length} violation${violations.length === 1 ? "" : "s"}`
+            : "No violations";
+          // Row body is identical whether or not the row expands; only the
+          // wrapper (interactive button vs. static div) and the chevron differ.
+          const rowInner = (
+            <>
+              <span
+                className={`shrink-0 inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${s.bg}`}
               >
-                <span
-                  className={`shrink-0 inline-flex w-6 h-6 rounded-full items-center justify-center text-2xs font-semibold text-white ${s.bg}`}
-                >
-                  {s.label}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <div className={`font-semibold ${isFail ? "text-terra" : ""}`}>
-                      {e.result}
-                    </div>
-                    <div className="num text-xs text-muted shrink-0">
-                      {formatInspectionDate(e.date)}
-                    </div>
+                {s.label}
+              </span>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className={`font-semibold ${isFail ? "text-terra" : ""}`}>
+                    {e.result}
                   </div>
-                  <div
-                    className={`text-sm mt-0.5 ${
-                      isFail ? "text-ink/90" : "text-muted"
-                    }`}
-                  >
-                    {e.type}
-                    {violations.length > 0 && (
-                      <>
-                        {" · "}
-                        <span className={isFail ? "font-medium" : ""}>
-                          {violations.length} violation
-                          {violations.length === 1 ? "" : "s"}
-                        </span>
-                      </>
-                    )}
+                  <div className="num text-xs text-muted shrink-0">
+                    {formatInspectionDate(e.date)}
                   </div>
                 </div>
+                <div
+                  className={`text-sm mt-0.5 ${
+                    isFail ? "text-ink/90" : "text-muted"
+                  }`}
+                >
+                  <span className={hasViolations && isFail ? "font-medium" : ""}>
+                    {violationLabel}
+                  </span>
+                  {" · "}
+                  {e.type}
+                </div>
+              </div>
+              {hasViolations && (
                 <ChevronDown
                   className={`shrink-0 w-4 h-4 mt-1 text-muted group-hover:text-ink transition-transform ${
                     isOpen ? "rotate-180" : ""
@@ -165,69 +163,79 @@ export function InspectionTimeline({
                   strokeWidth={2}
                   aria-hidden="true"
                 />
-              </button>
+              )}
+            </>
+          );
+          return (
+            <li key={key}>
+              {hasViolations ? (
+                <button
+                  type="button"
+                  onClick={() => toggle(key)}
+                  aria-expanded={isOpen}
+                  aria-controls={panelId}
+                  className="group flex items-start gap-4 w-full text-left rounded-xl px-2 py-2 -mx-2 cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
+                >
+                  {rowInner}
+                </button>
+              ) : (
+                <div className="flex items-start gap-4 w-full px-2 py-2 -mx-2">
+                  {rowInner}
+                </div>
+              )}
 
-              {isOpen && (
+              {hasViolations && isOpen && (
                 <div
                   id={panelId}
                   className="ml-10 mr-2 mt-1 mb-2 rounded-xl bg-tint border border-line p-4 text-sm leading-relaxed"
                 >
-                  {violations.length === 0 ? (
-                    <p className="text-ink/75 italic">
-                      No violations were recorded for this inspection.
-                    </p>
-                  ) : (
-                    <ul className="divide-y divide-line/60">
-                      {violations.map((v, vi) => {
-                        const vKey = `${key}-${vi}`;
-                        const vOpen = openViolations.has(vKey);
-                        const vPanelId = `violation-note-${vKey}`;
-                        const hasNote = Boolean(v.note);
-                        return (
-                          <li key={vi} className="py-2 first:pt-0 last:pb-0">
-                            {hasNote ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleViolation(vKey)}
-                                aria-expanded={vOpen}
-                                aria-controls={vPanelId}
-                                className="group/v flex items-start gap-2 w-full text-left rounded cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
-                              >
-                                <ChevronRight
-                                  className={`shrink-0 w-4 h-4 mt-0.5 text-muted group-hover/v:text-ink transition-transform ${
-                                    vOpen ? "rotate-90" : ""
-                                  }`}
-                                  strokeWidth={2}
-                                  aria-hidden="true"
-                                />
-                                <span className="font-medium text-ink/90">
-                                  {v.title}
-                                </span>
-                              </button>
-                            ) : (
-                              <div className="flex items-start gap-2">
-                                <span
-                                  className="shrink-0 w-4 h-4 mt-0.5"
-                                  aria-hidden="true"
-                                />
-                                <span className="font-medium text-ink/90">
-                                  {v.title}
-                                </span>
-                              </div>
-                            )}
-                            {hasNote && vOpen && (
-                              <p
-                                id={vPanelId}
-                                className="text-ink/80 mt-1 ml-6"
-                              >
-                                {v.note}
-                              </p>
-                            )}
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  <ul className="divide-y divide-line/60">
+                    {violations.map((v, vi) => {
+                      const vKey = `${key}-${vi}`;
+                      const vOpen = openViolations.has(vKey);
+                      const vPanelId = `violation-note-${vKey}`;
+                      const hasNote = Boolean(v.note);
+                      return (
+                        <li key={vi} className="py-2 first:pt-0 last:pb-0">
+                          {hasNote ? (
+                            <button
+                              type="button"
+                              onClick={() => toggleViolation(vKey)}
+                              aria-expanded={vOpen}
+                              aria-controls={vPanelId}
+                              className="group/v flex items-start gap-2 w-full text-left rounded cursor-pointer focus-visible:outline-2 focus-visible:outline-teal"
+                            >
+                              <ChevronRight
+                                className={`shrink-0 w-4 h-4 mt-0.5 text-muted group-hover/v:text-ink transition-transform ${
+                                  vOpen ? "rotate-90" : ""
+                                }`}
+                                strokeWidth={2}
+                                aria-hidden="true"
+                              />
+                              <span className="font-medium text-ink/90">
+                                {v.title}
+                              </span>
+                            </button>
+                          ) : (
+                            <div className="flex items-start gap-2">
+                              <span
+                                className="shrink-0 w-4 h-4 mt-0.5"
+                                aria-hidden="true"
+                              />
+                              <span className="font-medium text-ink/90">
+                                {v.title}
+                              </span>
+                            </div>
+                          )}
+                          {hasNote && vOpen && (
+                            <p id={vPanelId} className="text-ink/80 mt-1 ml-6">
+                              {v.note}
+                            </p>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
               )}
             </li>
