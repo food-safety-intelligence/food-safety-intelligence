@@ -4,6 +4,7 @@ import {
   BookOpen,
   ClipboardList,
   type LucideIcon,
+  MessageSquarePlus,
   ShieldCheck,
   Target,
   Wrench,
@@ -1132,6 +1133,27 @@ export default async function HowItWorksPage() {
             </dl>
           </article>
         </section>
+
+        {/* Feedback CTA — readers who reach the end of the methodology are the
+            most engaged, so invite a note here alongside the footer link. */}
+        <aside className="mt-12 rounded-3xl border border-line bg-tint p-7 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
+          <div>
+            <h2 className="text-xl font-medium tracking-tight">
+              Was this useful?
+            </h2>
+            <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[52ch]">
+              If something here is wrong, unclear, or missing, tell us — it goes
+              straight to the team.
+            </p>
+          </div>
+          <Link
+            href="/feedback?source=how-it-works"
+            className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors min-h-[44px]"
+          >
+            <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+            Give feedback
+          </Link>
+        </aside>
       </main>
 
       <SiteFooter />

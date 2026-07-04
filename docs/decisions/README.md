@@ -38,6 +38,9 @@ file per decision; the log is **append-only** — don't renumber existing record
   — **Accepted** (contract change): replaces the broken `trend_slope_90d` with a
   last-K-visits slope of a forecast-only model; descriptive trend + additive
   early-warning watch-list, not a verdict.
+- [0014 — User feedback collection via a hosted form endpoint](0014-user-feedback-collection.md)
+  — why a Google Apps Script form → private Sheet + team email (not an AWS
+  write-backend), no PII, honeypot spam guard, prefilled role, summarizer deferred.
 
 ---
 
