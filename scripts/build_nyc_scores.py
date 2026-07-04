@@ -395,8 +395,8 @@ def main():
         drivers.append([d.to_dict() for d in ds])
     latest["top_drivers"] = drivers
 
-    # trend: last-K forecast slope (field kept as trend_slope_90d for schema compat)
-    latest["trend_slope_90d"] = last_k_trend(
+    # trend: last-K forecast slope of the forecast-only model (schema 0.5.0)
+    latest["trend_slope"] = last_k_trend(
         ev[["license_id", "inspection_date", "forecast_risk"]], latest, TREND_K
     )
     latest["as_of_date"] = latest["inspection_date"]
@@ -435,14 +435,14 @@ def main():
         "risk_score",
         "risk_tier",
         "top_drivers",
-        "trend_slope_90d",
+        "trend_slope",
     ]
     out = latest[cols].reset_index(drop=True)
     OUT.mkdir(parents=True, exist_ok=True)
     write_scores_json(
         out,
         str(OUT / "scores.json"),
-        schema_version="0.4.0",
+        schema_version="0.5.0",
         model_version=MODEL_VERSION,
         label_window_days=0,
         calibration=calibration,
@@ -483,9 +483,9 @@ def main():
                 "lon": None if pd.isna(r.lon) else float(r.lon),
                 "risk_score": round(float(r.risk_score), 4),
                 "risk_tier": r.risk_tier,
-                "trend_slope_90d": None
-                if pd.isna(r.trend_slope_90d)
-                else round(float(r.trend_slope_90d), 6),
+                "trend_slope": None
+                if pd.isna(r.trend_slope)
+                else round(float(r.trend_slope), 6),
                 "top_driver": top_driver(r.top_drivers),
             }
             for r in out.itertuples(index=False)
