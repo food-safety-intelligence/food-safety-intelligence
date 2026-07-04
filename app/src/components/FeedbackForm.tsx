@@ -105,7 +105,13 @@ export function FeedbackForm() {
         <button
           type="button"
           onClick={() => {
+            // Reset ALL fields, not just the message — otherwise the next
+            // submission reuses the prior topic / venue-clear / honeypot state
+            // and mislabels the row.
             setMessage("");
+            setTopic(topics[0]);
+            setVenueCleared(false);
+            setCompany("");
             setStatus("idle");
           }}
           className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors min-h-[44px]"
@@ -179,12 +185,18 @@ export function FeedbackForm() {
         className="mt-3 w-full rounded-2xl border border-line bg-cream/40 px-4 py-3 text-md text-ink leading-relaxed resize-y outline-none transition-colors focus:border-teal focus:bg-card disabled:opacity-60 disabled:cursor-not-allowed"
       />
 
-      {/* Honeypot: hidden from humans (off-screen, not focusable, ignored by
-          assistive tech and autofill), so anything typed here is a bot. */}
+      {/* Honeypot: a decoy field hidden from humans (off-screen, not focusable),
+          so anything typed here is a bot. The id/name/label deliberately avoid
+          autofill tokens like "company"/"organization" — browsers and password
+          managers ignore `autocomplete="off"` often enough that a "company"-named
+          field would get autofilled and silently drop a real user's submission.
+          The value still travels in the payload as `company` (the key the Apps
+          Script honeypot check reads). */}
       <div aria-hidden="true" className="sr-only">
-        <label htmlFor="feedback-company">Company (leave blank)</label>
+        <label htmlFor="feedback-extra">Leave this field empty</label>
         <input
-          id="feedback-company"
+          id="feedback-extra"
+          name="feedback-extra"
           type="text"
           tabIndex={-1}
           autoComplete="off"

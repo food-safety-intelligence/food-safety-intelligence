@@ -51,7 +51,14 @@
 const NOTIFY_EMAIL = "bella_davies@berkeley.edu";
 
 function doPost(e) {
-  const data = JSON.parse(e.postData.contents);
+  // Guard the parse: a GET, a bot probe, or any POST without a JSON body would
+  // otherwise throw and return an error page. Nothing to record — just "ok".
+  let data;
+  try {
+    data = JSON.parse(e.postData.contents);
+  } catch (err) {
+    return ContentService.createTextOutput("ok");
+  }
 
   // Honeypot: the form's `company` field is hidden from humans, so a non-empty
   // value means a bot. Drop the row silently — return "ok" so the bot still sees

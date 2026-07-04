@@ -77,7 +77,7 @@ export interface FeedbackPayload {
   topic: string;
   /** Prefilled role (see FeedbackRole); "unknown" until the entry step lands. */
   role: FeedbackRole;
-  /** Where the feedback was sent from: "site" | "how-it-works" | "restaurant-detail". */
+  /** Entry point: "footer" | "how-it-works" | "restaurant-detail" | "site" (direct). */
   source: string;
   /** License id of the establishment, when sent from a restaurant detail page. */
   venueId?: string;
