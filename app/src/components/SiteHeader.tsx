@@ -15,6 +15,7 @@ import { CityToggle } from "@/components/CityPicker";
 export type NavItem =
   | "search"
   | "chat"
+  | "inspectors"
   | "caregivers"
   | "how"
   | "sources"
@@ -23,6 +24,7 @@ export type NavItem =
 const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "search", label: "Search", href: "/" },
   { id: "chat", label: "Chat", href: "/chat" },
+  { id: "inspectors", label: "For inspectors", href: "/inspectors" },
   { id: "caregivers", label: "For caregivers", href: "/caregivers" },
   { id: "how", label: "How this works", href: "/how-it-works" },
   { id: "sources", label: "Sources", href: "/sources" },

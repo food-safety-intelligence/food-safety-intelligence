@@ -5,6 +5,11 @@ interface TierPillProps {
   tier: RiskTier;
   size?: "sm" | "md";
   withCount?: number;
+  /**
+   * Renders the pill in its "toggled off" state (transparent bg, hairline
+   * border, muted text) — used by the inspectors page's tier filter chips.
+   */
+  inactive?: boolean;
   className?: string;
 }
 
@@ -18,17 +23,20 @@ export function TierPill({
   tier,
   size = "md",
   withCount,
+  inactive = false,
   className,
 }: TierPillProps) {
   const sizing =
     size === "sm" ? "text-2xs px-2 py-0.5" : "text-xs px-3.5 py-1.5";
 
-  const variant = {
-    Low: "bg-tier-low-bg text-tier-low-fg",
-    Moderate: "bg-tier-mod-bg text-tier-mod-fg",
-    Elevated: "bg-tier-elev-bg text-tier-elev-fg",
-    High: "bg-tier-high-bg text-tier-high-fg",
-  }[tier];
+  const variant = inactive
+    ? "bg-transparent border border-line text-muted"
+    : {
+        Low: "bg-tier-low-bg text-tier-low-fg",
+        Moderate: "bg-tier-mod-bg text-tier-mod-fg",
+        Elevated: "bg-tier-elev-bg text-tier-elev-fg",
+        High: "bg-tier-high-bg text-tier-high-fg",
+      }[tier];
 
   return (
     <span

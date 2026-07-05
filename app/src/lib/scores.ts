@@ -463,7 +463,15 @@ export interface SearchIndexRow {
   risk_score: number;
   risk_tier: RiskTier;
   trend_slope: number | null;
+  /** Latest scored inspection date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   top_driver: PinDriver | null;
+  /**
+   * DR 0014: the establishment's latest inspection event found it closed.
+   * Present (true) only on indexes built from scores.json 0.6.0+; absent
+   * means active. The inspectors worklist excludes these entirely — a closed
+   * venue must never appear on an inspection list.
+   */
   is_out_of_business?: boolean;
 }
 
@@ -471,6 +479,8 @@ export interface SearchIndexRow {
 export interface SearchIndex {
   schema_version: string;
   generated_at: string | null;
+  /** Payload-level as-of date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   total: number;
   tier_counts: Record<RiskTier, number>;
   rows: SearchIndexRow[];
