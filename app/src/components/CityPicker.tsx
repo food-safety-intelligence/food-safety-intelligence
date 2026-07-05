@@ -9,6 +9,7 @@ import { MapPin } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
+import { Wordmark } from "@/components/Wordmark";
 
 export function CityEntryModal() {
   const { needsPick, setCity } = useCity();
@@ -27,6 +28,13 @@ export function CityEntryModal() {
           Unsplash, self-hosted). */}
       <div className="absolute inset-0 bg-ink/65" aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
+        {/* Brand lockup on the entry screen, mirroring the header logo's text. */}
+        <div className="mb-4">
+          <div className="text-lg font-semibold tracking-tight">
+            <Wordmark />
+          </div>
+          <div className="text-2xs text-muted tracking-wide">Food Safety</div>
+        </div>
         <h2 id="city-pick-title" className="text-2xl font-light tracking-tight">
           Choose a city
         </h2>

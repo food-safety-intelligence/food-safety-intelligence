@@ -7,6 +7,7 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
 import { useCity } from "@/components/CityContext";
+import { Wordmark } from "@/components/Wordmark";
 
 export function HomeLogo() {
   const { requestPick } = useCity();
@@ -20,10 +21,8 @@ export function HomeLogo() {
         <MapPin className="w-[18px] h-[18px] text-sage" strokeWidth={2} />
       </span>
       <div className="leading-tight">
-        {/* "Eatelligence" = Eat + intelligence; the serif italic sage "Eat" stem
-            (sage-strong clears AA) plays up the pun, matching the chat logo. */}
         <div className="text-lg font-semibold tracking-tight group-hover:text-teal transition-colors">
-          <span className="serif italic text-sage-strong">Eat</span>elligence
+          <Wordmark />
         </div>
         <div className="text-2xs text-muted tracking-wide">Food Safety</div>
       </div>
