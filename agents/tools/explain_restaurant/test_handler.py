@@ -38,7 +38,9 @@ from handler import (  # noqa: E402
 
 
 def test_trend_label():
-    assert _trend_label(None) == "stable"
+    # Null slope = <2 scored inspections under scores schema 0.5.0, reported as
+    # "we can't say" rather than a confident flat trend (see decision 0011).
+    assert _trend_label(None) == "not enough inspection history"
     assert _trend_label(0.0) == "stable"
     assert _trend_label(0.5) == "worsening"
     assert _trend_label(-0.5) == "improving"
@@ -150,7 +152,7 @@ def test_handler_success(tmp_path, monkeypatch):
         "address": "1 Main St",
         "risk_score": 0.7,
         "risk_tier": "elevated",
-        "trend_slope_90d": 0.5,
+        "trend_slope": 0.5,
         "top_drivers": [{"feature": "prior_fail_rate", "shap": 0.2}],
     }
     history = {"L1": [{"date": "2024-06-01", "result": "Fail"}]}

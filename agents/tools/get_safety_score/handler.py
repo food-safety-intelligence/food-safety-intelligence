@@ -82,18 +82,28 @@ _GENERIC_NAME_TOKENS = frozenset(
 )
 
 
-@functools.lru_cache(maxsize=1)
-def _load_scores_index() -> dict[str, list[dict]]:
-    """
-    Load scores.json and index it by normalised address for fuzzy matching.
-    Returns empty dict if the file is unavailable.
+# Per-city scores.json path (multi-city, DR 0016). The entrypoint warms each
+# city's file to a separate /tmp path; default to Chicago.
+def _scores_path(city: str) -> str:
+    if city == "nyc":
+        return os.environ.get("SCORES_JSON_PATH_NYC", "/opt/nyc_scores.json")
+    if city == "la":
+        return os.environ.get("SCORES_JSON_PATH_LA", "/opt/la_scores.json")
+    return os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
 
-    Each address maps to a LIST of records: many Chicago establishments share
-    one street address (food courts, malls, O'Hare/Midway), so collapsing to a
-    single record per address would silently drop all but the last and let the
-    wrong business's score attach. The name disambiguates within the bucket.
+
+@functools.lru_cache(maxsize=3)
+def _load_scores_index(city: str = "chicago") -> dict[str, list[dict]]:
     """
-    scores_path = os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+    Load a city's scores.json and index it by normalised address for fuzzy
+    matching. Returns empty dict if the file is unavailable.
+
+    Each address maps to a LIST of records: many establishments share one street
+    address (food courts, malls, airports), so collapsing to a single record per
+    address would silently drop all but the last and let the wrong business's
+    score attach. The name disambiguates within the bucket.
+    """
+    scores_path = _scores_path(city)
     index: dict[str, list[dict]] = {}
     try:
         with open(scores_path, encoding="utf-8") as f:
@@ -105,13 +115,13 @@ def _load_scores_index() -> dict[str, list[dict]]:
     return index
 
 
-@functools.lru_cache(maxsize=1)
-def _load_scores_records() -> list[dict]:
+@functools.lru_cache(maxsize=3)
+def _load_scores_records(city: str = "chicago") -> list[dict]:
     """Flat list of every score record, for the name + proximity fallback.
 
     Derived from the cached address index so scores.json is read only once.
     """
-    return [r for bucket in _load_scores_index().values() for r in bucket]
+    return [r for bucket in _load_scores_index(city).values() for r in bucket]
 
 
 def _normalise_address(addr: str) -> str:
@@ -297,6 +307,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
             "risk_score":   float | null,  # calibrated probability 0–1, or null
             "risk_tier":    str | null,    # "Low" | "Moderate" | "Elevated" | "High"
             "trend":        str | null,    # "improving" | "stable" | "worsening"
+                                           #   | "not enough inspection history"
             "percentile_rank": float | null,
             "shap_drivers": list,
             "matched_scores_json": bool,
@@ -305,6 +316,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
         ...
     ]
     """
+    city: str = str(event.get("city", "chicago"))
     restaurants: Any = event.get("restaurants", [])
     # A non-list input (e.g. an upstream {"error": ...} from find_restaurants
     # when Overpass is down) means there is nothing to score — degrade
@@ -317,8 +329,8 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     if not restaurants:
         return []
 
-    scores_index = _load_scores_index()
-    scores_records = _load_scores_records()
+    scores_index = _load_scores_index(city)
+    scores_records = _load_scores_records(city)
 
     # A venue matched in scores.json returns its published batch score directly;
     # an unmatched venue has no record on file and returns no number. The model
@@ -382,7 +394,7 @@ def _output_from_scores(restaurant: dict[str, Any], record: dict[str, Any]) -> d
         "license_id": record.get("license_id"),
         "matched_scores_json": True,
         "percentile_rank": record.get("percentile_rank"),
-        "trend": _trend_label(record.get("trend_slope_90d")),
+        "trend": _trend_label(record.get("trend_slope")),
         "neighborhood": record.get("neighborhood"),
         "status": "scored",
     }
@@ -441,8 +453,13 @@ def _drivers_from_top_drivers(top_drivers: list[dict[str, Any]]) -> list[dict[st
 
 
 def _trend_label(slope: float | None) -> str:
+    # Under scores schema 0.5.0 a null trend_slope means the venue has fewer
+    # than 2 scored inspections, so no forward slope can be fit — that is "we
+    # can't say", not a flat trend. Reporting it as "stable" is what let the
+    # trend_slope_90d->trend_slope rename miss (decision 0011) go silent in the
+    # deployed agent, so say so explicitly instead.
     if slope is None:
-        return "stable"
+        return "not enough inspection history"
     if slope > 0.001:
         return "worsening"
     if slope < -0.001:

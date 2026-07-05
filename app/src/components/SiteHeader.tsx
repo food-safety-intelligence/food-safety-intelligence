@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { MapPin } from "lucide-react";
+import { CityToggle } from "@/components/CityPicker";
 
 /**
  * Top-of-page header. Server component — no client interactivity needed.
@@ -8,7 +9,16 @@ import { MapPin } from "lucide-react";
  * navigation is fine for this iteration; we'll lift to a config when more
  * routes land.
  */
-export type NavItem = "search" | "chat" | "caregivers" | "how" | "sources";
+// "feedback" is a valid active target (so the feedback page can pass it) but is
+// intentionally NOT in NAV below — feedback is a secondary action reached from
+// the footer / in-page links, not a top-nav destination, so no pill highlights.
+export type NavItem =
+  | "search"
+  | "chat"
+  | "caregivers"
+  | "how"
+  | "sources"
+  | "feedback";
 
 const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "search", label: "Search", href: "/" },
@@ -33,11 +43,12 @@ export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
               Food Safety
             </div>
             <div className="text-2xs text-muted tracking-wide">
-              Chicago · public-data preview
+              public-data preview
             </div>
           </div>
         </Link>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
+          <CityToggle />
           {NAV.map((item) => {
             const active = item.id === activeNav;
             return (

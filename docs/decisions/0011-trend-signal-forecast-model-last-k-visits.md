@@ -1,9 +1,19 @@
 # 0011 — Trend signal: forecast-only model + last-K-visits slope
 
-- **Status**: **Proposed** (contract change — needs all-owner ack before merge)
-- **Date**: 2026-06-28
+- **Status**: **Accepted** — landed (contract change acked by all owners)
+- **Date**: 2026-06-28 (accepted 2026-07-04)
 - **Owners to ack**: Bella (modeling / eval), Deepak (modeling backup), Aurelia
   + Jun (web app), Arun (DE) — the `scores.json` schema is the cross-team contract.
+- **Implementation status**:
+  - Pipeline / `predict_batch` scalar `trend_slope` + Model 2 — done (#61).
+  - Web app consumers + `trendDirection` retune + `TrendChart` — done (#62).
+  - Published S3 `scores.json` regenerated on schema 0.5.0 (`trend_slope`) — done (2026-06-29).
+  - Agent tool handlers (`get_safety_score`, `explain_restaurant`) — the rename
+    half-landed: the handlers kept reading `trend_slope_90d` and reported every
+    deployed answer's trend as "stable" from 2026-06-29 until this fix. Renamed
+    to `trend_slope`, `_trend_label(None)` now says "not enough inspection
+    history", committed fallback regenerated on 0.5.0, and a trend assertion
+    added to the eval faithfulness gate so this class of drift fails CI.
 
 > The web app already shows a per-establishment trend (Improving / Worsening /
 > Stable + a small chart), driven by the `trend_slope_90d` field. That field is

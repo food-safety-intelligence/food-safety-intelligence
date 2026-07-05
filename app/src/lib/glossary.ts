@@ -12,6 +12,12 @@ export interface GlossaryEntry {
   term: string;
   /** One/two-sentence definition shown in the popover and the page section. */
   short: string;
+  /**
+   * Override for the popover's "Full definition" link. Defaults to this term's
+   * own Definitions-section anchor (`/how-it-works#<id>`); set it to point at a
+   * richer prose section instead (e.g. the trend/score explanations).
+   */
+  href?: string;
 }
 
 export const GLOSSARY = {
@@ -31,7 +37,7 @@ export const GLOSSARY = {
     id: "inspection-types",
     term: "Inspection type",
     short:
-      "Why a visit happened: Canvass (routine, risk-based schedule), Complaint (triggered by a 311 report), License (before a new business opens), or Re-Inspection (follow-up to confirm earlier violations were fixed).",
+      "Why a visit happened: Canvass (routine, risk-based schedule), Complaint (triggered by a public complaint), License (before a new business opens), or Re-Inspection (follow-up to confirm earlier violations were fixed).",
   },
   "chicago-risk": {
     id: "chicago-risk",
@@ -51,12 +57,30 @@ export const GLOSSARY = {
     short:
       "Whether the establishment passed or failed the inspection on record as of this score — the model's strongest near-term signal. It describes that latest visit, not a prediction; the score is about the next 180 days.",
   },
+  "risk-score": {
+    id: "risk-score",
+    term: "Risk score",
+    short:
+      "The headline 0–100 prediction on the gauge — the production model's estimate that the establishment has a Fail or priority violation in the next 180 days. It counts the latest inspection's own result, so it can differ from the trend chart's last point.",
+    // Link to the richer "Reading the score" prose, not just the one-line entry.
+    href: "/how-it-works#reading-the-score",
+  },
+  "trend-estimate": {
+    id: "trend-estimate",
+    term: "Trend estimate",
+    short:
+      "The forecast model's 0–100 risk read as of each past inspection, with that visit's own pass/fail left out. Plotted as the trend chart's dots so the line shows direction over time, not a second headline number.",
+    // Link to the richer "recent trend" prose (two-models explanation).
+    href: "/how-it-works#recent-trend",
+  },
 } satisfies Record<string, GlossaryEntry>;
 
 export type GlossaryKey = keyof typeof GLOSSARY;
 
 /** Ordered for display on the how-it-works Definitions section. */
 export const GLOSSARY_ORDER: GlossaryKey[] = [
+  "risk-score",
+  "trend-estimate",
   "priority-violations",
   "core-violations",
   "inspection-types",

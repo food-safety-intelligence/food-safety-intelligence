@@ -98,6 +98,16 @@ tools:
       them to change a score or tier.
     lambda_arn: ${LAMBDA_ARN_FIND_REVIEWS}
 
+  - name: find_inspection_records
+    description: >
+      Build a link to the authoritative Chicago Food Inspections records for a
+      SET of establishments — a comparison, a list, or an area. Pass the non-null
+      license_ids from get_safety_score for named places, or a zip_code /
+      lat+lon+radius_m for an area. Returns a city-portal link the user clicks
+      through to. This is the city's own data (the source behind the score), not
+      third-party opinion, so it needs no disclaimer.
+    lambda_arn: ${LAMBDA_ARN_FIND_INSPECTION_RECORDS}
+
 memory:
   short_term: session     # AgentCore manages context within each session
   long_term: disabled     # no cross-session persistence for MVP

@@ -137,15 +137,33 @@ export default function CaregiversPage() {
         </Link>
 
         <header className="mt-6">
-          <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3 inline-flex items-center gap-2">
-            <Heart className="w-3.5 h-3.5" strokeWidth={2} />
-            For caregivers
-          </p>
-          <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
-            The <span className="serif italic text-teal">drivers</span> matter
-            more than the score.
-          </h1>
-          <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
+          {/* Hero banner: wholesome foods on the left of the photo, heading over
+              the dark negative space on the right; gradient keeps the text legible.
+              Image is self-hosted (free Unsplash); basePath prefix is a no-op in
+              prod (only set for the local proxy preview). */}
+          <div className="relative rounded-3xl overflow-hidden min-h-[280px] sm:min-h-[340px] flex items-center soft-shadow">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/images/caregivers-hero.jpg`}
+              alt="Wholesome fresh foods — oats, almonds, milk, avocado, kale and carrots — on a dark table"
+              className="absolute inset-0 w-full h-full object-cover"
+            />
+            <div
+              className="absolute inset-0 bg-gradient-to-r from-ink/35 via-ink/55 to-ink/80"
+              aria-hidden
+            />
+            <div className="relative w-full sm:w-[58%] sm:ml-auto px-7 sm:px-10 py-9">
+              <p className="text-cream/90 text-xs tracking-[0.18em] uppercase mb-3 inline-flex items-center gap-2">
+                <Heart className="w-3.5 h-3.5" strokeWidth={2} />
+                For caregivers
+              </p>
+              <h1 className="text-4xl sm:text-5xl font-light leading-[1.05] tracking-tight text-white">
+                The <span className="serif italic">drivers</span> matter more than
+                the score.
+              </h1>
+            </div>
+          </div>
+          <p className="text-lg text-muted leading-[1.65] mt-6 max-w-[58ch]">
             Two food establishments can share the same predicted risk score for
             very different reasons. If you&apos;re ordering for someone with
             compromised immunity — an older parent, a chemo patient, a transplant

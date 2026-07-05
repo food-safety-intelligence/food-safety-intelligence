@@ -1,7 +1,7 @@
 """
 Lambda handler: find_reviews
 ----------------------------
-Surfaces THIRD-PARTY restaurant reviews (Yelp, Google, web) for a single
+Surfaces THIRD-PARTY restaurant reviews (Yelp, Google, TripAdvisor) for a single
 establishment, focused on the food-safety topics a diner cares about:
 cleanliness, rodents/pests, food quality, and illness reports.
 
@@ -37,11 +37,11 @@ DISCLAIMER = (
     "They are NOT part of the food-safety risk score."
 )
 
-# Registry of valid topic keys → the diner-language SEARCH TERMS for each topic
-# (the " / " is split into separate query words). These are short synonyms of the
-# observable food-safety categories, kept brief so the search isn't over-narrowed.
-# The agent-facing link LABEL comes from the keys (see _topic_label), NOT these
-# values.
+# Registry of valid topic keys → a diner-language description of each food-safety
+# category. The keys are the accepted `topics` inputs (see _resolve_topics); the
+# descriptions are documentary. Topics record what the user cares about but do NOT
+# scope the review links — those go directly to each source's page for the
+# business (no source exposes a keyless per-topic review filter).
 TOPIC_LABELS: dict[str, str] = {
     "cleanliness": "cleanliness / sewage",
     "pests": "rodents / pests / droppings",
@@ -85,7 +85,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "name": name,
         "topics": topics,
         # Deep links always work — no credentials, no network call, nothing stored.
-        "review_links": _build_review_links(name, address, topics),
+        "review_links": _build_review_links(name, address),
         "disclaimer": DISCLAIMER,
     }
 
@@ -105,66 +105,47 @@ def _resolve_topics(raw: Any) -> list[str]:
     return keep or list(TOPIC_LABELS)
 
 
-def _topic_terms(topics: list[str]) -> str:
-    """Search-query terms for the requested topics.
-
-    When all topics are requested (the default), a short generic term keeps the
-    query clean — concatenating every synonym over-narrows it. For a specific
-    subset, use those topics' diner-language synonyms for a focused search.
-    """
-    if set(topics) == set(TOPIC_LABELS):
-        return "food safety"
-    return " ".join(TOPIC_LABELS[t].replace(" / ", " ") for t in topics)
-
-
-def _topic_label(topics: list[str]) -> str:
-    """Human label for the link — the topic keys, not the search synonyms."""
-    if set(topics) == set(TOPIC_LABELS):
-        return "food safety"
-    return ", ".join(t.replace("_", " ") for t in topics)
-
-
 # ---------------------------------------------------------------------------
 # Deep links (no network, no storage — always available)
 # ---------------------------------------------------------------------------
 
 
-def _build_review_links(name: str, address: str, topics: list[str]) -> list[dict[str, str]]:
+def _build_review_links(name: str, address: str) -> list[dict[str, str]]:
     """
-    Build attributed deep links to reviews for this business. These are search
-    URLs the user clicks through to; we never fetch them.
+    Build attributed deep links to each source's reviews for this business.
 
-    - Yelp: a site-restricted web search (site:yelp.com) — Yelp has no API-free
-      deep link to keyword-filtered reviews, but a site: search lands on the
-      business's Yelp page AND scopes to the requested topics (validated).
-    - Google: a direct Google Maps search for the place. Google Maps can't be
-      site-searched cleanly for one place's reviews, so this lands on the place's
-      Maps page (its full review corpus) — general, not topic-scoped; the user can
-      keyword-search reviews in Google's own UI.
-    - Web: an open (cross-site) web search, scoped to the requested topics.
+    Each link goes DIRECTLY to its named source's own site (a "Yelp" link is a
+    yelp.com URL, not a search-engine detour), using that site's keyless search
+    endpoint. We only ever build the URL — no fetch, no credentials, nothing
+    stored (see the LEGAL POSTURE note at the top).
+
+    Why a per-site search and not a review permalink: reaching one business's
+    reviews page needs that site's business id (Yelp alias / Google place_id /
+    TripAdvisor location id), which name+address alone can't yield without an API
+    or scraping. So each link lands ON the business via the site's own search —
+    for a specific name + full address this surfaces that exact place (Google Maps
+    typically opens its place card with reviews inline), one click from reviews.
+
+    Links are general (the business's full reviews), not scoped to the requested
+    food-safety topics — no source exposes a keyless per-topic review filter, and
+    landing on the real reviews matters more than pre-filtering. The user can
+    keyword-search within the source once there.
     """
     where = f"{name} {address}".strip()
-    terms = _topic_terms(topics)
-    label = _topic_label(topics)
 
-    def _ddg(query: str) -> str:
-        return "https://duckduckgo.com/?" + urllib.parse.urlencode({"q": query.strip()})
+    yelp = "https://www.yelp.com/search?" + urllib.parse.urlencode(
+        # find_loc defaults to the city so an address-less lookup still scopes to Chicago.
+        {"find_desc": name, "find_loc": address or "Chicago, IL"}
+    )
+    # Google Maps URLs scheme — a documented, keyless link format (NOT the paid
+    # Maps API): opens the place on Maps, where its reviews live.
+    google = "https://www.google.com/maps/search/?" + urllib.parse.urlencode(
+        {"api": "1", "query": where}
+    )
+    tripadvisor = "https://www.tripadvisor.com/Search?" + urllib.parse.urlencode({"q": where})
 
     return [
-        {
-            "source": "Yelp",
-            "label": f"Yelp reviews ({label})",
-            "url": _ddg(f"site:yelp.com {where} {terms}"),
-        },
-        {
-            # General (not topic-scoped): the place's full Google Maps reviews.
-            "source": "Google",
-            "label": "Google Maps reviews",
-            "url": "https://www.google.com/maps/search/" + urllib.parse.quote(where, safe=""),
-        },
-        {
-            "source": "Web",
-            "label": f"Web search ({label})",
-            "url": _ddg(f"{where} reviews {terms}"),
-        },
+        {"source": "Yelp", "label": "Yelp reviews", "url": yelp},
+        {"source": "Google", "label": "Google Maps reviews", "url": google},
+        {"source": "TripAdvisor", "label": "TripAdvisor reviews", "url": tripadvisor},
     ]

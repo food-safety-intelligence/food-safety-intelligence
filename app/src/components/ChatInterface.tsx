@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowUp, RotateCcw, AlertCircle, MapPin, Store, X } from "lucide-react";
 import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
 import type { ChatEstablishment } from "@/components/ChatScopeContext";
+import { CITY_CONFIG, type City } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -145,14 +147,33 @@ function renderContent(text: string): React.ReactNode[] {
 // than reshuffling. Each "learn" entry maps to a topic the agent's food_safety_info
 // tool covers; each "find" to real neighborhoods.
 
-const FIND_QUERIES = [
-  "Safest sushi near Wicker Park",
-  "Best options for someone with a compromised immune system near River North",
-  "Any High-risk restaurants in Logan Square?",
-  "Low-risk pizza in Lincoln Park",
-  "Taquerias in Pilsen with a Low risk tier",
-  "Safest Thai food near the Loop",
-];
+// "Find" prompts name real neighborhoods, so they're per-city (DR 0016).
+const FIND_QUERIES_BY_CITY: Record<City, string[]> = {
+  chicago: [
+    "Safest sushi near Wicker Park",
+    "Best options for someone with a compromised immune system near River North",
+    "Any High-risk restaurants in Logan Square?",
+    "Low-risk pizza in Lincoln Park",
+    "Taquerias in Pilsen with a Low risk tier",
+    "Safest Thai food near the Loop",
+  ],
+  nyc: [
+    "Safest sushi near the Lower East Side",
+    "Best options for someone with a compromised immune system near Harlem",
+    "Any High-risk restaurants in Williamsburg?",
+    "Low-risk pizza in Astoria",
+    "Dumplings in Flushing with a Low risk tier",
+    "Safest Thai food near Midtown",
+  ],
+  la: [
+    "Safest sushi near Silver Lake",
+    "Best options for someone with a compromised immune system near Koreatown",
+    "Any High-risk restaurants in Downtown LA?",
+    "Low-risk pizza in Santa Monica",
+    "Taquerias in Boyle Heights with a Low risk tier",
+    "Safest Thai food near Hollywood",
+  ],
+};
 
 const LEARN_QUERIES = [
   "How common is food poisoning in the US?",
@@ -188,9 +209,9 @@ function seededSample(pool: readonly string[], n: number, rng: () => number): st
 }
 
 // 3 "find a place" + 3 "learn", interleaved so both jobs show at a glance.
-function pickSuggestions(seed: number): string[] {
+function pickSuggestions(seed: number, city: City): string[] {
   const rng = mulberry32(seed);
-  const find = seededSample(FIND_QUERIES, 3, rng);
+  const find = seededSample(FIND_QUERIES_BY_CITY[city], 3, rng);
   const learn = seededSample(LEARN_QUERIES, 3, rng);
   return [find[0], learn[0], find[1], learn[1], find[2], learn[2]];
 }
@@ -279,6 +300,7 @@ export function ChatInterface({
   /** Establishment whose detail page is in view; scopes "this restaurant". */
   establishment?: ChatEstablishment | null;
 } = {}) {
+  const { city } = useCity();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -327,11 +349,21 @@ export function ChatInterface({
       sessionIdRef.current = getOrCreateSessionId();
     }
     const saved = loadMessages();
-    /* eslint-disable react-hooks/set-state-in-effect */
-    setSuggestions(pickSuggestions(getOrCreateSuggestSeed()));
+    // Starter chips are set by the city effect below, which also runs on mount —
+    // setting them here too would only duplicate that and pull `city` into this
+    // mount-only effect (a stale-closure trap the exhaustive-deps rule flags).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (saved.length) setMessages(saved);
-    /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
+
+  // Re-pick the starter chips when the city changes — the "find" prompts name
+  // real neighborhoods, so they're city-specific (same seed → stable per session).
+  // The seed comes from sessionStorage (browser-only), so this can't be derived
+  // during render; the setState here mirrors the mount effect above.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city));
+  }, [city]);
 
   // Persist the transcript so it survives the popup -> /chat expand. Skip the
   // first run so the initial empty render can't overwrite a saved transcript
@@ -372,6 +404,7 @@ export function ChatInterface({
         sessionIdRef.current,
         history,
         scoped ?? undefined,
+        city,
       );
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {
@@ -398,7 +431,7 @@ export function ChatInterface({
     clearMessages();
     sessionIdRef.current = resetSession();
     // A new chat rotates the starter chips to a fresh set.
-    setSuggestions(pickSuggestions(rotateSuggestSeed()));
+    setSuggestions(pickSuggestions(rotateSuggestSeed(), city));
     setInput("");
     inputRef.current?.focus();
   }
@@ -439,6 +472,20 @@ export function ChatInterface({
               <X className="w-4 h-4" strokeWidth={2} />
             </button>
           </Tooltip>
+        </div>
+      )}
+
+      {/* Notice for a city whose chat backend isn't live yet (chatSupported:false,
+          currently LA — DR 0016). Be honest: general food-safety questions work,
+          establishment lookups for this city don't. */}
+      {!CITY_CONFIG[city].chatSupported && (
+        <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
+          <span>
+            You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
+            assistant can&apos;t look up a specific {CITY_CONFIG[city].label} place
+            yet — general food-safety questions still work.
+          </span>
         </div>
       )}
 
@@ -539,8 +586,12 @@ export function ChatInterface({
             </div>
           </div>
           <p className="text-2xs text-muted/70 text-center mt-2">
-            180-day model predictions from public Chicago data, not a safety
-            verdict or city inspection{" "}
+            {city === "nyc"
+              ? "Next-inspection model predictions from public New York City data"
+              : city === "la"
+                ? "Next-inspection model predictions from public Los Angeles County data"
+                : "180-day model predictions from public Chicago data"}
+            , not a safety verdict or city inspection{" "}
             (
             <a
               href="/how-it-works#reading-the-score"
