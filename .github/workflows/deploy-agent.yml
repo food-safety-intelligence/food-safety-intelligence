@@ -114,7 +114,10 @@ jobs:
       - name: Reprovision guardrail + wire new version (if changed)
         if: steps.cg.outputs.changed == 'true'
         run: |
-          out=$(AWS_REGION="$REGION" python3 agents/create_guardrail.py)
+          # create_guardrail.py needs boto3, which setup-python's bare interpreter
+          # lacks. Run it through uv with just boto3 (its only third-party import) —
+          # --no-project skips syncing the full ML env for a standalone AWS script.
+          out=$(AWS_REGION="$REGION" uv run --no-project --with boto3 python3 agents/create_guardrail.py)
           echo "$out"
           ver=$(printf '%s\n' "$out" | sed -n 's/.*FSI_BEDROCK_GUARDRAIL_VERSION=\([0-9][0-9]*\).*/\1/p' | head -1)
           [ -n "$ver" ] || { echo "::error::could not parse the new guardrail version from create_guardrail.py output"; exit 1; }
