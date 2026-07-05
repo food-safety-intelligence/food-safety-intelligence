@@ -286,9 +286,13 @@ Layer-C TF-IDF→SVD(50) violation-text embedding.
 
 ## 3. `data/predictions/scores.parquet`
 
-**Grain**: one row per `(license_id, as_of_date)`. The app reads the latest
-`as_of_date` per license for the current view, and earlier dates for the
-trend chart.
+**Grain**: one row per **physical establishment**, keyed by `license_id`. Each
+license is first anchored on its most recent inspection (`as_of_date`); licenses
+that share a normalised `dba_name` + `address` (a reopen/renewal that minted a
+new `license_id`) are then collapsed to the most-recently-inspected one, so a
+restaurant is served once rather than as a live entry beside a stale ghost. Rows
+stay uniquely keyed by `license_id`; the trend chart reads earlier `as_of_date`s
+for that surviving license.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `src/foodsafety/serve/predict_batch.py` (Bella).
 **Consumer**: the Next.js web app, via the exported `app/public/data/scores.json`.
@@ -309,10 +313,15 @@ model inference happens in the app** — predictions are precomputed and written
 | `risk_tier` | `string` | no | `Low` / `Moderate` / `Elevated` / `High`. Discretized from `risk_score` via thresholds in `src/foodsafety/serve/predict_batch.py`. |
 | `top_drivers` | `list[struct]` | no | 3–5 top SHAP-style drivers. Each struct: `{feature: string, value: string, shap: float, label: string}` where `label` is the plain-English UI string. |
 | `trend_slope` | `float64` | yes | OLS slope of the **forecast-only model's** score over this license's last `TREND_K_VISITS` (=5) inspections — *visits*, not a calendar window. Positive = worsening. Null if <2 scored points. Forward-looking basis: the forecast model ignores each visit's own pass/fail, so a failed inspection and its required re-check don't dominate the trend; see [decision 0011](decisions/0011-trend-signal-forecast-model-last-k-visits.md). **Renamed from `trend_slope_90d`** in `schema_version` 0.5.0. |
+| `is_out_of_business` | `bool` | no | The license's **latest inspection event** (any type, from `inspections_labeled.parquet`) has result `Out of Business` or `Business Not Located`. Latest-event-only: a venue that reopens does so under a new `license_id`, so an old closure never marks a live license. `No Entry` / `Not Ready` are NOT closure signals. The app greys these venues out (map pin, list row, detail banner) and never presents their score as a current signal; they sort after active venues in risk-sorted views. Added in `schema_version` 0.6.0 — see [decision 0014](decisions/0014-out-of-business-establishments.md). |
+| `closed_since` | `datetime64[ns]` | yes | Date of the closing inspection event. Null unless `is_out_of_business`. ISO date string in `scores.json`. |
 
-**Top-level JSON envelope** (`scores.json`, `schema_version` `0.5.0`): alongside
+**Top-level JSON envelope** (`scores.json`, `schema_version` `0.6.0`): alongside
 `scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
-`label_window_days`, `totals`, and **`calibration`**. `calibration` is the
+`label_window_days`, `totals` (which as of 0.6.0 includes an
+`out_of_business` count, and whose `worsening` / `improving` counts cover
+**active venues only** — a closed business can't be "worsening"), and
+**`calibration`**. `calibration` is the
 Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
 uses it to reconstruct each establishment's calibrated-log-odds driver
 *waterfall* from the row's own `risk_score` + `top_drivers` shap values

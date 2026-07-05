@@ -31,6 +31,7 @@ from sklearn.linear_model import LogisticRegression
 
 from foodsafety.config import (
     FEATURES_PATH,
+    INSPECTIONS_LABELED_PATH,
     LABEL_WINDOW_DAYS,
     MODELS_DIR,
     PREDICTIONS_DIR,
@@ -52,7 +53,11 @@ from foodsafety.models.xgb import (
     extract_categorical_dtypes,
     prepare_xgb_features,
 )
-from foodsafety.serve.predict_batch import build_scores_table, write_scores_json
+from foodsafety.serve.predict_batch import (
+    build_scores_table,
+    out_of_business_status,
+    write_scores_json,
+)
 from foodsafety.tracking import provenance
 from foodsafety.utils.time import temporal_split
 
@@ -222,6 +227,12 @@ def main() -> None:
     )
 
     # --- Score every restaurant + export JSON -----------------------------
+    # Closure status comes from the labeled all-events parquet — the features
+    # frame has no Out of Business rows (they aren't scoreable inspections).
+    print(f"Deriving out-of-business status from {INSPECTIONS_LABELED_PATH}")
+    closure = out_of_business_status(storage.read_parquet(INSPECTIONS_LABELED_PATH))
+    print(f"  {int(closure['is_out_of_business'].sum()):,} licenses closed at latest event")
+
     print("Building scores table (latest inspection per license; TreeSHAP drivers)")
     scores = build_scores_table(
         served,
@@ -230,6 +241,7 @@ def main() -> None:
         n_drivers=5,
         contributions_fn=lambda X: served.contributions(X)[0],
         trend_scores=forecast_scores,
+        closure_status=closure,
     )
     storage.write_parquet(scores, SCORES_PARQUET_PATH)
     print(f"Wrote {SCORES_PARQUET_PATH}: {len(scores):,} restaurants")
@@ -244,7 +256,8 @@ def main() -> None:
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.5.0",
+        # 0.6.0 adds is_out_of_business / closed_since (DR 0014).
+        schema_version="0.6.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
     )

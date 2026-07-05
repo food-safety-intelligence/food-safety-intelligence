@@ -7,6 +7,7 @@ import { Search } from "lucide-react";
 import type { HomeSort, HomeView, RiskTier, SearchIndex } from "@/lib/scores";
 import {
   ALL_TIERS,
+  CLOSED_HEX,
   computeHomeView,
   isAllTiers,
   parseSort,
@@ -14,7 +15,7 @@ import {
   TIER_HEX,
   TIER_TEXT_CLASS,
 } from "@/lib/scores";
-import { TierPill } from "@/components/TierPill";
+import { ClosedPill, TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
 import { useCity } from "@/components/CityContext";
@@ -374,11 +375,20 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                 <li key={r.license_id}>
                   <Link
                     href={`/restaurant/?id=${r.license_id}`}
-                    className="flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors"
+                    className={cn(
+                      "flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors",
+                      // Closed venues read as archival: dimmed row, neutral
+                      // pill below instead of tier/trend, no score number.
+                      r.is_out_of_business && "opacity-70",
+                    )}
                   >
                     <div
                       className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
-                      style={{ background: TIER_HEX[r.risk_tier] }}
+                      style={{
+                        background: r.is_out_of_business
+                          ? CLOSED_HEX
+                          : TIER_HEX[r.risk_tier],
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm leading-tight truncate">
@@ -388,23 +398,31 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                         {r.address}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <TierPill tier={r.risk_tier} size="sm" />
-                        <TrendIndicator slope={r.trend_slope} />
+                        {r.is_out_of_business ? (
+                          <ClosedPill size="sm" />
+                        ) : (
+                          <>
+                            <TierPill tier={r.risk_tier} size="sm" />
+                            <TrendIndicator slope={r.trend_slope} />
+                          </>
+                        )}
                       </div>
-                      {r.top_driver && (
+                      {r.top_driver && !r.is_out_of_business && (
                         <div className="mt-1.5">
                           <PinDriverLine driver={r.top_driver} />
                         </div>
                       )}
                     </div>
-                    <div
-                      className={cn(
-                        "num text-lg font-medium tabular-nums leading-none",
-                        TIER_TEXT_CLASS[r.risk_tier],
-                      )}
-                    >
-                      {r.risk_score.toFixed(2)}
-                    </div>
+                    {!r.is_out_of_business && (
+                      <div
+                        className={cn(
+                          "num text-lg font-medium tabular-nums leading-none",
+                          TIER_TEXT_CLASS[r.risk_tier],
+                        )}
+                      >
+                        {r.risk_score.toFixed(2)}
+                      </div>
+                    )}
                   </Link>
                 </li>
               ))}

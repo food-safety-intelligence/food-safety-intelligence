@@ -42,6 +42,8 @@ async function main() {
       trend_slope: r.trend_slope,
       // top_drivers[0] reduced to the PinDriver the list/pin renders.
       top_driver: d ? { feature: d.feature, label: d.label, up: d.shap > 0 } : null,
+      // Serialized only when true (~27% of rows) — absent means active.
+      ...(r.is_out_of_business ? { is_out_of_business: true } : {}),
     };
   });
 
