@@ -547,16 +547,19 @@ export function ChatInterface({
           view and clears automatically on navigating away; the icon + label
           carry the meaning without relying on colour. */}
       {persona && (
-        <div className="flex-none flex items-center gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
+        // items-start + wrapping copy: the panel is a fixed ~384px card, so a
+        // one-line sentence truncated mid-word; let it wrap to ~2 lines and keep
+        // the icon aligned to the first line.
+        <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
           {persona === "inspector" ? (
-            <ClipboardList className="w-4 h-4 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
+            <ClipboardList className="w-4 h-4 mt-0.5 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
           ) : (
-            <HeartPulse className="w-4 h-4 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
+            <HeartPulse className="w-4 h-4 mt-0.5 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
           )}
-          <p className="min-w-0 flex-1 text-sm text-ink truncate">
+          <p className="min-w-0 flex-1 text-sm text-ink leading-snug">
             {persona === "inspector"
-              ? "Answering with inspector-focused detail — violation history, compliance drivers, worklist framing."
-              : "Answering with caregiver-focused framing — for someone immunocompromised, elderly, a child, or critically ill."}
+              ? "Answering with inspector-focused framing: violation history, compliance drivers, and worklist triage."
+              : "Answering with caregiver-focused framing: someone immunocompromised, elderly, a child, or critically ill."}
           </p>
         </div>
       )}
