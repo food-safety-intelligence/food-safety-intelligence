@@ -51,7 +51,7 @@ export function MethodologyHero({
         <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">{eyebrow}</p>
         <h1 className="text-5xl font-light leading-[1.05] tracking-tight">{title}</h1>
         <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">{children}</p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">{stats}</dl>
+        <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">{stats}</dl>
       </div>
     </header>
   );

@@ -234,7 +234,7 @@ export default async function HowItWorksPage() {
             headline metrics sit here as stat cards so the page leads with what
             the model actually does. */}
         <MethodologyHero
-          eyebrow="Methodology"
+          eyebrow="Methodology · Chicago"
           title={<>How this <span className="serif italic text-teal">works</span></>}
           stats={
             <>
@@ -244,14 +244,8 @@ export default async function HowItWorksPage() {
                 accent
               />
               <HeroStat
-                value={top20 ? `${Math.round(top20.recall * 100)}%` : "—"}
-                label="of next-180-day events caught in the top 20%"
-              />
-              <HeroStat
-                value={methodology.headline.pr_auc.toFixed(2)}
-                label={`precision–recall AUC, vs a ${Math.round(
-                  methodology.test.prevalence * 100,
-                )}% base rate`}
+                value={methodology.headline.roc_auc.toFixed(2)}
+                label="ROC-AUC: ranks venues headed for a fail or priority citation above those that won't"
               />
             </>
           }
@@ -539,6 +533,16 @@ export default async function HowItWorksPage() {
               {methodology.headline.pr_auc.toFixed(2)}, ROC-AUC{" "}
               {methodology.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
               {methodology.headline.top_decile_lift.toFixed(1)}×.
+            </p>
+            <p className="text-md text-muted leading-relaxed mt-3">
+              We <span className="text-ink/85">select</span> the production model
+              on two of these, <span className="text-ink/85">PR-AUC</span> and{" "}
+              <span className="text-ink/85">precision in the top 10%</span>,
+              requiring both to hold up under expanding-window cross-validation
+              before promoting it. The lift and ROC-AUC in the header describe how
+              well the chosen model works; PR-AUC and top-10% precision are how it
+              was chosen. Precision and recall at every operating point are in the
+              table below.
             </p>
           </article>
 
