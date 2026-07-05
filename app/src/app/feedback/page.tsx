@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata = {
-  title: "Give feedback · Food Safety",
+  title: "Give feedback · Eatelligence Food Safety",
   description:
     "Tell the team about a data error, a listing that looks wrong, or something we could explain more clearly.",
 };

@@ -15,7 +15,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
-  title: "For caregivers · Food Safety",
+  title: "For caregivers · Eatelligence Food Safety",
   description:
     "How to read a food establishment risk signal when you're choosing for someone with compromised immunity.",
 };

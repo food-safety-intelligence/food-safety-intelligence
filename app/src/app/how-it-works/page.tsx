@@ -148,7 +148,7 @@ function HeroStat({
 }
 
 export const metadata = {
-  title: "How this works · Food Safety",
+  title: "How this works · Eatelligence Food Safety",
   description:
     "How the risk score works: what it predicts, what the model looks at, how it's tested, why a score is what it is, and its limits.",
 };
