@@ -47,6 +47,26 @@ function wasPageReloaded(): boolean {
   return nav?.type === "reload";
 }
 
+// The navigation entry describes how the DOCUMENT was loaded and never changes
+// for its lifetime — but ChatInterface remounts on every soft navigation (tab
+// switch, popup open). Acting on the reload flag at every mount wiped the
+// transcript on each return to chat whenever the document had originally been
+// loaded via a refresh. This latch consumes the flag once per document: module
+// state resets exactly when the document really reloads, which is precisely
+// the intended "refresh = fresh chat" boundary.
+let reloadHandledThisDocument = false;
+
+export function shouldStartFreshChat(pageWasReloaded: boolean): boolean {
+  if (reloadHandledThisDocument) return false;
+  reloadHandledThisDocument = true;
+  return pageWasReloaded;
+}
+
+/** Test-only: reset the once-per-document latch between vitest cases. */
+export function resetReloadLatchForTests(): void {
+  reloadHandledThisDocument = false;
+}
+
 // The transcript is persisted to sessionStorage so it survives the floating
 // popup -> /chat expand (a <Link> navigation that remounts ChatInterface) within
 // the same tab session. Without this the new mount starts empty and the
@@ -340,9 +360,11 @@ export function ChatInterface({
   // them once post-mount.
   useEffect(() => {
     // A browser refresh starts a fresh conversation. The transcript is meant to
-    // survive the popup -> /chat expand (a <Link> soft navigation), not a reload,
-    // so on a reload we drop the saved transcript and start a new session.
-    if (wasPageReloaded()) {
+    // survive the popup -> /chat expand and tab switches (soft navigations that
+    // remount this component), not a reload — and the reload flag must only be
+    // consumed ONCE per document (see shouldStartFreshChat), or every remount
+    // after a refreshed page load would wipe the transcript again.
+    if (shouldStartFreshChat(wasPageReloaded())) {
       clearMessages();
       sessionIdRef.current = resetSession();
     } else {
