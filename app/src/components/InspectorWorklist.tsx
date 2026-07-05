@@ -11,8 +11,10 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
+import { type City, dataUrl } from "@/lib/city";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
@@ -79,11 +81,31 @@ export function InspectorWorklist() {
   const activeTiers = useMemo(() => parseTiers(tierParam), [tierParam]);
   const sort = parseInspectorSort(searchParams.get("sort"));
 
+  // City-scoped data — the header's CityToggle switches it. Expanded rows and
+  // the route reset with the city (license ids are per-city).
+  const { city } = useCity();
   const [index, setIndex] = useState<SearchIndex | null>(null);
   const [failed, setFailed] = useState(false);
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [route, setRoute] = useState<string[]>([]);
+  const [visibleCount, setVisibleCount] = useState(QUEUE_PAGE);
+
+  // Reset the city-scoped state when the city changes — adjust-state-during-
+  // render (React's recommended alternative to a reset effect; same pattern as
+  // MapExplorer's resultKey), so no cascading-render lint error.
+  const [prevCity, setPrevCity] = useState(city);
+  if (city !== prevCity) {
+    setPrevCity(city);
+    setIndex(null);
+    setFailed(false);
+    setExpanded({});
+    setRoute([]);
+    setVisibleCount(QUEUE_PAGE);
+  }
+
   useEffect(() => {
     let alive = true;
-    fetch("/data/search-index.json")
+    fetch(dataUrl(city, "search-index.json"))
       .then((r) =>
         r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
       )
@@ -96,11 +118,7 @@ export function InspectorWorklist() {
     return () => {
       alive = false;
     };
-  }, []);
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const [route, setRoute] = useState<string[]>([]);
-  const [visibleCount, setVisibleCount] = useState(QUEUE_PAGE);
+  }, [city]);
 
   // "now" is fixed per mount so day-counts don't drift between renders.
   const [now] = useState(() => Date.now());
@@ -130,11 +148,20 @@ export function InspectorWorklist() {
     setVisibleCount(QUEUE_PAGE);
   };
 
+  // An inspection worklist must never contain a closed venue (DR 0014) — every
+  // derived view on this page (queue, stats, Rising fast, tier counts) starts
+  // from activeRows, so a flagged establishment can't appear anywhere here.
+  // Indexes built from pre-0.6.0 scores.json carry no flag; those rows count
+  // as active until the pipeline change lands (PR #131).
+  const activeRows = useMemo(
+    () => (index ? index.rows.filter((r) => !r.is_out_of_business) : []),
+    [index],
+  );
+
   const rows = useMemo(() => {
-    if (!index) return [];
     const tierSet = new Set(activeTiers);
     const tierActive = !isAllTiers(activeTiers);
-    const matched = index.rows.filter(
+    const matched = activeRows.filter(
       (r) => !tierActive || tierSet.has(r.risk_tier),
     );
     const days = (r: SearchIndexRow) => daysSince(r.as_of_date, now) ?? -1;
@@ -144,40 +171,47 @@ export function InspectorWorklist() {
         return (b.trend_slope ?? -9) - (a.trend_slope ?? -9);
       return b.risk_score - a.risk_score;
     });
-  }, [index, activeTiers, sort, now]);
+  }, [activeRows, activeTiers, sort, now]);
 
   const worseningCount = useMemo(
     () =>
-      index
-        ? index.rows.filter((r) => (r.trend_slope ?? 0) > WORSENING_SLOPE)
-            .length
-        : 0,
-    [index],
+      activeRows.filter((r) => (r.trend_slope ?? 0) > WORSENING_SLOPE).length,
+    [activeRows],
   );
 
   const risingFast = useMemo(
     () =>
-      index
-        ? index.rows
-            .filter((r) => (r.trend_slope ?? 0) > TREND_STABLE_BAND)
-            .sort((a, b) => (b.trend_slope ?? 0) - (a.trend_slope ?? 0))
-            .slice(0, 3)
-        : [],
-    [index],
+      activeRows
+        .filter((r) => (r.trend_slope ?? 0) > TREND_STABLE_BAND)
+        .sort((a, b) => (b.trend_slope ?? 0) - (a.trend_slope ?? 0))
+        .slice(0, 3),
+    [activeRows],
   );
 
   const rowById = useMemo(() => {
     const m = new Map<string, SearchIndexRow>();
-    for (const r of index?.rows ?? []) m.set(r.license_id, r);
+    for (const r of activeRows) m.set(r.license_id, r);
     return m;
-  }, [index]);
+  }, [activeRows]);
+
+  // Tier chip counts / stat cards are computed over ACTIVE venues so they
+  // agree with the queue — the payload's tier_counts still include closed
+  // establishments (their historical tier).
+  const tierCounts = useMemo(() => {
+    if (!index) return undefined;
+    const counts = { Low: 0, Moderate: 0, Elevated: 0, High: 0 } as Record<
+      RiskTier,
+      number
+    >;
+    for (const r of activeRows) counts[r.risk_tier] += 1;
+    return counts;
+  }, [index, activeRows]);
 
   const asOfLabel = index?.as_of_date
     ? formatInspectionDate(index.as_of_date)
     : null;
 
   const visible = rows.slice(0, visibleCount);
-  const tierCounts = index?.tier_counts;
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
@@ -212,9 +246,11 @@ export function InspectorWorklist() {
             label="Worsening trend (90 d)"
             valueClass="text-coral"
           />
+          {/* Deviates from the handoff's "Scored citywide": counts active
+              venues only, so the card agrees with the queue (DR 0014). */}
           <StatCard
-            value={index ? index.total.toLocaleString() : "—"}
-            label="Scored citywide"
+            value={index ? activeRows.length.toLocaleString() : "—"}
+            label="Active establishments"
             valueClass="text-ink"
           />
         </div>
@@ -308,6 +344,7 @@ export function InspectorWorklist() {
             <QueueRow
               key={r.license_id}
               row={r}
+              city={city}
               rank={i + 1}
               days={daysSince(r.as_of_date, now)}
               expanded={!!expanded[r.license_id]}
@@ -536,6 +573,7 @@ function DriverGlyph({ icon: Icon }: { icon: LucideIcon }) {
 
 function QueueRow({
   row,
+  city,
   rank,
   days,
   expanded,
@@ -543,6 +581,7 @@ function QueueRow({
   onAddToRoute,
 }: {
   row: SearchIndexRow;
+  city: City;
   rank: number;
   days: number | null;
   expanded: boolean;
@@ -635,7 +674,11 @@ function QueueRow({
         </span>
       </button>
       {expanded && (
-        <ExpandedDetail licenseId={row.license_id} onAddToRoute={onAddToRoute} />
+        <ExpandedDetail
+          licenseId={row.license_id}
+          city={city}
+          onAddToRoute={onAddToRoute}
+        />
       )}
     </div>
   );
@@ -650,25 +693,28 @@ const detailCache = new Map<string, DetailBundle>();
 
 function ExpandedDetail({
   licenseId,
+  city,
   onAddToRoute,
 }: {
   licenseId: string;
+  city: City;
   onAddToRoute: () => void;
 }) {
+  const cacheKey = `${city}:${licenseId}`;
   const [bundle, setBundle] = useState<DetailBundle | null>(
-    detailCache.get(licenseId) ?? null,
+    detailCache.get(cacheKey) ?? null,
   );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (detailCache.has(licenseId)) return;
+    if (detailCache.has(cacheKey)) return;
     let alive = true;
-    fetch(`/data/detail/${encodeURIComponent(licenseId)}.json`)
+    fetch(dataUrl(city, `detail/${encodeURIComponent(licenseId)}.json`))
       .then((r) =>
         r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
       )
       .then((b: DetailBundle) => {
-        detailCache.set(licenseId, b);
+        detailCache.set(cacheKey, b);
         if (alive) setBundle(b);
       })
       .catch(() => {
@@ -677,7 +723,7 @@ function ExpandedDetail({
     return () => {
       alive = false;
     };
-  }, [licenseId]);
+  }, [cacheKey, city, licenseId]);
 
   if (failed) {
     return (
