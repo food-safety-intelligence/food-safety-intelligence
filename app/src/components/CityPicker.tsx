@@ -4,6 +4,7 @@
 // Both drive the same CityContext, so the whole app re-fetches the selected
 // city's data (DR 0016).
 
+import { startTransition } from "react";
 import { MapPin } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
@@ -70,10 +71,21 @@ export function CityToggle() {
   const onDetailPage = pathname === "/restaurant" || pathname === "/restaurant/";
 
   function switchCity(c: City) {
-    setCity(c);
     // Only reroute on a real change — clicking the already-active tab should stay
     // put, not bounce the user off the detail page to the map.
-    if (onDetailPage && c !== city) router.push(`/?city=${c}`);
+    if (onDetailPage && c !== city) {
+      // Batch the city change and the navigation into one transition so React
+      // commits the destination (the map) directly, skipping an intermediate
+      // re-render of the detail page — which would otherwise remount the detail
+      // loader (keyed on city+id) and fire a doomed fetch for the new city's
+      // nonexistent bundle before we navigate away.
+      startTransition(() => {
+        setCity(c);
+        router.push(`/?city=${c}`);
+      });
+      return;
+    }
+    setCity(c);
   }
 
   return (
