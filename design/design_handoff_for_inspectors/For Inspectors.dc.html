@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body { margin:0; background:#F6F1E9; color:#2B3239; font-family:'Manrope',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  </style>
+</helmet>
+
+<!-- ============ HEADER (matches SiteHeader) ============ -->
+<header style="padding-top:24px">
+  <div style="max-width:1240px;margin:0 auto;padding:0 32px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 8px">
+    <div style="display:flex;align-items:center;gap:12px;cursor:pointer">
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:rgba(122,143,106,0.15)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7A8F6A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+      </span>
+      <div style="line-height:1.2">
+        <div style="font-size:17px;font-weight:600;letter-spacing:-0.01em">Food Safety</div>
+        <div style="font-size:11px;color:#6B7280;letter-spacing:0.02em">public-data preview</div>
+      </div>
+    </div>
+    <nav style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;font-size:13px">
+      <span style="padding:6px 12px;border-radius:999px;border:1px solid #E6DFD3;background:#FFFFFF;font-weight:600;display:inline-flex;align-items:center;gap:6px;margin-right:6px"><span style="width:7px;height:7px;border-radius:50%;background:#7A8F6A"></span>Chicago</span>
+      <span style="padding:6px 12px;border-radius:999px;cursor:pointer" style-hover="background:#EDE6D8">Search</span>
+      <span style="padding:6px 12px;border-radius:999px;cursor:pointer" style-hover="background:#EDE6D8">Chat</span>
+      <span style="padding:6px 12px;border-radius:999px;background:#2B3239;color:#F6F1E9;font-weight:500">For inspectors</span>
+      <span style="padding:6px 12px;border-radius:999px;cursor:pointer" style-hover="background:#EDE6D8">For caregivers</span>
+      <span style="padding:6px 12px;border-radius:999px;cursor:pointer" style-hover="background:#EDE6D8">How this works</span>
+      <span style="padding:6px 12px;border-radius:999px;cursor:pointer" style-hover="background:#EDE6D8">Sources</span>
+    </nav>
+  </div>
+</header>
+
+<main style="max-width:1240px;margin:0 auto;padding:40px 32px 72px">
+
+  <!-- ============ PAGE INTRO ============ -->
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px">
+    <div style="max-width:640px">
+      <div style="font-size:11px;letter-spacing:0.2em;text-transform:uppercase;color:#6B7280">Inspector worklist · {{ asOfLabel }}</div>
+      <h1 style="font-family:'Instrument Serif',serif;font-weight:400;font-size:44px;line-height:1.08;margin:10px 0 14px">Inspect where it matters&nbsp;most.</h1>
+      <p style="font-size:15px;line-height:1.6;color:#6B7280;margin:0">
+        Establishments ranked by their modeled probability of a <strong style="color:#2B3239;font-weight:600">failed inspection or critical violation</strong> in the next 180 days. Working from the top of this list surfaces roughly
+        <span style="font-family:'Instrument Serif',serif;font-style:italic;color:{{ accent }};font-size:1.2em"> 4× more</span> failures per visit than inspecting at random.
+      </p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <sc-for list="{{ statCards }}" as="s" hint-placeholder-count="3">
+        <div style="background:#FFFFFF;border:1px solid #E6DFD3;border-radius:24px;padding:16px 22px;min-width:118px;box-shadow:0 1px 2px rgba(43,50,57,0.04), 0 8px 24px rgba(43,50,57,0.04)">
+          <div style="font-family:'IBM Plex Sans',sans-serif;font-size:26px;font-weight:600;letter-spacing:-0.01em;color:{{ s.color }}">{{ s.value }}</div>
+          <div style="font-size:11px;color:#6B7280;margin-top:2px;line-height:1.4">{{ s.label }}</div>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ============ CONTROLS ============ -->
+  <div style="margin-top:32px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px">
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px">
+      <span style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;margin-right:6px">Tier</span>
+      <sc-for list="{{ tierChips }}" as="chip" hint-placeholder-count="4">
+        <button onClick="{{ chip.toggle }}" style="display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:500;letter-spacing:0.04em;font-family:'Manrope',sans-serif;cursor:pointer;border:1px solid {{ chip.border }};background:{{ chip.bg }};color:{{ chip.fg }};opacity:{{ chip.opacity }}">
+          <span style="width:7px;height:7px;border-radius:50%;background:currentColor"></span>{{ chip.tier }}
+          <span style="font-family:'IBM Plex Sans',sans-serif;font-size:11px;opacity:0.75">{{ chip.count }}</span>
+        </button>
+      </sc-for>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;margin-right:4px">Sort</span>
+      <sc-for list="{{ sortChips }}" as="s" hint-placeholder-count="3">
+        <button onClick="{{ s.select }}" style="border-radius:999px;padding:6px 14px;font-size:12px;font-weight:500;font-family:'Manrope',sans-serif;cursor:pointer;border:1px solid {{ s.border }};background:{{ s.bg }};color:{{ s.fg }}">{{ s.label }}</button>
+      </sc-for>
+    </div>
+  </div>
+
+  <!-- ============ MAIN GRID ============ -->
+  <div style="margin-top:20px;display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start">
+
+    <!-- ===== QUEUE ===== -->
+    <div style="background:#FFFFFF;border:1px solid #E6DFD3;border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(43,50,57,0.05), 0 24px 48px rgba(43,50,57,0.06)">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;padding:20px 24px 14px;border-bottom:1px solid #E6DFD3">
+        <div style="font-size:15px;font-weight:700">Priority queue</div>
+        <div style="font-size:12px;color:#6B7280"><span style="font-family:'IBM Plex Sans',sans-serif">{{ shownCount }}</span> establishments · highest expected yield first</div>
+      </div>
+
+      <sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+        <div style="border-bottom:1px solid #EFE9DD">
+          <div onClick="{{ r.toggle }}" style="display:grid;grid-template-columns:44px 1fr auto;gap:14px;align-items:center;padding:{{ rowPad }};cursor:pointer;background:{{ r.rowBg }}" style-hover="background:#FAF7F0">
+            <div style="font-family:'IBM Plex Sans',sans-serif;font-size:13px;color:#6B7280;text-align:center">
+              <div style="font-weight:600;color:#2B3239">{{ r.rank }}</div>
+            </div>
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-weight:700;font-size:14.5px">{{ r.name }}</span>
+                <span style="display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:500;letter-spacing:0.04em;background:{{ r.tierBg }};color:{{ r.tierFg }}">
+                  <span style="width:6px;height:6px;border-radius:50%;background:currentColor"></span>{{ r.tier }}
+                </span>
+                <sc-if value="{{ r.overdue }}" hint-placeholder-val="{{ false }}">
+                  <span style="display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:600;background:#F9EAB0;color:#7A5A24">Overdue</span>
+                </sc-if>
+              </div>
+              <div style="font-size:12.5px;color:#6B7280;margin-top:3px">{{ r.address }} · {{ r.neighborhood }} · last inspected <span style="font-family:'IBM Plex Sans',sans-serif">{{ r.daysSince }}</span> days ago</div>
+              <div style="display:flex;align-items:center;gap:6px;margin-top:7px">
+                <span style="display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:11.5px;font-weight:500;background:{{ r.driverBg }};color:{{ r.driverFg }};max-width:420px">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex:none;transform:rotate({{ r.driverRot }}deg)"><path d="M12 19V5"></path><path d="m5 12 7-7 7 7"></path></svg>
+                  <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ r.topDriver }}</span>
+                </span>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:18px">
+              <div style="text-align:right">
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#6B7280">Trend</div>
+                <div style="display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;color:{{ r.trendColor }};margin-top:2px">{{ r.trendArrow }} {{ r.trendLabel }}</div>
+              </div>
+              <div style="text-align:right;min-width:64px">
+                <div style="font-size:10px;letter-spacing:0.12em;text-transform:uppercase;color:#6B7280">Score</div>
+                <div style="font-family:'IBM Plex Sans',sans-serif;font-size:24px;font-weight:600;letter-spacing:-0.01em;color:{{ r.tierHex }}">{{ r.score }}</div>
+              </div>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate({{ r.chev }}deg);transition:transform 0.2s"><path d="m6 9 6 6 6-6"></path></svg>
+            </div>
+          </div>
+
+          <!-- expanded detail -->
+          <sc-if value="{{ r.expanded }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:4px 24px 20px 82px;display:grid;grid-template-columns:1fr 1fr;gap:24px">
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;margin-bottom:10px">Why the model flags this</div>
+                <div style="display:flex;flex-direction:column;gap:8px">
+                  <sc-for list="{{ r.drivers }}" as="d" hint-placeholder-count="3">
+                    <div style="display:grid;grid-template-columns:1fr 90px 44px;gap:10px;align-items:center">
+                      <div style="font-size:12.5px;line-height:1.4">{{ d.label }}</div>
+                      <div style="position:relative;height:6px;background:#F1ECE1;border-radius:3px;overflow:hidden">
+                        <div style="position:absolute;top:0;left:0;height:100%;border-radius:3px;background:{{ d.barColor }};width:{{ d.barPct }}%"></div>
+                      </div>
+                      <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:500;text-align:right;color:{{ d.valColor }}">{{ d.signed }}</div>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div>
+                <div style="font-size:10.5px;letter-spacing:0.14em;text-transform:uppercase;color:#6B7280;margin-bottom:10px">Recent inspection history</div>
+                <div style="display:flex;flex-direction:column;gap:7px">
+                  <sc-for list="{{ r.history }}" as="h" hint-placeholder-count="3">
+                    <div style="display:flex;align-items:baseline;gap:10px;font-size:12.5px">
+                      <span style="font-family:'IBM Plex Sans',sans-serif;color:#6B7280;flex:none">{{ h.date }}</span>
+                      <span style="font-weight:600;color:{{ h.color }};flex:none">{{ h.result }}</span>
+                      <span style="color:#6B7280;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ h.headline }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="margin-top:14px;display:flex;gap:8px">
+                  <button style="border-radius:999px;padding:7px 16px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;background:#2B3239;color:#F6F1E9;border:none;cursor:pointer">Open full record</button>
+                  <button style="border-radius:999px;padding:7px 16px;font-size:12px;font-weight:600;font-family:'Manrope',sans-serif;background:transparent;color:#2B3239;border:1px solid #E6DFD3;cursor:pointer" style-hover="background:#EDE6D8">Add to today's route</button>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <!-- ===== SIDEBAR ===== -->
+    <div style="display:flex;flex-direction:column;gap:20px">
+
+      <!-- Model lift card -->
+      <sc-if value="{{ showLift }}" hint-placeholder-val="{{ true }}">
+      <div style="background:#2B3239;color:#F6F1E9;border-radius:24px;padding:24px;box-shadow:0 1px 2px rgba(43,50,57,0.05), 0 24px 48px rgba(43,50,57,0.10)">
+        <div style="font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;opacity:0.65">Why trust this ranking</div>
+        <div style="font-family:'Instrument Serif',serif;font-size:42px;line-height:1;margin:12px 0 4px">~4×<span style="font-size:18px;font-family:'Manrope',sans-serif;font-weight:500;opacity:0.8;margin-left:8px">better than random</span></div>
+        <p style="font-size:12.5px;line-height:1.6;opacity:0.75;margin:10px 0 0">In backtests, visits drawn from the top of this list found failures or critical violations about four times as often as visits chosen at random. Predicts <em>where to look first</em> — it is not a verdict on any establishment.</p>
+        <div style="margin-top:16px;display:flex;flex-direction:column;gap:8px">
+          <sc-for list="{{ liftBars }}" as="b" hint-placeholder-count="2">
+            <div>
+              <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px"><span style="opacity:0.75">{{ b.label }}</span><span style="font-family:'IBM Plex Sans',sans-serif">{{ b.value }}</span></div>
+              <div style="height:7px;border-radius:4px;background:rgba(246,241,233,0.14);overflow:hidden"><div style="height:100%;border-radius:4px;background:{{ b.color }};width:{{ b.pct }}%"></div></div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="margin-top:14px;font-size:11.5px;opacity:0.6;text-decoration:underline;cursor:pointer">Full methodology →</div>
+      </div>
+      </sc-if>
+
+      <!-- Watch list -->
+      <div style="background:#FFFFFF;border:1px solid #E6DFD3;border-radius:24px;padding:22px 24px;box-shadow:0 1px 2px rgba(43,50,57,0.04), 0 8px 24px rgba(43,50,57,0.04)">
+        <div style="display:flex;align-items:center;gap:8px">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#B8634A" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"></polyline><polyline points="16 7 22 7 22 13"></polyline></svg>
+          <div style="font-size:14px;font-weight:700">Rising fast</div>
+        </div>
+        <p style="font-size:12px;color:#6B7280;line-height:1.5;margin:6px 0 12px">Steepest score increase over the last 90 days — worth a look even below the High tier.</p>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <sc-for list="{{ watchRows }}" as="w" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;margin:0 -10px;border-radius:12px;cursor:pointer" style-hover="background:#FAF7F0">
+              <div style="min-width:0">
+                <div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ w.name }}</div>
+                <div style="font-size:11.5px;color:#6B7280">{{ w.neighborhood }}</div>
+              </div>
+              <div style="font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;color:#B8634A;flex:none">{{ w.delta }}</div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- Today's route -->
+      <div style="background:#FFFFFF;border:1px solid #E6DFD3;border-radius:24px;padding:22px 24px;box-shadow:0 1px 2px rgba(43,50,57,0.04), 0 8px 24px rgba(43,50,57,0.04)">
+        <div style="font-size:14px;font-weight:700">Today's route</div>
+        <p style="font-size:12px;color:#6B7280;line-height:1.5;margin:6px 0 0">Queue rows you add appear here, grouped by neighborhood for an efficient day plan.</p>
+        <sc-if value="{{ routeEmpty }}" hint-placeholder-val="{{ true }}">
+          <div style="margin-top:14px;border:1.5px dashed #E6DFD3;border-radius:16px;padding:18px;text-align:center;font-size:12px;color:#6B7280">No stops yet — expand a row and press <strong style="color:#2B3239">Add to today's route</strong></div>
+        </sc-if>
+        <sc-if value="{{ routeHasStops }}" hint-placeholder-val="{{ false }}">
+          <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px">
+            <sc-for list="{{ routeRows }}" as="rt" hint-placeholder-count="2">
+              <div style="display:flex;align-items:center;gap:10px;font-size:12.5px;padding:8px 12px;background:#FAF7F0;border-radius:12px">
+                <span style="font-family:'IBM Plex Sans',sans-serif;color:#6B7280">{{ rt.n }}</span>
+                <span style="font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ rt.name }}</span>
+                <span onClick="{{ rt.remove }}" style="color:#6B7280;cursor:pointer;font-size:14px;line-height:1">×</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <!-- Honest-use note -->
+      <div style="border:1px solid #E6DFD3;border-radius:24px;padding:18px 22px;font-size:11.5px;color:#6B7280;line-height:1.6;background:#EDE6D8">
+        <strong style="color:#2B3239">A ranking, not a judgment.</strong> Scores are calibrated probabilities from public inspection, license and 311 data. They prioritize limited inspection capacity — every establishment still gets its regular cadence.
+      </div>
+    </div>
+  </div>
+</main>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1280},&quot;showLiftCard&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Sidebar&quot;},&quot;queueDensity&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;default&quot;:&quot;comfortable&quot;,&quot;options&quot;:[&quot;comfortable&quot;,&quot;compact&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Queue&quot;},&quot;accentTone&quot;:{&quot;editor&quot;:&quot;color&quot;,&quot;default&quot;:&quot;#B8634A&quot;,&quot;options&quot;:[&quot;#B8634A&quot;,&quot;#486073&quot;,&quot;#7A8F6A&quot;],&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Theme&quot;}}">
+class Component extends DCLogic {
+  state = {
+    tiers: { High: true, Elevated: true, Moderate: true, Low: true },
+    sort: "risk",
+    expanded: {},
+    route: [],
+  };
+
+  data() {
+    return [
+      { id:"1242184", name:"Great Falafel", address:"500 W Diversey Pkwy", neighborhood:"Lakeview East", score:0.82, tier:"High", slope:0.0048, days:412,
+        drivers:[
+          { label:"3 priority violations in the prior 2 years", shap:0.18 },
+          { label:"4 rodent complaints within 300 m, last 90 days", shap:0.12 },
+          { label:"Temperature-related violation in recent history", shap:0.09 },
+          { label:"Last inspected 412 days ago", shap:0.07 },
+        ],
+        history:[
+          { date:"2025-11-14", result:"Conditions", headline:"Code 32 — improper cooling within 4 hrs" },
+          { date:"2024-04-12", result:"Fail", headline:"Code 02 — cold-holding above 41 °F at prep cooler" },
+          { date:"2023-01-19", result:"Fail", headline:"Code 02 — improper hot-holding, chicken <135 °F" },
+        ] },
+      { id:"1198033", name:"Enchanting Cafe & Lounge", address:"300 E 75th St", neighborhood:"Greater Grand Crossing", score:0.68, tier:"High", slope:0.0021, days:198,
+        drivers:[
+          { label:"2 priority violations in the prior 2 years", shap:0.14 },
+          { label:"3 sanitation complaints nearby (90 d)", shap:0.10 },
+          { label:"Vermin/pest violation noted previously", shap:0.08 },
+        ],
+        history:[
+          { date:"2024-11-03", result:"Fail", headline:"Code 38 — vermin evidence in dry storage" },
+          { date:"2024-08-21", result:"Conditions", headline:"Code 47 — food-contact surfaces not sanitized" },
+        ] },
+      { id:"2734519", name:"Parlay at Joy District", address:"112–114 W Hubbard St", neighborhood:"River North", score:0.64, tier:"Elevated", slope:-0.0005, days:287,
+        drivers:[
+          { label:"1 failed inspection in the prior 2 years", shap:0.11 },
+          { label:"Cross-contamination violation cited previously", shap:0.07 },
+          { label:"Last inspected 287 days ago", shap:0.04 },
+        ],
+        history:[
+          { date:"2024-09-15", result:"Fail", headline:"Code 03 — raw/ready-to-eat separation" },
+          { date:"2024-02-27", result:"Pass", headline:"" },
+        ] },
+      { id:"2841992", name:"Homan Square Cafe Inc", address:"3517 W Arthington St", neighborhood:"East Garfield Park", score:0.60, tier:"Elevated", slope:0.0011, days:342,
+        drivers:[
+          { label:"5 rodent complaints within 300 m, last 90 days", shap:0.13 },
+          { label:"1 priority violation in the prior 2 years", shap:0.06 },
+        ],
+        history:[
+          { date:"2025-02-11", result:"Conditions", headline:"Code 36 — non-food contact surfaces" },
+          { date:"2024-06-30", result:"Pass", headline:"" },
+        ] },
+      { id:"1015872", name:"Subway", address:"3800 W 103rd St", neighborhood:"Mount Greenwood", score:0.56, tier:"Elevated", slope:0.0004, days:315,
+        drivers:[
+          { label:"Temperature-related violation in recent history", shap:0.08 },
+          { label:"Last inspected 315 days ago", shap:0.04 },
+        ],
+        history:[
+          { date:"2025-03-18", result:"Conditions", headline:"Code 33 — cold-holding equipment capacity" },
+          { date:"2024-05-02", result:"Pass", headline:"" },
+        ] },
+      { id:"26755", name:"Golden Wok Corporation", address:"4500 N Broadway", neighborhood:"Uptown", score:0.24, tier:"Moderate", slope:-0.0019, days:145,
+        drivers:[ { label:"No failed inspections on record", shap:-0.04 } ],
+        history:[ { date:"2026-02-08", result:"Pass", headline:"" }, { date:"2025-07-19", result:"Pass", headline:"" } ] },
+      { id:"1773390", name:"Starbucks", address:"2545 N Lincoln Ave", neighborhood:"Lincoln Park", score:0.18, tier:"Low", slope:-0.0008, days:96,
+        drivers:[ { label:"No failed inspections on record", shap:-0.06 } ],
+        history:[ { date:"2026-03-30", result:"Pass", headline:"" } ] },
+      { id:"2398970", name:"La Pasadita", address:"1132 N Ashland Ave", neighborhood:"Wicker Park", score:0.14, tier:"Low", slope:-0.0012, days:121,
+        drivers:[ { label:"No failed inspections on record", shap:-0.05 } ],
+        history:[ { date:"2026-03-12", result:"Pass", headline:"" } ] },
+    ];
+  }
+
+  renderVals() {
+    const TIER = {
+      High:     { bg:"#E7C9BE", fg:"#7B3C26", hex:"#B8634A" },
+      Elevated: { bg:"#F2DBCB", fg:"#8B4C30", hex:"#DA8A6C" },
+      Moderate: { bg:"#F4E9D5", fg:"#7A5A24", hex:"#D4A571" },
+      Low:      { bg:"#EAEDDE", fg:"#445539", hex:"#7A8F6A" },
+    };
+    const TIER_ORDER = ["High","Elevated","Moderate","Low"];
+    const COUNTS = { High:412, Elevated:4442, Moderate:14891, Low:8302 };
+    const all = this.data();
+    const st = this.state;
+
+    let rows = all.filter(r => st.tiers[r.tier]);
+    if (st.sort === "risk") rows.sort((a,b) => b.score - a.score);
+    if (st.sort === "overdue") rows.sort((a,b) => b.days - a.days);
+    if (st.sort === "trend") rows.sort((a,b) => (b.slope ?? -9) - (a.slope ?? -9));
+
+    const band = 0.0003;
+    const fmtCount = n => n.toLocaleString();
+
+    const rowVals = rows.map((r, i) => {
+      const t = TIER[r.tier];
+      const dir = r.slope > band ? "worsening" : r.slope < -band ? "improving" : "stable";
+      const maxShap = Math.max(...r.drivers.map(d => Math.abs(d.shap)));
+      return {
+        rank: String(i + 1).padStart(2, "0"),
+        name: r.name, address: r.address, neighborhood: r.neighborhood,
+        daysSince: r.days, overdue: r.days > 300,
+        tier: r.tier, tierBg: t.bg, tierFg: t.fg, tierHex: t.hex,
+        score: r.score.toFixed(2),
+        topDriver: r.drivers[0].label,
+        driverBg: r.drivers[0].shap > 0 ? "rgba(184,99,74,0.10)" : "rgba(122,143,106,0.15)",
+        driverFg: r.drivers[0].shap > 0 ? "#7B3C26" : "#445539",
+        driverRot: r.drivers[0].shap > 0 ? 0 : 180,
+        trendArrow: dir === "worsening" ? "↑" : dir === "improving" ? "↓" : "—",
+        trendLabel: dir === "worsening" ? "Worsening" : dir === "improving" ? "Improving" : "Stable",
+        trendColor: dir === "worsening" ? "#B8634A" : dir === "improving" ? "#7A8F6A" : "#6B7280",
+        expanded: !!st.expanded[r.id],
+        chev: st.expanded[r.id] ? 180 : 0,
+        rowBg: st.expanded[r.id] ? "#FAF7F0" : "#FFFFFF",
+        toggle: () => this.setState(s => ({ expanded: { ...s.expanded, [r.id]: !s.expanded[r.id] } })),
+        drivers: r.drivers.map(d => ({
+          label: d.label,
+          barPct: Math.round(Math.abs(d.shap) / maxShap * 100),
+          barColor: d.shap > 0 ? "#B8634A" : "#7A8F6A",
+          valColor: d.shap > 0 ? "#7B3C26" : "#445539",
+          signed: (d.shap > 0 ? "+" : "−") + Math.abs(d.shap).toFixed(2),
+        })),
+        history: r.history.map(h => ({
+          date: h.date,
+          result: h.result,
+          color: h.result === "Fail" ? "#B8634A" : h.result === "Pass" ? "#445539" : "#7A5A24",
+          headline: h.headline || "No violations recorded",
+        })),
+      };
+    });
+
+    const watch = all.filter(r => r.slope > band).sort((a,b) => b.slope - a.slope).slice(0,3)
+      .map(r => ({ name: r.name, neighborhood: r.neighborhood, delta: "+" + (r.slope * 90).toFixed(2) + " / 90d" }));
+
+    const routeIds = st.route;
+    const routeRows = routeIds.map((id, i) => {
+      const r = all.find(x => x.id === id);
+      return { n: i + 1, name: r ? r.name : id, remove: () => this.setState(s => ({ route: s.route.filter(x => x !== id) })) };
+    });
+
+    const compact = (this.props.queueDensity ?? "comfortable") === "compact";
+    return {
+      accent: this.props.accentTone ?? "#B8634A",
+      showLift: this.props.showLiftCard ?? true,
+      rowPad: compact ? "9px 24px" : "16px 24px",
+      asOfLabel: "As of Jun 2, 2026",
+      statCards: [
+        { value: "412", label: "High-tier establishments", color: "#B8634A" },
+        { value: "1,108", label: "Worsening trend (90 d)", color: "#DA8A6C" },
+        { value: "28,047", label: "Scored citywide", color: "#2B3239" },
+      ],
+      tierChips: TIER_ORDER.map(tier => {
+        const on = st.tiers[tier];
+        const t = TIER[tier];
+        return {
+          tier, count: fmtCount(COUNTS[tier]),
+          bg: on ? t.bg : "transparent",
+          fg: on ? t.fg : "#6B7280",
+          border: on ? "transparent" : "#E6DFD3",
+          opacity: 1,
+          toggle: () => this.setState(s => ({ tiers: { ...s.tiers, [tier]: !s.tiers[tier] } })),
+        };
+      }),
+      sortChips: [
+        { key: "risk", label: "Highest risk" },
+        { key: "overdue", label: "Most overdue" },
+        { key: "trend", label: "Worsening fastest" },
+      ].map(o => ({
+        label: o.label,
+        bg: st.sort === o.key ? "#2B3239" : "transparent",
+        fg: st.sort === o.key ? "#F6F1E9" : "#2B3239",
+        border: st.sort === o.key ? "#2B3239" : "#E6DFD3",
+        select: () => this.setState({ sort: o.key }),
+      })),
+      shownCount: rows.length,
+      rows: rowVals,
+      liftBars: [
+        { label: "Model-ranked visits — hit rate", value: "~41%", pct: 82, color: "#DA8A6C" },
+        { label: "Random visits — hit rate", value: "~10%", pct: 20, color: "rgba(246,241,233,0.45)" },
+      ],
+      watchRows: watch,
+      routeEmpty: routeIds.length === 0,
+      routeHasStops: routeIds.length > 0,
+      routeRows,
+    };
+  }
+}
+</script>
+</body>
+</html>
