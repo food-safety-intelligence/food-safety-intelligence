@@ -35,6 +35,20 @@ if (!scoresPath || !historyPath) {
   process.exit(1);
 }
 
+// Verify fast-path: FSI_DETAIL_ONLY=<id,id,...> generates ONLY those establishments'
+// bundles (plus detail-globals). Generating one bundle per establishment is the
+// slowest step of a build — tens of thousands of tiny file writes — and a UI
+// (JS-only) change needs just a handful of test venues to observe. This flag turns
+// a ~13-minute regen into seconds for verification. It is NOT for deploys, which
+// must build every establishment's bundle so every venue is reachable; leave it
+// unset there. percentile_rank + populationStats are still computed over the FULL
+// population so the sampled bundles carry correct ranks.
+const onlyIds = (process.env.FSI_DETAIL_ONLY ?? "")
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+const onlySet = onlyIds.length ? new Set(onlyIds) : null;
+
 /** Percentile rank of each score in the full population + aggregate stats. */
 function computePercentiles(scores) {
   const sorted = scores.map((r) => r.risk_score).sort((a, b) => a - b);
@@ -82,19 +96,24 @@ async function main() {
   const history = JSON.parse(await readFile(historyPath, "utf-8"));
   const scores = payload.scores ?? [];
 
+  // Percentiles/populationStats are computed over the FULL population even in
+  // --only mode, so a sampled bundle's rank is still correct.
   const populationStats = computePercentiles(scores);
+  const toWrite = onlySet ? scores.filter((r) => onlySet.has(r.license_id)) : scores;
 
   const detailDir = path.join(outDir, "detail");
-  // Start clean so a stale bundle from an older data version can't linger.
-  await rm(detailDir, { recursive: true, force: true });
+  // Full runs start clean so a stale bundle from an older data version can't
+  // linger. --only runs write alongside whatever is already there (they're a
+  // verify sample, not the authoritative full set), so they must NOT wipe.
+  if (!onlySet) await rm(detailDir, { recursive: true, force: true });
   await mkdir(detailDir, { recursive: true });
 
   // Bounded-concurrency batches — 23.6k tiny files at once would exhaust file
   // descriptors. Comments are read per-license inside the batch (small slices),
   // so the 266 MB comment corpus is never held resident.
   const BATCH = 256;
-  for (let i = 0; i < scores.length; i += BATCH) {
-    const batch = scores.slice(i, i + BATCH);
+  for (let i = 0; i < toWrite.length; i += BATCH) {
+    const batch = toWrite.slice(i, i + BATCH);
     await Promise.all(
       batch.map(async (restaurant) => {
         const id = restaurant.license_id;
@@ -123,7 +142,8 @@ async function main() {
   );
 
   console.log(
-    `[build-detail-data] ${scores.length} bundles → ${detailDir}` +
+    `[build-detail-data] ${toWrite.length} bundles → ${detailDir}` +
+      `${onlySet ? ` (--only ${toWrite.length}/${scores.length})` : ""}` +
       `${commentsDir ? " (with comments)" : " (no comments dir)"} ` +
       `(${Date.now() - t0} ms) from ${scoresPath}`,
   );

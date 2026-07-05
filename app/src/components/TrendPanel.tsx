@@ -10,6 +10,8 @@ import {
   trendDirection,
 } from "@/lib/scores";
 import { applyTrendZoom } from "@/lib/utils";
+import { CITY_CONFIG } from "@/lib/city";
+import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 import { TrendCaptionLead, TrendChart, type TrendPoint } from "@/components/TrendChart";
 import { TrendChartModal } from "@/components/TrendChartModal";
@@ -41,6 +43,7 @@ export function TrendPanel({
   /** Headline production risk_score (Model 1) — drawn as the chart's reference line. */
   riskScore: number;
 }) {
+  const { city } = useCity();
   const [open, setOpen] = useState(false);
   const enlargeRef = useRef<HTMLButtonElement>(null);
   // Inline zoom window as [start, end] fractions of the full time span; [0,1] is
@@ -48,7 +51,7 @@ export function TrendPanel({
   // keeps the wheel/pinch/drag gestures.
   const [frac, setFrac] = useState<[number, number]>([0, 1]);
 
-  const dir = trendDirection(slope);
+  const dir = trendDirection(slope, CITY_CONFIG[city].trendStableBand);
   const trend = TREND_META[dir];
   const TrendIcon = trend.Icon;
 

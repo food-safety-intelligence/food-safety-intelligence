@@ -12,6 +12,8 @@ import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
 import type { DetailBundle, DetailGlobals } from "@/lib/scores";
+import { useCity } from "@/components/CityContext";
+import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
 import { formatInspectionDate } from "@/lib/utils";
 
 type LoadState =
@@ -28,23 +30,25 @@ type LoadState =
  */
 export function RestaurantDetail() {
   const id = useSearchParams().get("id");
+  const { city } = useCity();
   // No id → nothing to load; render not-found during render (not via an effect).
-  // Key the loader on id so a new id remounts it back to the loading state,
-  // keeping the effect's setState calls confined to async callbacks.
+  // Key the loader on city+id so either change remounts it back to the initial
+  // loading state, keeping the effect's setState calls confined to async
+  // callbacks (no synchronous setState in the effect body).
   if (!id) return <DetailNotFound />;
-  return <DetailLoader key={id} id={id} />;
+  return <DetailLoader key={`${city}:${id}`} id={id} city={city} />;
 }
 
-function DetailLoader({ id }: { id: string }) {
+function DetailLoader({ id, city }: { id: string; city: City }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetch(`/data/detail/${encodeURIComponent(id)}.json`).then((r) =>
+      fetch(dataUrl(city, `detail/${encodeURIComponent(id)}.json`)).then((r) =>
         r.ok ? (r.json() as Promise<DetailBundle>) : Promise.reject(r.status),
       ),
-      fetch(`/data/detail-globals.json`).then((r) =>
+      fetch(dataUrl(city, "detail-globals.json")).then((r) =>
         r.ok ? (r.json() as Promise<DetailGlobals>) : Promise.reject(r.status),
       ),
     ])
@@ -57,7 +61,7 @@ function DetailLoader({ id }: { id: string }) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, city]);
 
   if (state.status === "loading") return <DetailSkeleton />;
   if (state.status === "notfound") return <DetailNotFound />;
@@ -76,7 +80,7 @@ function DetailLoader({ id }: { id: string }) {
 
   // Location line — join only the parts we have so a missing neighborhood/zip
   // doesn't leave orphaned "·" separators.
-  const cityLine = `Chicago, IL${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
+  const cityLine = `${CITY_CONFIG[city].cityState}${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
   const locationLine = [
     restaurant.address.trim(),
     restaurant.neighborhood.trim(),
@@ -136,31 +140,46 @@ function DetailLoader({ id }: { id: string }) {
       <main className="w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
         <section className="mb-10">
-          <div className="mb-6">
-            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-              Food establishment profile
-            </p>
-            <h1 className="text-6xl font-light leading-[1.04] tracking-tight">
-              {restaurant.dba_name}
-            </h1>
-            <p className="text-lg text-muted mt-4 leading-relaxed">
-              {locationLine}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-4 items-center text-xs text-muted">
-              <span className="px-2.5 py-1 rounded-full bg-tint">
-                License #{restaurant.license_id}
-              </span>
-              {facilityType && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <div>
+              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
+                Food establishment profile
+              </p>
+              <h1 className="text-6xl font-light leading-[1.04] tracking-tight">
+                {restaurant.dba_name}
+              </h1>
+              <p className="text-lg text-muted mt-4 leading-relaxed">
+                {locationLine}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4 items-center text-xs text-muted">
                 <span className="px-2.5 py-1 rounded-full bg-tint">
-                  {facilityType}
+                  License #{restaurant.license_id}
                 </span>
-              )}
-              {lastInspection && (
-                <span className="px-2.5 py-1 rounded-full bg-tint">
-                  Last inspected · {formatInspectionDate(lastInspection)}
-                </span>
-              )}
+                {facilityType && (
+                  <span className="px-2.5 py-1 rounded-full bg-tint">
+                    {facilityType}
+                  </span>
+                )}
+                {lastInspection && (
+                  <span className="px-2.5 py-1 rounded-full bg-tint">
+                    Last inspected · {formatInspectionDate(lastInspection)}
+                  </span>
+                )}
+              </div>
             </div>
+            {/* Contextual feedback — top-right by the name; carries this
+                establishment's id + name to the feedback form so a data
+                correction is tied to the right listing (the form still lets the
+                user clear the venue). */}
+            <Link
+              href={`/feedback?venue=${encodeURIComponent(
+                restaurant.license_id,
+              )}&name=${encodeURIComponent(restaurant.dba_name)}`}
+              className="shrink-0 self-start inline-flex items-center gap-1.5 rounded-full border border-line px-3.5 py-2 text-sm text-teal hover:bg-tint transition-colors"
+            >
+              <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+              Something look wrong?
+            </Link>
           </div>
 
           <ScoreCard
@@ -264,15 +283,12 @@ function DetailLoader({ id }: { id: string }) {
                 className="serif italic text-terra"
                 style={{ fontSize: "1.05em" }}
               >
-                {history.filter((e) => e.result === "Fail").length} failure
-                {history.filter((e) => e.result === "Fail").length === 1
-                  ? ""
-                  : "s"}
-                .
+                {history.filter((e) => CITY_CONFIG[city].isBadOutcome(e.result)).length}{" "}
+                {CITY_CONFIG[city].outcomeNoun}.
               </span>
             </h2>
             <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
-              Real Chicago Department of Public Health records, independent of the
+              Real {CITY_CONFIG[city].healthDept} records, independent of the
               predicted risk score above.
             </p>
           </div>
@@ -307,8 +323,7 @@ function DetailLoader({ id }: { id: string }) {
               <p className="font-medium mb-2">It is a prediction.</p>
               <p>
                 A model estimate, drawn from the public record, of whether this
-                establishment will fail an inspection or be cited for a priority
-                violation in the next 180 days.
+                establishment will {CITY_CONFIG[city].outcomeSentence}.
               </p>
             </div>
             <div className="col-span-12 md:col-span-6">
@@ -320,23 +335,6 @@ function DetailLoader({ id }: { id: string }) {
                 failed inspection.
               </p>
             </div>
-          </div>
-
-          {/* Contextual feedback — carries this establishment's id + name to the
-              feedback form so a data correction is tied to the right listing. */}
-          <div className="mt-6 pt-5 border-t border-line flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <span className="text-muted">
-              Something look wrong with this listing?
-            </span>
-            <Link
-              href={`/feedback?venue=${encodeURIComponent(
-                restaurant.license_id,
-              )}&name=${encodeURIComponent(restaurant.dba_name)}`}
-              className="inline-flex items-center gap-1.5 text-teal font-medium hover:underline"
-            >
-              <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
-              Tell us
-            </Link>
           </div>
         </section>
 

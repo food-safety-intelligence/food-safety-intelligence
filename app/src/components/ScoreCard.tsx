@@ -1,4 +1,8 @@
+"use client";
+
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
+import { useCity } from "@/components/CityContext";
+import { CITY_CONFIG } from "@/lib/city";
 import type { InspectionEvent, PopulationStats, RestaurantScore } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
@@ -32,6 +36,8 @@ export function ScoreCard({
   /** Inspection history (newest-first) — the scored events become chart points. */
   history?: InspectionEvent[];
 }) {
+  const { city } = useCity();
+  const copy = CITY_CONFIG[city];
   // Percentile rank reads honestly across every tier. "Top X%" alone gets
   // misleading at the extremes (e.g. "top 0.00%" for the highest-scoring
   // restaurant, "top 78%" for a low-risk place where "top" misframes it).
@@ -76,7 +82,7 @@ export function ScoreCard({
     <p className="text-base text-muted leading-relaxed">
       {medianScore !== null ? (
         <>
-          A typical Chicago food establishment scores{" "}
+          A typical {copy.typicalNoun} scores{" "}
           <span className="num font-medium text-ink">{medianScore.toFixed(2)}</span>.{" "}
         </>
       ) : null}
@@ -89,10 +95,10 @@ export function ScoreCard({
                 and reads as a bug ("higher than 100%" is paradoxical). */}
             {(Math.floor(percentile * 10) / 10).toFixed(1)}%
           </span>{" "}
-          of currently active food licenses.
+          of {copy.comparedNoun}.
         </>
       ) : (
-        <>Compared against all currently active food licenses in Chicago.</>
+        <>Compared against all {copy.comparedNoun} in {copy.label}.</>
       )}
     </p>
   );
@@ -100,7 +106,7 @@ export function ScoreCard({
   return (
     <div className="rounded-3xl bg-card border border-line soft-shadow-lg p-7 lg:p-8">
       <div className="text-2xs tracking-widest uppercase text-muted">
-        Predicted 180-day risk
+        {copy.riskLabel}
       </div>
 
       {/* Horizontal band: gauge+tier · top factor + percentile · 90-day trend.

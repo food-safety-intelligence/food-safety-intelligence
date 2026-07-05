@@ -2,6 +2,7 @@
 
 import {
   Map,
+  type MapRef,
   Marker,
   Popup,
   NavigationControl,
@@ -9,7 +10,7 @@ import {
 } from "react-map-gl/maplibre";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
@@ -111,20 +112,54 @@ function pinCapForZoom(zoom: number): number {
 export function MapView({
   pins,
   className = "",
+  center = CHICAGO_CENTER,
 }: {
   pins: PinSummary[];
   className?: string;
+  center?: { lat: number; lon: number; zoom: number };
 }) {
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // Recenter imperatively on city change — rather than remount the map via key,
+  // which races maplibre's container init. Two paths because the city can
+  // resolve either before OR after the map's tiles finish loading:
+  //   • already loaded  → flyTo when the center prop changes (e.g. a header toggle)
+  //   • not yet loaded  → onLoad jumps to whatever the latest center is (e.g. a
+  //     direct visit to /?city=nyc, where the flyTo would otherwise fire on an
+  //     unloaded map and be lost — leaving NYC data over a Chicago map).
+  const mapRef = useRef<MapRef>(null);
+  const loadedRef = useRef(false);
+  // Keep the latest center in a ref so `handleLoad` can read it without being
+  // re-created on every center change. Updated in an effect (not during render).
+  const centerRef = useRef(center);
+  useEffect(() => {
+    centerRef.current = center;
+  });
+  useEffect(() => {
+    if (loadedRef.current) {
+      mapRef.current?.flyTo({
+        center: [center.lon, center.lat],
+        zoom: center.zoom,
+        duration: 800,
+      });
+    }
+  }, [center.lat, center.lon, center.zoom]);
+  const handleLoad = useCallback(() => {
+    loadedRef.current = true;
+    const c = centerRef.current;
+    mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
+  }, []);
+
   return (
     <div className={className}>
       <Map
+        ref={mapRef}
+        onLoad={handleLoad}
         initialViewState={{
-          latitude: CHICAGO_CENTER.lat,
-          longitude: CHICAGO_CENTER.lon,
-          zoom: CHICAGO_CENTER.zoom,
+          latitude: center.lat,
+          longitude: center.lon,
+          zoom: center.zoom,
         }}
         mapStyle={VOYAGER_STYLE as never}
         style={{ width: "100%", height: "100%" }}

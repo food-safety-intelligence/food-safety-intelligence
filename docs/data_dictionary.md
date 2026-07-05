@@ -1,10 +1,12 @@
 # Data dictionary
 
 Every dataset the pipeline pulls, where it comes from, and the columns that
-matter. All sources are the public **Chicago Open Data portal** (Socrata / SODA
-API, `https://data.cityofchicago.org/resource/<id>.json`); the four-by-four IDs
-live in `DATASETS` in `src/foodsafety/config.py`, and the loaders are in
-`src/foodsafety/io/soda.py`.
+matter. The core Chicago sources are on the public **Chicago Open Data portal**
+(Socrata / SODA API, `https://data.cityofchicago.org/resource/<id>.json`); the
+four-by-four IDs live in `DATASETS` in `src/foodsafety/config.py`, and the
+loaders are in `src/foodsafety/io/soda.py`. The second city (New York City, see
+below) is also on a Socrata portal but is pulled by its own self-contained
+producer script, not through `config.py` / `io/soda.py`.
 
 > Adding a dataset? Add its ID to `config.py`, document it here, and — if it
 > reaches the model — update `docs/interface_contracts.md` too.
@@ -59,6 +61,31 @@ adjacent numbers).
   `model-experiments.md`). `src/foodsafety/features/building_features.py` + the dataset
   IDs are kept for resumability if a parcel-level (building-footprint) join ever
   becomes available.
+
+### NYC DOHMH Restaurant Inspections — `43nn-pn8j` (second city)
+New York City's food inspections, from the **NYC Open Data portal**
+(`https://data.cityofnewyork.us/resource/43nn-pn8j.json`). Pulled and cached by
+its own self-contained producer, `scripts/build_nyc_scores.py` — **not** through
+`config.py` / `io/soda.py`. One row per inspection-violation; the producer
+collapses to one row per `(camis, inspection_date)`.
+- **Key columns:** `camis` (establishment id, used as `license_id` in the served
+  JSON), `dba`, `boro`, `zipcode`, `latitude` / `longitude`, `cuisine_description`,
+  `inspection_date`, `action`, `violation_code` / `violation_description`,
+  `critical_flag`, `score` (numeric points — **higher is worse**), `grade`
+  (A / B / C; derived from `score` when the grade cell is blank).
+- **Label:** `y_next_bc` — 1 if the establishment's **next** inspection is graded
+  **B or C (score ≥ 14)**, else 0. This is a different target from Chicago's
+  `y_fail_or_critical_next_180d`; the two cities predict different things.
+- **Training window:** **2022-07-01 onward.** NYC halted inspections in March 2020
+  (COVID) and grades/scores only normalise from 2022 — the analog of Chicago's
+  2019 cutoff for the July-2018 procedure change.
+- **Served model:** a calibrated logistic-regression, reusing Chicago's SHAP /
+  calibration / risk-tier machinery; XGBoost is only the eval comparator. Output
+  is written to `app/public/data/nyc/{scores,inspection_history,methodology}.json`
+  in the same schema Chicago uses (decision record 0016).
+- **Violation vocabulary:** NYC's codes are mapped to the shared theme + severity
+  crosswalk in `reference/violation_crosswalk.csv` so the product describes
+  violations consistently across cities.
 
 ## Data sources considered but NOT used
 

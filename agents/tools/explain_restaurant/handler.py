@@ -21,24 +21,40 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 
-@functools.lru_cache(maxsize=1)
-def _load_scores() -> dict[str, dict]:
-    """Load scores.json indexed by license_id."""
-    path = os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+# Per-city data paths (multi-city, DR 0016); the entrypoint warms each city's
+# files to separate /tmp paths. Default to Chicago.
+def _scores_path(city: str) -> str:
+    if city == "nyc":
+        return os.environ.get("SCORES_JSON_PATH_NYC", "/opt/nyc_scores.json")
+    if city == "la":
+        return os.environ.get("SCORES_JSON_PATH_LA", "/opt/la_scores.json")
+    return os.environ.get("SCORES_JSON_PATH", "/opt/scores.json")
+
+
+def _history_path(city: str) -> str:
+    if city == "nyc":
+        return os.environ.get("HISTORY_JSON_PATH_NYC", "/opt/nyc_inspection_history.json")
+    if city == "la":
+        return os.environ.get("HISTORY_JSON_PATH_LA", "/opt/la_inspection_history.json")
+    return os.environ.get("HISTORY_JSON_PATH", "/opt/inspection_history.json")
+
+
+@functools.lru_cache(maxsize=3)
+def _load_scores(city: str = "chicago") -> dict[str, dict]:
+    """Load a city's scores.json indexed by license_id."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(_scores_path(city), encoding="utf-8") as f:
             payload = json.load(f)
         return {r["license_id"]: r for r in payload.get("scores", [])}
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 
-@functools.lru_cache(maxsize=1)
-def _load_history() -> dict[str, list[dict]]:
-    """Load inspection_history.json indexed by license_id."""
-    path = os.environ.get("HISTORY_JSON_PATH", "/opt/inspection_history.json")
+@functools.lru_cache(maxsize=3)
+def _load_history(city: str = "chicago") -> dict[str, list[dict]]:
+    """Load a city's inspection_history.json indexed by license_id."""
     try:
-        with open(path, encoding="utf-8") as f:
+        with open(_history_path(city), encoding="utf-8") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
@@ -85,13 +101,14 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "found": bool
     }
     """
+    city: str = str(event.get("city", "chicago"))
     license_id: str | None = event.get("license_id")
 
     if not license_id:
         return {"found": False, "error": "license_id is required"}
 
-    scores = _load_scores()
-    history = _load_history()
+    scores = _load_scores(city)
+    history = _load_history(city)
 
     record = scores.get(str(license_id))
     if not record:
@@ -124,15 +141,32 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         # SHAP drivers — full detail
         "top_drivers": _format_drivers(record.get("top_drivers", [])),
         # Inspection summary + history
-        "inspection_summary": _summarise(events),
+        "inspection_summary": _summarise(events, city),
         "inspection_history": events[:10],  # most recent 10
         # Model context
-        "model_note": (
-            "Risk score is a 180-day forward prediction "
-            "(probability of a failed inspection or priority violation), "
-            "not a real-time safety verdict."
-        ),
+        "model_note": _model_note(city),
     }
+
+
+def _model_note(city: str) -> str:
+    """One-line description of what the risk score means, per city."""
+    if city == "nyc":
+        return (
+            "Risk score is the probability the establishment's next inspection "
+            "is graded B or C (a score of 14+ points), not a real-time safety verdict."
+        )
+    if city == "la":
+        # LA grades run the opposite way to NYC: A = 90-100 (higher is cleaner),
+        # so a "bad" next inspection is a B or C, i.e. a score BELOW 90.
+        return (
+            "Risk score is the probability the establishment's next inspection "
+            "is graded B or C (a score below 90 out of 100), not a real-time safety verdict."
+        )
+    return (
+        "Risk score is a 180-day forward prediction "
+        "(probability of a failed inspection or priority violation), "
+        "not a real-time safety verdict."
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -190,17 +224,29 @@ def _sort_events_desc(events: list[dict]) -> list[dict]:
     return sorted(events, key=_event_sort_key, reverse=True)
 
 
-def _classify_result(result: str) -> str:
-    """Map a Chicago inspection `result` string to a summary bucket.
+def _classify_result(result: str, city: str = "chicago") -> str:
+    """Map an inspection `result` string to a summary bucket, per city.
 
-    The feed is not just Pass / Fail / Pass w/ Conditions: it also carries
-    "Out of Business", "No Entry", "Not Ready" and "Business Not Located",
-    which are not inspection outcomes. They go to `other` so they are never
-    miscounted as passes (the old catch-all `else` inflated the pass count).
+    Chicago: the feed is not just Pass / Fail / Pass w/ Conditions — it also
+    carries "Out of Business", "No Entry", "Not Ready" and "Business Not
+    Located", which are not inspection outcomes and go to `other`.
+
+    NYC and LA: results are letter grades ("Grade A (score 7)" …). They map onto
+    the same clean / middling / bad buckets: A -> pass, B -> pass_w_conditions,
+    C -> fail. (The grade *direction* differs — NYC A is a low score, LA A is a
+    high score — but the letter-to-bucket mapping is identical.)
     """
     # Coerce defensively: the `result` key can be present but explicitly None,
     # which would crash on .strip()/.lower() — match the null-tolerant sort key.
     r = str(result).strip().lower()
+    if city in ("nyc", "la"):
+        if r.startswith("grade a"):
+            return "pass"
+        if r.startswith("grade b"):
+            return "pass_w_conditions"
+        if r.startswith("grade c"):
+            return "fail"
+        return "other"
     if "fail" in r:
         return "fail"
     if "conditions" in r:  # "Pass w/ Conditions"
@@ -210,7 +256,7 @@ def _classify_result(result: str) -> str:
     return "other"
 
 
-def _summarise(events: list[dict]) -> dict[str, Any]:
+def _summarise(events: list[dict], city: str = "chicago") -> dict[str, Any]:
     """Compute aggregate stats over inspection history (expects newest-first)."""
     if not events:
         return {
@@ -225,7 +271,7 @@ def _summarise(events: list[dict]) -> dict[str, Any]:
 
     counts = {"pass": 0, "fail": 0, "pass_w_conditions": 0, "other": 0}
     for ev in events:
-        counts[_classify_result(ev.get("result", ""))] += 1
+        counts[_classify_result(ev.get("result", ""), city)] += 1
 
     last_date: str | None = events[0].get("date")
     days_since: int | None = None

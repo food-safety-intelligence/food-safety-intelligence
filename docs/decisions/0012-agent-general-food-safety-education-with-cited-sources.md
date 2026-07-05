@@ -12,6 +12,18 @@
 > kept. The decision reverses part of the earlier tight scope, so it is not
 > recoverable from the diff.
 
+> **Update (2026-07-04) — the `OffTopicNonFoodSafety` guardrail topic was later
+> REMOVED, superseding what this record says below.** Same day this DR was written,
+> a follow-up found that the negatively-defined off-topic topic made Bedrock's
+> classifier over-match and **block ~100% of queries** (including core risk
+> lookups), so commit `9c92ce7` dropped it: the guardrail now denies only
+> **personalised medical + legal advice**, and off-topic requests (recipes, other
+> cities, chit-chat) are declined by the **system prompt** instead (verified by the
+> eval's off-topic / other-city cases). Confirmed live 2026-07-04: the deployed
+> guardrail has only `PersonalisedMedicalAdvice` + `LegalAdvice`. The "re-scoped
+> off-topic topic survives" wording in the sections below is stale — read it as
+> historical.
+
 ## Decision
 
 1. **The agent now answers general food-safety / foodborne-illness questions**
@@ -69,7 +81,8 @@
   guardrail's denied topics would still block general food-safety questions at the
   platform layer, so the feature would not actually work in the deployed agent.
   The guardrail's `OffTopicNonFoodSafety` / `PersonalisedMedicalAdvice` topics
-  were re-scoped to match.
+  were re-scoped to match. *(Stale — the `OffTopicNonFoodSafety` topic was removed
+  the same day; see the Update note at the top.)*
 
 ## Consequences
 
@@ -84,6 +97,9 @@
   general food-safety education is not blocked, only genuinely off-topic requests
   and *personalised* medical/legal advice. **Re-provision** the guardrail (re-run
   the script, publish a new version, update the env vars) for the deployed agent.
+  *(Superseded — the off-topic topic was dropped the same day (over-blocking); the
+  live guardrail denies only personalised medical + legal advice, and off-topic is
+  handled by the system prompt. See the Update note at the top.)*
 - **Eval** (`agents/eval/run_eval.py`) gains a deterministic citation **allow-list
   gate**, an opt-in **live link-resolution** check (`--links`), and two guardrail
   cases (a general stat must be answered with a cited source; a personal medical
@@ -101,3 +117,37 @@
 - `agents/README.md` — the tool contract for `food_safety_info` and the safety
   layers.
 - `docs/agent-experiments.md` — eval runs covering the new cases.
+
+## Update (2026-07-04) — narrow the medical topic so caregiver queries pass
+
+Live chat over-blocked a core use case: "Best options for someone with a
+compromised immune system near Harlem" was denied by the `PersonalisedMedicalAdvice`
+guardrail topic, whose definition included "whether a food is safe given their
+health condition." That's the exact caregiver/immunocompromised food-safety
+recommendation the app is built to answer (the "For caregivers" page + the
+system-prompt CAREGIVER section). Fix: deny only a **personal medical ruling for the speaker** (diagnosis, treatment,
+medication) and explicitly allow **ranking restaurants by food-safety risk** —
+including for a vulnerable diner.
+
+**The classifier keys on the topic EXAMPLES, not the definition** — rewording the
+definition alone changed nothing; the fix was replacing the examples, found by live
+`apply-guardrail` testing across three reprovisions. Two traps: an "immune system"
+example made it match any immune-system mention (blocking caregiver queries), and
+examples that named an illness ("food poisoning") made it match the illness word
+(blocking general education like "how common is food poisoning?"). The final examples
+describe only personal treatment-seeking with no disease terms; the definition stays
+≤200 chars (Bedrock topic-definition cap). Verified live — caregiver / education /
+city-lookup → allowed; personal-ruling / medical / legal → blocked.
+
+Also fixed a self-inflicted **output** block: the system prompt told the model to
+append "consult your care team's guidance," which the output guardrail treated as
+personalised medical advice and blocked, truncating good answers; that instruction
+was removed. And `create_guardrail.py`'s default region was corrected to **us-west-2**
+(was us-east-1 → a re-run without `AWS_REGION` would create a duplicate guardrail).
+
+**Deploy (changed this iteration):** `deploy-agent.yml` now **auto-reprovisions** the
+guardrail on merge when `create_guardrail.py` changes — runs it (us-west-2), wires the
+new version into `agentcore.json` before deploy, and the guardrail gate verifies the
+new config. Requires the deploy role `github-agent-deploy` to hold the Bedrock
+control-plane guardrail permissions (attached out-of-band in `991500268971`). The
+3-city block message rides along in the same reprovision. No more manual run.

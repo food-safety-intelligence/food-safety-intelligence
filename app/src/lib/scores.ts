@@ -297,10 +297,13 @@ export type TrendDirection = "improving" | "stable" | "worsening";
  */
 export const TREND_STABLE_BAND = 0.0003;
 
-export function trendDirection(slope: number | null): TrendDirection {
+export function trendDirection(
+  slope: number | null,
+  band: number = TREND_STABLE_BAND,
+): TrendDirection {
   if (slope === null) return "stable";
-  if (slope > TREND_STABLE_BAND) return "worsening";
-  if (slope < -TREND_STABLE_BAND) return "improving";
+  if (slope > band) return "worsening";
+  if (slope < -band) return "improving";
   return "stable";
 }
 

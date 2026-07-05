@@ -1,0 +1,349 @@
+city,native_code,native_desc,theme,severity_tier
+Chicago,1,"SOURCE SOUND CONDITION, NO SPOILAGE, FOODS PROPERLY LABELED, SHELLFISH TAGS IN PLACE",approved_source_food_safety,T2
+Chicago,2,CITY OF CHICAGO FOOD SERVICE SANITATION CERTIFICATE,management_certification,T2
+Chicago,3,"POTENTIALLY HAZARDOUS FOOD MEETS TEMPERATURE REQUIREMENT DURING STORAGE, PREPARATION DISPLAY AND SERVICE",temperature_control,T2
+Chicago,4,"SOURCE OF CROSS CONTAMINATION CONTROLLED I.E. CUTTING BOARDS, FOOD HANDLERS, UTENSILS, ETC",approved_source_food_safety,T2
+Chicago,5,"PERSONNEL WITH INFECTIONS RESTRICTED: NO OPEN SORES, WOUNDS, ETC",hygiene_handwashing,T2
+Chicago,6,"HANDS WASHED AND CLEANED, GOOD HYGIENIC PRACTICES; NO BARE HAND CONTACT WITH READY-TO-EAT FOODS.",hygiene_handwashing,T2
+Chicago,7,WASH AND RINSE WATER: CLEAN AND PROPER TEMPERATURE,temperature_control,T2
+Chicago,8,"SANITIZING RINSE FOR EQUIPMENT AND UTENSILS: CLEAN, PROPER TEMPERATURE, CONCENTRATION, EXPOSURE TIME",temperature_control,T2
+Chicago,9,NO BARE HAND CONTACT WITH RTE FOOD OR A PRE-APPROVED ALTERNATIVE PROCEDURE PROPERLY ALLOWED,cross_contamination_protection,T2
+Chicago,10,"SEWAGE AND WASTE WATER DISPOSAL, NO BACK SIPHONAGE, CROSS CONNECTION AND/OR BACK FLOW",plumbing_sewage_water,T1
+Chicago,11,"ADEQUATE NUMBER, CONVENIENT, ACCESSIBLE, DESIGNED, AND MAINTAINED",other_administrative,T2
+Chicago,12,"HAND WASHING FACILITIES: WITH SOAP AND SANITARY HAND DRYING DEVICES, CONVENIENT AND ACCESSIBLE TO FOOD PREP AREA",hygiene_handwashing,T2
+Chicago,13,"NO EVIDENCE OF RODENT OR INSECT INFESTATION, NO BIRDS, TURTLES OR OTHER ANIMALS",pest_vermin,T1
+Chicago,14,"REQUIRED RECORDS AVAILABLE: SHELLSTOCK TAGS, PARASITE DESTRUCTION",management_certification,T2
+Chicago,15,UNWRAPPED AND POTENTIALLY HAZARDOUS FOOD NOT RE-SERVED,cross_contamination_protection,T2
+Chicago,16,"FOOD PROTECTED DURING STORAGE, PREPARATION, DISPLAY, SERVICE AND TRANSPORTATION",cross_contamination_protection,T2
+Chicago,17,"PROPER DISPOSITION OF RETURNED, PREVIOUSLY SERVED, RECONDITIONED & UNSAFE FOOD",cross_contamination_protection,T2
+Chicago,18,"NO EVIDENCE OF RODENT OR INSECT OUTER OPENINGS PROTECTED/RODENT PROOFED, A WRITTEN LOG SHALL BE MAINTAINED AVAILABLE TO THE INSPECTORS",pest_vermin,T1
+Chicago,19,"OUTSIDE GARBAGE WASTE GREASE AND STORAGE AREA; CLEAN, RODENT PROOF, ALL CONTAINERS COVERED",pest_vermin,T1
+Chicago,20,"INSIDE CONTAINERS OR RECEPTACLES: ADEQUATE NUMBER, PROPERLY COVERED AND INSECT/RODENT PROOF",pest_vermin,T1
+Chicago,21,* CERTIFIED FOOD MANAGER ON SITE WHEN POTENTIALLY HAZARDOUS FOODS ARE PREPARED AND SERVED,management_certification,T2
+Chicago,22,"DISH MACHINES: PROVIDED WITH ACCURATE THERMOMETERS, CHEMICAL TEST KITS AND SUITABLE GAUGE COCK",food_contact_surface,T2
+Chicago,23,"DISHES AND UTENSILS FLUSHED, SCRAPED, SOAKED",food_contact_surface,T2
+Chicago,24,"DISH WASHING FACILITIES: PROPERLY DESIGNED, CONSTRUCTED, MAINTAINED, INSTALLED, LOCATED AND OPERATED",food_contact_surface,T2
+Chicago,25,CONSUMER ADVISORY PROVIDED FOR RAW/UNDERCOOKED FOOD,cross_contamination_protection,T2
+Chicago,26,"ADEQUATE NUMBER, CONVENIENT, ACCESSIBLE, PROPERLY DESIGNED AND INSTALLED",other_administrative,T2
+Chicago,27,"TOILET ROOMS ENCLOSED CLEAN, PROVIDED WITH HAND CLEANSER, SANITARY HAND DRYING DEVICES AND PROPER WASTE RECEPTACLES",hygiene_handwashing,T2
+Chicago,28,* INSPECTION REPORT SUMMARY DISPLAYED AND VISIBLE TO ALL CUSTOMERS,other_administrative,T2
+Chicago,29,COMPLIANCE WITH VARIANCE/SPECIALIZED PROCESS/HACCP,management_certification,T2
+Chicago,30,"FOOD IN ORIGINAL CONTAINER, PROPERLY LABELED: CUSTOMER ADVISORY POSTED AS NEEDED",management_certification,T3
+Chicago,31,CLEAN MULTI-USE UTENSILS AND SINGLE SERVICE ARTICLES PROPERLY STORED: NO REUSE OF SINGLE SERVICE ARTICLES,cross_contamination_protection,T3
+Chicago,32,"FOOD AND NON-FOOD CONTACT SURFACES PROPERLY DESIGNED, CONSTRUCTED AND MAINTAINED",food_contact_surface,T3
+Chicago,33,"FOOD AND NON-FOOD CONTACT EQUIPMENT UTENSILS CLEAN, FREE OF ABRASIVE DETERGENTS",food_contact_surface,T3
+Chicago,34,"FLOORS: CONSTRUCTED PER CODE, CLEANED, GOOD REPAIR, COVING INSTALLED, DUST-LESS CLEANING METHODS USED",equipment_nonfood_surface,T3
+Chicago,35,"WALLS, CEILINGS, ATTACHED EQUIPMENT CONSTRUCTED PER CODE: GOOD REPAIR, SURFACES CLEAN AND DUST-LESS CLEANING METHODS",equipment_nonfood_surface,T3
+Chicago,36,"LIGHTING: REQUIRED MINIMUM FOOT-CANDLES OF LIGHT PROVIDED, FIXTURES SHIELDED",equipment_nonfood_surface,T3
+Chicago,37,TOILET ROOM DOORS SELF CLOSING: DRESSING ROOMS WITH LOCKERS PROVIDED: COMPLETE SEPARATION FROM LIVING/SLEEPING QUARTERS,hygiene_handwashing,T3
+Chicago,38,VENTILATION: ROOMS AND EQUIPMENT VENTED AS REQUIRED: PLUMBING: INSTALLED AND MAINTAINED,plumbing_sewage_water,T3
+Chicago,39,"CONTAMINATION PREVENTED DURING FOOD PREPARATION, STORAGE & DISPLAY",cross_contamination_protection,T3
+Chicago,40,REFRIGERATION AND METAL STEM THERMOMETERS PROVIDED AND CONSPICUOUS,temperature_control,T3
+Chicago,41,"PREMISES MAINTAINED FREE OF LITTER, UNNECESSARY ARTICLES, CLEANING EQUIPMENT PROPERLY STORED",cross_contamination_protection,T3
+Chicago,42,APPROPRIATE METHOD OF HANDLING OF FOOD (ICE) HAIR RESTRAINTS AND CLEAN APPAREL WORN,hygiene_handwashing,T3
+Chicago,43,"FOOD (ICE) DISPENSING UTENSILS, WASH CLOTHS PROPERLY STORED",cross_contamination_protection,T3
+Chicago,44,"UTENSILS, EQUIPMENT & LINENS: PROPERLY STORED, DRIED, & HANDLED",cross_contamination_protection,T3
+Chicago,45,SINGLE-USE/SINGLE-SERVICE ARTICLES: PROPERLY STORED & USED,cross_contamination_protection,T3
+Chicago,46,GLOVES USED PROPERLY,hygiene_handwashing,T3
+Chicago,47,"FOOD & NON-FOOD CONTACT SURFACES CLEANABLE, PROPERLY DESIGNED, CONSTRUCTED & USED",food_contact_surface,T3
+Chicago,48,"WAREWASHING FACILITIES: INSTALLED, MAINTAINED & USED; TEST STRIPS",food_contact_surface,T3
+Chicago,49,NON-FOOD/FOOD CONTACT SURFACES CLEAN,food_contact_surface,T3
+Chicago,50,HOT & COLD WATER AVAILABLE; ADEQUATE PRESSURE,plumbing_sewage_water,T3
+Chicago,51,PLUMBING INSTALLED; PROPER BACKFLOW DEVICES,plumbing_sewage_water,T3
+Chicago,52,SEWAGE & WASTE WATER PROPERLY DISPOSED,plumbing_sewage_water,T1
+Chicago,53,"TOILET FACILITIES: PROPERLY CONSTRUCTED, SUPPLIED, & CLEANED",hygiene_handwashing,T3
+Chicago,54,GARBAGE & REFUSE PROPERLY DISPOSED; FACILITIES MAINTAINED,equipment_nonfood_surface,T3
+Chicago,55,"PHYSICAL FACILITIES INSTALLED, MAINTAINED & CLEAN",equipment_nonfood_surface,T3
+Chicago,56,ADEQUATE VENTILATION & LIGHTING; DESIGNATED AREAS USED,equipment_nonfood_surface,T3
+Chicago,57,ALL FOOD EMPLOYEES HAVE FOOD HANDLER TRAINING,management_certification,T3
+Chicago,58,ALLERGEN TRAINING AS REQUIRED,management_certification,T3
+Chicago,59,PREVIOUS PRIORITY FOUNDATION VIOLATION CORRECTED,other_administrative,T3
+Chicago,60,PREVIOUS CORE VIOLATION CORRECTED,other_administrative,T3
+Chicago,61,SUMMARY REPORT DISPLAYED AND VISIBLE TO THE PUBLIC,other_administrative,T3
+Chicago,62,COMPLIANCE WITH CLEAN INDOOR AIR ORDINANCE,other_administrative,T3
+Chicago,63,REMOVAL OF SUSPENSION SIGN,management_certification,T3
+Chicago,64,MISCELLANEOUS / PUBLIC HEALTH ORDERS,other_administrative,T3
+Chicago,70,NO SMOKING REGULATIONS,other_administrative,T3
+NYC,02A,"Time/Temperature Control for Safety (TCS) food not cooked to required minimum internal temperature.   • Poultry, poultry parts, ground and comminuted poultry, all stuffing containing poultry, meats, fish or ratites to or above 165 °F for 15 seconds with no interruption of the cooking process   • Ground meat, and food containing ground and comminuted meat, to or above 158 °F for 15 seconds with no interruption of the cooking process, except per individual customer request  • Pork, any food containing pork to or above 150 °F for 15 seconds  • Mechanically tenderized or injected meats to or above 155 °F.  • Whole meat roasts and beef steak to or above required temperature and time except per individual customer request  • Raw animal foods cooked in microwave to or above165 °F, covered, rotated or stirred   • All other foods to or above 140 °F for 15 seconds; shell eggs to or above 145 °F for 15 seconds except per individual customer request.",temperature_control,T2
+NYC,02B,Hot TCS food item not held at or above 140 °F.,temperature_control,T2
+NYC,02C,Hot TCS food item that has been cooked and cooled is being held for service without first being reheated to 165º F or above within 2 hours.,temperature_control,T2
+NYC,02D,Commercially processed pre-cooked TCS in hermetically sealed containers and precooked TCS in intact packages from non-retail food processing establishments not heated to 140 °F within 2 hours of removal from container or package.,temperature_control,T2
+NYC,02F,"Meat, fish, molluscan shellfish, unpasteurized raw shell eggs, poultry or other TCS offered or served raw or undercooked and written notice not provided to consumer.",approved_source_food_safety,T2
+NYC,02G,Cold TCS food item held above 41 °F; smoked or processed fish held above 38 °F; intact raw eggs held above 45 °F; or reduced oxygen packaged (ROP) TCS foods held above required temperatures except during active necessary preparation.,temperature_control,T2
+NYC,02H,"After cooking or removal from hot holding, TCS food not cooled by an approved method whereby the internal temperature is reduced from 140 °F to 70 °F or less within 2 hours, and from 70 °F to 41 °F or less within 4 additional hours.",temperature_control,T2
+NYC,02I,TCS food removed from cold holding or prepared from or combined with ingredients at room temperature not cooled by an approved method to 41 °F or below within 4 hours.,temperature_control,T2
+NYC,03A,"Food, prohibited, from unapproved or unknown source, home canned or home prepared. Animal slaughtered, butchered or dressed (eviscerated, skinned) in establishment. Reduced Oxygen Packaged (ROP) fish not frozen before processing. ROP food prepared on premises transported to another site.",approved_source_food_safety,T2
+NYC,03B,"Shellfish not from approved source, not or improperly tagged/labeled; tags not retained for 90 days.",approved_source_food_safety,T2
+NYC,03C,"Unclean or cracked whole eggs or unpasteurized liquid, frozen or powdered eggs kept or used.",approved_source_food_safety,T2
+NYC,03D,"Food package (including canned food product or hermetically sealed container) not in good condition to the degree contents are not suitable for human consumption. Package is swollen, leaking or rusted, without “DO NOT USE” label or not segregated from consumable food items.",approved_source_food_safety,T2
+NYC,03E,No or inadequate potable water supply. Water or ice not potable or from unapproved source. Bottled water not NY State certified. Cross connection in potable water supply system.,approved_source_food_safety,T2
+NYC,03F,Unpasteurized milk or milk product (except certain aged cheese) served.,approved_source_food_safety,T2
+NYC,03G,Raw fruit or vegetable not properly washed prior to cutting or serving.,cross_contamination_protection,T2
+NYC,03I,"Juice packaged on premises with no or incomplete label, no warning statement",approved_source_food_safety,T2
+NYC,04A,Food Protection Certificate (FPC) not held by manager or supervisor of food operations.,cross_contamination_protection,T2
+NYC,04B,Food worker or vendor working or is knowingly or negligently permitted to work in FSE while afflicted with infected wound or reportable communicable disease. No spitting allowed. Spitting anywhere in the establishment is prohibited.,hygiene_handwashing,T2
+NYC,04C,Food worker/food vendor does not use utensil or other barrier to eliminate bare hand contact with food that will not receive adequate additional heat treatment.,cross_contamination_protection,T2
+NYC,04D,"Food worker/food vendor does not wash hands thoroughly after using the toilet, or after coughing, sneezing, smoking, eating, preparing raw foods or otherwise contaminating hands or does not change gloves when required; Worker fails to refrain from smoking or being fully clothed in clean outer garments.",hygiene_handwashing,T2
+NYC,04E,Toxic chemical or pesticide improperly stored or used such that food contamination may occur.,pest_vermin,T2
+NYC,04F,"Food preparation area, food storage area, or other area used by employees or patrons, contaminated by sewage or liquid waste.",cross_contamination_protection,T1
+NYC,04H,"Raw, cooked or prepared food is adulterated, contaminated, cross-contaminated, or not discarded in accordance with HACCP plan.",approved_source_food_safety,T2
+NYC,04I,Non-TCS food that has been served to the public being re-served. (Does not apply to wrapped foods where the wrapper seal has not been broken or opened).,cross_contamination_protection,T2
+NYC,04J,"Properly scaled and calibrated thermometer or thermocouple not provided or not readily accessible in food preparation and hot/cold holding areas to measure temperatures of TCS foods during cooking, cooling, reheating, and holding.",temperature_control,T2
+NYC,04K,Evidence of rats or live rats in establishment's food or non-food areas.,pest_vermin,T1
+NYC,04L,Evidence of mice or live mice in establishment's food or non-food areas.,pest_vermin,T1
+NYC,04M,Live roaches in facility's food or non-food area.,pest_vermin,T1
+NYC,04N,"Filth flies or food/refuse/sewage associated with (FRSA) flies or other nuisance pests in establishment’s food and/or non-food areas. FRSA flies include house flies, blow flies, bottle flies, flesh flies, drain flies, Phorid flies and fruit flies.",pest_vermin,T1
+NYC,04O,Live animal other than fish in tank or service animal present in facility’s food or non-food area.,equipment_nonfood_surface,T2
+NYC,04P,"Food containing a prohibited substance held, kept, offered, prepared, processed, packaged, or served.",approved_source_food_safety,T2
+NYC,05A,"Sewage disposal system is not provided, improper, inadequate or unapproved.",approved_source_food_safety,T1
+NYC,05B,Harmful noxious gas or vapor detected. Carbon Monoxide (CO) level exceeds nine (9) ppm,other_administrative,T2
+NYC,05C,"Food contact surface, refillable, reusable containers, or equipment improperly constructed, placed or maintained. Unacceptable material used. Culinary sink or other acceptable method not provided for washing food.",food_contact_surface,T2
+NYC,05D,"No hand washing facility in or adjacent to toilet room or within 25 feet of a food preparation, food service or ware washing area. Hand washing facility not accessible, obstructed or used for non-hand washing purposes. No hot and cold running water or water at inadequate pressure. No soap or acceptable hand-drying device.",hygiene_handwashing,T2
+NYC,05E,"Toilet facility not provided for employees or for patrons when required. Shared patron-employee toilet accessed through kitchen, food prep or storage area or utensil washing area.",hygiene_handwashing,T2
+NYC,05F,"Insufficient or no hot holding, cold storage or cold holding equipment provided to maintain Time/Temperature Control for Safety Foods (TCS) at required temperatures",temperature_control,T2
+NYC,05H,No approved written standard operating procedure for avoiding contamination by refillable returnable containers.,cross_contamination_protection,T2
+NYC,05I,Refrigeration unit used to implement HACCP plan not equipped with an electronic system that continuously monitors time and temperature.,temperature_control,T2
+NYC,06A,Personal cleanliness is inadequate. Outer garment soiled with possible contaminant. Effective hair restraint not worn where required. Jewelry worn on hands or arms. Fingernail polish worn or fingernails not kept clean and trimmed.,hygiene_handwashing,T2
+NYC,06B,"Tobacco or electronic cigarette use, eating, or drinking from open container in food preparation, food storage or dishwashing area.",food_contact_surface,T2
+NYC,06C,"Food, supplies, or equipment not protected from potential source of contamination during storage, preparation, transportation, display, service or from customer’s refillable, reusable container. Condiments not in single-service containers or dispensed directly by the vendor.",approved_source_food_safety,T2
+NYC,06D,"Food contact surface not properly washed, rinsed and sanitized after each use and following any activity when contamination may have occurred.",cross_contamination_protection,T2
+NYC,06E,"Sanitized equipment or utensil, including in-use food dispensing utensil, improperly used or stored.",cross_contamination_protection,T2
+NYC,06F,"Wiping cloths not stored clean and dry, or in a sanitizing solution, between uses.",cross_contamination_protection,T2
+NYC,06G,HACCP plan not approved or approved HACCP plan not maintained on premises.,equipment_nonfood_surface,T2
+NYC,06H,Records and logs not maintained to show that approved HACCP plan has been properly implemented.,management_certification,T2
+NYC,06I,Food not labeled in accordance with the approved HACCP plan,management_certification,T2
+NYC,07A,Duties of an officer of the Department interfered with or obstructed.,other_administrative,T2
+NYC,08A,"Establishment is not free of harborage or conditions conducive to rodents, insects or other pests.",pest_vermin,T3
+NYC,08B,"Garbage receptacle not pest or water resistant, with tight-fitting lids, and covered except while in active use. Garbage receptacle and cover not cleaned after emptying and prior to reuse. Garbage, refuse and other solid and liquid waste not collected, stored, removed and disposed of so as to prevent a nuisance.",pest_vermin,T3
+NYC,08C,"Pesticide not properly labeled or used by unlicensed individual. Pesticide, other toxic chemical improperly used/stored. Unprotected, unlocked bait station used.",pest_vermin,T3
+NYC,09A,"Swollen, leaking, rusted or otherwise damaged canned food to be returned to distributor not segregated from intact product and clearly labeled DO NOT USE",approved_source_food_safety,T3
+NYC,09B,Thawing procedure improper.,temperature_control,T3
+NYC,09C,"Design, construction, materials used or maintenance of food contact surface improper. Surface not easily cleanable, sanitized and maintained.",food_contact_surface,T3
+NYC,09D,Food service operation occurring in room or area used as living or sleeping quarters.,other_administrative,T3
+NYC,09E,Wash hands sign not posted near or above hand washing sink.,hygiene_handwashing,T3
+NYC,10A,"Toilet facility not maintained or provided with toilet paper, waste receptacle or self-closing door.",hygiene_handwashing,T3
+NYC,10B,Anti-siphonage or back-flow prevention device not provided where required; equipment or floor not properly drained; sewage disposal system in disrepair or not functioning properly. Condensation or liquid waste improperly disposed of.,plumbing_sewage_water,T1
+NYC,10C,"Lighting inadequate; permanent lighting not provided in food preparation areas, ware washing areas, and storage rooms. Shatterproof bulb or shield to prevent broken glass from falling into food or onto surfaces, not installed.",pest_proofing_facility,T3
+NYC,10D,"Mechanical or natural ventilation not provided, inadequate, improperly installed, in disrepair or fails to prevent and control excessive build-up of grease, heat, steam condensation, vapors, odors, smoke or fumes.",equipment_nonfood_surface,T3
+NYC,10E,"Accurate thermometer not provided or properly located in refrigerated, cold storage or hot holding equipment",temperature_control,T3
+NYC,10F,"Non-food contact surface or equipment made of unacceptable material, not kept clean, or not properly sealed, raised, spaced or movable to allow accessibility for cleaning on all sides, above and underneath the unit.",food_contact_surface,T3
+NYC,10G,"Dishwashing and ware washing: Cleaning and sanitizing of tableware, including dishes, utensils, and equipment deficient.",food_contact_surface,T3
+NYC,10H,"Single service article not provided. Single service article reused or not protected from contamination when transported, stored, dispensed. Drinking straws not completely enclosed in wrapper or dispensed from a sanitary device.",cross_contamination_protection,T3
+NYC,10I,"Single service item reused, improperly stored, dispensed; not used when required.",cross_contamination_protection,T3
+NYC,10J,Hand wash sign not posted,hygiene_handwashing,T3
+NYC,10K,"Immersion basket not provided, used or of incorrect size. Incorrect manual technique. Test kit and thermometer not provide or used. Improper drying practices.",food_contact_surface,T3
+NYC,10M,"""wash hands"" sign not posted at hand wash facility.",hygiene_handwashing,T3
+NYC,15-01,Smoking or electronic cigarette use allowed in prohibited area,other_administrative,T3
+NYC,15-17,"Sale of tobacco products, herbal cigarettes, liquid nicotine, shisha, rolling papers or smoking paraphernalia to minors prohibited",other_administrative,T3
+NYC,15-21,"Flavored tobacco products sold, offered for sale",other_administrative,T3
+NYC,15-22,Original label for smoking products sold or offered for sale.,other_administrative,T3
+NYC,15-26,"""No Smoking"" sign not posted with ashtrays in hotel or motels, or at hotel or motels entrances.",management_certification,T3
+NYC,15-27,Sign prohibiting smoking or using electronic cigarettes not conspicuously posted.,management_certification,T3
+NYC,15-32,Warning sign re dangers of hookah smoking not posted at or on each public entryway to Non-Tobacco Hookah Establishment (NTHE) patron,management_certification,T3
+NYC,15-33,Warning sign re dangers of hookah smoking not posted in each room or area of Non-Tobacco Hookah Establishment (NTHE) where smoking is allowed,management_certification,T3
+NYC,15-36,Sign prohibiting entry of persons under 21 years of age not posted at public entryway to Non-Tobacco Hookah Establishment (NTHE),management_certification,T3
+NYC,15-37,Workplace SFAA policy not prominently posted in workplace.,management_certification,T3
+NYC,15-39,Ashtray present in smoke-free area.,other_administrative,T3
+NYC,15-42,"Failure to make a good faith effort to inform smokers or electronic cigarette users of Smoke-Free Air Act (""SFAA"") prohibitions",other_administrative,T3
+NYC,15A1,No Smoking permitted in an area where it is prohibited,management_certification,T3
+NYC,15E2,Flavored tobacco products sold or offered for sale,other_administrative,T3
+NYC,15F1,Ashtrays in smoke-free area,other_administrative,T3
+NYC,15F2,Operator failed to make a good faith effort to inform smokers or users of electronic cigarettes of the SFAA,other_administrative,T3
+NYC,15F6,Workplace SFAA policy not prominently posted in workplace,management_certification,T3
+NYC,15F7,Sign prohibiting smoking or using electronic cigarettes not conspicuously  posted,management_certification,T3
+NYC,15I,“No Smoking” and/or “Smoking Permitted” sign not conspicuously posted. Health warning not present on “Smoking Permitted” sign.,management_certification,T3
+NYC,15K,Operator failed to make good faith effort to inform smokers of the Smoke-free Act prohibition of smoking.,other_administrative,T3
+NYC,15L,"Smoke free workplace smoking policy inadequate, not posted, not provided to employees.",management_certification,T3
+NYC,15S,Flavored tobacco products sold or offered for sale,other_administrative,T3
+NYC,16-01,"A food containing artificial trans-fat, with 0.5 grams or more of trans fat per serving, is being stored, distributed, held for service, used in preparation of a menu item, or served.",cross_contamination_protection,T3
+NYC,16-02,"The original nutrition fact labels or ingredient label for a cooking oil, shortening or margarine or food item sold in bulk, or acceptable manufacturer’s documentation not maintained on site.",other_administrative,T3
+NYC,16-03,"Caloric content not posted on menus, menu boards or food tags, in a food service establishment that is 1 of 15 or more outlets operating the same type of business nationally under common ownership or control, or as a franchise or doing business under the same name, for each menu item that is served in portions, the size and content of which are standardized.",management_certification,T3
+NYC,16-04,"Required succinct nutritional statements not posted on menu(s) for adults and children (2,000 calories per day for adults)",management_certification,T3
+NYC,16-06,"Additional nutritional information statement not posted, or additional nutritional information not provided",management_certification,T3
+NYC,16-08,"Sodium Warning icon not posted on menus, menu boards or food tags for food items that contain 2300mg or more of sodium in a food service establishment that is 1 of 15 or more outlets operating the same type of business nationally under common ownership or control, or as a franchise or doing business under the same name, for each menu item that is served in portions, the size and content of which are standardized",management_certification,T3
+NYC,16-09,"Sodium Warning icon posted on menus, menu boards or food tags for food items that contain 2300mg or more of sodium is not a black and white equilateral triangle; or the equilateral triangle is not as wide as it is tall, or is not equal in height to the largest letter in the food item’s name, as displayed on the menu, menu board, or tag.",management_certification,T3
+NYC,16-10,Sodium Warning statement not posted conspicuously at the point of purchase. “Warning: [icon image] indicates that the sodium (salt) content of this item is higher than the total daily recommended limit (2300 mg). High sodium intake can increase blood pressure and risk of heart disease and stroke.”,management_certification,T3
+NYC,16-11,Prohibited drink listed on children's meal menu,other_administrative,T3
+NYC,16A,"Cooking oil, shortening, margarine that contains 0.5 grams or more of artificial trans fat",other_administrative,T3
+NYC,16B,"The original nutritional fact labels and/or ingredient label for a cooking oil, shortening or margarine or food item sold in bulk, or acceptable manufacturer’s documentation not maintained on site.",other_administrative,T3
+NYC,16C,Required calorie information not posted/improperly posted.,management_certification,T3
+NYC,16D,"Required nutritional information statement not posted (2,000 calories per day).",management_certification,T3
+NYC,16E,"Additional nutritional information statement not posted, and/or additional nutritional information not provided.",management_certification,T3
+NYC,16J,Sodium Warning - Icon not posted,management_certification,T3
+NYC,16K,Sodium Warning - Icon not compliant,other_administrative,T3
+NYC,16L,Sodium Warning - Statement,other_administrative,T3
+NYC,18-01,"Current valid permit, registration or other authorization to operate a Food Service Establishment (FSE) or Non-retail Food Processing Establishment (NRFP) not available.",management_certification,T2
+NYC,18-08,Permit not conspicuously displayed.,management_certification,T3
+NYC,18-11,Food Protection Certificate not available for inspection,cross_contamination_protection,T3
+NYC,18-12,"Document issued by the Board of Health, Commissioner or Department reproduced or altered. False, untrue or misleading statement or document made to, submitted or filed with the Department",other_administrative,T3
+NYC,18-13,"Failure to comply with an order of the Board of Health, Commissioner or Department.",other_administrative,T3
+NYC,18-14,"Order or notice posted or required to be posted by the Department mutilated, obstructed or removed.",management_certification,T3
+NYC,18B,"Document issued by the Board of Health, Commissioner or Department unlawfully reproduced or altered.",other_administrative,T3
+NYC,18C,"Notice of the Department of Board of Health mutilated, obstructed, or removed.",other_administrative,T3
+NYC,18D,"Failure to comply with an Order of the Board of Health, Commissioner, or Department.",other_administrative,T3
+NYC,18F,Permit not conspicuously displayed.,management_certification,T3
+NYC,18G,"Manufacture of frozen dessert not authorized on Food Service Establishment permit. Milk or milk product undated, improperly dated or expired.",approved_source_food_safety,T3
+NYC,18I,"""Choking first aid"" poster not posted. ""Alcohol and pregnancy"" warning sign not posted. Latex gloves, sign not posted. Inspection report sign not posted.",hygiene_handwashing,T3
+NYC,19-01,Organics mixed with non-organic material,other_administrative,T3
+NYC,19-02,Organics containers not labeled,other_administrative,T3
+NYC,19-03,Failure to post signage in organics collection area.,other_administrative,T3
+NYC,19-04,Expanded Polystyrene (EPS) single service article not designated as a recyclable material.,other_administrative,T3
+NYC,19-05,Providing single-use plastic stirrers or single-use plastic splash sticks.,other_administrative,T3
+NYC,19-06,"Providing single-use, non-compostable plastic straws to customers without customer request (including providing such straws at a self-serve station)",other_administrative,T3
+NYC,19-07,"Failure to maintain a sufficient supply of single-use, non-compostable plastic straws.",other_administrative,T3
+NYC,19-08,"Failure to provide a single-use, non-compostable plastic straw upon request.",cross_contamination_protection,T3
+NYC,19-10,Failure to display required signage about plastic straw availability,cross_contamination_protection,T3
+NYC,19-11,Providing compostable plastic straws to be used outside of the food establishment’s premises; failure to appropriately dispose of compostable plastic straws; failure to maintain required bins for disposal of compostable plastic straws.,equipment_nonfood_surface,T3
+NYC,20-01,Allergen or intolerance notice not translated into common language when required,management_certification,T3
+NYC,20-02,Failure to conspicuously post a hyperlink to the Department’s inspection lookup tool as required.,other_administrative,T3
+NYC,20-03,Food allergy poster not approved by the Department of Health and Mental Hygiene.,hygiene_handwashing,T3
+NYC,20-04,"“Choking first aid” poster not posted. “Alcohol and Pregnancy” warning sign not posted. Resuscitation equipment: exhaled air resuscitation masks (adult & pediatric), latex gloves, sign not posted.",hygiene_handwashing,T3
+NYC,20-05,"Current letter grade or ""Grade Pending"" card not conspicuously posted or visible to passersby",management_certification,T3
+NYC,20-06,Current letter grade or Grade Pending card not posted,management_certification,T3
+NYC,20-07,"Letter grade or Grade Pending card removed, destroyed, modified, obscured, or otherwise tampered with",other_administrative,T3
+NYC,20-08,Failure to post or conspicuously post healthy eating information,other_administrative,T3
+NYC,20A,Food allergy information poster not conspicuously posted where food is being prepared or processed by food workers.,management_certification,T3
+NYC,20D,"“Choking first aid” poster not posted. “Alcohol and pregnancy” warning sign not posted. Resuscitation equipment: exhaled air resuscitation masks (adult & pediatric), latex gloves, sign not posted.",hygiene_handwashing,T3
+NYC,20E,Letter grade or Grade Pending card not conspicuously posted and visible to passersby.,management_certification,T3
+NYC,20F,Current letter grade sign not posted.,management_certification,T3
+NYC,22A,"Nuisance created or allowed to exist.  Facility not free from unsafe, hazardous, offensive or annoying conditions.",other_administrative,T3
+NYC,22B,Toilet facility used by women does not have at least one covered garbage receptacle.,hygiene_handwashing,T3
+NYC,22C,"Bulb not shielded or shatterproof, in areas where there is extreme heat, temperature changes, or where accidental contact may occur.",temperature_control,T3
+NYC,22E,ROP processing equipment not approved by DOHMH.,equipment_nonfood_surface,T3
+NYC,22F,MISBRANDED AND LABELING,other_administrative,T3
+NYC,22G,Sale or use of certain expanded polystyrene items restricted,other_administrative,T3
+NYC,28-01,"Nuisance created or allowed to exist. Facility not free from unsafe, hazardous, offensive or annoying condition.",other_administrative,T3
+NYC,28-03,"Lighting fixture located over, by or within food storage, preparation, service or display facility, and facility where utensils and equipment are cleaned and stored, which may shatter due to extreme heat, temperature changes or accidental contact; not fitted with shatterproof bulb or shielded and encased, with end caps or other device.",temperature_control,T3
+NYC,28-04,Equipment used for ROP not approved by the Department,equipment_nonfood_surface,T3
+NYC,28-05,"Food adulterated or misbranded. Adulterated or misbranded food possessed, being manufactured, produced, packed, sold, offered for sale, delivered or given away",approved_source_food_safety,T3
+NYC,28-06,Contract with a pest management professional not in place. Record of extermination activities not kept on premises.,pest_vermin,T3
+NYC,28-07,"Unapproved outdoor, street or sidewalk cooking.",approved_source_food_safety,T3
+NYC,99B,Other general,other_administrative,T3
+LA,F002,"COMMUNICABLE DISEASE; REPORTING, RESTRICTIONS & EXCLUSIONS",hygiene_handwashing,T2
+LA,F003,"NO DISCHARGE FROM EYES, NOSE, AND MOUTH",hygiene_handwashing,T3
+LA,F004,"PROPER EATING, DRINKING, OR TOBACCO USE",hygiene_handwashing,T3
+LA,F005,HANDS CLEAN AND PROPERLY WASHED; GLOVES USED PROPERLY,hygiene_handwashing,T2
+LA,F006,ADEQUATE HANDWASHING FACILITIES SUPPLIED & ACCESSIBLE,hygiene_handwashing,T3
+LA,F007,PROPER HOT AND COLD HOLDING TEMPERATURES,temperature_control,T2
+LA,F008,TIME AS A PUBLIC HEALTH CONTROL; PROCEDURES & RECORDS,temperature_control,T2
+LA,F009,PROPER COOLING METHODS,temperature_control,T2
+LA,F011,PROPER REHEATING PROCEDURES FOR HOT HOLDING,temperature_control,T2
+LA,F012,RETURNED AND RESERVICE FOOD,cross_contamination_protection,T3
+LA,F013,"FOOD IN GOOD CONDITION, SAFE AND UNADULTERATED",approved_source_food_safety,T2
+LA,F014,FOOD CONTACT SURFACES: CLEAN AND SANITIZED,food_contact_surface,T2
+LA,F015,FOOD OBTAINED FROM APPROVED SOURCE,approved_source_food_safety,T2
+LA,F016,"COMPLIANCE WITH SHELF STOCK TAGS, CONDITION, DISPLAYED",approved_source_food_safety,T2
+LA,F017,COMPLIANCE WITH GULF OYSTER REGULATIONS,approved_source_food_safety,T3
+LA,F020,LICENSED HEALTH CARE FACILITIES/PUBLIC & PRIVATE SCHOOLS; PROHIBITED FOODS NOT OFFERED,approved_source_food_safety,T2
+LA,F021,WATER AVAILABLE,plumbing_sewage_water,T1
+LA,F022,SEWAGE AND WASTEWATER PROPERLY DISPOSED,plumbing_sewage_water,T1
+LA,F023,"NO RODENTS, INSECTS, BIRDS, OR ANIMALS",pest_vermin,T1
+LA,F024,PERSON IN CHARGE PRESENT AND PERFORMS DUTIES,management_certification,T3
+LA,F025,PERSONAL CLEANLINESS AND HAIR RESTRAINTS,hygiene_handwashing,T3
+LA,F026,"APPROVED THAWING METHODS USED, FROZEN FOOD MAINTAINED FROZEN",temperature_control,T3
+LA,F027,FOOD SEPARATED AND PROTECTED,cross_contamination_protection,T3
+LA,F028,FRUITS AND VEGETABLES WASHED AS REQUIRED,cross_contamination_protection,T3
+LA,F029,"TOXIC SUBSTANCES PROPERLY IDENTIFIED, STORED, USED",cross_contamination_protection,T3
+LA,F030,FOOD PROPERLY STORED; FOOD STORAGE CONTAINERS IDENTIFIED,approved_source_food_safety,T3
+LA,F031,CONSUMER SELF SERVICE FACILITIES PROPERLY CONSTRUCTED AND MAINTAINED,cross_contamination_protection,T3
+LA,F032,FOOD PROPERLY LABELED & HONESTLY PRESENTED,approved_source_food_safety,T3
+LA,F033,NONFOOD-CONTACT SURFACES CLEAN AND IN GOOD REPAIR,equipment_nonfood_surface,T3
+LA,F034,"WAREWASHING FACILITIES: ADEQUATE, MAINTAINED, PROPERLY USE, TEST STRIPS AVAILABLE",food_contact_surface,T3
+LA,F035,"EQUIPMENT/UTENSILS - APPROVED; INSTALLED; CLEAN; GOOD REPAIR, CAPACITY",equipment_nonfood_surface,T3
+LA,F036,"EQUIPMENT, UTENSILS AND LINENS: STORAGE AND USE",equipment_nonfood_surface,T3
+LA,F037,"ADEQUATE VENTILATION AND LIGHTING; DESIGNATED AREAS, USE",equipment_nonfood_surface,T3
+LA,F038,THERMOMETERS PROVIDED AND ACCURATE,temperature_control,T3
+LA,F039,WIPING CLOTHS: PROPERLY USED AND STORED,equipment_nonfood_surface,T3
+LA,F040,"PLUMBING: PLUMBING IN GOOD REPAIR, PROPER BACKFLOW DEVICES",plumbing_sewage_water,T3
+LA,F041,GARBAGE AND REFUSE PROPERLY DISPOSED; FACILITIES MAINTAINED,equipment_nonfood_surface,T3
+LA,F042,"TOILET FACILITIES: PROPERLY CONSTRUCTED, SUPPLIED, CLEANED",equipment_nonfood_surface,T3
+LA,F043,PREMISES; PERSONAL/CLEANING ITEMS; VERMIN-PROOFING,pest_vermin,T3
+LA,F044,"FLOORS, WALLS AND CEILINGS: PROPERLY BUILT, MAINTAINED IN GOOD REPAIR AND CLEAN",equipment_nonfood_surface,T3
+LA,F045,SLEEPING QUARTERS,other_administrative,T3
+LA,F046,SIGNS POSTED; LAST INSPECTION REPORT AVAILABLE,management_certification,T3
+LA,F047,PLAN REVIEW REQUIRED FOR NEW OR REMODEL CONSTRUCTION,management_certification,T3
+LA,F048,PERMITS AVAILABLE,management_certification,T3
+LA,F049,IMPOUNDMENT OF UNSANITARY EQUIPMENT OR FOOD,other_administrative,T3
+LA,F050,PERMIT SUSPENSION,management_certification,T3
+LA,F051,SAMPLES COLLECTED,other_administrative,T3
+LA,F052,FOOD SAFETY CERTIFICATION,management_certification,T3
+LA,F053,HOT WATER AVAILABLE,plumbing_sewage_water,T2
+LA,F054,MULTIPLE MAJOR CRITICAL VIOLATIONS / INCREASED RISK TO PUBLIC HEALTH,other_administrative,T2
+LA,F055,DEMONSTRATION OF KNOWLEDGE,management_certification,T3
+LA,F056,PROPER COOKING TIME & TEMPERATURES,temperature_control,T2
+LA,F057,"COMPLIANCE WITH VARIANCE, SPECIALIZED PROCESS, & HACCP PLAN",approved_source_food_safety,T2
+LA,F058,CONSUMER ADVISORY PROVIDED FOR RAW OR UNDERCOOKED FOODS,cross_contamination_protection,T3
+LA,F101,DEMONSTRATION OF KNOWLEDGE,management_certification,T3
+LA,F102,FOOD SAFETY CERTIFICATION,management_certification,T3
+LA,F104,"NO DISCHARGE FROM EYES, NOSE, AND MOUTH",hygiene_handwashing,T2
+LA,F105,"PROPER EATING, DRINKING, OR TOBACCO USE",hygiene_handwashing,T3
+LA,F106,HANDS CLEAN AND PROPERLY WASHED; PROPER GLOVE USE,hygiene_handwashing,T2
+LA,F107,ADEQUATE HANDWASHING FACILITIES; SUPPLIED & ACCESSIBLE,hygiene_handwashing,T3
+LA,F108,PROPER HOT AND COLD HOLDING TEMPERATURES,temperature_control,T2
+LA,F109,TIME AS A PUBLIC HEALTH CONTROL; PROCEDURES & RECORDS,temperature_control,T2
+LA,F110,PROPER COOLING METHODS,temperature_control,T2
+LA,F111,PROPER COOKING TIME & TEMPERATURES,temperature_control,T2
+LA,F112,PROPER REHEATING PROCEDURES FOR HOT HOLDING,temperature_control,T2
+LA,F113,RETURNED AND RE-SERVICE OF FOOD,other_administrative,T3
+LA,F114,"FOOD IN GOOD CONDITION, SAFE AND UNADULTERATED",approved_source_food_safety,T2
+LA,F115,FOOD CONTACT SURFACES: CLEAN AND SANITIZED,food_contact_surface,T2
+LA,F116,FOOD OBTAINED FROM APPROVED SOURCE,approved_source_food_safety,T2
+LA,F117,"COMPLIANCE WITH SHELLSTOCK TAGS, CONDITION, DISPLAY",other_administrative,T2
+LA,F118,COMPLIANCE WITH GULF OYSTER REGULATIONS,approved_source_food_safety,T2
+LA,F119,"COMPLIANCE WITH VARIANCE, SPECIALIZED PROCESSES & HACCP",approved_source_food_safety,T2
+LA,F120,CONSUMER ADVISORY PROVIDED FOR RAW/UNDERCOOKED FOOD,cross_contamination_protection,T3
+LA,F122,HOT AND COLD WATER AVAILABLE,plumbing_sewage_water,T2
+LA,F123,SEWAGE AND WASTEWATER PROPERLY DISPOSED,plumbing_sewage_water,T1
+LA,F124,"NO INSECTS, RODENTS, BIRDS OR ANIMALS PRESENT",pest_vermin,T1
+LA,F125,PERSON IN CHARGE PRESENT AND PERFORMS DUTIES,management_certification,T3
+LA,F126,PERSONAL CLEANLINESS AND HAIR RESTRAINTS,hygiene_handwashing,T3
+LA,F127,"APPROVED THAWING METHODS USED, FROZEN FOOD",temperature_control,T3
+LA,F128,FOOD SEPARATED AND PROTECTED,cross_contamination_protection,T3
+LA,F129,WASHING FRUITS AND VEGETABLES,other_administrative,T3
+LA,F130,"TOXIC SUBSTANCES PROPERLY IDENTIFIED, STORED, AND USED",cross_contamination_protection,T3
+LA,F131,FOOD STORAGE; FOOD STORAGE CONTAINERS IDENTIFIED,other_administrative,T3
+LA,F132,CONSUMER SELF-SERVICE,other_administrative,T3
+LA,F133,FOOD PROPERLY LABELED & HONESTLY PRESENTED,approved_source_food_safety,T3
+LA,F134,NON-FOOD CONTACT SURFACES CLEAN,food_contact_surface,T2
+LA,F135,"WAREWASHING FACILITIES: INSTALLED, MAINTAINED; USED; TEST EQUIPMENT",food_contact_surface,T3
+LA,F136,EQUIPMENT/UTENSILS APPROVED: INSTALLED; GOOD REPAIR; CAPACITY,equipment_nonfood_surface,T3
+LA,F137,"EQUIPMENT, UTENSILS AND LINENS: STORAGE AND USE",equipment_nonfood_surface,T3
+LA,F138,"ADEQUATE VENTILATION AND LIGHTING; DESIGNATED AREAS, USE",equipment_nonfood_surface,T3
+LA,F139,THERMOMETERS PROVIDED AND ACCURATE,temperature_control,T3
+LA,F140,WIPING CLOTHS: PROPERLY USED AND STORED,equipment_nonfood_surface,T3
+LA,F141,"PLUMBING: FIXTURES, BACKFLOW DEVICE, DRAINAGE",plumbing_sewage_water,T3
+LA,F142,GARBAGE AND REFUSE PROPERLY DISPOSED; FACILITIES MAINTAINED,equipment_nonfood_surface,T3
+LA,F143,"TOILET FACILITIES: PROPERLY CONSTRUCTED, SUPPLIED, CLEANED",equipment_nonfood_surface,T3
+LA,F144,PREMISES; PERSONAL/CLEANING ITEMS; VERMIN-PROOFING,pest_vermin,T3
+LA,F145,"FLOORS, WALLS AND CEILINGS PROPERLY BUILT, MAINTAINED AND CLEAN",equipment_nonfood_surface,T3
+LA,F146,NO UNAPPROVED SLEEPING QUARTERS,other_administrative,T3
+LA,F147,SIGNS POSTED; LAST INSPECTION REPORT AVAILABLE,management_certification,T3
+LA,F148,PERMITS AVAILABLE,management_certification,T3
+LA,F149,PLAN REVIEW,management_certification,T3
+LA,F150,NOTIFICATION OF INTENT TO SUSPEND,other_administrative,T3
+LA,F151,IMPOUNDMENT/VOLUNTARY CONDEMN AND DISPOSE (VC&D)/SAMPLING,other_administrative,T3
+LA,F152,"PERMIT SUSPENDED, REVOKED, MODIFIED, OR CLOSED FOR NO PERMIT",other_administrative,T3
+LA,F153,MULTIPLE MAJOR CRITICAL VIOLATIONS / INCREASED RISK TO PUBLIC HEALTH,other_administrative,T2
+LA,FM56,MULTIPLE MAJOR CRITICAL VIOLATIONS / INCREASED RISK TO PUBLIC HEALTH,other_administrative,T2
+LA,MP08,PROPER HOT AND COLD HOLDING TEMPERATURES,temperature_control,T3
+LA,MP31,FOOD STORAGE; FOOD STORAGE CONTAINERS IDENTIFIED,other_administrative,T3
+LA,MP34,NON-FOOD CONTACT SURFACES CLEAN,food_contact_surface,T3
+LA,MP36,"EQUIPMENT AND UTENSILS APPROVED; INSTALLED; GOOD REPAIR, APPROPRIATE CAPACITY",other_administrative,T3
+LA,MP44,PREMISES; PERSONAL / CLEANING ITEMS; VERMIN PROOFING,equipment_nonfood_surface,T3
+LA,MP45,"FLOORS, WALLS AND CEILINGS: BUILT, MAINTAINED, AND CLEAN",equipment_nonfood_surface,T3
+LA,TF01,601.  NO HEALTH CODE VIOLATIONS OBSERVED AT THE TIME OF INSPECTION.,other_administrative,T3
+LA,W005,FOOD ELEVATED,other_administrative,T3
+LA,W016,BUILDING RODENT PROOF,pest_vermin,T3
+LA,W017,HOT AND COLD WATER AVAILABLE,plumbing_sewage_water,T3
+LA,W019,PLUMBING APPROVED AND MAINTAINED IN GOOD REPAIR.,plumbing_sewage_water,T3
+LA,W026,CEILING MAINTAINED IN GOOD REPAIR,other_administrative,T3
+LA,W029,TOILET MAINTAINED CLEAN / SANITARY,other_administrative,T3
+LA,W034,TOILET ROOM WITH TOILET PAPER / SOAP / TOWELS / TRASH RECEPTACLE,other_administrative,T3
+LA,W035,TOILET ROOM WELL VENTILATED,other_administrative,T3
+LA,W038,HAND SINK AVAILABLE,other_administrative,T3
+LA,W039,PROPER STORAGE OR USE OF HAZARDOUS MATERIALS,other_administrative,T3
+LA,W044,GARBAGE / RUBBISH RECEPTACLES MAINTAINED CLEAN AND SANITARY,other_administrative,T3
+LA,W048,PERMITS AVAILABLE,management_certification,T3
+LA,W050,FOOD PROPERLY LABELED,approved_source_food_safety,T3
+LA,W051,"WALLS, FLOORS, CEILINGS: APPROVED, MAINTAINED CLEAN AND IN GOOD REPAIR",other_administrative,T3
+LA,W052,"EQUIPMENT, SHELVING, CABINETS: APPROVED, MAINTAINED CLEAN AND IN GOOD REPAIR",other_administrative,T3

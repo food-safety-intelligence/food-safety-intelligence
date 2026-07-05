@@ -15,6 +15,10 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
+import { CityGate } from "@/components/CityGate";
+import { HowItWorksNyc } from "@/components/HowItWorksNyc";
+import { HowItWorksLa } from "@/components/HowItWorksLa";
+import { MethodologyHero } from "@/components/HowItWorksCards";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -216,6 +220,7 @@ export default async function HowItWorksPage() {
           residual overhang from intrinsic-width content (operating-points table)
           without clipping text. Desktop keeps the 820 reading cap. */}
       <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
+        <CityGate nyc={<HowItWorksNyc />} la={<HowItWorksLa />}>
         <Link
           href="/"
           className="inline-flex items-center gap-2 text-xs text-teal hover:underline"
@@ -224,37 +229,15 @@ export default async function HowItWorksPage() {
           Back to search
         </Link>
 
-        {/* Hero band — a soft diagonal wash (cream → white) with a faint sage
-            glow lifts the page out of plain-document territory while staying in
-            the muted Clinical Quiet palette. The headline metrics sit here as
-            stat cards so the page leads with what the model actually does. */}
-        <header
-          className="relative mt-6 overflow-hidden rounded-3xl border border-line p-7 sm:p-10 soft-shadow"
-          style={{
-            background:
-              "linear-gradient(135deg, #EFE9DC 0%, #F6F1E9 48%, #FFFFFF 100%)",
-          }}
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full blur-3xl"
-            style={{ background: "rgba(122, 143, 106, 0.16)" }}
-          />
-          <div className="relative">
-            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-              Methodology
-            </p>
-            <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
-              How this <span className="serif italic text-teal">works</span>
-            </h1>
-            <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
-              A gradient-boosted decision-tree model (XGBoost) fit on six years
-              of Chicago inspection history. The score is a calibrated
-              probability that a food establishment will fail an inspection or be
-              cited for a priority violation in the next 180 days.
-            </p>
-
-            <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {/* Hero band — the shared MethodologyHero card (soft cream→white wash +
+            faint sage glow), so Chicago, NYC, and LA open identically. The
+            headline metrics sit here as stat cards so the page leads with what
+            the model actually does. */}
+        <MethodologyHero
+          eyebrow="Methodology"
+          title={<>How this <span className="serif italic text-teal">works</span></>}
+          stats={
+            <>
               <HeroStat
                 value={`${methodology.headline.top_decile_lift.toFixed(1)}×`}
                 label="more hits than random, working the top 10% by risk"
@@ -270,9 +253,14 @@ export default async function HowItWorksPage() {
                   methodology.test.prevalence * 100,
                 )}% base rate`}
               />
-            </dl>
-          </div>
-        </header>
+            </>
+          }
+        >
+          A gradient-boosted decision-tree model (XGBoost) fit on six years
+          of Chicago inspection history. The score is a calibrated
+          probability that a food establishment will fail an inspection or be
+          cited for a priority violation in the next 180 days.
+        </MethodologyHero>
 
         {/* Sticky jump-nav — lets a reader skip to any part without scrolling
             the whole methodology. Plain anchors (server component); deep-links
@@ -518,6 +506,22 @@ export default async function HowItWorksPage() {
                 chronological train/test split)
               </li>
             </ul>
+          </article>
+
+          <article>
+            <h2 className="text-2xl font-medium tracking-tight">
+              How the datasets connect
+            </h2>
+            <p className="text-md text-muted leading-relaxed mt-2">
+              Food Inspections is the backbone — one row per inspection, keyed by the
+              establishment&apos;s license number. Business Licenses join on that same
+              license number to add license age and history. Everything else is built
+              per establishment from its own earlier inspections: every prior-history
+              and recency feature looks only at that establishment&apos;s record
+              strictly before the inspection being scored. There is no
+              cross-establishment or map-proximity join — each place is scored from its
+              own history and the current visit.
+            </p>
           </article>
 
           <article>
@@ -1036,8 +1040,8 @@ export default async function HowItWorksPage() {
               Data sources &amp; retention
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              The inputs are Chicago&apos;s public Food Inspections, Business
-              Licenses, and 311 service-request datasets. We keep a cached copy of
+              The inputs are Chicago&apos;s public Food Inspections and Business
+              Licenses datasets. We keep a cached copy of
               the fields needed to build features and scores for as long as the
               product is maintained; it is refreshed in place rather than kept as a
               growing archive of dated snapshots. Because no visitor data is
@@ -1078,7 +1082,7 @@ export default async function HowItWorksPage() {
               Handling of updated source data
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              Chicago updates its inspection, licence, and 311 records continuously
+              Chicago updates its inspection and licence records continuously
               — new inspections, late-arriving results, and corrections to old ones.
               We do not read the city&apos;s feed live; instead we re-pull it and
               re-score in a batch job, then publish a fresh JSON. The scores you see
@@ -1133,9 +1137,11 @@ export default async function HowItWorksPage() {
             </dl>
           </article>
         </section>
+        </CityGate>
 
         {/* Feedback CTA — readers who reach the end of the methodology are the
-            most engaged, so invite a note here alongside the footer link. */}
+            most engaged, so invite a note here alongside the footer link.
+            Outside CityGate so both Chicago and NYC readers see it. */}
         <aside className="mt-12 rounded-3xl border border-line bg-tint p-7 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
           <div>
             <h2 className="text-xl font-medium tracking-tight">
