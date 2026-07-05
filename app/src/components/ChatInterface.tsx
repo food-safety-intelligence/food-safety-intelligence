@@ -39,7 +39,9 @@ function resetSession(): string {
 // /chat expand is a <Link> click (a soft navigation, type "navigate"), so the
 // Navigation Timing type tells the two apart: a reload should start a fresh
 // conversation, the soft navigation should carry the transcript over.
-function wasPageReloaded(): boolean {
+// Exported for the tests, which pin the navigation entry to prove the flag is
+// read correctly and — crucially — stays true across a document's remounts.
+export function wasPageReloaded(): boolean {
   if (typeof window === "undefined" || !window.performance) return false;
   const [nav] = performance.getEntriesByType(
     "navigation",
