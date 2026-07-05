@@ -93,10 +93,10 @@ export function FloatingChat() {
               <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sage/15 flex-none">
                 <MessageCircle className="w-4 h-4 text-sage" strokeWidth={2} />
               </span>
-              {/* "Eatelligence" = Eat + intelligence; the sage "Eat" stem
-                  (sage-strong clears AA) plays up the pun. */}
+              {/* "Eatelligence" = Eat + intelligence; the serif italic sage "Eat"
+                  stem (sage-strong clears AA) plays up the pun. */}
               <span className="text-sm font-semibold tracking-tight truncate">
-                <span className="text-sage-strong">Eat</span>elligence
+                <span className="serif italic text-sage-strong">Eat</span>elligence
               </span>
             </span>
             <span className="flex items-center gap-1 flex-none">
