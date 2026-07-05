@@ -31,7 +31,7 @@ export function CityEntryModal() {
           Choose a city
         </h2>
         <p className="text-sm text-muted mt-2 leading-[1.6]">
-          This tool covers {CITIES.length} cities. Pick one to start — you can
+          This tool covers {CITIES.length} cities. Pick one to start. You can
           switch any time from the header.
         </p>
         <div className="mt-5 grid gap-3">

@@ -39,7 +39,7 @@ const KITCHEN_PATTERNS: Pattern[] = [
   {
     icon: History,
     title: "Recurring violations",
-    body: "Multiple priority violations in prior history — especially temperature, handwashing, or cross-contamination — describe how the kitchen actually operates. These are the drivers your care team would most want to consider.",
+    body: "Multiple priority violations in prior history (especially temperature, handwashing, or cross-contamination) describe how the kitchen actually operates. These are the drivers your care team would most want to consider.",
   },
   {
     // Driver: flag_kw_rodent / flag_kw_pest — vermin/pest noted in the
@@ -47,7 +47,7 @@ const KITCHEN_PATTERNS: Pattern[] = [
     // nearby 311 complaints; that 311 feature is not wired into the contract.)
     icon: Bug,
     title: "Pest or vermin on inspection",
-    body: "Rodent, vermin, or pest activity recorded in the establishment's own recent inspection violations. Repeated pest findings point to a sanitation problem in the kitchen itself — exactly the kind of pattern that matters most for a vulnerable diner.",
+    body: "Rodent, vermin, or pest activity recorded in the establishment's own recent inspection violations. Repeated pest findings point to a sanitation problem in the kitchen itself, exactly the kind of pattern that matters most for a vulnerable diner.",
   },
 ];
 
@@ -57,12 +57,12 @@ const ADMIN_PATTERNS: Pattern[] = [
   {
     icon: CalendarClock,
     title: "Long since last inspection",
-    body: "An administrative gap, not evidence of a problem. The score treats it as a risk signal because inspection cadence correlates with risk in Chicago's data — but it doesn't tell you anything about the kitchen itself.",
+    body: "An administrative gap, not evidence of a problem. The score treats it as a risk signal because inspection cadence correlates with risk in Chicago's data, but it doesn't tell you anything about the kitchen itself.",
   },
   {
     icon: IdCard,
     title: "License age",
-    body: "How long the business has held its license. The score uses it because tenure correlates with risk in Chicago's data — but it's a proxy for the business, not a measure of what happens in the kitchen, so it shouldn't sway your choice much.",
+    body: "How long the business has held its license. The score uses it because tenure correlates with risk in Chicago's data, but it's a proxy for the business, not a measure of what happens in the kitchen, so it shouldn't sway your choice much.",
   },
 ];
 
@@ -149,7 +149,7 @@ export default function CaregiversPage() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/images/caregivers-hero.jpg`}
-              alt="Wholesome fresh foods — oats, almonds, milk, avocado, kale and carrots — on a dark table"
+              alt="Wholesome fresh foods (oats, almonds, milk, avocado, kale and carrots) on a dark table"
               className="absolute inset-0 w-full h-full object-cover"
             />
             <div
@@ -170,8 +170,8 @@ export default function CaregiversPage() {
           <p className="text-lg text-muted leading-[1.65] mt-6 max-w-[58ch]">
             Two food establishments can share the same predicted risk score for
             very different reasons. If you&apos;re ordering for someone with
-            compromised immunity — an older parent, a chemo patient, a transplant
-            recipient — the kind of pattern matters far more than the number.
+            compromised immunity (an older parent, a chemo patient, a transplant
+            recipient), the kind of pattern matters far more than the number.
           </p>
         </header>
 
@@ -184,14 +184,14 @@ export default function CaregiversPage() {
           </h2>
           <p className="text-base text-muted leading-relaxed mt-2 max-w-[60ch]">
             On an establishment&apos;s detail page, the score comes with its top
-            drivers — the specific patterns pushing risk up or down. Some
+            drivers: the specific patterns pushing risk up or down. Some
             describe the kitchen itself; others are administrative. The score
             counts both, but for your decision they don&apos;t carry the same
             weight.
           </p>
 
           <div className="mt-8">
-            <GroupLabel tone="more">About the kitchen — weigh these</GroupLabel>
+            <GroupLabel tone="more">About the kitchen: weigh these</GroupLabel>
             <div className="mt-4 grid gap-5">
               {KITCHEN_PATTERNS.map((p) => (
                 <PatternCard key={p.title} pattern={p} tone="more" />
@@ -201,7 +201,7 @@ export default function CaregiversPage() {
 
           <div className="mt-8">
             <GroupLabel tone="less">
-              Administrative — weigh these less
+              Administrative: weigh these less
             </GroupLabel>
             <div className="mt-4 grid gap-5">
               {ADMIN_PATTERNS.map((p) => (
@@ -219,7 +219,7 @@ export default function CaregiversPage() {
             A &quot;High&quot; prediction does not mean a food establishment is
             unsafe to eat at today. It means the patterns in the public record
             resemble those that historically precede a failed inspection. Use it
-            as one input alongside the precautions your care team recommends —
+            as one input alongside the precautions your care team recommends,
             not as a verdict.
           </p>
         </section>

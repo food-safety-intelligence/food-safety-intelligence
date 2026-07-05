@@ -38,7 +38,7 @@ export function PinDriverLine({ driver }: { driver: PinDriver }) {
     <span
       // Direction is in the accessible name too — not just the arrow + colour —
       // so it isn't a colour-only signal (matches DriverList's row title).
-      title={`${driver.label} — ${driver.up ? "raises" : "lowers"} risk`}
+      title={`${driver.label}: ${driver.up ? "raises" : "lowers"} risk`}
       className={cn(
         "flex items-center gap-1 text-2xs",
         driver.up ? "text-terra-strong" : "text-sage-strong",
@@ -347,8 +347,8 @@ function PinLayer({
             onMouseLeave={() => onHover(null)}
             label={
               p.is_out_of_business
-                ? `${p.dba_name} — out of business (was ${p.risk_tier} risk)`
-                : `${p.dba_name} — ${p.risk_tier} risk`
+                ? `${p.dba_name}, out of business (was ${p.risk_tier} risk)`
+                : `${p.dba_name}, ${p.risk_tier} risk`
             }
           />
         </Marker>

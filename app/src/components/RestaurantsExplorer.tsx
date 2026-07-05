@@ -129,7 +129,7 @@ export function RestaurantsExplorer({
                 {" "}
                 <span className="text-muted/70">
                   (top {scores.length} shown out of{" "}
-                  {totalEstablishments.toLocaleString()} — speed mode)
+                  {totalEstablishments.toLocaleString()}, speed mode)
                 </span>
               </>
             )}

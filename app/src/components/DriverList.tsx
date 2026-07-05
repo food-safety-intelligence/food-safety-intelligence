@@ -81,7 +81,7 @@ export function DriverList({ drivers }: { drivers: Driver[] }) {
             ? { left: "50%", width: `${halfPct}%` }
             : { right: "50%", width: `${halfPct}%` };
           const direction = isPositive ? "raises" : "lowers";
-          const rowTitle = `${d.label} — ${direction} risk by ${Math.abs(d.shap).toFixed(2)} (log-odds contribution)`;
+          const rowTitle = `${d.label}: ${direction} risk by ${Math.abs(d.shap).toFixed(2)} (log-odds contribution)`;
           return (
             <li
               key={d.feature + i}
