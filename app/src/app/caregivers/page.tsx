@@ -10,6 +10,7 @@ import {
   Search,
 } from "lucide-react";
 import Link from "next/link";
+import { RegisterChatPersona } from "@/components/RegisterChatPersona";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 import { cn } from "@/lib/utils";
@@ -125,6 +126,9 @@ function GroupLabel({ tone, children }: { tone: "more" | "less"; children: strin
 export default function CaregiversPage() {
   return (
     <>
+      {/* Scopes the site-wide floating chat to the caregiver persona while this
+          page is in view (cleared on unmount) — see RegisterChatPersona. */}
+      <RegisterChatPersona persona="caregiver" />
       <SiteHeader activeNav="caregivers" />
 
       <main className="max-w-[820px] mx-auto px-8 pt-10 pb-24 flex-1">

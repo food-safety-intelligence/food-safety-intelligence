@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWireQuery,
   scopedInputBudget,
+  taggedWireQuery,
   type AgentEstablishment,
 } from "@/lib/agent-api";
 
@@ -53,5 +54,41 @@ describe("scopedInputBudget", () => {
 
   it("never returns a negative budget, even for an absurd name", () => {
     expect(scopedInputBudget({ licenseId: "9", name: "Z".repeat(10_000) })).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("taggedWireQuery", () => {
+  it("returns the plain query for Chicago with no persona or establishment", () => {
+    expect(taggedWireQuery("safe sushi near Wicker Park", "chicago")).toBe(
+      "safe sushi near Wicker Park",
+    );
+  });
+
+  it("prepends a city marker for a non-Chicago city", () => {
+    const wire = taggedWireQuery("safe sushi", "nyc");
+    expect(wire).toBe("[[city:nyc]]safe sushi");
+  });
+
+  it("prepends a persona marker after the city marker", () => {
+    const wire = taggedWireQuery("worklist for Logan Square", "chicago", "inspector");
+    expect(wire).toBe("[[persona:inspector]]worklist for Logan Square");
+  });
+
+  it("orders city marker before persona marker before the establishment tag", () => {
+    const wire = taggedWireQuery("is it safe?", "nyc", "caregiver", AMARIT);
+    const cityIdx = wire.indexOf("[[city:nyc]]");
+    const personaIdx = wire.indexOf("[[persona:caregiver]]");
+    const tagIdx = wire.indexOf("AMARIT RESTAURANT");
+    expect(cityIdx).toBe(0);
+    expect(cityIdx).toBeLessThan(personaIdx);
+    expect(personaIdx).toBeLessThan(tagIdx);
+    expect(wire.endsWith("is it safe?")).toBe(true);
+  });
+
+  it("omits both markers for the default chicago, no-persona case even with an establishment", () => {
+    const wire = taggedWireQuery("tell me about this restaurant", "chicago", undefined, AMARIT);
+    expect(wire).not.toContain("[[city:");
+    expect(wire).not.toContain("[[persona:");
+    expect(wire.startsWith('(The user is viewing')).toBe(true);
   });
 });
