@@ -47,8 +47,16 @@
  *   company    string   honeypot — always empty for real users; bots fill it
  */
 
-// Where new-feedback notifications are sent.
-const NOTIFY_EMAIL = "bella_davies@berkeley.edu";
+// Where new-feedback notifications are sent. Comma-separated list — MailApp
+// treats the whole string as multiple recipients, so every address gets the
+// email.
+const NOTIFY_EMAIL = [
+  "bella_davies@berkeley.edu",
+  "junxu315@gmail.com",
+  "deepak_srivastava@berkeley.edu",
+  "aagarwal19@berkeley.edu",
+  "ayang103@berkeley.edu",
+].join(",");
 
 function doPost(e) {
   // Guard the parse: a GET, a bot probe, or any POST without a JSON body would
