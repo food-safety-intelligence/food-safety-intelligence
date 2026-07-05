@@ -40,6 +40,9 @@ async function main() {
       risk_score: Math.round(r.risk_score * 1000) / 1000,
       risk_tier: r.risk_tier,
       trend_slope: r.trend_slope,
+      // Anchor date of the latest scored inspection — the inspectors page
+      // derives "last inspected N days ago" / overdue sorting from it.
+      as_of_date: r.as_of_date ?? null,
       // top_drivers[0] reduced to the PinDriver the list/pin renders.
       top_driver: d ? { feature: d.feature, label: d.label, up: d.shap > 0 } : null,
       // Serialized only when true (~27% of rows) — absent means active.
@@ -50,6 +53,7 @@ async function main() {
   const out = {
     schema_version: "1",
     generated_at: payload.generated_at ?? null,
+    as_of_date: payload.as_of_date ?? null,
     total: payload.totals?.establishments ?? rows.length,
     tier_counts: payload.totals?.tier_counts ?? {},
     rows,

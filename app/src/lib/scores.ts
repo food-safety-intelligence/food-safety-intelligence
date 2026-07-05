@@ -463,6 +463,8 @@ export interface SearchIndexRow {
   risk_score: number;
   risk_tier: RiskTier;
   trend_slope: number | null;
+  /** Latest scored inspection date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   top_driver: PinDriver | null;
   is_out_of_business?: boolean;
 }
@@ -471,6 +473,8 @@ export interface SearchIndexRow {
 export interface SearchIndex {
   schema_version: string;
   generated_at: string | null;
+  /** Payload-level as-of date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   total: number;
   tier_counts: Record<RiskTier, number>;
   rows: SearchIndexRow[];
