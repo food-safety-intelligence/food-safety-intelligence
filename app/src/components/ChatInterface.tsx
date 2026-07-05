@@ -608,7 +608,7 @@ export function ChatInterface({
           <span>
             You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
             assistant can&apos;t look up a specific {CITY_CONFIG[city].label} place
-            yet — general food-safety questions still work.
+            yet. General food-safety questions still work.
           </span>
         </div>
       )}

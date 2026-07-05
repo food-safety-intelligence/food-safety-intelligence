@@ -394,20 +394,20 @@ export function InspectorWorklist() {
             <p className="text-sm leading-relaxed opacity-75 mt-2.5">
               In backtests, visits drawn from the top of this list found
               failures or critical violations about four times as often as
-              visits chosen at random. Predicts <em>where to look first</em> —
-              it is not a verdict on any establishment.
+              visits chosen at random. Predicts <em>where to look first</em>.
+              It is not a verdict on any establishment.
             </p>
             <div className="mt-4 flex flex-col gap-2">
               {/* Placeholder hit-rates from the design handoff — replace with
                   real backtest numbers before this page ships (DR 0015). */}
               <LiftBar
-                label="Model-ranked visits — hit rate"
+                label="Model-ranked visits: hit rate"
                 value="~41%"
                 pct={82}
                 barClass="bg-coral"
               />
               <LiftBar
-                label="Random visits — hit rate"
+                label="Random visits: hit rate"
                 value="~10%"
                 pct={20}
                 barClass="bg-cream/45"
@@ -434,7 +434,7 @@ export function InspectorWorklist() {
               <h2 className="text-base font-bold">Rising fast</h2>
             </div>
             <p className="text-xs text-muted mt-1.5 mb-3">
-              Steepest score increase over the last 90 days — worth a look even
+              Steepest score increase over the last 90 days, worth a look even
               below the High tier.
             </p>
             <div className="flex flex-col gap-0.5">
@@ -476,7 +476,7 @@ export function InspectorWorklist() {
             </p>
             {route.length === 0 ? (
               <div className="mt-3.5 border-[1.5px] border-dashed border-line rounded-2xl p-4.5 text-center text-xs text-muted">
-                No stops yet — expand a row and press{" "}
+                No stops yet. Expand a row and press{" "}
                 <strong className="text-ink">Add to today&apos;s route</strong>
               </div>
             ) : (
@@ -510,7 +510,7 @@ export function InspectorWorklist() {
           <aside className="border border-line rounded-3xl px-5 py-4 text-xs text-muted leading-relaxed bg-tint">
             <strong className="text-ink">A ranking, not a judgment.</strong>{" "}
             Scores are calibrated probabilities from public inspection, license
-            and 311 data. They prioritize limited inspection capacity — every
+            and 311 data. They prioritize limited inspection capacity. Every
             establishment still gets its regular cadence.
           </aside>
         </div>

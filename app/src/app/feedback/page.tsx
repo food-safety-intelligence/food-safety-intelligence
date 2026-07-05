@@ -37,7 +37,7 @@ export default function FeedbackPage() {
           </h1>
           <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[52ch]">
             This is a research preview built on public data. If something looks
-            wrong, reads unclearly, or is missing, we want to know — it goes
+            wrong, reads unclearly, or is missing, we want to know. It goes
             straight to the team.
           </p>
         </header>
