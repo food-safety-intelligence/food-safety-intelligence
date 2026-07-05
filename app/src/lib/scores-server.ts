@@ -21,7 +21,13 @@ import type {
   RiskTier,
   ScoresPayload,
 } from "@/lib/scores";
-import { compareByName, isAllTiers, matchesQuery, toPinDriver } from "@/lib/scores";
+import {
+  closedRank,
+  compareByName,
+  isAllTiers,
+  matchesQuery,
+  toPinDriver,
+} from "@/lib/scores";
 
 // S3 source of truth for the precomputed JSONs. Credentials resolve via the
 // AWS SDK's default chain: env vars → ~/.aws/credentials → the SSR runtime's
@@ -282,6 +288,7 @@ function pinFromScore(r: RestaurantScore): PinSummary {
     risk_score: r.risk_score,
     risk_tier: r.risk_tier,
     top_driver: d ? toPinDriver(d) : undefined,
+    is_out_of_business: r.is_out_of_business,
   };
 }
 
@@ -328,8 +335,9 @@ export async function getHomeView(opts: {
   // alphabetically; "low" surfaces the lowest-risk end; default is highest-risk.
   const sorted = matched.slice().sort((a, b) => {
     if (sort === "name") return compareByName(a.dba_name, b.dba_name);
-    if (sort === "low") return a.risk_score - b.risk_score;
-    return b.risk_score - a.risk_score;
+    if (sort === "low")
+      return closedRank(a) - closedRank(b) || a.risk_score - b.risk_score;
+    return closedRank(a) - closedRank(b) || b.risk_score - a.risk_score;
   });
   const listRows: HomeListRow[] = sorted.slice(0, listLimit).map((r) => {
     // Carry the #1 driver (compact) so list rows can show "what's driving this".
@@ -342,6 +350,7 @@ export async function getHomeView(opts: {
       risk_tier: r.risk_tier,
       trend_slope: r.trend_slope,
       top_driver: d ? toPinDriver(d) : undefined,
+      is_out_of_business: r.is_out_of_business,
     };
   });
 
@@ -351,8 +360,12 @@ export async function getHomeView(opts: {
   // so the map and the side list never contradict each other.
   const pins: PinSummary[] = matched
     .filter(hasCoords)
-    .sort((a, b) =>
-      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
+    .sort(
+      (a, b) =>
+        closedRank(a) - closedRank(b) ||
+        (sort === "low"
+          ? a.risk_score - b.risk_score
+          : b.risk_score - a.risk_score),
     )
     .map(pinFromScore);
 
