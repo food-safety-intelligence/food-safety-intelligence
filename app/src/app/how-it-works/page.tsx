@@ -534,16 +534,6 @@ export default async function HowItWorksPage() {
               {methodology.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
               {methodology.headline.top_decile_lift.toFixed(1)}×.
             </p>
-            <p className="text-md text-muted leading-relaxed mt-3">
-              We <span className="text-ink/85">select</span> the production model
-              on two of these, <span className="text-ink/85">PR-AUC</span> and{" "}
-              <span className="text-ink/85">precision in the top 10%</span>,
-              requiring both to hold up under expanding-window cross-validation
-              before promoting it. The lift and ROC-AUC in the header describe how
-              well the chosen model works; PR-AUC and top-10% precision are how it
-              was chosen. Precision and recall at every operating point are in the
-              table below.
-            </p>
           </article>
 
           <article>
@@ -627,6 +617,17 @@ export default async function HowItWorksPage() {
               inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
               with an event). &ldquo;Lift&rdquo; is precision divided by that
               base rate.
+            </p>
+
+            <p className="text-md text-muted leading-relaxed mt-4">
+              These are also the two numbers we{" "}
+              <span className="text-ink/85">select</span> the model on:{" "}
+              <span className="text-ink/85">PR-AUC</span> and{" "}
+              <span className="text-ink/85">precision in the top 10%</span>, both
+              measured on this held-out split and required to hold up under
+              expanding-window cross-validation before a model is promoted. Lift
+              and ROC-AUC describe how well the chosen model works; these two are
+              how it was chosen.
             </p>
 
             <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
