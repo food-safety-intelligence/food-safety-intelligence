@@ -107,8 +107,8 @@ export function ModelCard({ city, m, number, limitations }: {
           and{" "}
           <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>
           {" "}above; the intended-use, limits, and retraining points below are what the
-          card adds. It covers <span className="font-medium text-ink/80">two models</span> —
-          the risk score and a separate trend forecast — the same pair as Chicago,
+          card adds. It covers <span className="font-medium text-ink/80">two models</span>{" "}
+          (the risk score and a separate trend forecast), the same pair as Chicago,
           retrained on {c.label} data.
         </p>
 
@@ -117,7 +117,7 @@ export function ModelCard({ city, m, number, limitations }: {
           <div className="rounded-2xl border border-line bg-card p-4">
             <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">Model 1 · Risk score</p>
             <p className="text-sm text-muted leading-relaxed mt-2">
-              The headline percentage — {c.predictionBlurb}. It uses the current
+              The headline percentage: {c.predictionBlurb}. It uses the current
               inspection&apos;s own outcome, the strongest near-term signal. The details
               and evaluation on this card describe this model.
             </p>
@@ -165,7 +165,7 @@ export function ModelCard({ city, m, number, limitations }: {
 
         <h3 className="text-lg font-medium tracking-tight mt-8">Intended users &amp; use</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
-          Built for the people who plan food-safety inspections — the {c.healthDept} or
+          Built for the people who plan food-safety inspections: the {c.healthDept} or
           an inspection team deciding where limited inspector time should go. It is a
           triage signal that ranks {c.nounPlural} by forward risk so a capacity-limited
           team can work the riskiest first; the value is in the ranking, not any single
@@ -175,11 +175,11 @@ export function ModelCard({ city, m, number, limitations }: {
 
         <h3 className="text-lg font-medium tracking-tight mt-6">Out-of-scope uses</h3>
         <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85 max-w-[62ch]">
-          <li><span className="font-medium">Not a verdict.</span> A high score is not a finding that a place is unsafe — most flagged establishments have no event in the window.</li>
+          <li><span className="font-medium">Not a verdict.</span> A high score is not a finding that a place is unsafe. Most flagged establishments have no event in the window.</li>
           <li><span className="font-medium">Not an enforcement or licensing input.</span> It shouldn&apos;t be used on its own to fine, close, or penalise a business without a human inspection.</li>
           <li><span className="font-medium">Not a live diner guarantee.</span> It doesn&apos;t say whether a specific meal is safe right now.</li>
           <li><span className="font-medium">Not another city.</span> Trained only on {c.label} data and not validated elsewhere.</li>
-          <li><span className="font-medium">Preview quality.</span> {c.label} is a research-preview coverage feature with a weaker signal than Chicago — treat its scores as a rougher guide.</li>
+          <li><span className="font-medium">Preview quality.</span> {c.label} is a research-preview coverage feature with a weaker signal than Chicago. Treat its scores as a rougher guide.</li>
         </ul>
 
         <h3 className="text-lg font-medium tracking-tight mt-6">How it&apos;s evaluated</h3>
@@ -201,7 +201,7 @@ export function ModelCard({ city, m, number, limitations }: {
         <h3 className="text-lg font-medium tracking-tight mt-6">Retraining</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           Retrained on demand from the public source, not on a fixed schedule and never
-          live — each run is tied to the exact commit that produced it, and a published
+          live. Each run is tied to the exact commit that produced it, and a published
           score set can always be regenerated from scratch. The model type and the date
           its metrics were generated are shown above.
         </p>
@@ -218,9 +218,9 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
       <article>
         <h2 className="text-2xl font-medium tracking-tight">Where the data comes from and how it&apos;s handled</h2>
         <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
-          Every input is a public record — {m?.data_source ?? c.sources.join(", ")}. The
-          app collects nothing from the people who visit it — no accounts, no login, no
-          personal data — so the questions below are about public business records, not
+          Every input is a public record: {m?.data_source ?? c.sources.join(", ")}. The
+          app collects nothing from the people who visit it (no accounts, no login, no
+          personal data), so the questions below are about public business records, not
           private user data. The full source list is on the{" "}
           <a href="/sources" className="text-teal hover:underline">Sources</a> page.
         </p>
@@ -237,7 +237,7 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           Scores are published as static JSON served through a content-delivery network.
           The website is read-only static pages with no login and no server-side
-          database, and it never runs the model on a page load — it only reads the
+          database, and it never runs the model on a page load: it only reads the
           pre-computed JSON (the batch-score-to-JSON contract). Source and working data
           sit in a private cloud bucket limited to the team&apos;s own credentials.
         </p>
@@ -246,14 +246,14 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           We don&apos;t read the source feed live; we re-pull and re-score in a batch
           job, then publish a fresh JSON. The scores you see are a snapshot as of the
-          last publish — the detail page shows each establishment&apos;s &ldquo;as
-          of&rdquo; date — not a live reading.
+          last publish (the detail page shows each establishment&apos;s &ldquo;as
+          of&rdquo; date), not a live reading.
         </p>
 
         <h3 className="text-lg font-medium tracking-tight mt-6">Location data</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           The only location data is an establishment&apos;s own address and map
-          coordinates — it locates a business, not a person.{" "}
+          coordinates: it locates a business, not a person.{" "}
           {city === "la"
             ? "The LA feed carries no coordinates, so they're geocoded from the public street address (a few fall back to a ZIP-code centroid)."
             : "They come straight from the public inspection record."}{" "}

@@ -27,7 +27,7 @@ const SOURCES_BY_CITY: Record<City, Source[]> = {
       name: "Chicago Business Licenses (current + historical)",
       href: "https://data.cityofchicago.org/Community-Economic-Development/Business-Licenses-Current-Active/uupf-x98q",
       summary:
-        "Active + full license history — facility type, risk tier, address, and license-age features.",
+        "Active + full license history: facility type, risk tier, address, and license-age features.",
     },
   ],
   nyc: [
@@ -49,7 +49,7 @@ const SOURCES_BY_CITY: Record<City, Source[]> = {
       name: "LA County Restaurant and Market Violations",
       href: "https://data.lacounty.gov/datasets/5eaea9f89b7549ee841da7617d3a9cba",
       summary:
-        "Per-violation records joined to inspections on serial number — the source for the shared violation dictionary's theme and severity-tier features.",
+        "Per-violation records joined to inspections on serial number: the source for the shared violation dictionary's theme and severity-tier features.",
     },
   ],
 };
@@ -66,7 +66,7 @@ export function SourcesList() {
         <h1 className="text-5xl font-light leading-[1.05] tracking-tight">Public data, attributed.</h1>
         <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
           Every score for <strong className="text-ink font-medium">{c.label}</strong>{" "}
-          is computed from the public datasets below. We don&apos;t scrape, buy, or combine private data — and
+          is computed from the public datasets below. We don&apos;t scrape, buy, or combine private data, and
           the app collects nothing from the people who visit it.
         </p>
       </header>
@@ -92,7 +92,7 @@ export function SourcesList() {
       <section className="mt-10 rounded-3xl bg-tint border border-line p-6">
         <p className="text-teal text-xs tracking-[0.18em] uppercase mb-2">Refresh cadence</p>
         <p className="text-md text-ink/85 leading-relaxed">
-          Scores are computed on a fixed snapshot and published as static JSON — the detail page
+          Scores are computed on a fixed snapshot and published as static JSON. The detail page
           shows each establishment&apos;s &ldquo;as of&rdquo; date. A scheduled incremental refresh
           is on the roadmap. See how the data is handled under{" "}
           <a href="/how-it-works#data-governance" className="text-teal hover:underline">Data governance</a>.

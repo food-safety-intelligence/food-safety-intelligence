@@ -91,7 +91,7 @@ export default async function HomePage() {
               </h3>
               <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
                 Two food establishments can share the same score for different
-                reasons — and for someone with a weakened immune system, the
+                reasons, and for someone with a weakened immune system, the
                 reason matters. We surface the top drivers, like temperature
                 abuse, cross-contamination, and handwashing lapses, so you can
                 match the data to the precautions your care team recommends.

@@ -361,7 +361,20 @@ def _coerce_history(raw: object) -> list[dict]:
     return cleaned
 
 
-def _build_agent(messages: list[dict] | None = None) -> Agent:
+# Persona a request can be tagged with (frontend: the For Inspectors / For
+# Caregivers pages), and which system-prompt section each one activates by
+# default. See the matching sections in system_prompt.txt.
+_PERSONA_LABELS = {
+    "inspector": "Food-safety inspector",
+    "caregiver": "Caregiver (immunocompromised, elderly, child, or critically ill patient)",
+}
+_PERSONA_SECTIONS = {
+    "inspector": "INSPECTOR CONTEXT",
+    "caregiver": "CAREGIVER / IMMUNOCOMPROMISED CONTEXT",
+}
+
+
+def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent:
     """Build a fresh agent for ONE request.
 
     The model is shared (stateless), but each invocation gets its OWN Agent so its
@@ -383,6 +396,18 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
         f"'no record' statement to {city_label}; do not mention or use the other "
         f"city's establishments for this request.\n\n"
     )
+    # Tell the model which audience opened this chat (frontend: the For
+    # Inspectors / For Caregivers pages), so the relevant system-prompt section
+    # applies by default rather than only when the user's own words trigger it
+    # (e.g. a caregiver who never says "immunocompromised").
+    persona_prefix = ""
+    if persona in _PERSONA_LABELS:
+        persona_prefix = (
+            f"ACTIVE PERSONA: {_PERSONA_LABELS[persona]}. The user opened this chat "
+            f'from the For {persona.title()}s page. Apply the "{_PERSONA_SECTIONS[persona]}" '
+            f"rules below by default for this conversation, even if they don't use "
+            f"those words themselves. All FRAMING & GUARDRAILS rules still apply.\n\n"
+        )
     return Agent(
         model=model,
         messages=messages or [],
@@ -394,7 +419,7 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
             find_inspection_records,
             food_safety_info,
         ],
-        system_prompt=city_prefix + SYSTEM_PROMPT,
+        system_prompt=city_prefix + persona_prefix + SYSTEM_PROMPT,
     )
 
 
@@ -427,9 +452,15 @@ def invoke(payload: dict) -> dict:
     query, city = _extract_city(query, payload.get("city"))
     _ACTIVE_CITY.set(city)
 
+    # Persona (For Inspectors / For Caregivers chat entry points): same
+    # precedence and marker mechanism as city, extracted from what's left of the
+    # query after the city marker above (frontend emits city marker first, then
+    # persona marker, then the establishment-scope tag / user text).
+    query, persona = _extract_persona(query, payload.get("persona"))
+
     # Fresh, isolated agent per request, seeded with the caller's prior turns so
     # follow-up questions have context. History is client-supplied and validated.
-    agent = _build_agent(_coerce_history(payload.get("history")))
+    agent = _build_agent(_coerce_history(payload.get("history")), persona)
     result = agent(query)
     return {"result": str(result)}
 
@@ -449,6 +480,25 @@ def _extract_city(query: str, field: object) -> tuple[str, str]:
     if m:
         return query[m.end() :], m.group(1)
     return query, "chicago"
+
+
+_PERSONA_MARKER = re.compile(r"^\s*\[\[persona:(inspector|caregiver)\]\]\s*")
+
+
+def _extract_persona(query: str, field: object) -> tuple[str, str]:
+    """Resolve the request persona and strip its marker from the query.
+
+    Mirrors ``_extract_city``: an explicit `persona` payload field takes
+    precedence over a leading `[[persona:...]]` marker (the frontend's fallback
+    for the deployed proxy, which forwards only the query string). Unknown or
+    missing → "" (no persona framing — the default, unscoped chat).
+    """
+    if isinstance(field, str) and field.lower() in _PERSONA_LABELS:
+        return _PERSONA_MARKER.sub("", query), field.lower()
+    m = _PERSONA_MARKER.match(query)
+    if m:
+        return query[m.end() :], m.group(1)
+    return query, ""
 
 
 # ---------------------------------------------------------------------------
