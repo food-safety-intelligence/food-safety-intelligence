@@ -193,96 +193,7 @@
           <span class="sub">ranked by predicted risk × time since last inspection</span>
         </div>
         <ol class="worklist">
-          <li class="selected">
-            <a class="row" href="#briefing" aria-current="true">
-              <span class="rank">1</span>
-              <span class="who">
-                <span class="nm">DALE VIDA A TU CUERPO <span class="pill high">High</span></span>
-                <span class="addr">3835 W North Ave</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">90 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="90 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited Jan 2019</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a class="row" href="#briefing">
-              <span class="rank">2</span>
-              <span class="who">
-                <span class="nm">2337 MILWAUKEE <span class="pill high">High</span></span>
-                <span class="addr">2337 N Milwaukee Ave Fl 1</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">82 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="82 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited Sep 2019</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a class="row" href="#briefing">
-              <span class="rank">3</span>
-              <span class="who">
-                <span class="nm">YANQUI LEON LLC <span class="pill high">High</span></span>
-                <span class="addr">4059 W Armitage Ave</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">28 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="28 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited Mar 2024</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a class="row" href="#briefing">
-              <span class="rank">4</span>
-              <span class="who">
-                <span class="nm">SEE THRU CHINESE RESTAURANT <span class="pill high">High</span></span>
-                <span class="addr">800 N Kedzie Ave</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">18 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="18 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited Jan 2025</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a class="row" href="#briefing">
-              <span class="rank">5</span>
-              <span class="who">
-                <span class="nm">BIG TEDDY BEAR INS <span class="pill elev">Elevated</span></span>
-                <span class="addr">3513 N Pulaski Rd</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">62 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="62 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited May 2021</span>
-              </span>
-            </a>
-          </li>
-          <li>
-            <a class="row" href="#briefing">
-              <span class="rank">6</span>
-              <span class="who">
-                <span class="nm">BOOMBOX CHICAGO <span class="pill elev">Elevated</span></span>
-                <span class="addr">900 N Ashland Ave</span>
-                <span class="why"><strong>Failed its last inspection</strong></span>
-              </span>
-              <span class="due past">
-                <span class="mo">88 <small>mo</small></span>
-                <span class="meter" role="img" aria-label="88 months since last inspection, target 6"><i style="width:100%"></i></span>
-                <span class="since">last visited Mar 2019</span>
-              </span>
-            </a>
-          </li>
+<!--WORKLIST-->
         </ol>
       </section>
 
@@ -292,21 +203,7 @@
           <span class="sub">forecast trend rising across recent inspections</span>
         </div>
         <div class="worse-cards">
-          <div class="wcard">
-            <div class="nm">PORKCHOP</div>
-            <div class="addr">1132-1138 W Grand Ave</div>
-            <div class="slope">↗ +0.0076<small> / day · Moderate</small></div>
-          </div>
-          <div class="wcard">
-            <div class="nm">THE HALLMARK</div>
-            <div class="addr">2960 N Lake Shore Dr</div>
-            <div class="slope">↗ +0.0053<small> / day · Moderate</small></div>
-          </div>
-          <div class="wcard">
-            <div class="nm">AL KABEER RESTAURANT</div>
-            <div class="addr">6426 N Western Ave</div>
-            <div class="slope">↗ +0.0041<small> / day · Elevated</small></div>
-          </div>
+<!--WORSENING-->
         </div>
       </section>
     </div>
@@ -314,29 +211,25 @@
     <section class="panel brief" id="briefing" aria-labelledby="br-h">
       <div class="inner">
         <div class="eyebrow" id="br-h">Pre-visit briefing</div>
-        <h3>Dale Vida A Tu Cuerpo</h3>
-        <div class="addr">3835 W North Ave · License #2636270</div>
+        <h3>{B_NAME}</h3>
+        <div class="addr">{B_ADDR} · License #{B_LICENSE}</div>
         <div class="stats">
-          <div class="stat"><b>High</b>predicted tier</div>
-          <div class="stat"><b>0.36</b>180-day risk</div>
-          <div class="stat"><b>Jan 2019</b>last inspected</div>
+          <div class="stat"><b>{B_TIER}</b>predicted tier</div>
+          <div class="stat"><b>{B_SCORE}</b>180-day risk</div>
+          <div class="stat"><b>{B_LAST}</b>last inspected</div>
         </div>
 
         <div class="checks">
           <h4>What to check on-site</h4>
           <ul>
-            <li><span>Re-check the 2 priority violations from the last report<small>Verify correction; these were open at the last inspection.</small></span></li>
-            <li><span>Core sanitation sweep<small>10 core violations recorded at the last visit — expect general upkeep issues.</small></span></li>
-            <li><span>Cooling practices &amp; walk-in temperatures<small>Improper cooling was cited at the last visit.</small></span></li>
-            <li class="low"><span>Complaint history is clean<small>No complaint-driven inspections on record.</small></span></li>
+<!--B_CHECKS-->
         </ul>
         </div>
 
         <div class="visits">
           <h4>Visit history</h4>
           <table>
-            <tr><td class="d">Jan 2019</td><td>License</td><td class="r fail">Fail</td></tr>
-            <tr><td class="d">Nov 2018</td><td>License</td><td class="r">No Entry</td></tr>
+<!--B_VISITS-->
         </table>
         </div>
 
