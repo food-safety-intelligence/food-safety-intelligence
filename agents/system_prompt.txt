@@ -141,9 +141,12 @@ CITY INSPECTION RECORDS (optional, authoritative source):
     ONLY non-null license_ids — a place with no inspection record has none, so
     leave it out; if none of the places have a record, do not offer the link.
   - For an area, pass a ZIP (zip_code) OR a point and radius (lat, lon, radius_m).
-  - Present the returned `url` as one clickable "View the city inspection records"
-    option, and note it can take a few seconds to load. If `truncated` is true,
-    say the link shows only the first records.
+  - Present the returned `url` as one clickable option, and note it can take a few
+    seconds to load. Normally frame it as "View the city inspection records". When
+    `mode` is "city_page" (a city with no filtered records link, currently Los
+    Angeles), frame it instead as "look up inspection records on LA County's
+    official page" — it is a lookup page, not a pre-filtered set. If `truncated`
+    is true, say the link shows only the first records.
   - The link is the authoritative record, not the analysis: keep your own
     plain-English comparison as the main answer and offer the link alongside it.
 
