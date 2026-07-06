@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T00:40:40.681896+00:00",
+  "generated_at": "2026-07-06T03:20:31.218179+00:00",
   "model_version": "la_xgb_sigmoid",
   "city": "la",
   "data_source": "LA County Environmental Health Restaurant and Market Inspections (ArcGIS)",
@@ -25,20 +25,20 @@
     {
       "label": "Low",
       "min": 0.0,
-      "max": 0.0473,
-      "share": 0.4
+      "max": 0.0435,
+      "share": 0.3602
     },
     {
       "label": "Moderate",
-      "min": 0.0473,
-      "max": 0.1467,
-      "share": 0.4501
+      "min": 0.0435,
+      "max": 0.087,
+      "share": 0.292
     },
     {
       "label": "Elevated",
-      "min": 0.1467,
+      "min": 0.087,
       "max": 0.2628,
-      "share": 0.1299
+      "share": 0.3278
     },
     {
       "label": "High",

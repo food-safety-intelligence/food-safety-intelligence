@@ -205,12 +205,11 @@ export function HowItWorksNyc() {
         <article>
           <h2 className="text-2xl font-medium tracking-tight">The model</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            A logistic-regression pipeline with sigmoid (Platt) calibration:
-            identical machinery to Chicago&apos;s production model, so the
-            per-establishment SHAP driver breakdown and the calibrated-log-odds
-            waterfall on each detail page work the same way. Scores are computed in
-            a batch job and written to JSON; the site never calls a model at request
-            time.
+            A gradient-boosted tree model (XGBoost, depth-3) with sigmoid (Platt)
+            calibration. The per-establishment SHAP driver breakdown and the
+            calibrated-log-odds waterfall on each detail page show which factors
+            moved the score. Scores are computed in a batch job and written to JSON;
+            the site never calls a model at request time.
           </p>
         </article>
         <article>
@@ -313,20 +312,20 @@ export function HowItWorksNyc() {
             Per-establishment SHAP attribution: signed log-odds contributions from
             each feature, summed and squashed to recover the probability on the
             gauge. The detail page surfaces the top drivers; here is how they add up
-            for one real high-risk establishment (score 99).
+            for one real high-risk establishment (risk score 84).
           </p>
           <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden max-w-[62ch]">
             <WaterfallRow label="Base rate (model intercept)" value={-0.46} muted />
-            <WaterfallRow label="48 critical violations in prior inspections" value={6.32} />
-            <WaterfallRow label="8 prior inspections on record" value={-3.25} />
-            <WaterfallRow label="8 prior inspections graded B/C" value={-1.01} />
-            <WaterfallRow label="4 imminent-hazard-tier violations now" value={0.87} />
-            <WaterfallRow label="20 prior general-tier violations" value={0.62} />
-            <WaterfallRow label="Everything else (remaining features)" value={1.56} muted />
-            <WaterfallRow label="Total (calibrated log-odds)" value={4.65} strong />
+            <WaterfallRow label="15 critical violations in prior inspections" value={0.64} />
+            <WaterfallRow label="Past B/C rate: 1.0" value={0.37} />
+            <WaterfallRow label="8 prior imminent-hazard-tier violations" value={0.37} />
+            <WaterfallRow label="3 prior inspections on record" value={-0.35} />
+            <WaterfallRow label="10 prior critical-tier violations" value={0.28} />
+            <WaterfallRow label="Everything else (remaining features)" value={0.81} muted />
+            <WaterfallRow label="Total (calibrated log-odds)" value={1.66} strong />
             <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-tint/50">
               <span className="text-sm text-ink font-medium">Squashed to a probability (the gauge)</span>
-              <span className="num text-terra-strong font-semibold">99.1%</span>
+              <span className="num text-terra-strong font-semibold">84.1%</span>
             </div>
           </div>
           <p className="text-xs text-muted leading-relaxed mt-3 max-w-[62ch]">

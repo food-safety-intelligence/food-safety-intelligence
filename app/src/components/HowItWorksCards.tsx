@@ -59,8 +59,8 @@ export function MethodologyHero({
 
 // Friendly labels for the served model slug (mirrors the Chicago page's map).
 const MODEL_TYPE_LABELS: Record<string, string> = {
-  la_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",
-  nyc_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",
+  la_xgb_sigmoid: "Gradient-boosted trees (XGBoost)",
+  nyc_xgb_sigmoid: "Gradient-boosted trees (XGBoost)",
 };
 
 interface Methodology {
