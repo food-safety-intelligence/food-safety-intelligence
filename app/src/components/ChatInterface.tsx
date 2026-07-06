@@ -16,6 +16,7 @@ import type { ChatEstablishment, ChatPersona } from "@/components/ChatScopeConte
 import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
+import { Wordmark } from "@/components/Wordmark";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -627,10 +628,8 @@ export function ChatInterface({
                   <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                     <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
                   </span>
-                  {/* "Eatelligence" = Eat + intelligence; sage "Eat" stem
-                      (sage-strong clears AA) plays up the pun. */}
                   <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                    <span className="text-sage-strong">Eat</span>elligence
+                    <Wordmark />
                   </h2>
                 </>
               )}
