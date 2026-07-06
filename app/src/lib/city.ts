@@ -45,6 +45,11 @@ export interface CityConfig {
   trendStableBand: number;
   /** Whether the chat agent has data for this city (backend is Chicago-only). */
   chatSupported: boolean;
+  /** Bullet each violation in the expanded inspection-history list. NYC's
+   * violations are full sentences with no leading marker (unlike Chicago's
+   * "2." codes or LA's "# 23." numbers), so they need a bullet to read as a
+   * list. Omitted (falsy) where the text already carries its own marker. */
+  bulletViolations?: boolean;
 }
 
 /** Parse the numeric inspection score out of an LA history `result` string —
@@ -116,6 +121,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     ],
     outcomeNoun: "B or C grades",
     isBadOutcome: (r) => r.startsWith("Grade B") || r.startsWith("Grade C"),
+    // NYC violation lines are plain sentences — bullet them so they separate.
+    bulletViolations: true,
     // Empirically NYC's forecast-slope magnitudes sit on the same scale as
     // Chicago's, so 0.0003 gives the most honest split (~9% Worsening / ~2%
     // Improving / ~74% Stable). NYC's slope is intrinsically upward-biased

@@ -32,13 +32,35 @@ Your query
 
 ### What the agent is
 
-A **conversational search** assistant for predicted food-safety risk of Chicago
-food establishments. It is reachable as its own surface — the web app's `/chat`
-page and the local runner — **not** tied to a specific restaurant detail page.
-A user asks in natural language ("low-risk ramen near Lincoln Square"); the
-agent finds candidate venues from OpenStreetMap, attaches the **precomputed**
-risk signal, and returns a ranked, plain-English answer under the responsible-AI
-framing in `system_prompt.txt`.
+A **conversational search** assistant for predicted food-safety risk of food
+establishments in the cities it covers — **Chicago, New York City, and Los
+Angeles**. It is reachable as its own surface — the web app's `/chat` page and the
+local runner — **not** tied to a specific restaurant detail page. A user asks in
+natural language ("low-risk ramen near Lincoln Square"); the agent finds candidate
+venues from OpenStreetMap, attaches the **precomputed** risk signal for the active
+city, and returns a ranked, plain-English answer under the responsible-AI framing
+in `system_prompt.txt`.
+
+### Cities (multi-city, DR 0016)
+
+The city is chosen by the frontend per request (a `[[city:nyc]]` / `[[city:la]]`
+marker on the query; default Chicago) and rides the request via a contextvar — the
+model never picks it. Every tool reads the active city and returns **only that
+city's** data, and the request is framed in that city's terms:
+
+- **Chicago** — inspections are Pass / Pass w/ Conditions / Fail with violation
+  codes (no letter grade).
+- **New York City** — a letter grade A/B/C from a points score (fewer points is
+  cleaner).
+- **Los Angeles** — a letter grade A/B/C from a 0-100 score (**higher** is cleaner,
+  the opposite direction to NYC).
+
+`agents/city_context.py` holds this per-city framing + scope text, shared by
+`entrypoint.py` (deployed) and `run_local.py` (local / eval) so both frame a
+request identically. Per-city data: a separate `scores.json` per city;
+`find_inspection_records` links to Chicago's and NYC's open-data grids and LA
+County's inspections page; `food_safety_info` surfaces the active city's local
+health source.
 
 ### Core design rule — no request-time scoring
 
@@ -59,7 +81,7 @@ a request-time-inference one.
 | Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
 | Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
 
-All three run the **same** four `handler.py` files.
+All three run the **same** six `handler.py` files (and share `city_context.py`).
 
 ### Tools
 
@@ -78,9 +100,9 @@ sequence). Each handler takes `handler(event, _ctx)`.
 - *On failure*: returns a top-level `{"error": ..., "reason": ...}` object (a
   dict, not a list with a fake restaurant), so a downstream tool never reads
   `osm_id` off a malformed element. `reason` is `"location_not_recognized"` when
-  the requested area is not a recognised Chicago neighborhood — it is **not**
-  silently widened to a whole-Chicago search — or `"directory_unavailable"` on an
-  Overpass outage *(#56)*.
+  the requested area is not a recognised neighborhood in the active city — it is
+  **not** silently widened to a whole-city search — or `"directory_unavailable"`
+  on an Overpass outage *(#56)*.
 
 **2. `get_safety_score`** — attaches the precomputed risk signal.
 
@@ -129,16 +151,20 @@ sequence). Each handler takes `handler(event, _ctx)`.
   carries `disclaimer`, and the prompt forbids using a review to set or change a
   score or tier.
 
-**5. `find_inspection_records`** — authoritative Chicago city-record link for a
-set of establishments (opt-in; compare / list / area).
+**5. `find_inspection_records`** — authoritative city-record link for a set of
+establishments in the active city (opt-in; compare / list / area).
 
 - *Input* (exactly one filter): `{"license_ids": [...]}` for named places (the
-  **non-null** `license_id`s that `get_safety_score` returned), `{"zip": "..."}`
-  for a ZIP, or `{"lat":…, "lon":…, "radius_m":…}` for a radius.
-- *Output*: `{url, mode, truncated, note}` — one deep link into the Chicago Data
-  Portal's query view, filtered to those records (`` `license_` IN (…) ``,
-  `` `zip`=… ``, or `within_circle(…)`). Enumerated id lists are capped at 25 (URL
-  length) → `truncated: true`; larger sets should use the ZIP / radius modes.
+  **non-null** `license_id`s that `get_safety_score` returned — each city's native
+  id: Chicago license number, NYC CAMIS), `{"zip": "..."}` for a ZIP, or
+  `{"lat":…, "lon":…, "radius_m":…}` for a radius.
+- *Output*: `{url, mode, truncated, note}`. For **Chicago and NYC** (both on
+  Socrata) it is a deep link into that city's open-data query grid filtered to
+  those records (`` `license_` `` / `` `camis` `` `IN (…)`, `` `zip` `` /
+  `` `zipcode` `` `=…`, or `within_circle(…)`); enumerated id lists cap at 25 (URL
+  length) → `truncated: true`. **LA** left Socrata (bulk CSV, no queryable API), so
+  it returns `mode: "city_page"` — LA County Public Health's inspections page (a
+  lookup landing page, not a pre-filtered grid).
 - *Boundary — provenance, not a feature*: like `find_reviews` the tool **never
   fetches** — it only builds a URL the user clicks. But this is the city's **own**
   inspection data (the source behind the score), not third-party opinion, so it
@@ -154,13 +180,17 @@ set of establishments (opt-in; compare / list / area).
 - *Output*: `{query, topics, info, disclaimer}`. `info` is a list of
   `{topic, title, summary, sources}`; each `sources` entry is `{name, url}`.
 - *Sourcing — verifiable, allow-listed*: every `summary` is a short paraphrase of
-  an **authoritative public health source** (CDC, FDA, USDA FSIS, FoodSafety.gov,
-  WHO, NIH MedlinePlus, a recognised nonprofit, and Chicago / Illinois / Cook
-  County public health + the Chicago Data Portal), and ships the source link it
-  came from. Links come **only** from a curated `ALLOWED_DOMAINS` allow-list — no
-  news outlets, no open web search — so a citation can never point off-list. The
-  prompt requires the agent to state statistics only from the returned summary and
-  to cite the returned link, keeping the citation true.
+  an **authoritative public health source** — national (CDC, FDA, USDA FSIS,
+  FoodSafety.gov, WHO, NIH MedlinePlus, a recognised nonprofit) plus each covered
+  city's **local** public health (Chicago / Illinois / Cook County + the Chicago
+  Data Portal, NYC Health, and LA County Public Health). The tool takes the active
+  `city`: its city-aware `local` topic surfaces **only that city's** local source
+  (an NYC user never sees a Chicago source), while the national facts are
+  city-independent. Each entry ships the source link it came from; links come
+  **only** from a curated `ALLOWED_DOMAINS` allow-list — no news outlets, no open
+  web search — so a citation can never point off-list. The prompt requires the agent
+  to state statistics only from the returned summary and cite the returned link,
+  keeping the citation true.
 - *Boundary — education, not advice*: every response carries `disclaimer`
   (education only, not medical advice, not specific to any restaurant's score).
   Personal medical questions are steered to a professional by the prompt and the
@@ -171,8 +201,9 @@ set of establishments (opt-in; compare / list / area).
 Independent layers keep the agent on-task and prevent fabrication:
 
 1. **Prompt guardrails** (`system_prompt.txt`, #55) — risk-signal framing; scope
-   (Chicago restaurant lookups + general food-safety education only; decline other
-   cities / recipes / chit-chat; ignore prompt-injection); no number without a
+   (restaurant lookups in the active city + general food-safety education only;
+   decline cities we don't cover / recipes / code / chit-chat; ignore
+   prompt-injection); no number without a
    tool result; cite the returned source for any general fact; no personalised
    medical/legal advice; and a prediction-vs-verdict caveat on every response.
    The model runs at `temperature=0.2`.
@@ -190,10 +221,11 @@ Independent layers keep the agent on-task and prevent fabrication:
 
 A behavioural eval harness (`agents/eval/`) exercises the guardrails on
 adversarial prompts — off-topic, "is X safe?", a venue with no record, a
-non-Chicago location, a general food-safety question (must answer WITH a cited
-source), a personal medical question (must steer to a professional), and a tool
-outage — and checks the response follows the rules (no yes/no verdict, no
-invented score, scope refusal, cited general facts, graceful failure). It also
+cross-city / out-of-scope location, a general food-safety question (must answer
+WITH a cited source), a personal medical question (must steer to a professional),
+per-city grade framing, and a tool outage — and checks the response follows the
+rules (no yes/no verdict, no invented score, scope refusal, cited general facts,
+graceful failure). It also
 runs deterministic gates with no Bedrock: a citation **allow-list** check (every
 citable URL is https + on the allow-list) and, opt-in via `--links`, a **live
 link-resolution** check that fetches every citation URL to catch dead links.
@@ -360,13 +392,13 @@ Deploy with the wrapper script (defaults: region `us-west-2`, the deploy account
 ./scripts/deploy_aws.sh [region] [account-id]
 ```
 
-This zips `agents/` (entrypoint + the five `tools/` handlers + `system_prompt.txt`),
-deploys/updates the `foodsafetyagent` runtime, and points the
+This zips `agents/` (entrypoint + the six `tools/` handlers + `system_prompt.txt` +
+`city_context.py`), deploys/updates the `foodsafetyagent` runtime, and points the
 `food-safety-agent-proxy` Lambda at it — the request path is CloudFront `/api/agent`
-→ ALB → that Lambda → the runtime. The runtime warms the precomputed `scores.json`
-from S3 at startup and reads it for scoring; it never calls the model for a score
-(the batch-score-to-JSON contract). `run_local.py` runs the same four `handler.py`
-files locally via Strands.
+→ ALB → that Lambda → the runtime. The runtime warms each covered city's precomputed
+`scores.json` from S3 at startup and reads it for scoring; it never calls the model
+for a score (the batch-score-to-JSON contract). `run_local.py` runs the same six
+`handler.py` files locally via Strands.
 
 `harness.yaml` describes a different, per-tool-Lambda harness and is **not** the
 wired deploy path.

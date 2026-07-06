@@ -35,6 +35,7 @@ to produce the client detail bundles (build-time, gitignored).
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import json
 import urllib.parse
@@ -380,8 +381,58 @@ def la_labels(theme_cols, sev_cols) -> dict:
 
 
 # ------------------------------------------------------------ history (detail page)
-def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> dict:
-    """dict keyed by facility_id -> [{date, type, result, headline, score}] newest-first.
+def _violation_lines(grp: pd.DataFrame) -> str:
+    """Full cited-violation list for one inspection, worst (highest-point) first,
+    one per line, deduped by code (keeping its max-point occurrence). The point
+    deduction is appended when it carries one. This is the comment-shard text the
+    detail-page timeline expands to (Chicago-parity); `headline` is just its first
+    line, truncated. Empty when the inspection cited nothing."""
+    v = grp.loc[
+        grp["violation_code"].notna(), ["violation_code", "violation_description", "points"]
+    ].dropna(subset=["violation_description"])
+    best: dict[str, tuple[str, float]] = {}
+    for code, desc, pts in zip(
+        v["violation_code"],
+        v["violation_description"],
+        pd.to_numeric(v["points"], errors="coerce").fillna(0),
+        strict=False,
+    ):
+        d, p = str(desc), float(pts)
+        cur = best.get(str(code))
+        if cur is None or p > cur[1]:
+            best[str(code)] = (d, p)
+    items = sorted(best.values(), key=lambda x: -x[1])
+    # The minus glyph matches the app's number styling (U+2212), not a hyphen.
+    return "\n".join(f"{d} (−{int(p)} pts)" if p > 0 else d for d, p in items)
+
+
+def _shard_of(license_id: str) -> str:
+    # md5 first two hex chars → 256 even buckets. Must match the web app's shard
+    # scheme (scores-server.ts / prebuild-sync-s3.mjs) so the build reads the right file.
+    return hashlib.md5(license_id.encode()).hexdigest()[:2]
+
+
+def write_comment_shards(comments: dict[str, list[str]], out_dir: Path) -> int:
+    """Write the full violation text as 256 md5 shards ({license: [text_per_event]}),
+    mirroring Chicago's export_inspection_history.py so prebuild-sync-s3.mjs re-shards
+    them per license at build. Licenses whose every inspection cited nothing are
+    skipped (a missing shard entry → the timeline falls back to the headline)."""
+    shards: dict[str, dict[str, list[str]]] = {}
+    for lid, arr in comments.items():
+        if any(arr):
+            shards.setdefault(_shard_of(lid), {})[lid] = arr
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for sh, by_license in shards.items():
+        (out_dir / f"{sh}.json").write_text(json.dumps(by_license, separators=(",", ":")))
+    return sum(len(m) for m in shards.values())
+
+
+def build_history(
+    raw: pd.DataFrame, forecast_by_event: dict | None = None
+) -> tuple[dict, dict[str, list[str]]]:
+    """(history, comments). history is keyed by facility_id ->
+    [{date, type, result, headline, score}] newest-first; comments is keyed the
+    same, each an event-aligned list of the full cited-violation text.
 
     `result` is the LA letter grade + score ("Grade A (score 95)"); `headline` is
     the highest-point violation text at that inspection; `score` is the forecast-only
@@ -425,11 +476,16 @@ def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> d
                 "result": result,
                 "headline": headline,
                 "score": None if fc is None else round(float(fc), 6),
+                # Rides along on the event so the date-sort below keeps it aligned;
+                # popped into `comments` (and out of the history payload) after.
+                "_comment": _violation_lines(grp),
             }
         )
+    comments: dict[str, list[str]] = {}
     for k in hist:
         hist[k].sort(key=lambda e: e["date"], reverse=True)
-    return hist
+        comments[k] = [e.pop("_comment") for e in hist[k]]
+    return hist, comments
 
 
 # --------------------------------------------------------------------- fit + calibrate
@@ -656,9 +712,13 @@ def main():
         (r.license_id, pd.Timestamp(r.inspection_date).strftime("%Y-%m-%d")): r.forecast_risk
         for r in ev.itertuples(index=False)
     }
-    hist = build_history(raw, forecast_by_event)
+    hist, comments = build_history(raw, forecast_by_event)
     (OUT / "inspection_history.json").write_text(json.dumps(hist, separators=(",", ":")))
     print(f"Wrote inspection_history.json ({len(hist):,} facilities)")
+    # Full violation text, md5-sharded (Chicago-parity). Gitignored; publish.py
+    # uploads to web-app-data/la/comments/ and prebuild-sync-s3.mjs pulls it.
+    n_c = write_comment_shards(comments, OUT / "comments")
+    print(f"Wrote comment shards for {n_c:,} facilities → {OUT / 'comments'}")
 
     def top_driver(drivers):
         if not drivers:

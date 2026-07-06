@@ -87,6 +87,8 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
                                       #   | "not enough inspection history"
         "trend_slope":  float | null, # forecast-only last-K-visits slope; null if <2 scored
         "percentile_rank": float | null,
+        "is_out_of_business": bool,   # latest inspection event was a closure
+        "closed_since": str | null,   # ISO date of that closure, if known
         "top_drivers":  list[DriverDetail],
         "inspection_summary": {
             "total":       int,
@@ -138,6 +140,10 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         "percentile_rank": record.get("percentile_rank"),
         "trend": _trend_label(record.get("trend_slope")),
         "trend_slope": record.get("trend_slope"),
+        # Closure flag (scores schema 0.6.0, decision 0014): a closed venue's
+        # score/trend/drivers are historical, not a current signal.
+        "is_out_of_business": bool(record.get("is_out_of_business")),
+        "closed_since": record.get("closed_since"),
         # SHAP drivers — full detail
         "top_drivers": _format_drivers(record.get("top_drivers", [])),
         # Inspection summary + history
