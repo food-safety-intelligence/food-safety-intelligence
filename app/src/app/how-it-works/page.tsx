@@ -234,7 +234,7 @@ export default async function HowItWorksPage() {
             headline metrics sit here as stat cards so the page leads with what
             the model actually does. */}
         <MethodologyHero
-          eyebrow="Methodology"
+          eyebrow="Methodology · Chicago"
           title={<>How this <span className="serif italic text-teal">works</span></>}
           stats={
             <>
@@ -244,14 +244,8 @@ export default async function HowItWorksPage() {
                 accent
               />
               <HeroStat
-                value={top20 ? `${Math.round(top20.recall * 100)}%` : "—"}
-                label="of next-180-day events caught in the top 20%"
-              />
-              <HeroStat
-                value={methodology.headline.pr_auc.toFixed(2)}
-                label={`precision–recall AUC, vs a ${Math.round(
-                  methodology.test.prevalence * 100,
-                )}% base rate`}
+                value={methodology.headline.roc_auc.toFixed(2)}
+                label="ROC-AUC: ranks venues headed for a fail or priority citation above those that won't"
               />
             </>
           }
@@ -623,6 +617,17 @@ export default async function HowItWorksPage() {
               inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
               with an event). &ldquo;Lift&rdquo; is precision divided by that
               base rate.
+            </p>
+
+            <p className="text-md text-muted leading-relaxed mt-4">
+              These are also the two numbers we{" "}
+              <span className="text-ink/85">select</span> the model on:{" "}
+              <span className="text-ink/85">PR-AUC</span> and{" "}
+              <span className="text-ink/85">precision in the top 10%</span>, both
+              measured on this held-out split and required to hold up under
+              expanding-window cross-validation before a model is promoted. Lift
+              and ROC-AUC describe how well the chosen model works; these two are
+              how it was chosen.
             </p>
 
             <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">

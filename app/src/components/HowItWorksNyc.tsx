@@ -12,7 +12,7 @@ import {
   Target,
   Wrench,
 } from "lucide-react";
-import { ModelCard, DataGovernance, MethodologyHero, articleFor } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, MethodologyHero } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
@@ -112,13 +112,12 @@ export function HowItWorksNyc() {
   return (
     <div>
       <MethodologyHero
-        eyebrow="Research preview · New York City"
-        title="How this works: New York City"
+        eyebrow="Methodology · New York City"
+        title={<>How this <span className="serif italic text-teal">works</span></>}
         stats={
           <>
             <HeroStat accent value={m ? `${m.headline.top_decile_lift.toFixed(1)}×` : "—"} label="more hits than random, working the top 10% by predicted risk" />
-            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC, how well it ranks a B/C above a clean inspection (comparable across cities)" />
-            <HeroStat value={m ? m.headline.pr_auc.toFixed(2) : "—"} label={`precision–recall AUC, against ${articleFor(prevPct)} ${prevPct}% base rate`} />
+            <HeroStat value={m ? m.headline.roc_auc.toFixed(2) : "—"} label="ROC-AUC: ranks venues headed for a B or C grade above those that won't" />
           </>
         }
       >
@@ -258,10 +257,19 @@ export function HowItWorksNyc() {
             </p>
           )}
           {m && (
+            <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
+              The two numbers we judge the model on are here, not in the header:{" "}
+              <span className="text-ink">PR-AUC</span> and{" "}
+              <span className="text-ink">precision in the top 10%</span>, on the
+              held-out split. The lift and ROC-AUC above describe how well the
+              chosen model works; these two are how it was chosen.
+            </p>
+          )}
+          {m && (
             <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
               <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
                 <dt className="font-medium text-ink">ROC-AUC {m.headline.roc_auc.toFixed(2)}</dt>
-                <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above a clean one. Base-rate-independent, so it&apos;s the fair way to compare NYC with Chicago and LA, and it shows NYC is the weakest of the three.</dd>
+                <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above one that isn&apos;t. Base-rate-independent, so it&apos;s the fair way to compare NYC with Chicago and LA, and it shows NYC is the weakest of the three.</dd>
               </div>
               <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
                 <dt className="font-medium text-ink">PR-AUC {m.headline.pr_auc.toFixed(2)}</dt>
