@@ -48,6 +48,7 @@ OUTPUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "methodology.json")
 # onward is the time-held-out test. Never a random shuffle.
 TRAIN_END = pd.Timestamp("2024-07-01")
 TEST_START = pd.Timestamp("2025-07-01")
+K_FRACS = (0.05, 0.10, 0.20, 0.30, 0.50)
 
 N_GLOBAL_FEATURES = 12
 N_WATERFALL_DRIVERS = 4
@@ -211,9 +212,7 @@ def main() -> None:
     y = test[LABEL_COL].astype(int).to_numpy()
 
     report = evaluate(y, scores)
-    # Use operating_point_table's default k_fracs so Chicago shows the same
-    # top-K rows as the NYC/LA methodology pages (they use the default too).
-    table = operating_point_table(y, scores)
+    table = operating_point_table(y, scores, k_fracs=K_FRACS)
 
     payload = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),

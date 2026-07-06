@@ -94,12 +94,18 @@ type OpPoint = {
   lift: number;
 };
 
+// The five top-K slices shown on every city's methodology table. NYC/LA carry
+// extra fracs (15 / 25 / 40%) in their data; we render the same five everywhere
+// so the tables read consistently and stay uncrowded.
+const SHOWN_FRACS = [0.05, 0.1, 0.2, 0.3, 0.5];
+
 /**
  * The shared "inspect the top K%" operating-points table, used by all three
  * cities so columns, styling, and number formatting can't drift. Headers pair
  * each metric with a plain gloss (hit rate / events caught).
  */
 export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
+  const rows = ops.filter((p) => SHOWN_FRACS.some((f) => Math.abs(p.frac - f) < 1e-9));
   return (
     <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
       <div className="overflow-x-auto">
@@ -114,7 +120,7 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
             </tr>
           </thead>
           <tbody className="num text-ink/85">
-            {ops.map((p) => (
+            {rows.map((p) => (
               <tr key={p.frac} className="border-b border-line last:border-b-0">
                 <td className="py-2.5 px-4">{Math.round(p.frac * 100)}%</td>
                 <td className="py-2.5 px-4">{p.n_flagged.toLocaleString("en-US")}</td>
