@@ -5,7 +5,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { SourcesList } from "@/components/SourcesList";
 
 export const metadata = {
-  title: "Sources · Food Safety",
+  title: "Sources · Eatelligence Food Safety",
   description: "Public datasets behind every score on this site.",
 };
 
