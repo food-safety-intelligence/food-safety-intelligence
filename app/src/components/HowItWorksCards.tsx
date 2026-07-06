@@ -116,7 +116,6 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
               <th className="py-2.5 px-4 font-medium">Flagged</th>
               <th className="py-2.5 px-4 font-medium">Precision (hit rate)</th>
               <th className="py-2.5 px-4 font-medium">Recall (events caught)</th>
-              <th className="py-2.5 px-4 font-medium">Lift</th>
             </tr>
           </thead>
           <tbody className="num text-ink/85">
@@ -126,7 +125,6 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
                 <td className="py-2.5 px-4">{p.n_flagged.toLocaleString("en-US")}</td>
                 <td className="py-2.5 px-4">{Math.round(p.precision * 100)}%</td>
                 <td className="py-2.5 px-4">{Math.round(p.recall * 100)}%</td>
-                <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
               </tr>
             ))}
           </tbody>
