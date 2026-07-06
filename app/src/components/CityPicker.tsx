@@ -4,15 +4,51 @@
 // Both drive the same CityContext, so the whole app re-fetches the selected
 // city's data (DR 0016).
 
-import { startTransition, useEffect } from "react";
+import { startTransition, useCallback, useEffect } from "react";
 import { MapPin, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Wordmark } from "@/components/Wordmark";
 
+// Switch the active city, but reroute to the new city's map when the user is on
+// an establishment detail page. That page is keyed to a city-specific `?id=`
+// with no equivalent in another city, so switching in place would 404
+// ("Establishment not found"). Every other page is city-aware but not id-bound,
+// so it switches in place. trailingSlash is on (next.config), so usePathname()
+// returns "/restaurant/"; match both forms so the guard holds either way.
+// Shared by the header toggle AND the entry modal so both honour the guard.
+function useCitySwitch(): (c: City) => void {
+  const { city, setCity } = useCity();
+  const router = useRouter();
+  const pathname = usePathname();
+  const onDetailPage = pathname === "/restaurant" || pathname === "/restaurant/";
+
+  return useCallback(
+    (c: City) => {
+      // Only reroute on a real change — re-picking the current city should stay
+      // put, not bounce the user off the detail page to the map.
+      if (onDetailPage && c !== city) {
+        // Batch the city change and the navigation into one transition so React
+        // commits the destination (the map) directly, skipping an intermediate
+        // re-render of the detail page — which would otherwise remount the detail
+        // loader (keyed on city+id) and fire a doomed fetch for the new city's
+        // nonexistent bundle before we navigate away.
+        startTransition(() => {
+          setCity(c);
+          router.push(`/?city=${c}`);
+        });
+        return;
+      }
+      setCity(c);
+    },
+    [onDetailPage, city, setCity, router],
+  );
+}
+
 export function CityEntryModal() {
-  const { needsPick, setCity, dismissPick } = useCity();
+  const { needsPick, dismissPick } = useCity();
+  const switchCity = useCitySwitch();
 
   // The header logo can re-open this popup (requestPick), so a returning visitor
   // who already has a city must be able to back out without re-picking. Esc
@@ -70,7 +106,7 @@ export function CityEntryModal() {
             <button
               key={c}
               type="button"
-              onClick={() => setCity(c)}
+              onClick={() => switchCity(c)}
               className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 text-left hover:border-sage hover:bg-sage/5 transition-colors min-h-[44px]"
             >
               <MapPin className="size-5 text-sage shrink-0" aria-hidden />
@@ -89,35 +125,8 @@ export function CityEntryModal() {
 }
 
 export function CityToggle() {
-  const { city, setCity } = useCity();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // The establishment detail page is keyed to a city-specific `?id=` that has no
-  // equivalent in another city, so switching city there would 404 ("Establishment
-  // not found"). From that page, send the user to the new city's map instead of
-  // leaving them on a dead link. Every other page is city-aware but not id-bound,
-  // so it switches in place. trailingSlash is on (next.config), so usePathname()
-  // returns "/restaurant/"; match both forms so the guard holds either way.
-  const onDetailPage = pathname === "/restaurant" || pathname === "/restaurant/";
-
-  function switchCity(c: City) {
-    // Only reroute on a real change — clicking the already-active tab should stay
-    // put, not bounce the user off the detail page to the map.
-    if (onDetailPage && c !== city) {
-      // Batch the city change and the navigation into one transition so React
-      // commits the destination (the map) directly, skipping an intermediate
-      // re-render of the detail page — which would otherwise remount the detail
-      // loader (keyed on city+id) and fire a doomed fetch for the new city's
-      // nonexistent bundle before we navigate away.
-      startTransition(() => {
-        setCity(c);
-        router.push(`/?city=${c}`);
-      });
-      return;
-    }
-    setCity(c);
-  }
+  const { city } = useCity();
+  const switchCity = useCitySwitch();
 
   return (
     <div
