@@ -816,7 +816,8 @@ function ExpandedDetail({
                 {h.result || "—"}
               </span>
               <span className="text-muted truncate">
-                {h.headline || "No violations recorded"}
+                {/* LA labels items "# 23. …"; drop the leading hash for display. */}
+                {h.headline.replace(/^#\s+/, "") || "No violations recorded"}
               </span>
             </div>
           ))}
