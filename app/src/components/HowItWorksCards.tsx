@@ -86,6 +86,92 @@ function CardSectionLabel({ id, number, icon: Icon, children }: {
   );
 }
 
+type OpPoint = {
+  frac: number;
+  n_flagged: number;
+  precision: number;
+  recall: number;
+  lift: number;
+};
+
+/**
+ * The shared "inspect the top K%" operating-points table, used by all three
+ * cities so columns, styling, and number formatting can't drift. Headers pair
+ * each metric with a plain gloss (hit rate / events caught).
+ */
+export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
+  return (
+    <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
+              <th className="py-2.5 px-4 font-medium">Inspect top</th>
+              <th className="py-2.5 px-4 font-medium">Flagged</th>
+              <th className="py-2.5 px-4 font-medium">Precision (hit rate)</th>
+              <th className="py-2.5 px-4 font-medium">Recall (events caught)</th>
+              <th className="py-2.5 px-4 font-medium">Lift</th>
+            </tr>
+          </thead>
+          <tbody className="num text-ink/85">
+            {ops.map((p) => (
+              <tr key={p.frac} className="border-b border-line last:border-b-0">
+                <td className="py-2.5 px-4">{Math.round(p.frac * 100)}%</td>
+                <td className="py-2.5 px-4">{p.n_flagged.toLocaleString("en-US")}</td>
+                <td className="py-2.5 px-4">{Math.round(p.precision * 100)}%</td>
+                <td className="py-2.5 px-4">{Math.round(p.recall * 100)}%</td>
+                <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The "reading the two tightest slices" callout (top 5% + top 10%), shared so
+ * every city explains its operating points the same way. `unit` is the city's
+ * establishment noun; the event wording stays neutral ("had an event") so it
+ * reads correctly for both the Chicago fail/priority label and the NYC/LA B/C
+ * grade label.
+ */
+export function TightestSlices({
+  top5,
+  top10,
+  unit,
+}: {
+  top5?: OpPoint;
+  top10?: OpPoint;
+  unit: string;
+}) {
+  return (
+    <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
+      <p className="font-medium mb-1.5">Reading the two tightest slices</p>
+      <ul className="space-y-1.5 list-disc pl-5">
+        <li>
+          <span className="font-medium">Top 5%</span>
+          {top5
+            ? ` (~${top5.n_flagged.toLocaleString("en-US")} ${unit}): about ${Math.round(top5.precision * 100)}% of those flagged had an event (${top5.lift.toFixed(1)}× better than picking at random), and that sliver alone covers ${Math.round(top5.recall * 100)}% of all events.`
+            : ": run the metrics pipeline to populate."}
+        </li>
+        <li>
+          <span className="font-medium">Top 10%</span>
+          {top10
+            ? ` (~${top10.n_flagged.toLocaleString("en-US")} ${unit}): roughly ${Math.round(top10.precision * 100)}% flagged had an event (${top10.lift.toFixed(1)}× random), catching about ${Math.round(top10.recall * 100)}% of all events.`
+            : ""}
+        </li>
+      </ul>
+      <p className="mt-2 text-xs text-muted">
+        The tighter the slice, the higher the hit-rate but the fewer events you
+        cover. That&apos;s the precision/recall trade an inspection team tunes to
+        its capacity.
+      </p>
+    </div>
+  );
+}
+
 export function ModelCard({ city, m, number, limitations }: {
   city: City; m: Methodology | null; number: string; limitations?: ReactNode;
 }) {

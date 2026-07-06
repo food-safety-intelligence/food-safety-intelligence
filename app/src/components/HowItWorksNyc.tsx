@@ -12,7 +12,7 @@ import {
   Target,
   Wrench,
 } from "lucide-react";
-import { ModelCard, DataGovernance, MethodologyHero } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import type { RiskTier } from "@/lib/scores";
@@ -245,28 +245,47 @@ export function HowItWorksNyc() {
       <div className="mt-10 space-y-8">
         <SectionLabel id="how-well-it-works" number="03" icon={Target}>How well it works</SectionLabel>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">Performance</h2>
+          <h2 className="text-2xl font-medium tracking-tight">What it catches</h2>
           {m && (
             <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-              On a time-held-out test set (n = {m.test.n.toLocaleString()}, {prevPct}%
-              B/C base rate): PR-AUC <strong className="text-ink">{m.headline.pr_auc.toFixed(2)}</strong>,
-              ROC-AUC <strong className="text-ink">{m.headline.roc_auc.toFixed(2)}</strong>,
-              top-decile lift <strong className="text-ink">{m.headline.top_decile_lift.toFixed(1)}×</strong>.
-              For context, Chicago reaches ROC-AUC ~0.78 and lift ~3.4×. NYC is
-              meaningfully weaker, which is why it&apos;s labelled a preview.
+              Inspectors are capacity-limited, so the score is really a ranked
+              work-list. The honest read isn&apos;t a single number. It&apos;s how
+              much of the real risk you catch at the slice you can actually staff.
+              NYC&apos;s signal is weaker than Chicago&apos;s (ROC-AUC{" "}
+              {m.headline.roc_auc.toFixed(2)} vs ~0.78), so it stays a preview:
+            </p>
+          )}
+          {m && <OperatingPointsTable ops={m.operating_points} />}
+          {m && (
+            <p className="text-xs text-muted leading-relaxed mt-3">
+              Working the top 20% by risk surfaces{" "}
+              {Math.round((m.operating_points.find((p) => p.frac === 0.2)?.recall ?? 0) * 100)}% of
+              the next B/C inspections,{" "}
+              {(m.operating_points.find((p) => p.frac === 0.2)?.lift ?? 0).toFixed(1)}× better than
+              inspecting a random 20%. Time-held-out test from {m.test.split_from} onward (n ≈{" "}
+              {m.test.n.toLocaleString()}, {prevPct}% graded B/C). &ldquo;Lift&rdquo; is precision
+              divided by that base rate.
             </p>
           )}
           {m && (
-            <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-              The two numbers we judge the model on are here, not in the header:{" "}
+            <p className="text-muted leading-[1.7] mt-4 max-w-[62ch]">
+              These are also the two numbers we{" "}
+              <span className="text-ink">select</span> the model on:{" "}
               <span className="text-ink">PR-AUC</span> and{" "}
               <span className="text-ink">precision in the top 10%</span>, on the
-              held-out split. The lift and ROC-AUC above describe how well the
-              chosen model works; these two are how it was chosen.
+              held-out split. Lift and ROC-AUC describe how well the chosen model
+              works; these two are how it was chosen.
             </p>
           )}
           {m && (
-            <dl className="mt-4 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
+            <TightestSlices
+              top5={m.operating_points.find((p) => p.frac === 0.05)}
+              top10={m.operating_points.find((p) => p.frac === 0.1)}
+              unit="establishments"
+            />
+          )}
+          {m && (
+            <dl className="mt-6 grid gap-2.5 sm:grid-cols-2 max-w-[62ch] text-sm">
               <div className="rounded-xl border border-line bg-card px-3.5 py-2.5">
                 <dt className="font-medium text-ink">ROC-AUC {m.headline.roc_auc.toFixed(2)}</dt>
                 <dd className="text-muted leading-snug mt-0.5">How often it ranks a B/C inspection above one that isn&apos;t. Base-rate-independent, so it&apos;s the fair way to compare NYC with Chicago and LA, and it shows NYC is the weakest of the three.</dd>
@@ -284,37 +303,6 @@ export function HowItWorksNyc() {
                 <dd className="text-muted leading-snug mt-0.5">Share of next inspections that are actually B/C: what &ldquo;random&rdquo; and the PR-AUC floor are measured against.</dd>
               </div>
             </dl>
-          )}
-          {m && (
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-muted border-b border-line">
-                    <th className="py-2 pr-4 font-medium">Inspect top…</th>
-                    <th className="py-2 pr-4 font-medium">Flagged</th>
-                    <th className="py-2 pr-4 font-medium">Precision</th>
-                    <th className="py-2 pr-4 font-medium">Recall</th>
-                    <th className="py-2 pr-4 font-medium">Lift</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {m.operating_points.map((p) => (
-                    <tr key={p.frac} className="border-b border-line/60">
-                      <td className="py-2 pr-4 num">{Math.round(p.frac * 100)}%</td>
-                      <td className="py-2 pr-4 num">{p.n_flagged.toLocaleString()}</td>
-                      <td className="py-2 pr-4 num">{(p.precision * 100).toFixed(0)}%</td>
-                      <td className="py-2 pr-4 num">{(p.recall * 100).toFixed(0)}%</td>
-                      <td className="py-2 pr-4 num">{p.lift.toFixed(2)}×</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <p className="text-xs text-muted mt-2">
-                Read a row as: inspect the top X% by predicted risk and you catch
-                that share of the next B/C inspections, at that precision and lift
-                over chance.
-              </p>
-            </div>
           )}
         </article>
         <article>

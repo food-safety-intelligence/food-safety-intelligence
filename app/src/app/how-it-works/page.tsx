@@ -18,7 +18,7 @@ import { loadMethodology } from "@/lib/methodology-server";
 import { CityGate } from "@/components/CityGate";
 import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
-import { MethodologyHero } from "@/components/HowItWorksCards";
+import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -568,43 +568,7 @@ export default async function HowItWorksPage() {
               how much of the real risk you catch at the slice you can actually
               staff:
             </p>
-            <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
-                      <th className="py-2.5 px-4 font-medium">Inspect top</th>
-                      <th className="py-2.5 px-4 font-medium">Establishments</th>
-                      <th className="py-2.5 px-4 font-medium">Precision</th>
-                      <th className="py-2.5 px-4 font-medium">Events caught</th>
-                      <th className="py-2.5 px-4 font-medium">Lift</th>
-                    </tr>
-                  </thead>
-                  <tbody className="num text-ink/85">
-                    {methodology.operating_points.map((p) => (
-                      <tr
-                        key={p.frac}
-                        className="border-b border-line last:border-b-0"
-                      >
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.frac * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {p.n_flagged.toLocaleString("en-US")}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.precision * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.recall * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <OperatingPointsTable ops={methodology.operating_points} />
             <p className="text-xs text-muted leading-relaxed mt-3">
               Working the top 20% by risk surfaces{" "}
               {top20 ? Math.round(top20.recall * 100) : 54}% of the next-180-day
@@ -630,42 +594,7 @@ export default async function HowItWorksPage() {
               how it was chosen.
             </p>
 
-            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
-              <p className="font-medium mb-1.5">
-                Reading the two tightest slices
-              </p>
-              <ul className="space-y-1.5 list-disc pl-5">
-                <li>
-                  <span className="font-medium">Top 5%</span>
-                  {top5
-                    ? ` (~${top5.n_flagged.toLocaleString("en-US")} food establishments): about ${Math.round(
-                        top5.precision * 100,
-                      )}% of those visits find a real problem (${top5.lift.toFixed(
-                        1,
-                      )}× better than picking at random) and that sliver alone covers ${Math.round(
-                        top5.recall * 100,
-                      )}% of every problem city-wide.`
-                    : ": run the metrics pipeline to populate."}
-                </li>
-                <li>
-                  <span className="font-medium">Top 10%</span>
-                  {top10
-                    ? ` (~${top10.n_flagged.toLocaleString("en-US")} food establishments): roughly ${Math.round(
-                        top10.precision * 100,
-                      )}% of visits find a problem (${top10.lift.toFixed(
-                        1,
-                      )}× random), catching about ${Math.round(
-                        top10.recall * 100,
-                      )}% of all problems.`
-                    : ""}
-                </li>
-              </ul>
-              <p className="mt-2 text-xs text-muted">
-                The tighter the slice, the higher the hit-rate but the fewer
-                problems you cover. That&apos;s the precision/recall trade an
-                inspection team tunes to its capacity.
-              </p>
-            </div>
+            <TightestSlices top5={top5} top10={top10} unit="food establishments" />
           </article>
 
           <article>
