@@ -4,11 +4,16 @@
  * "elligence" inherits the surrounding text style. This emits inline text only —
  * the parent element controls size, weight, and colour of the rest — so the same
  * wordmark works in the header logo, a chat heading, or the entry popup.
+ *
+ * The serif italic "Eat" has a smaller x-height and narrower slant than the sans
+ * around it, so at the parent's size it reads small and crowds "elligence". The
+ * em-relative bump + trailing space compensate so it looks the same weight, and
+ * scale with whatever size the parent sets.
  */
 export function Wordmark() {
   return (
     <>
-      <span className="serif italic text-sage-strong">Eat</span>elligence
+      <span className="serif italic text-sage-strong text-[1.12em] pr-[0.06em]">Eat</span>elligence
     </>
   );
 }
