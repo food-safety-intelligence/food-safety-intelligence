@@ -389,6 +389,20 @@ to the committed/locally-generated copies under `app/public/data/`).
   the same md5 scheme. Regenerate and upload `inspection_history.json` and the
   shards **together** so the index alignment holds.
 
+  **Per city (NYC, LA).** The same scheme lives under each city prefix —
+  `web-app-data/nyc/comments/<xx>.json` and `web-app-data/la/comments/<xx>.json`,
+  emitted by `build_nyc_scores.py` / `build_la_scores.py` (`write_comment_shards`)
+  in the same aligned pass as that city's `inspection_history.json`. Format
+  differs by source: **LA** lines carry the point deduction (`"<item> (−N pts)"`,
+  LA scores start at 100 and deduct per violation); **NYC** flags critical
+  citations (`"<description> (critical)"`). Neither feed has a per-line inspector
+  note, so the timeline renders a flat list (the nested-note expansion stays
+  Chicago-only). `prebuild-sync-s3.mjs` pulls all three cities' shards and
+  re-shards them per license at build; `package.json`'s NYC/LA `build-detail-data`
+  steps read the synced dirs. Gitignored like Chicago's — S3 is the source of
+  truth; whoever republishes a city's `web-app-data/<city>/` must sync its
+  `comments/` subdir too.
+
 - **`detail/<license_id>.json` + `detail-globals.json`** (build artifacts, #119,
   decision 0013) — since #119 the detail page is **client-rendered**
   (`/restaurant/?id=<id>`) and fetches one **per-license bundle**
