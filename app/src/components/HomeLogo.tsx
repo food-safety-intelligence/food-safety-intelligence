@@ -14,7 +14,13 @@ export function HomeLogo() {
   return (
     <Link
       href="/"
-      onClick={() => requestPick()}
+      onClick={(e) => {
+        // Let modifier / non-primary clicks (open-in-new-tab, etc.) behave
+        // normally; only a plain navigation should also re-open the city picker,
+        // otherwise a cmd/ctrl-click would pop the modal in the current tab.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        requestPick();
+      }}
       className="flex items-center gap-3 group"
     >
       <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-sage/15">
