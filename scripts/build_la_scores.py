@@ -1,9 +1,12 @@
 """Build Los Angeles County's scores.json in the current Chicago/NYC schema (DR 0016).
 
-LA served model mirrors Chicago's production model: a LogisticRegression pipeline
-+ sigmoid (Platt) calibration, so the SHAP-waterfall + calibration-triple + tier
-machinery in `foodsafety.serve` / `foodsafety.explain` reuse unchanged. XGBoost
-stays only as the feasibility comparator (not served).
+LA served model mirrors Chicago's production model: an XGBoost risk model (depth-3)
++ Platt-on-margin calibration + native TreeSHAP drivers, so the SHAP-waterfall +
+calibration-triple + tier machinery in `foodsafety.serve` / `foodsafety.explain`
+reuse unchanged. Model 1 (risk) and Model 2 (forecast-only trend basis) are both
+XGBoost; the forecast model uses a regularized shallow config suited to its thin
+prior-history feature set. Both beat the LogReg baseline on both gate metrics on
+LA's own temporal splits.
 
 Two things make LA different from Chicago/NYC (see DR 0016):
 
@@ -41,16 +44,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.compose import ColumnTransformer
-from sklearn.frozen import FrozenEstimator
-from sklearn.impute import SimpleImputer
+from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 from foodsafety.config import RANDOM_STATE
-from foodsafety.explain.shap_drivers import linear_contributions, top_drivers_for_row
+from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.serve.predict_batch import write_scores_json
 from foodsafety.utils.time import temporal_split
@@ -82,7 +81,7 @@ LA_TRAIN_START = "2023-04-01"
 TRAIN_END = "2024-07-01"
 VAL_END = "2025-01-01"
 TREND_K = 5
-MODEL_VERSION = "la_logreg_sigmoid"
+MODEL_VERSION = "la_xgb_sigmoid"
 
 CENSUS_BATCH = "https://geocoding.geo.census.gov/geocoder/locations/addressbatch"
 
@@ -429,29 +428,64 @@ def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> d
 
 
 # --------------------------------------------------------------------- fit + calibrate
-def fit_calibrated(train, val, feats, label="y_next_bad"):
-    num = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())])
-    pre = ColumnTransformer(
-        [("num", num, feats)], sparse_threshold=0.0, verbose_feature_names_out=True
+def fit_xgb_platt(train, val, feats, label="y_next_bad", *, regularized=False):
+    """Fit XGB + Platt-on-margin calibration, mirroring Chicago's serve path.
+
+    Returns ``(xgb, coef, inter)``: the calibrated risk is
+    ``expit(coef * raw_margin + inter)`` (see ``xgb_proba``), and TreeSHAP drivers
+    come from ``tree_contributions(xgb, ...)``. The risk model (Model 1) uses the
+    gate-validated depth-3 config; ``regularized=True`` gives the forecast-only
+    model (Model 2) a shallower, heavily-regularized config for its thin
+    prior-history feature set (deeper trees over-fit that set — see gate CV).
+    Non-monotone: NYC/LA feature names don't map to Chicago's monotone direction
+    conventions, and the non-monotone config is the one that won the gate.
+    """
+    y = train[label].astype(int)
+    spw = (len(y) - float(y.sum())) / max(float(y.sum()), 1.0)
+    common = dict(
+        scale_pos_weight=spw,
+        missing=np.nan,
+        random_state=RANDOM_STATE,
+        n_jobs=4,
+        eval_metric="aucpr",
     )
-    base = Pipeline(
-        [
-            ("preprocess", pre),
-            (
-                "model",
-                LogisticRegression(
-                    class_weight="balanced",
-                    solver="liblinear",
-                    max_iter=3000,
-                    random_state=RANDOM_STATE,
-                ),
-            ),
-        ]
+    if regularized:
+        clf = XGBClassifier(
+            n_estimators=120,
+            max_depth=2,
+            learning_rate=0.03,
+            subsample=0.7,
+            colsample_bytree=0.7,
+            reg_lambda=8.0,
+            reg_alpha=1.0,
+            min_child_weight=30,
+            gamma=1.0,
+            **common,
+        )
+    else:
+        clf = XGBClassifier(
+            n_estimators=400,
+            max_depth=3,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_lambda=1.0,
+            min_child_weight=5,
+            **common,
+        )
+    clf.fit(train[feats], y)
+    # Platt on the raw margin (1-D logistic) — the {a, b} the app waterfall expects
+    # live in margin space, unlike CalibratedClassifierCV's double-squash.
+    margin_val = clf.predict(val[feats], output_margin=True)
+    platt = LogisticRegression(C=1e10, solver="lbfgs").fit(
+        margin_val.reshape(-1, 1), val[label].astype(int)
     )
-    base.fit(train[feats], train[label].astype(int))
-    cal = CalibratedClassifierCV(FrozenEstimator(base), method="sigmoid")
-    cal.fit(val[feats], val[label].astype(int))
-    return base, cal
+    return clf, float(platt.coef_[0, 0]), float(platt.intercept_[0])
+
+
+def xgb_proba(clf, coef, inter, X):
+    """Calibrated positive-class probability: Platt on the raw XGB margin."""
+    return expit(coef * clf.predict(X, output_margin=True) + inter)
 
 
 def last_k_trend(events_scored: pd.DataFrame, anchors: pd.DataFrame, k: int) -> pd.Series:
@@ -491,18 +525,19 @@ def main():
         f"| test base {sp.test.y_next_bad.mean():.3f}"
     )
 
-    base1, cal1 = fit_calibrated(sp.train, sp.val, FEATS_M1)
-    base2, cal2 = fit_calibrated(sp.train, sp.val, PRIOR)  # forecast-only for trend
+    xgb1, coef1, inter1 = fit_xgb_platt(sp.train, sp.val, FEATS_M1)
+    # forecast-only trend model: thin PRIOR set -> regularized shallow config
+    xgb2, coef2, inter2 = fit_xgb_platt(sp.train, sp.val, PRIOR, regularized=True)
     y_test = sp.test["y_next_bad"].astype(int).values
-    p_test = cal1.predict_proba(sp.test[FEATS_M1])[:, 1]
+    p_test = xgb_proba(xgb1, coef1, inter1, sp.test[FEATS_M1])
     test_metrics = evaluate(y_test, p_test).to_dict()
     print(
         "Model 1 test:", {k: test_metrics[k] for k in ("pr_auc", "roc_auc", "precision_at_10pct")}
     )
 
     # score EVERY facility's latest inspection (serving anchor)
-    ev["risk_score"] = cal1.predict_proba(ev[FEATS_M1])[:, 1]
-    ev["forecast_risk"] = cal2.predict_proba(ev[PRIOR])[:, 1]
+    ev["risk_score"] = xgb_proba(xgb1, coef1, inter1, ev[FEATS_M1])
+    ev["forecast_risk"] = xgb_proba(xgb2, coef2, inter2, ev[PRIOR])
     # Collapse reopened establishments: LA mints a new facility_id when a place
     # reopens at the same name+address, which would otherwise render as duplicate
     # map/search pins. Dedup on a normalised name+address key, keeping the most
@@ -533,7 +568,10 @@ def main():
         how="left",
     )
 
-    contribs = linear_contributions(cal1, latest[FEATS_M1], original_features=FEATS_M1)
+    # SHAP drivers via native TreeSHAP (margin space) — same machinery as Chicago's
+    # served XGB. base_margin is shipped as calibration.intercept below.
+    contribs, base_margin = tree_contributions(xgb1, latest[FEATS_M1], FEATS_M1)
+    contribs.index = latest.index
     drivers = []
     for i, row in latest.iterrows():
         ds = top_drivers_for_row(row[FEATS_M1], contribs.loc[i], k=5, labels=labels)
@@ -562,11 +600,10 @@ def main():
     latest["risk_tier"] = latest["risk_score"].apply(tier)
     print("tier counts:", latest["risk_tier"].value_counts().to_dict())
 
-    calibration = {
-        "a": float(cal1.calibrated_classifiers_[0].calibrators[0].a_),
-        "b": float(cal1.calibrated_classifiers_[0].calibrators[0].b_),
-        "intercept": float(base1.named_steps["model"].intercept_[0]),
-    }
+    # App waterfall formula: logit = -(a*margin + b), margin = intercept + Σshap.
+    # Platt logit(p) = coef*margin + inter  ->  a = -coef, b = -inter; the intercept
+    # is the TreeSHAP base margin (so intercept + Σshap == raw margin).
+    calibration = {"a": -coef1, "b": -inter1, "intercept": float(base_margin)}
 
     cols = [
         "license_id",

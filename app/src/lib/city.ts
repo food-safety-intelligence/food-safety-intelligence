@@ -166,7 +166,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // the score so ungraded-but-low inspections still count toward the headline.
     isBadOutcome: (r) => { const s = laScore(r); return s !== null ? s < 90 : /^Grade [BC]/.test(r); },
     // LA's forecast-slope magnitudes sit on the same scale as Chicago's and NYC's
-    // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
+    // (the forecast model is a prior-history XGBoost), so 0.0003 gives the
     // same honest Worsening / Stable / Improving split.
     trendStableBand: 0.0003,
     // Enabled: LA data is in S3 and merging this PR redeploys the agent LA-aware
