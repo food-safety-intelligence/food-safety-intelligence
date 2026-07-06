@@ -64,8 +64,20 @@ os.environ.setdefault(
 import importlib.util as _ilu  # noqa: E402
 import types as _types  # noqa: E402
 
+import city_context  # noqa: E402 — shared per-city framing (also used by entrypoint.py)
 from strands import Agent, tool  # noqa: E402
 from strands.models.bedrock import BedrockModel  # noqa: E402
+
+# Active city for a run. The deployed runtime scopes each request via a contextvar;
+# run_local drives one agent synchronously per process, so a module global is enough.
+# The CLI stays Chicago; the eval calls set_active_city() to exercise NYC / LA.
+_ACTIVE_CITY = "chicago"
+
+
+def set_active_city(city: str) -> None:
+    """Set the city all tool wrappers + the prompt prefix use for this run."""
+    global _ACTIVE_CITY
+    _ACTIVE_CITY = city if city in ("chicago", "nyc", "la") else "chicago"
 
 
 def _load_handler(tool_name: str) -> _types.ModuleType:
@@ -101,20 +113,20 @@ def find_restaurants(
     limit: int = 20,
 ) -> list | dict:
     """
-    Find restaurants near a Chicago neighborhood or lat/lon coordinates using
-    OpenStreetMap (free, no API key). Filters by cuisine when provided.
+    Find restaurants near a neighborhood or lat/lon coordinates in the ACTIVE CITY
+    using OpenStreetMap (free, no API key). Filters by cuisine when provided.
     Returns name, address, coordinates, cuisine, and opening hours.
     ALWAYS call this first before get_safety_score.
 
     Args:
-        neighborhood: Chicago neighborhood name, e.g. "Wicker Park", "Lincoln Square"
+        neighborhood: a neighborhood name in the active city, e.g. "Wicker Park"
         lat: Latitude (use instead of neighborhood if you have coordinates)
         lon: Longitude (use instead of neighborhood if you have coordinates)
         radius_km: Search radius in kilometres (default 1.0)
         cuisine: Cuisine type e.g. "sushi", "ramen", "thai", "pizza" (optional)
         limit: Maximum number of restaurants to return (default 20, max 50)
     """
-    event: dict = {"radius_km": radius_km, "limit": limit}
+    event: dict = {"radius_km": radius_km, "limit": limit, "city": _ACTIVE_CITY}
     if neighborhood:
         event["neighborhood"] = neighborhood
     if lat and lon:
@@ -128,31 +140,31 @@ def find_restaurants(
 @tool
 def get_safety_score(restaurants: list) -> list:
     """
-    Look up the precomputed Chicago batch risk score for each restaurant from
-    scores.json. Does not call any model — a venue that matches the published
-    batch run returns that calibrated score, tier and drivers directly, and a
-    venue not in the batch run returns no score (no inspection record found).
+    Look up the precomputed batch risk score for each restaurant in the ACTIVE
+    CITY from its scores.json. Does not call any model — a venue that matches the
+    published batch run returns that calibrated score, tier and drivers directly,
+    and a venue not in the batch run returns no score (no inspection record found).
     Returns risk_score (0-1 or null), risk_tier, trend, SHAP drivers, and
-    whether a Chicago inspection record was found (matched_scores_json).
+    whether an inspection record was found (matched_scores_json).
     Call after find_restaurants. Pass the full restaurant list from that call.
 
     Args:
         restaurants: List of restaurant dicts from find_restaurants
     """
-    return _score_handler.handler({"restaurants": restaurants}, None)
+    return _score_handler.handler({"restaurants": restaurants, "city": _ACTIVE_CITY}, None)
 
 
 @tool
 def explain_restaurant(license_id: str) -> dict:
     """
     Get the full SHAP driver breakdown and inspection history for one restaurant
-    identified by its Chicago license_id (from get_safety_score results).
-    Call this for the 2-3 lowest predicted-risk results to give the user meaningful context.
+    identified by its license_id (from get_safety_score results — the active city's
+    native establishment id). Call this for the 2-3 lowest predicted-risk results.
 
     Args:
-        license_id: Chicago business license ID (from get_safety_score result)
+        license_id: the establishment id from a get_safety_score result
     """
-    return _explain_handler.handler({"license_id": license_id}, None)
+    return _explain_handler.handler({"license_id": license_id, "city": _ACTIVE_CITY}, None)
 
 
 @tool
@@ -187,23 +199,24 @@ def find_inspection_records(
     radius_m: float | None = None,
 ) -> dict:
     """
-    Build a link to the AUTHORITATIVE Chicago Food Inspections records for a SET of
-    establishments — a comparison, a short list, or an area. This is the city's own
-    data (the source behind the risk score), so it needs no disclaimer. Use it when
-    the user compares/lists several places, or asks about an area, and would want to
-    see or verify the underlying city records. Returns a {url, mode, note} link the
-    user clicks through to — nothing is fetched.
+    Build a link to the ACTIVE CITY's AUTHORITATIVE food-inspection records for a
+    SET of establishments — a comparison, a short list, or an area. This is the
+    city's own data (the source behind the risk score), so it needs no disclaimer.
+    Use it when the user compares/lists several places, or asks about an area, and
+    would want to see or verify the underlying city records. Returns a {url, mode,
+    note} link the user clicks through to — nothing is fetched. (Chicago and NYC
+    return a filtered grid; LA returns its county inspections page.)
 
     Provide EXACTLY ONE filter:
       license_ids: the establishments to compare/list. Use the license_id values
         get_safety_score returned, and pass ONLY non-null ones (a place with no
         inspection record has none). Preferred for named places.
-      zip_code: a Chicago ZIP, for "records in <ZIP>".
+      zip_code: a ZIP in the active city, for "records in <ZIP>".
       lat + lon + radius_m: a point and radius in metres, for "records near here".
 
     Args:
         license_ids: license_id strings from get_safety_score (non-null only)
-        zip_code: Chicago ZIP code (area mode)
+        zip_code: a ZIP in the active city (area mode)
         lat: latitude of the area centre (with lon + radius_m)
         lon: longitude of the area centre (with lat + radius_m)
         radius_m: search radius in metres (with lat + lon)
@@ -215,6 +228,7 @@ def find_inspection_records(
             "lat": lat,
             "lon": lon,
             "radius_m": radius_m,
+            "city": _ACTIVE_CITY,
         },
         None,
     )
@@ -226,9 +240,9 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
     Answer a GENERAL food-safety or foodborne-illness question (what a germ is,
     how common illness is, safe cooking temperatures, who is most at risk, how to
     prevent it) with short vetted facts AND a citation to an authoritative public
-    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or Chicago/Illinois
-    public health). Use this for general questions that are NOT about one specific
-    Chicago restaurant's score.
+    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or the active city's
+    local public health department). Use this for general questions that are NOT
+    about one specific restaurant's score.
 
     Base any statistic you state on the returned `summary`, and cite the returned
     `sources` links so the user can verify them. This is education, not medical
@@ -239,7 +253,9 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
         topics: Optional explicit subset of topic keys (e.g. ["salmonella",
                 "cooking_temperatures"]); omit to match on the query text
     """
-    return _info_handler.handler({"query": query, "topics": topics or []}, None)
+    return _info_handler.handler(
+        {"query": query, "topics": topics or [], "city": _ACTIVE_CITY}, None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -278,7 +294,7 @@ def _guardrail_kwargs() -> dict[str, str]:
     return {}
 
 
-def build_agent() -> Agent:
+def build_agent(messages: list | None = None) -> Agent:
     region = os.environ.get("AWS_REGION", "us-east-1")
     # Nova 2 Lite — cost-effective AWS-native model with tool-use support.
     # Note: the `thinking` field is only valid on Nova Premier; Nova 2 Lite
@@ -295,6 +311,7 @@ def build_agent() -> Agent:
     )
     return Agent(
         model=model,
+        messages=messages or [],
         tools=[
             find_restaurants,
             get_safety_score,
@@ -303,7 +320,9 @@ def build_agent() -> Agent:
             find_inspection_records,
             food_safety_info,
         ],
-        system_prompt=SYSTEM_PROMPT,
+        # Prepend the ACTIVE CITY block (grade framing + scope) exactly as the
+        # deployed runtime does, so the local agent and the eval frame identically.
+        system_prompt=city_context.city_prefix(_ACTIVE_CITY) + SYSTEM_PROMPT,
     )
 
 

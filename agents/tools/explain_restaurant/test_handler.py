@@ -164,3 +164,27 @@ def test_handler_success(tmp_path, monkeypatch):
     assert out["trend"] == "worsening"
     assert out["inspection_summary"]["fail"] == 1
     assert out["top_drivers"][0]["feature"] == "prior_fail_rate"
+    # Active venue: closure keys present and false (decision 0014).
+    assert out["is_out_of_business"] is False
+    assert out["closed_since"] is None
+
+
+def test_handler_surfaces_closure(tmp_path, monkeypatch):
+    # A closed venue must pass its closure flag + date through so the agent can
+    # frame the score as historical (decision 0014).
+    record = {
+        "license_id": "L2",
+        "dba_name": "Gone Grill",
+        "risk_score": 0.7,
+        "risk_tier": "elevated",
+        "trend_slope": 0.5,
+        "is_out_of_business": True,
+        "closed_since": "2021-03-15",
+        "top_drivers": [],
+    }
+    _wire_data(tmp_path, monkeypatch, scores=[record], history={})
+
+    out = handler({"license_id": "L2"}, None)
+    assert out["found"] is True
+    assert out["is_out_of_business"] is True
+    assert out["closed_since"] == "2021-03-15"

@@ -18,6 +18,39 @@
 > shape so that *if* NYC is picked up, the team starts from a decision, not a
 > blank page. It authorises no code by itself.
 
+## Update (2026-07-06, PR #165) — NYC/LA now serve XGBoost
+
+The "LogReg served (XGBoost comparator only)" decision recorded below is
+**superseded**: NYC and LA now serve **XGBoost** for both models, matching
+Chicago's two-XGB architecture. The feasibility numbers below still stand; only
+the served estimator changed.
+
+- **Model 1 (risk score) → XGBoost.** On a deploy-realistic split (train on all
+  realized history, test on the most recent 12 months) XGB beats the calibrated
+  LogReg baseline on both gate metrics: NYC +0.016 PR-AUC / +0.039 precision@10%,
+  LA +0.006 / +0.044. (Rolling-CV early folds train on a data-starved post-COVID
+  sliver that won't recur, so the deploy-realistic eval is the honest read of a
+  "deploy now" decision.)
+- **Model 2 (forecast-only trend) → regularized shallow XGBoost** (depth-2,
+  strong L2, few trees) — the thin prior-only feature set overfits at depth-3.
+  The tree config is matched to feature-set size, not city (the same reg config
+  is the *worst* option on Chicago's richer Model-2 feature set).
+- **Label unchanged.** A 365-day calendar window was evaluated and **rejected**:
+  the median next-inspection gap is ~378 d (NYC) / ~342 d (LA), so a fixed window
+  would mislabel ~60% of establishments as false negatives. The event-anchored
+  next-inspection label stays.
+- **Trend framing per city.** LA's steeply-rising-slope watch list shows ~2.7×
+  forward lift (validated, DR 0011 style); NYC's is weak (~1.4×, no
+  strict-vs-loose separation, compressed by its high base rate) so NYC's trend
+  stays **descriptive-only**, never a watch-list claim.
+- **Serving shape unchanged.** XGB uses Platt-on-margin calibration + native
+  TreeSHAP drivers + the same calibration triple the detail-page waterfall
+  already consumed under LogReg, so the app path is unchanged. `MODEL_VERSION`
+  is now `{nyc,la}_xgb_sigmoid`.
+- **Archival parity.** NYC/LA are now S3-backed like Chicago and persist Model 1
+  + Model 2 joblibs (`/models`) plus the raw pull snapshot (`/processed`, the
+  reproducibility anchor, since the source feed drifts) via `make publish-cities`.
+
 ## Question
 
 We want to (a) add a second city (New York City) and (b) give the product **one

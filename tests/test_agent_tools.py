@@ -21,6 +21,7 @@ import importlib.util
 import os
 import sys
 import urllib.error
+import urllib.parse
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _TOOLS_DIR = os.path.join(_REPO_ROOT, "agents", "tools")
@@ -41,6 +42,8 @@ def _load_handler(tool_name: str):
 explain = _load_handler("explain_restaurant")
 find_restaurants = _load_handler("find_restaurants")
 get_safety_score = _load_handler("get_safety_score")
+records = _load_handler("find_inspection_records")
+info = _load_handler("food_safety_info")
 
 
 # ---------------------------------------------------------------------------
@@ -188,3 +191,72 @@ def test_no_location_still_searches_whole_chicago():
 def test_unrecognised_neighborhood_resolves_to_none():
     """An unknown area resolves to None so the handler can report it."""
     assert find_restaurants._resolve_geometry("Atlantis", None, None, 1.0, *_CHI_TABLES) is None
+
+
+# ---------------------------------------------------------------------------
+# Multi-city: each tool must scope to the ACTIVE CITY (no cross-city leakage).
+# Deterministic — no data files, no network — so these run in CI.
+# ---------------------------------------------------------------------------
+
+
+def test_records_link_is_city_scoped():
+    """Chicago and NYC each build their OWN portal's grid; neither leaks the other."""
+    chi = records.handler({"license_ids": ["12345"], "city": "chicago"}, None)
+    assert "data.cityofchicago.org" in chi["url"] and "cityofnewyork" not in chi["url"]
+    nyc = records.handler({"license_ids": ["30075445"], "city": "nyc"}, None)
+    assert "data.cityofnewyork.us" in nyc["url"] and "cityofchicago" not in nyc["url"]
+
+
+def test_records_use_each_citys_native_columns():
+    """The id + zip columns differ per city (Chicago license_/zip, NYC camis/zipcode)."""
+    chi = urllib.parse.unquote(records.handler({"zip": "60657", "city": "chicago"}, None)["url"])
+    assert "`zip`='60657'" in chi
+    nyc_id = urllib.parse.unquote(
+        records.handler({"license_ids": ["30075445"], "city": "nyc"}, None)["url"]
+    )
+    assert "`camis` IN" in nyc_id and "license_" not in nyc_id
+    nyc_zip = urllib.parse.unquote(records.handler({"zip": "10002", "city": "nyc"}, None)["url"])
+    assert "`zipcode`='10002'" in nyc_zip
+
+
+def test_records_la_has_no_filtered_grid():
+    """LA has no queryable API, so the tool returns the LA County inspections page."""
+    la = records.handler({"license_ids": ["1"], "city": "la"}, None)
+    assert la["mode"] == "city_page"
+    assert "lacounty.gov" in la["url"] and "explore/query" not in la["url"]
+
+
+def test_food_safety_info_local_source_is_city_scoped():
+    """The 'local' topic surfaces only the ACTIVE CITY's health source (allow-listed)."""
+    for city, host, other in [
+        ("nyc", "nyc.gov", "cityofchicago"),
+        ("la", "lacounty.gov", "cityofchicago"),
+        ("chicago", "chicago", "nyc.gov"),
+    ]:
+        out = info.handler({"query": "letter grade", "city": city}, None)
+        local = [e for e in out["info"] if e["topic"] == "local"]
+        assert local, f"{city}: no local topic surfaced"
+        urls = [s["url"] for e in local for s in e["sources"]]
+        assert any(host in u for u in urls), f"{city}: expected {host} in {urls}"
+        assert not any(other in u for u in urls), f"{city}: leaked {other}"
+        assert all(info.is_allowed_url(u) for u in urls)
+
+
+def test_food_safety_info_national_facts_are_city_independent():
+    """A general (non-local) question returns the same national sources for any city."""
+
+    def _urls(city):
+        out = info.handler({"query": "salmonella", "city": city}, None)
+        return {s["url"] for e in out["info"] for s in e["sources"]}
+
+    assert _urls("chicago") == _urls("nyc") == _urls("la")
+
+
+def test_get_safety_score_reads_the_active_citys_scores_file(monkeypatch):
+    """Score lookups route to the per-city scores.json, not always Chicago's."""
+    monkeypatch.setenv("SCORES_JSON_PATH", "/x/chi.json")
+    monkeypatch.setenv("SCORES_JSON_PATH_NYC", "/x/nyc.json")
+    monkeypatch.setenv("SCORES_JSON_PATH_LA", "/x/la.json")
+    assert get_safety_score._scores_path("chicago") == "/x/chi.json"
+    assert get_safety_score._scores_path("nyc") == "/x/nyc.json"
+    assert get_safety_score._scores_path("la") == "/x/la.json"

@@ -311,6 +311,8 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
             "percentile_rank": float | null,
             "shap_drivers": list,
             "matched_scores_json": bool,
+            "is_out_of_business": bool,    # latest inspection event was a closure
+            "closed_since": str | null,    # ISO date of that closure, if known
             "status":       str            # "scored" | "no_inspection_record"
         },
         ...
@@ -396,6 +398,11 @@ def _output_from_scores(restaurant: dict[str, Any], record: dict[str, Any]) -> d
         "percentile_rank": record.get("percentile_rank"),
         "trend": _trend_label(record.get("trend_slope")),
         "neighborhood": record.get("neighborhood"),
+        # Closure flag (scores schema 0.6.0, decision 0014). A closed venue's
+        # forward-window score is historical, not a live signal; the prompt
+        # directs the agent to disclose closure and frame the score that way.
+        "is_out_of_business": bool(record.get("is_out_of_business")),
+        "closed_since": record.get("closed_since"),
         "status": "scored",
     }
 
@@ -428,6 +435,9 @@ def _output_no_record(restaurant: dict[str, Any]) -> dict[str, Any]:
         "percentile_rank": None,
         "trend": None,
         "neighborhood": None,
+        # No matched record, so no closure signal either way.
+        "is_out_of_business": False,
+        "closed_since": None,
         "status": "no_inspection_record",
     }
 

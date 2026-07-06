@@ -27,6 +27,10 @@ The core dataset; one row per inspection. Drives the label and most features.
   labels non-comparable); pre-2019 inspections are burn-in only.
 - **Note:** no inspector identity is published in this feed (only
   `inspection_id` / `inspection_type` / `inspection_date`).
+- **Agent records link:** the chat agent's `find_inspection_records` tool builds a
+  user-facing deep link to this dataset's Socrata query grid (filtered by
+  `license_`, `zip`, or a lat/lon radius) so a user can verify the records behind a
+  score. It only builds the URL — nothing is fetched.
 
 ### 311 Service Requests — `v6vf-nfxy`
 Resident-reported issues. Only the food/sanitation-relevant `sr_type`s are
@@ -76,6 +80,10 @@ collapses to one row per `(camis, inspection_date)`.
 - **Label:** `y_next_bc` — 1 if the establishment's **next** inspection is graded
   **B or C (score ≥ 14)**, else 0. This is a different target from Chicago's
   `y_fail_or_critical_next_180d`; the two cities predict different things.
+- **Agent records link:** the chat agent's `find_inspection_records` tool deep-links
+  to this dataset's Socrata query grid too, filtered by `camis` / `zipcode` / radius.
+  (Los Angeles left Socrata for a bulk CSV with no queryable API, so for LA the tool
+  links to LA County Public Health's inspections page instead of a filtered grid.)
 - **Training window:** **2022-07-01 onward.** NYC halted inspections in March 2020
   (COVID) and grades/scores only normalise from 2022 — the analog of Chicago's
   2019 cutoff for the July-2018 procedure change.

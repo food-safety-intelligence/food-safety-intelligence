@@ -12,8 +12,16 @@ inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
 
 1. A measured model (logistic regression baseline → calibrated XGBoost) with
    SHAP explainability.
-2. A Next.js web app that runs on a laptop and answers three questions for any
-   Chicago restaurant: *Is risk elevated? Improving or worsening? What's driving it?*
+2. A Next.js web app (and a conversational agent) that answer three questions for
+   any restaurant in a covered city — Chicago, New York City, or Los Angeles:
+   *Is risk elevated? Improving or worsening? What's driving it?*
+
+The web app and agent are **multi-city** (decision record 0016): **Chicago** is the
+primary, full pipeline; **New York City** and **Los Angeles** are scored by their
+own self-contained producers into the same JSON contract, one scored dataset per
+city. Each city predicts a different target and is framed in its own terms (Chicago
+pass/fail + violation codes; NYC/LA letter grades A/B/C — LA's 0-100 scale runs the
+opposite way to NYC).
 
 See `CLAUDE.md` for the full scope contract.
 
