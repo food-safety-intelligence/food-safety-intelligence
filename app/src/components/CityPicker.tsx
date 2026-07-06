@@ -4,15 +4,30 @@
 // Both drive the same CityContext, so the whole app re-fetches the selected
 // city's data (DR 0016).
 
-import { startTransition } from "react";
-import { MapPin } from "lucide-react";
+import { startTransition, useEffect } from "react";
+import { MapPin, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Wordmark } from "@/components/Wordmark";
 
 export function CityEntryModal() {
-  const { needsPick, setCity } = useCity();
+  const { needsPick, setCity, dismissPick } = useCity();
+
+  // The header logo can re-open this popup (requestPick), so a returning visitor
+  // who already has a city must be able to back out without re-picking. Esc
+  // closes it; the close button below and a stored/URL city do the same. A first
+  // visitor who dismisses falls back to the default city, still switchable from
+  // the header.
+  useEffect(() => {
+    if (!needsPick) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") dismissPick();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [needsPick, dismissPick]);
+
   if (!needsPick) return null;
   return (
     <div
@@ -28,6 +43,14 @@ export function CityEntryModal() {
           Unsplash, self-hosted). */}
       <div className="absolute inset-0 bg-ink/65" aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
+        <button
+          type="button"
+          onClick={dismissPick}
+          aria-label="Close"
+          className="absolute right-2 top-2 inline-flex items-center justify-center size-11 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
         {/* Brand lockup on the entry screen, mirroring the header logo's text. */}
         <div className="mb-4">
           <div className="text-lg font-semibold tracking-tight">
