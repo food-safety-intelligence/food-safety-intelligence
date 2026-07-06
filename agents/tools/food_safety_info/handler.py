@@ -7,8 +7,9 @@ prevent it) with short, vetted facts AND a citation to an authoritative public
 health source the user can click through to.
 
 This is the educational counterpart to the restaurant-risk tools. It is NOT about
-any specific Chicago establishment's score — it gives general public-health
-information and verifiable links.
+any specific establishment's score — it gives general public-health information
+and verifiable links. The "local" topic is city-aware: it surfaces the ACTIVE
+CITY's health department + inspection portal (Chicago, NYC, or LA).
 
 GROUNDING & SOURCING POSTURE — read before changing this file:
   * Every fact in this file is a short paraphrase of an AUTHORITATIVE public
@@ -18,8 +19,9 @@ GROUNDING & SOURCING POSTURE — read before changing this file:
     page the link opens are the same source.
   * Sources are restricted to a curated ALLOWED_DOMAINS allow-list (US federal
     public-health agencies, the WHO, NIH MedlinePlus, a recognised food-safety
-    nonprofit, and Chicago / Illinois / Cook County public health + the Chicago
-    Data Portal). No news outlets, no blogs, no open web search — those are not
+    nonprofit, and the covered cities' local public health: Chicago / Illinois /
+    Cook County + the Chicago Data Portal, NYC Health, and LA County Public
+    Health). No news outlets, no blogs, no open web search — those are not
     authoritative for disease statistics and their links rot or paywall.
   * Links are stable landing pages, not search URLs. The eval harness
     (agents/eval/run_eval.py --links) resolves every URL so dead links are caught
@@ -64,6 +66,8 @@ ALLOWED_DOMAINS: frozenset[str] = frozenset(
         "cityofchicago.org",  # Chicago Data Portal (data.cityofchicago.org)
         "illinois.gov",  # Illinois Department of Public Health (dph.illinois.gov)
         "cookcountypublichealth.org",  # Cook County Department of Public Health
+        "nyc.gov",  # NYC Department of Health and Mental Hygiene
+        "lacounty.gov",  # LA County Public Health (publichealth.lacounty.gov)
     }
 )
 
@@ -143,6 +147,14 @@ _SOURCES: dict[str, tuple[str, str]] = {
     "cook_county": (
         "Cook County Department of Public Health",
         "https://cookcountypublichealth.org/",
+    ),
+    "nyc_doh": (
+        "NYC Health — Restaurant grades & inspection results",
+        "https://www.nyc.gov/site/doh/services/restaurant-grades.page",
+    ),
+    "la_eh": (
+        "LA County Public Health — Restaurant & market inspections",
+        "https://publichealth.lacounty.gov/eh/inspection-and-reports/restaurant-and-market-inspections.htm",
     ),
 }
 
@@ -250,13 +262,38 @@ _TOPICS: dict[str, tuple[str, str, list[str]]] = {
         "estimates are produced.",
         ["cdc_foodnet", "cdc_burden"],
     ),
+}
+
+# The "local" topic — how the ACTIVE CITY inspects restaurants and where to find
+# its records. One entry per covered city; the handler picks the active city's, so
+# an NYC user only ever sees NYC sources, an LA user LA sources, etc. Each summary
+# also states that city's GRADE FRAMING (letter grades + direction), so it doubles
+# as the answer to "how does this city's grading work?".
+_LOCAL_TOPICS: dict[str, tuple[str, str, list[str]]] = {
     "chicago": (
         "Food safety in Chicago",
         "Chicago food establishments are inspected by the Chicago Department of Public "
-        "Health, and inspection results are public on the Chicago Data Portal (the "
-        "dataset behind this project's risk scores). Illinois DPH and Cook County DPH "
-        "also publish food-safety guidance.",
+        "Health and each inspection is recorded as Pass, Pass with Conditions, or Fail "
+        "with cited violation codes (there is no letter grade). Results are public on "
+        "the Chicago Data Portal — the dataset behind this project's risk scores. "
+        "Illinois DPH and Cook County DPH also publish food-safety guidance.",
         ["chicago_cdph", "chicago_data", "illinois_dph", "cook_county"],
+    ),
+    "nyc": (
+        "Food safety in New York City",
+        "New York City restaurants are inspected by the NYC Health Department, which "
+        "assigns a letter grade — A, B, or C — from an inspection points score where "
+        "FEWER points is cleaner (A is the top grade). Grades and full inspection "
+        "results are public.",
+        ["nyc_doh"],
+    ),
+    "la": (
+        "Food safety in Los Angeles",
+        "Restaurants in Los Angeles County are inspected by the LA County Department of "
+        "Public Health, which posts a letter grade — A, B, or C — from a 0-100 score "
+        "where a HIGHER score is cleaner (A is 90-100, the opposite direction to NYC). "
+        "Inspection results are public.",
+        ["la_eh"],
     ),
 }
 
@@ -304,11 +341,23 @@ _SYNONYMS: dict[str, str] = {
     "foodnet": "surveillance",
     "surveillance": "surveillance",
     "how is it tracked": "surveillance",
-    "chicago": "chicago",
-    "illinois": "chicago",
-    "cook county": "chicago",
-    "data portal": "chicago",
-    "inspection data": "chicago",
+    # Local inspection regime / where to find records -> the ACTIVE CITY's sources.
+    "chicago": "local",
+    "illinois": "local",
+    "cook county": "local",
+    "new york": "local",
+    "nyc": "local",
+    "los angeles": "local",
+    "la county": "local",
+    "data portal": "local",
+    "inspection data": "local",
+    "letter grade": "local",
+    "restaurant grade": "local",
+    "grading": "local",
+    "who inspects": "local",
+    "how are restaurants inspected": "local",
+    "how often are restaurants inspected": "local",
+    "inspection frequency": "local",
     "symptom": "symptoms",
     "nausea": "symptoms",
     "vomit": "symptoms",
@@ -354,12 +403,18 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
     }
     """
     query: str = (event.get("query") or "").strip()
+    # Which city's local sources to surface for the "local" topic (multi-city).
+    # Default Chicago; the entrypoint passes the active city.
+    city = (event.get("city") or "chicago").strip().lower()
+    if city not in _LOCAL_TOPICS:
+        city = "chicago"
     topics = _resolve_topics(event.get("topics"), query)
 
     return {
         "query": query,
+        "city": city,
         "topics": topics,
-        "info": [_entry(key) for key in topics],
+        "info": [_entry(key, city) for key in topics],
         "disclaimer": DISCLAIMER,
     }
 
@@ -379,7 +434,11 @@ def _resolve_topics(raw: Any, query: str) -> list[str]:
     if raw:
         if isinstance(raw, str):
             raw = [raw]
-        keep = [t.strip().lower() for t in raw if t.strip().lower() in _TOPICS]
+        keep = [
+            t.strip().lower()
+            for t in raw
+            if t.strip().lower() in _TOPICS or t.strip().lower() == "local"
+        ]
         if keep:
             return keep[:_MAX_TOPICS]
 
@@ -394,9 +453,13 @@ def _resolve_topics(raw: Any, query: str) -> list[str]:
     return (matched or _DEFAULT_TOPICS)[:_MAX_TOPICS]
 
 
-def _entry(key: str) -> dict[str, Any]:
-    """Build one topic entry: title, vetted summary, and its citation links."""
-    title, summary, source_ids = _TOPICS[key]
+def _entry(key: str, city: str = "chicago") -> dict[str, Any]:
+    """Build one topic entry: title, vetted summary, and its citation links.
+
+    The "local" topic resolves to the ACTIVE CITY's inspection regime + sources, so
+    an NYC user gets NYC sources and framing, an LA user LA's, etc.
+    """
+    title, summary, source_ids = _LOCAL_TOPICS[city] if key == "local" else _TOPICS[key]
     return {
         "topic": key,
         "title": title,

@@ -60,6 +60,8 @@ os.environ.setdefault("DATA_PREFIX", "web-app-data")
 # (the LLM never chooses the city). Defaults to Chicago.
 import contextvars  # noqa: E402
 
+import city_context  # noqa: E402 — shared per-city framing (see run_local.py too)
+
 _ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
 
 # ---------------------------------------------------------------------------
@@ -209,23 +211,24 @@ def find_inspection_records(
     radius_m: float | None = None,
 ) -> dict:
     """
-    Build a link to the AUTHORITATIVE Chicago Food Inspections records for a SET of
-    establishments — a comparison, a short list, or an area. This is the city's own
-    data (the source behind the risk score), so it needs no disclaimer. Use it when
-    the user compares/lists several places, or asks about an area, and would want to
-    see or verify the underlying city records. Returns a {url, mode, note} link the
-    user clicks through to — nothing is fetched.
+    Build a link to the ACTIVE CITY's AUTHORITATIVE food-inspection records for a
+    SET of establishments — a comparison, a short list, or an area. This is the
+    city's own data (the source behind the risk score), so it needs no disclaimer.
+    Use it when the user compares/lists several places, or asks about an area, and
+    would want to see or verify the underlying city records. Returns a {url, mode,
+    note} link the user clicks through to — nothing is fetched. (Chicago and NYC
+    return a filtered grid; LA returns its county inspections page.)
 
     Provide EXACTLY ONE filter:
       license_ids: the establishments to compare/list. Use the license_id values
         get_safety_score returned, and pass ONLY non-null ones (a place with no
         inspection record has none). Preferred for named places.
-      zip_code: a Chicago ZIP, for "records in <ZIP>".
+      zip_code: a ZIP in the active city, for "records in <ZIP>".
       lat + lon + radius_m: a point and radius in metres, for "records near here".
 
     Args:
         license_ids: license_id strings from get_safety_score (non-null only)
-        zip_code: Chicago ZIP code (area mode)
+        zip_code: a ZIP in the active city (area mode)
         lat: latitude of the area centre (with lon + radius_m)
         lon: longitude of the area centre (with lat + radius_m)
         radius_m: search radius in metres (with lat + lon)
@@ -237,6 +240,7 @@ def find_inspection_records(
             "lat": lat,
             "lon": lon,
             "radius_m": radius_m,
+            "city": _ACTIVE_CITY.get(),
         },
         None,
     )
@@ -258,7 +262,9 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
         query: The user's general food-safety question, passed through verbatim
         topics: Optional explicit subset of topic keys; omit to match on the query
     """
-    return _info_handler.handler({"query": query, "topics": topics or []}, None)
+    return _info_handler.handler(
+        {"query": query, "topics": topics or [], "city": _ACTIVE_CITY.get()}, None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -389,13 +395,9 @@ def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent
     # Tell the model which city this request is scoped to (multi-city, DR 0016).
     # The tools already read the right city's data; this keeps the model's
     # framing + "no record" wording aligned to the active city.
-    city = _ACTIVE_CITY.get()
-    city_label = {"nyc": "New York City", "la": "Los Angeles"}.get(city, "Chicago")
-    city_prefix = (
-        f"ACTIVE CITY: {city_label}. Scope every restaurant lookup and every "
-        f"'no record' statement to {city_label}; do not mention or use the other "
-        f"city's establishments for this request.\n\n"
-    )
+    # ACTIVE CITY block: per-city grade framing + scope. Shared with run_local.py
+    # via city_context so the deployed agent and the eval frame a request identically.
+    city_prefix = city_context.city_prefix(_ACTIVE_CITY.get())
     # Tell the model which audience opened this chat (frontend: the For
     # Inspectors / For Caregivers pages), so the relevant system-prompt section
     # applies by default rather than only when the user's own words trigger it
