@@ -334,7 +334,7 @@ export function TrendChart({
               tabIndex={0}
               role={linkable ? "link" : "button"}
               aria-label={`${fmtFull(pts[i].date)}, trend estimate ${Math.round(pts[i].score * 100)}${
-                isLast ? " (latest — leaves out this visit's result, so it can differ from the risk score)" : ""
+                isLast ? " (latest: leaves out this visit's result, so it can differ from the risk score)" : ""
               }${pts[i].result ? `, inspection result ${pts[i].result}` : ""}${
                 linkable && activateHint ? `, ${activateHint}` : ""
               }`}
@@ -415,7 +415,7 @@ export function TrendChart({
               widening the tooltip past the chart edge. */}
           {hover === pts.length - 1 && (
             <div className="opacity-70 whitespace-normal max-w-[190px] leading-tight mt-0.5">
-              Latest — leaves out this visit&apos;s result, so it can differ from the risk score.
+              Latest: leaves out this visit&apos;s result, so it can differ from the risk score.
             </div>
           )}
         </div>
@@ -441,7 +441,7 @@ export function TrendCaptionLead() {
   return (
     <>
       Each point is the trend estimate
-      <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" /> — the model&apos;s read
+      <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" />: the model&apos;s read
       with each visit&apos;s own result removed, so the line shows direction. The dashed line is the
       risk score
       <DefineTerm termKey="risk-score" className="align-middle mx-0.5" />, which counts the latest
