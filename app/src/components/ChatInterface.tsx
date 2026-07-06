@@ -600,9 +600,11 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Notice for a city whose chat backend isn't live yet (chatSupported:false,
-          currently LA — DR 0016). Be honest: general food-safety questions work,
-          establishment lookups for this city don't. */}
+      {/* Notice for a city whose chat backend isn't live yet
+          (chatSupported:false). Every current city (Chicago, NYC, LA) is
+          supported, so this stays dormant; it's the honest fallback for a future
+          city added before its agent is live — general food-safety questions
+          work, establishment lookups for that city don't. */}
       {!CITY_CONFIG[city].chatSupported && (
         <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
