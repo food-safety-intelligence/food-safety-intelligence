@@ -1,6 +1,10 @@
 # 0008 — Risk-tier thresholds (Low / Moderate / Elevated / High)
 
-- **Status**: Accepted
+- **Status**: Accepted, then **superseded** by the unified cross-city tier rule in
+  [0017](0017-seasonality-asof-scoring-and-low-tier-widening.md) (2026-07-05). The
+  fixed cutoffs below are the original Chicago-only scheme, kept for the record; the
+  *why* (calibrated probs concentrate near zero; fixed cutoffs over quantiles for
+  reship-stability) still holds and is what 0017 generalises to all three cities.
 - **Date**: 2026-06-21
 - **Owners to ack**: Bella (eval / serve), Aurelia + Jun (web app), Jun (PM)
 
@@ -11,18 +15,25 @@
 
 ## Decision
 
-Bucket `risk_score` with these thresholds (single source of truth:
-`RISK_TIER_THRESHOLDS` in `src/foodsafety/serve/predict_batch.py`):
+Original Chicago cutoffs (`0.04` at first ship, widened to `0.06`):
 
-| Score range | Tier | Approx. population share |
-|---|---|---|
-| `[0.00, 0.04)` | Low | ~25% |
-| `[0.04, 0.13)` | Moderate | ~62% |
-| `[0.13, 0.30)` | Elevated | ~11% |
-| `[0.30, 1.00]` | High | ~1% |
+| Score range | Tier |
+|---|---|
+| `[0.00, 0.06)` | Low |
+| `[0.06, 0.13)` | Moderate |
+| `[0.13, 0.30)` | Elevated |
+| `[0.30, 1.00]` | High |
 
-Tiers are assigned **in Python only** (`score_to_tier`) and shipped in
-`scores.json`; the web app reads the `risk_tier` field directly. Documented in
+**Superseded (2026-07-05).** [0017](0017-seasonality-asof-scoring-and-low-tier-widening.md)
+replaces these hand-picked cutoffs with one rule for all three cities, anchored to
+each city's base rate: Low `<0.5×`, Moderate `0.5–1×`, Elevated `1×–High_cut`, High
+`≥ max(2× base, city p98)`. For Chicago (base 0.108) that is `0.054 / 0.108 / 0.216`
+— the Low line barely moves, so nothing about the "why" here changes; it just now
+applies uniformly. Cutoffs live in `assign_risk_tiers` (`predict_batch.py`), and the
+served cutoffs are recorded in `scores.json`'s `risk_tier_thresholds`.
+
+Tiers are assigned **in Python only** and shipped in `scores.json`; the web app
+reads the `risk_tier` field directly. Documented in
 [`interface_contracts.md`](../interface_contracts.md) § 3.
 
 ## Why these cutoffs

@@ -123,8 +123,8 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
             </span>
             {restaurant.closed_since && (
               <>
-                {" "}
-                — an inspector found it closed on{" "}
+                :{" "}
+                an inspector found it closed on{" "}
                 {formatInspectionDate(restaurant.closed_since)}
               </>
             )}
@@ -237,10 +237,10 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
               </div>
               <p className="text-base text-muted leading-relaxed mb-4 max-w-[60ch]">
                 The same drivers as the bars above, rescaled to the model&apos;s
-                calibrated scale so they add up — so the numbers here are smaller
+                calibrated scale so they add up, so the numbers here are smaller
                 than the bars (which show raw influence and don&apos;t sum). The
                 base, each driver, and everything else total one number, which a
-                sigmoid turns into the probability on the gauge — so this column
+                sigmoid turns into the probability on the gauge, so this column
                 reconciles exactly with the score.
               </p>
               <Waterfall restaurant={restaurant} calibration={calibration} />

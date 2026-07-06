@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata = {
-  title: "Give feedback · Food Safety",
+  title: "Give feedback · Eatelligence Food Safety",
   description:
     "Tell the team about a data error, a listing that looks wrong, or something we could explain more clearly.",
 };
@@ -37,7 +37,7 @@ export default function FeedbackPage() {
           </h1>
           <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[52ch]">
             This is a research preview built on public data. If something looks
-            wrong, reads unclearly, or is missing, we want to know — it goes
+            wrong, reads unclearly, or is missing, we want to know. It goes
             straight to the team.
           </p>
         </header>

@@ -38,7 +38,7 @@ from xgboost import XGBClassifier
 from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
-from foodsafety.serve.predict_batch import write_scores_json
+from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
 from foodsafety.utils.time import temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
@@ -103,6 +103,10 @@ BC_THRESHOLD = 14
 # NYC halted inspections Mar 2020; grades/scores only normalise from 2022. Train
 # on 2022-07-01+ anchors (post-COVID steady state) — the analog of Chicago's 2019
 # cutoff. Earlier scored events are still used as burn-in for prior_* history.
+# NYC label prevalence (P next graded B/C) on the held-out test set — the base
+# rate the unified tier rule anchors on (DR 0017). Fixed so tier cutoffs stay
+# stable across rescores; printed at runtime (test base) to spot large drift.
+NYC_BASE_RATE = 0.41
 NYC_TRAIN_START = "2022-07-01"
 TRAIN_END = "2024-10-01"
 VAL_END = "2025-04-01"
@@ -456,22 +460,14 @@ def main():
     )
     latest["as_of_date"] = latest["inspection_date"]
 
-    # ---- recalibrate tiers to NYC's score distribution
-    q = latest["risk_score"].quantile([0.4, 0.85, 0.98]).round(4).tolist()
+    # ---- tier with the unified cross-city rule (DR 0017): cutoffs anchored to
+    # NYC's own base rate, not per-city quantiles. Same rule as Chicago / LA.
+    latest["risk_tier"], thr = assign_risk_tiers(latest["risk_score"], NYC_BASE_RATE)
     print(
         f"NYC risk_score dist: p50={latest.risk_score.median():.3f} "
         f"p90={latest.risk_score.quantile(0.9):.3f} max={latest.risk_score.max():.3f}"
     )
-    print(f"NYC tier thresholds (p40/p85/p98): {q}")
-    thr = [(q[0], "Low"), (q[1], "Moderate"), (q[2], "Elevated"), (1.01, "High")]
-
-    def tier(s):
-        for t, name in thr:
-            if s < t:
-                return name
-        return "High"
-
-    latest["risk_tier"] = latest["risk_score"].apply(tier)
+    print(f"NYC tier thresholds (base={NYC_BASE_RATE}): {thr}")
     print("tier counts:", latest["risk_tier"].value_counts().to_dict())
 
     # App waterfall formula: logit = -(a*margin + b), margin = intercept + Σshap.
@@ -524,6 +520,7 @@ def main():
         model_version=MODEL_VERSION,
         label_window_days=0,
         calibration=calibration,
+        risk_tier_thresholds=thr,
     )
     print(f"\nWrote {OUT / 'scores.json'}  ({len(out):,} establishments)")
 
@@ -601,20 +598,13 @@ def main():
             "(ROC-AUC ~0.66 vs ~0.78); its data window is only ~3 post-COVID years."
         ),
         "risk_tiers": [
-            {"label": "Low", "min": 0.0, "max": q[0], "share": round(shares.get("Low", 0), 4)},
             {
-                "label": "Moderate",
-                "min": q[0],
-                "max": q[1],
-                "share": round(shares.get("Moderate", 0), 4),
-            },
-            {
-                "label": "Elevated",
-                "min": q[1],
-                "max": q[2],
-                "share": round(shares.get("Elevated", 0), 4),
-            },
-            {"label": "High", "min": q[2], "max": None, "share": round(shares.get("High", 0), 4)},
+                "label": name,
+                "min": round(lo, 4),
+                "max": (None if cut > 1.0 else round(cut, 4)),
+                "share": round(shares.get(name, 0), 4),
+            }
+            for (cut, name), lo in zip(thr, [0.0, thr[0][0], thr[1][0], thr[2][0]], strict=True)
         ],
         "operating_points": op,
     }
@@ -626,7 +616,8 @@ def main():
         json.dumps(
             {
                 "model_version": MODEL_VERSION,
-                "tier_thresholds": q,
+                "tier_thresholds": [c for c, _ in thr[:3]],
+                "base_rate": NYC_BASE_RATE,
                 "train_start": NYC_TRAIN_START,
                 "split": {"train_end": TRAIN_END, "val_end": VAL_END},
                 "test_metrics": test_metrics,

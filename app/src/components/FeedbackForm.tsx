@@ -85,7 +85,7 @@ export function FeedbackForm() {
           <CheckCircle2 className="w-6 h-6 text-sage-strong" strokeWidth={1.8} />
         </span>
         <h2 className="text-2xl font-light tracking-tight mt-4">
-          Thank you — we&apos;ve got it.
+          Thank you. We&apos;ve got it.
         </h2>
         <p className="text-muted leading-relaxed mt-2 max-w-[46ch] mx-auto">
           Your note has been sent to the team. We read every submission to help
@@ -156,7 +156,7 @@ export function FeedbackForm() {
       <label htmlFor="feedback-message" className="block">
         <span className="text-sm font-medium text-ink">Your feedback</span>
         <span className="block text-sm text-muted mt-1 leading-relaxed">
-          Tell us what&apos;s wrong, confusing, or missing — a data error, a
+          Tell us what&apos;s wrong, confusing, or missing: a data error, a
           listing that looks off, or something we could explain better.
         </span>
       </label>
@@ -196,7 +196,7 @@ export function FeedbackForm() {
 
       <div className="mt-2 flex items-center justify-between gap-3">
         <p id="feedback-privacy" className="text-xs text-muted leading-relaxed">
-          Please don&apos;t include personal details — we don&apos;t collect your
+          Please don&apos;t include personal details. We don&apos;t collect your
           name or email.
         </p>
         <span

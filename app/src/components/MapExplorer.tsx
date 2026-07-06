@@ -356,7 +356,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   </>
                 ) : sort === "low" ? (
                   <>
-                    Lowest {listRows.length.toLocaleString()} by risk — a weaker
+                    Lowest {listRows.length.toLocaleString()} by risk: a weaker
                     signal, not a safety guarantee
                   </>
                 ) : (

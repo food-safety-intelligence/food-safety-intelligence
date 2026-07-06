@@ -316,6 +316,13 @@ source of truth.
   Tailwind reserves the `base` keyword, so `text-base` has no paired
   line-height and inherits the 1.5 body default — that's expected.)
 - No emoji in committed code or UI unless explicitly asked.
+- No em dashes (—) in user-facing UI copy. This covers JSX text, string props
+  (labels, aria-labels, titles, placeholders), template literals rendered as
+  text, and user-facing data strings (glossary, driver descriptions, city
+  descriptions). Rewrite the sentence instead: a comma, colon, parentheses, or
+  a sentence split, whichever reads best. En dashes (–, e.g. code ranges like
+  `1–29`) and a standalone dash used as a "no value" placeholder are fine. Code
+  comments are exempt.
 - Accessibility is default: keyboard nav, ARIA labels on icon-only buttons,
   ≥44px tap targets, sufficient contrast.
 - **Validate UI changes rigorously — by observing the running app, not
@@ -378,7 +385,8 @@ Process:
 
 - Branch per **owner + workstream**: `<owner>/<workstream>-<short-desc>` — e.g.
   `bella/mle-feature-refresh`, `arun/de-loader-fix`. Workstreams: `de`, `eda`,
-  `mle`, `app`, `pm`. (Applies to new branches; existing ones aren't retroactively renamed.)
+  `mle`, `app`, `agent` (Bedrock/AgentCore agent + its deploy), `pm`. (Applies to
+  new branches; existing ones aren't retroactively renamed.)
 - Squash-merge to `main`. No direct pushes to `main`.
 - One reviewer required; backup owner is the default reviewer.
 - PR review SLA = 24h. If silent past 24h on a clearly-scoped workstream

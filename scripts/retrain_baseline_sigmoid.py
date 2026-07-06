@@ -276,6 +276,8 @@ def main() -> None:
         schema_version="0.6.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
+        # Unified tier cutoffs used this run (DR 0017) — Chicago base rate default.
+        risk_tier_thresholds=scores.attrs.get("risk_tier_thresholds"),
     )
     print(f"Wrote {SCORES_JSON_PATH}")
 

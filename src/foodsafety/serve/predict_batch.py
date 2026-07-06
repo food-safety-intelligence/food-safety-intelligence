@@ -32,29 +32,38 @@ from foodsafety.explain.shap_drivers import (
     top_drivers_for_row,
 )
 
-# Tier thresholds calibrated to the actual score distribution.
+# --- Unified cross-city risk-tier rule (DR 0017) ------------------------------
+# Every city's model emits a CALIBRATED probability, but the three cities predict
+# different events with very different base rates (Chicago P(fail-or-priority 180d)
+# ~11%; NYC P(next graded B/C) ~41%; LA ~9%), so a shared ABSOLUTE cutoff would mean
+# different things per city. Instead the cutoffs are anchored to each city's own
+# base rate (its label prevalence):
 #
-# The mock fixture in `scores_mock.json` used (0.20, 0.40, 0.65) — sensible for
-# uniformly-distributed synthetic scores in [0, 1] but wrong for real
-# calibrated probabilities. Empirically the production model's score
-# distribution on 23k restaurants is:
-#   p50 ≈ 0.06   p90 ≈ 0.17   p99 ≈ 0.29   max = 1.00
+#   Low       score <  0.5x base    -- clearly below baseline; genuinely low risk
+#   Moderate  0.5x - 1.0x base      -- around the city's own baseline
+#   Elevated  1.0x base - High_cut  -- above baseline
+#   High      score >= High_cut     -- High_cut = max(2x base, the city's p98 score)
 #
-# These thresholds split the population into:
-#   Low       — model is confident this restaurant is low-risk
-#   Moderate  — typical Chicago restaurant
-#   Elevated  — several risk signals present
-#   High      — strong risk signals; warrants attention
+# Low/Moderate/Elevated boundaries are FIXED multiples of the base rate: "Low" then
+# means the same low risk in every city, and (being fixed, not quantiles) a venue's
+# tier only moves when ITS score moves, not when the population shifts. High is the
+# rarer of "top 2%" or ">=2x base", so it stays a small, genuinely-elevated triage
+# slice regardless of how each city's score distribution is shaped -- without the
+# p98 cap, a low-base city piles many merely-above-average venues into High.
 #
-# Canonical tier-share split lives in `docs/interface_contracts.md` § 3 (the
-# served script also prints the actual split at runtime). Specific percentages
-# were removed from this comment to avoid drift across three sources.
-RISK_TIER_THRESHOLDS = [
-    (0.04, "Low"),
-    (0.13, "Moderate"),
-    (0.30, "Elevated"),
-    (1.01, "High"),  # 1.01 to include the rare 1.0 case
-]
+# This supersedes the fixed Chicago cutoffs (DR 0008) and the NYC/LA p40/p85/p98
+# quantile blocks; all three producers now tier via `assign_risk_tiers`. Full
+# rationale + per-city numbers in `docs/tier-method-cross-city-analysis.md`.
+TIER_LOW_MULTIPLE = 0.5
+TIER_MODERATE_MULTIPLE = 1.0
+TIER_HIGH_MULTIPLE = 2.0
+TIER_HIGH_PERCENTILE = 0.98
+
+# Per-city base rate = label prevalence on the city's held-out test set. Fixed
+# reference values (not recomputed per run) so the Low/Moderate/Elevated cutoffs
+# stay stable across rescores. Chicago's is the default for build_scores_table;
+# the NYC/LA producers pass their own.
+CHICAGO_BASE_RATE = 0.108
 
 # Trend slope is fit over each license's last K inspections (visits), not a fixed
 # calendar window. K=5 is the tuned default — see DR 0011 / docs/model-experiments.md
@@ -97,12 +106,42 @@ def out_of_business_status(labeled: pd.DataFrame) -> pd.DataFrame:
     return latest.set_index("license_id")[["is_out_of_business", "closed_since"]]
 
 
-def score_to_tier(score: float) -> str:
+def tier_thresholds(base_rate: float, high_percentile_score: float) -> list[tuple[float, str]]:
+    """Unified tier cutoffs for one city (DR 0017).
+
+    ``base_rate`` is the city's label prevalence; ``high_percentile_score`` is the
+    :data:`TIER_HIGH_PERCENTILE` (p98) of the scored population. Returns the
+    ``(upper_bound, tier)`` list :func:`score_to_tier` consumes, ``High`` last.
+    """
+    low = round(TIER_LOW_MULTIPLE * base_rate, 4)
+    moderate = round(TIER_MODERATE_MULTIPLE * base_rate, 4)
+    # High is the rarer of ">=2x base" or "top 2%": max() keeps it both genuinely
+    # elevated and rare in every city.
+    high = round(max(TIER_HIGH_MULTIPLE * base_rate, high_percentile_score), 4)
+    return [(low, "Low"), (moderate, "Moderate"), (high, "Elevated"), (1.01, "High")]
+
+
+def score_to_tier(score: float, thresholds: list[tuple[float, str]]) -> str:
     """Discretise a probability into Low / Moderate / Elevated / High."""
-    for threshold, tier in RISK_TIER_THRESHOLDS:
+    for threshold, tier in thresholds:
         if score < threshold:
             return tier
     return "High"
+
+
+def assign_risk_tiers(
+    scores: pd.Series, base_rate: float
+) -> tuple[pd.Series, list[tuple[float, str]]]:
+    """Tier every score with the unified rule; return the tiers + thresholds used.
+
+    ``base_rate`` is the city's label prevalence. The High cutoff's p98 is taken
+    from ``scores`` itself (the served population), so callers can persist the
+    returned thresholds to methodology.json rather than recomputing them.
+    """
+    p98 = float(scores.quantile(TIER_HIGH_PERCENTILE))
+    thresholds = tier_thresholds(base_rate, p98)
+    tiers = scores.apply(lambda s: score_to_tier(s, thresholds))
+    return tiers, thresholds
 
 
 def _establishment_key(df: pd.DataFrame) -> pd.Series:
@@ -136,6 +175,7 @@ def build_scores_table(
     contributions_fn=None,
     trend_scores=None,
     closure_status: pd.DataFrame | None = None,
+    base_rate: float = CHICAGO_BASE_RATE,
 ) -> pd.DataFrame:
     """Produce the scores table for every restaurant in ``features``.
 
@@ -227,8 +267,10 @@ def build_scores_table(
         df, latest_per_license, score_col="_trend_score"
     )
 
-    # Tier + as_of_date.
-    latest_per_license["risk_tier"] = latest_per_license["risk_score"].apply(score_to_tier)
+    # Tier (unified rule, DR 0017) + as_of_date. Thresholds are stashed on the
+    # frame's .attrs so the producer can persist them to methodology.json.
+    tiers, applied_thresholds = assign_risk_tiers(latest_per_license["risk_score"], base_rate)
+    latest_per_license["risk_tier"] = tiers
     latest_per_license["as_of_date"] = latest_per_license["inspection_date"]
 
     # Closure status (DR 0014). Licenses absent from the closure frame — and
@@ -253,7 +295,9 @@ def build_scores_table(
         "is_out_of_business",
         "closed_since",
     ]
-    return latest_per_license[output_cols].reset_index(drop=True)
+    result = latest_per_license[output_cols].reset_index(drop=True)
+    result.attrs["risk_tier_thresholds"] = applied_thresholds
+    return result
 
 
 def _compute_trend_slopes(
@@ -319,6 +363,7 @@ def write_scores_json(
     label_window_days: int = 180,
     totals: dict | None = None,
     calibration: dict | None = None,
+    risk_tier_thresholds: list[tuple[float, str]] | None = None,
 ) -> None:
     """Convert ``scores.parquet`` to the JSON the Next.js app reads.
 
@@ -381,6 +426,13 @@ def write_scores_json(
         "label_window_days": label_window_days,
         "totals": totals,
         "calibration": calibration,
+        # Unified tier cutoffs actually used this run (DR 0017), so the
+        # methodology page reports the real bands without recomputing p98.
+        "risk_tier_thresholds": (
+            [[float(t), name] for t, name in risk_tier_thresholds]
+            if risk_tier_thresholds is not None
+            else None
+        ),
         "scores": [_row_to_json(r) for r in df.itertuples(index=False)],
     }
 

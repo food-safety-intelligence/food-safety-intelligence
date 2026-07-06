@@ -16,6 +16,7 @@ import type { ChatEstablishment, ChatPersona } from "@/components/ChatScopeConte
 import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
+import { Wordmark } from "@/components/Wordmark";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -599,16 +600,18 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Notice for a city whose chat backend isn't live yet (chatSupported:false,
-          currently LA — DR 0016). Be honest: general food-safety questions work,
-          establishment lookups for this city don't. */}
+      {/* Notice for a city whose chat backend isn't live yet
+          (chatSupported:false). Every current city (Chicago, NYC, LA) is
+          supported, so this stays dormant; it's the honest fallback for a future
+          city added before its agent is live — general food-safety questions
+          work, establishment lookups for that city don't. */}
       {!CITY_CONFIG[city].chatSupported && (
         <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
           <span>
             You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
             assistant can&apos;t look up a specific {CITY_CONFIG[city].label} place
-            yet — general food-safety questions still work.
+            yet. General food-safety questions still work.
           </span>
         </div>
       )}
@@ -627,10 +630,8 @@ export function ChatInterface({
                   <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                     <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
                   </span>
-                  {/* "Eatelligence" = Eat + intelligence; sage "Eat" stem
-                      (sage-strong clears AA) plays up the pun. */}
                   <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                    <span className="text-sage-strong">Eat</span>elligence
+                    <Wordmark />
                   </h2>
                 </>
               )}

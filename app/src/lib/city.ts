@@ -67,7 +67,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place will see a failed inspection or priority violation in the next six months",
     sourceBlurb:
-      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
+      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months, and show you exactly why.",
     cityState: "Chicago, IL",
     healthDept: "Chicago Department of Public Health",
     riskLabel: "Predicted 180-day risk",
@@ -99,7 +99,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place's next inspection is graded B or C (a score of 14 or more points)",
     sourceBlurb:
-      "New York City publishes every restaurant inspection its Health Department conducts, each carrying a letter grade (A / B / C). We use inspection history since the post-COVID restart to estimate the chance a place's next inspection is graded B or C — and show you exactly why. NYC is a research-preview second city with a weaker signal than Chicago.",
+      "New York City publishes every restaurant inspection its Health Department conducts, each carrying a letter grade (A / B / C). We use inspection history since the post-COVID restart to estimate the chance a place's next inspection is graded B or C, and show you exactly why. NYC is a research-preview second city with a weaker signal than Chicago.",
     cityState: "New York, NY",
     healthDept: "New York City Department of Health and Mental Hygiene",
     riskLabel: "Predicted next-inspection risk",
@@ -140,7 +140,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place's next inspection is graded B or C (a score below 90 out of 100)",
     sourceBlurb:
-      "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C — and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
+      "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C, and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
     cityState: "Los Angeles, CA",
     healthDept: "Los Angeles County Department of Public Health",
     riskLabel: "Predicted next-inspection risk",

@@ -5,7 +5,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata = {
-  title: "For inspectors — Food Safety Chicago",
+  title: "For inspectors · Eatelligence Food Safety",
   description:
     "A model-ranked inspection worklist: establishments ordered by their probability of a failed inspection or critical violation in the next 180 days.",
 };

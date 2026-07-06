@@ -15,11 +15,13 @@ Other tests pin down:
 from __future__ import annotations
 
 import pandas as pd
+import pytest
 
 from foodsafety.features.build import build_features
 from foodsafety.features.inspection_features import add_inspection_features
 from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.features.license_features import add_license_features, normalize_facility_type
+from foodsafety.features.temporal_features import add_temporal_features, override_scoring_month
 
 
 def _minimal_row(**overrides) -> dict:
@@ -658,3 +660,54 @@ def test_building_features_no_geo_anchor_is_na_not_zero():
     out = add_building_features(inspections, permits=None, violations=violations)
     assert pd.isna(out.loc[0, "prior_bldg_violations_365d"])
     assert pd.isna(out.loc[0, "days_since_last_bldg_violation"])
+
+
+# ---------------------------------------------------------------------------
+# override_scoring_month — the as-of-common-month scoring anchor (DR 0017)
+# ---------------------------------------------------------------------------
+
+
+def test_override_scoring_month_freezes_only_seasonal_columns():
+    # Two venues inspected in different months: their real seasonal features
+    # differ, so their frozen-month scoring must NOT depend on inspection date.
+    df = add_temporal_features(
+        _df(
+            [
+                _minimal_row(license_id="L1", inspection_date="2023-12-26"),
+                _minimal_row(license_id="L2", inspection_date="2024-05-04"),
+            ]
+        )
+    )
+    before = df.copy(deep=True)
+
+    out = override_scoring_month(df, month=7)
+
+    # Both seasonal model features collapse to the common month (July -> Q3),
+    # identically for every row regardless of its real inspection month.
+    assert out["temporal_month"].tolist() == [7, 7]
+    assert out["temporal_quarter"].tolist() == [3, 3]
+    assert str(out["temporal_month"].dtype) == "Int8"
+    assert str(out["temporal_quarter"].dtype) == "Int8"
+
+    # Nothing else moves: every non-seasonal column is untouched, including the
+    # real inspection_date and the (excluded-from-model) temporal_season/year/dow.
+    untouched = [c for c in out.columns if c not in {"temporal_month", "temporal_quarter"}]
+    pd.testing.assert_frame_equal(out[untouched], before[untouched])
+
+    # And the input frame is not mutated in place.
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_override_scoring_month_quarter_tracks_month():
+    df = add_temporal_features(_df([_minimal_row(inspection_date="2023-12-26")]))
+    for month, quarter in [(1, 1), (3, 1), (4, 2), (9, 3), (10, 4), (12, 4)]:
+        out = override_scoring_month(df, month=month)
+        assert out["temporal_month"].iloc[0] == month
+        assert out["temporal_quarter"].iloc[0] == quarter
+
+
+def test_override_scoring_month_rejects_out_of_range():
+    df = add_temporal_features(_df([_minimal_row(inspection_date="2023-12-26")]))
+    for bad in (0, 13, -1):
+        with pytest.raises(ValueError):
+            override_scoring_month(df, month=bad)
