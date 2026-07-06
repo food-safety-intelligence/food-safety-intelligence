@@ -55,14 +55,24 @@ jobs:
       - name: Build static export
         run: npm run build
 
-      # Sync the app shell (HTML, JS/CSS chunks, the small data JSONs) with the
-      # plain mtime-based sync — it is small and changes on every code deploy.
-      # The ~23.6k per-license detail bundles are EXCLUDED here (excluded keys
-      # are also exempt from --delete) and handled by the content-aware step
-      # below: they are byte-identical across code-only deploys, so re-uploading
-      # all of them every time (mtime always changes on rebuild) is pure waste.
-      - name: Upload app shell to S3
-        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete --exclude "data/detail/*" --exclude "data/nyc/detail/*" --exclude "data/la/detail/*"
+      # Content-hashed build assets (_next/static/**) are immutable: the filename
+      # changes whenever the bytes change, so they can cache forever. --delete is
+      # scoped to this prefix, cleaning out chunks from prior builds.
+      - name: Upload immutable build assets to S3
+        run: aws s3 sync out/_next/static "s3://${{ vars.WEBSITE_BUCKET }}/_next/static" --delete --cache-control "public,max-age=31536000,immutable"
+
+      # Everything else — HTML shells and the data JSON (search-index, methodology,
+      # per-city scores) — shares a STABLE url, so without a revalidation directive
+      # browsers heuristically cache it and keep showing stale data after a
+      # republish (this is what made a detail page's risk tier lag the map's). Set
+      # `no-cache` so clients always revalidate against the ETag: unchanged files
+      # return a tiny 304, changed data is picked up immediately, no hard refresh.
+      # The immutable assets above and the ~23.6k per-license detail bundles are
+      # EXCLUDED (excluded keys are also exempt from --delete); the bundles are
+      # byte-identical across code-only deploys and handled by the content-aware
+      # step below, so re-uploading all of them every time is pure waste.
+      - name: Upload app shell + data to S3
+        run: aws s3 sync out/ "s3://${{ vars.WEBSITE_BUCKET }}/" --delete --exclude "_next/static/*" --exclude "data/detail/*" --exclude "data/nyc/detail/*" --exclude "data/la/detail/*" --cache-control "no-cache"
 
       # Upload only the detail bundles whose content actually changed (md5 vs the
       # live object ETag), and delete bundles for licenses that no longer exist.
