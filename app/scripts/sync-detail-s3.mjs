@@ -115,6 +115,12 @@ async function main() {
             Key: key,
             Body: body,
             ContentType: "application/json",
+            // Revalidate against the ETag on every load (mirrors the data JSON in
+            // deploy-web.yml): a detail bundle shares a stable url, so without this
+            // a browser keeps serving a cached bundle after a republish and the
+            // detail page's risk tier lags the map. Unchanged → 304; changed →
+            // fresh, no hard refresh.
+            CacheControl: "no-cache",
           }),
         );
       }),

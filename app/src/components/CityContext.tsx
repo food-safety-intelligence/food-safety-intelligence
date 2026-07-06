@@ -8,6 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { type City, DEFAULT_CITY, isCity } from "@/lib/city";
+import { safeGet, safeSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "fsi.city";
 
@@ -25,7 +26,7 @@ function readInitial(): { city: City; needsPick: boolean } {
   if (typeof window === "undefined") return { city: DEFAULT_CITY, needsPick: false };
   const url = new URLSearchParams(window.location.search).get("city");
   if (isCity(url)) return { city: url, needsPick: false };
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = safeGet("local", STORAGE_KEY);
   if (isCity(stored)) return { city: stored, needsPick: false };
   return { city: DEFAULT_CITY, needsPick: true };
 }
@@ -52,7 +53,7 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
     setCityState(c);
     setNeedsPick(false);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, c);
+      safeSet("local", STORAGE_KEY, c);
       const url = new URL(window.location.href);
       url.searchParams.set("city", c);
       window.history.replaceState(null, "", url.toString());

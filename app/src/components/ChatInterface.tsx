@@ -12,6 +12,7 @@ import {
   HeartPulse,
 } from "lucide-react";
 import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
+import { safeGet, safeRemove, safeSet } from "@/lib/safe-storage";
 import type { ChatEstablishment, ChatPersona } from "@/components/ChatScopeContext";
 import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
@@ -32,16 +33,16 @@ const SESSION_KEY = "fsi_chat_session";
 
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return crypto.randomUUID();
-  const stored = sessionStorage.getItem(SESSION_KEY);
+  const stored = safeGet("session", SESSION_KEY);
   if (stored && stored.length >= 33) return stored;
   const id = crypto.randomUUID(); // 36 chars, satisfies AgentCore min-33 requirement
-  sessionStorage.setItem(SESSION_KEY, id);
+  safeSet("session", SESSION_KEY, id);
   return id;
 }
 
 function resetSession(): string {
   const id = crypto.randomUUID();
-  sessionStorage.setItem(SESSION_KEY, id);
+  safeSet("session", SESSION_KEY, id);
   return id;
 }
 
@@ -68,7 +69,7 @@ const MESSAGES_KEY = "fsi_chat_messages";
 function loadMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+    const parsed = JSON.parse(safeGet("session", MESSAGES_KEY) || "[]");
     if (!Array.isArray(parsed)) return [];
     // Validate shape before these reach render and the agent-history payload —
     // sessionStorage is user-writable and the stored schema could drift.
@@ -85,15 +86,12 @@ function loadMessages(): Message[] {
 
 function saveMessages(messages: Message[]): void {
   if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
-  } catch {
-    // Best-effort: ignore quota / serialization failures.
-  }
+  // Best-effort: safeSet swallows quota / private-mode failures.
+  safeSet("session", MESSAGES_KEY, JSON.stringify(messages));
 }
 
 function clearMessages(): void {
-  if (typeof window !== "undefined") sessionStorage.removeItem(MESSAGES_KEY);
+  safeRemove("session", MESSAGES_KEY);
 }
 
 // ─── Markdown-lite renderer ───────────────────────────────────────────────────
@@ -316,16 +314,16 @@ function pickSuggestions(seed: number, city: City, persona: ChatPersona | null):
 // and the full /chat page (same session) agree, and a brand-new chat rotates.
 function getOrCreateSuggestSeed(): number {
   if (typeof window === "undefined") return 0;
-  const stored = sessionStorage.getItem(SUGGEST_SEED_KEY);
+  const stored = safeGet("session", SUGGEST_SEED_KEY);
   if (stored !== null) return Number(stored);
   const seed = Math.floor(Math.random() * 2 ** 31);
-  sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  safeSet("session", SUGGEST_SEED_KEY, String(seed));
   return seed;
 }
 
 function rotateSuggestSeed(): number {
   const seed = Math.floor(Math.random() * 2 ** 31);
-  if (typeof window !== "undefined") sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  safeSet("session", SUGGEST_SEED_KEY, String(seed));
   return seed;
 }
 
