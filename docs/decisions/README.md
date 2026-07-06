@@ -52,6 +52,13 @@ file per decision; the log is **append-only** — don't renumber existing record
   — why `find_reviews` links go direct to the source (unverified opinion, no
   scrape/paid API) and the new `find_inspection_records` links to the city's own
   records (authoritative provenance, keyless); extends 0012's sourcing principle.
+- [0017 — As-of-common-month scoring + unified cross-city risk-tier rule](0017-seasonality-asof-scoring-and-low-tier-widening.md)
+  — (A) freeze the seasonal features to the current month at scoring time only
+  (keeps seasonality in the model, fixes calendar-frozen/stale Chicago scores); and
+  (B) one tier rule for all three cities anchored to each city's base rate
+  (Low `<0.5×`, Mod `<1×`, Elev `<max(2×, p98)`, High above) — meaning-based Low,
+  small capped High; supersedes 0008's fixed Chicago cutoffs and the NYC/LA quantile
+  blocks.
 
 ---
 

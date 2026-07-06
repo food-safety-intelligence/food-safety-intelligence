@@ -26,9 +26,11 @@ from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_p
 from foodsafety.serve.predict_batch import (
     TREND_STABLE_BAND,
     _row_to_json,
+    assign_risk_tiers,
     build_scores_table,
     out_of_business_status,
     score_to_tier,
+    tier_thresholds,
     write_scores_json,
 )
 
@@ -125,9 +127,11 @@ def test_risk_score_and_tier_are_valid():
 
     assert scores["risk_score"].between(0.0, 1.0).all()
     assert set(scores["risk_tier"]).issubset({"Low", "Moderate", "Elevated", "High"})
-    # Tier must be the discretisation of the score it sits next to.
+    # Tier must be the discretisation of the score under the unified-rule thresholds
+    # this run actually used (recorded on the frame's .attrs — DR 0017).
+    thresholds = scores.attrs["risk_tier_thresholds"]
     for _, row in scores.iterrows():
-        assert row["risk_tier"] == score_to_tier(row["risk_score"])
+        assert row["risk_tier"] == score_to_tier(row["risk_score"], thresholds)
 
 
 def test_top_drivers_are_json_ready_dicts():
@@ -372,3 +376,43 @@ def test_reopened_license_collapses_to_one_establishment_row():
         + scores["address"].str.upper().str.replace(r"\s+", " ", regex=True).str.strip()
     )
     assert est.is_unique
+
+
+# ---------------------------------------------------------------------------
+# Unified cross-city tier rule (DR 0017)
+# ---------------------------------------------------------------------------
+
+
+def test_tier_thresholds_are_multiples_of_base_rate():
+    # Low = 0.5x base, Moderate = 1x base; High = max(2x base, p98). Here 2x base
+    # (0.216) dominates the small p98 (0.20), so High cuts at 0.216.
+    thr = tier_thresholds(0.108, 0.20)
+    assert thr == [(0.054, "Low"), (0.108, "Moderate"), (0.216, "Elevated"), (1.01, "High")]
+
+
+def test_tier_thresholds_high_cut_uses_p98_when_it_dominates():
+    # For a low-base city with a long right tail, p98 (0.31) exceeds 2x base
+    # (0.174), so High is capped at the top ~2% — keeping it small, not a big slice.
+    thr = tier_thresholds(0.087, 0.31)
+    assert thr[2] == (0.31, "Elevated")  # High cut = max(0.174, 0.31)
+    assert thr[0] == (0.0435, "Low")
+
+
+def test_assign_risk_tiers_labels_and_thresholds():
+    scores = pd.Series([0.01, 0.08, 0.15, 0.95])
+    tiers, thr = assign_risk_tiers(scores, base_rate=0.108)
+    # p98 of this tiny series is ~0.95, so High cut = max(0.216, ~0.95) -> ~0.95.
+    assert thr[0] == (0.054, "Low") and thr[1] == (0.108, "Moderate")
+    # 0.01 < 0.054 Low; 0.08 in [0.054,0.108) Moderate; 0.15 Elevated; 0.95 top.
+    assert list(tiers) == ["Low", "Moderate", "Elevated", "High"]
+
+
+def test_assign_risk_tiers_high_stays_rare_for_a_low_base_city():
+    # A low-base distribution with a right tail: the p98 cap keeps High ~2%,
+    # instead of a fixed 2x-base cut sweeping many merely-above-average venues in.
+    import numpy as np
+
+    scores = pd.Series(np.concatenate([np.full(980, 0.03), np.linspace(0.1, 0.6, 20)]))
+    tiers, _ = assign_risk_tiers(scores, base_rate=0.087)
+    high_share = (tiers == "High").mean()
+    assert high_share <= 0.03

@@ -37,8 +37,10 @@ from foodsafety.models.xgb import (
     extract_categorical_dtypes,
     prepare_xgb_features,
 )
-from foodsafety.serve.predict_batch import RISK_TIER_THRESHOLDS
 from foodsafety.tracking import provenance
+
+# Tier bands are read from the served scores.json (the unified thresholds this run
+# actually used, DR 0017) — not recomputed here — so the page can't drift from it.
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = storage.join(str(WEB_APP_DATA_DIR), "methodology.json")
@@ -156,31 +158,37 @@ def worked_waterfall(model: _ServedXGB, test: pd.DataFrame) -> dict:
     }
 
 
-def served_tier_shares() -> dict[str, float] | None:
-    """Share of *scored establishments* in each tier, from the served
-    ``scores.json`` totals — the population the app actually displays. Lets the
-    methodology page show shares without itself loading the 18 MB scores file.
+def served_tier_info() -> tuple[dict[str, float] | None, list | None]:
+    """Read the served ``scores.json`` once and return ``(shares, thresholds)``.
 
-    Returns ``None`` if ``scores.json`` isn't built yet (fresh clone before the
-    serving script runs); the page then just omits the Share column.
+    ``shares`` is the share of scored establishments per tier (the population the
+    app displays); ``thresholds`` is the unified tier cutoffs the serving run used
+    (DR 0017). Either is ``None`` if ``scores.json`` isn't built yet (fresh clone)
+    or predates the field; the page then omits the Share column / bands table.
     """
     scores_path = storage.join(str(WEB_APP_DATA_DIR), "scores.json")
     if not storage.exists(scores_path):
-        return None
+        return None, None
     try:
-        counts = json.loads(storage.read_text(scores_path))["totals"]["tier_counts"]
-    except (KeyError, json.JSONDecodeError):
-        return None
-    total = sum(counts.values())
-    return {label: count / total for label, count in counts.items()} if total else None
+        doc = json.loads(storage.read_text(scores_path))
+    except json.JSONDecodeError:
+        return None, None
+    counts = doc.get("totals", {}).get("tier_counts")
+    total = sum(counts.values()) if counts else 0
+    shares = {label: c / total for label, c in counts.items()} if total else None
+    thresholds = doc.get("risk_tier_thresholds")
+    return shares, thresholds
 
 
-def risk_tier_bands(shares: dict[str, float] | None = None) -> list[dict]:
-    """Score→tier bands for the page, derived from the served
-    ``RISK_TIER_THRESHOLDS`` so the page can't drift from ``score_to_tier``."""
+def risk_tier_bands(shares: dict[str, float] | None, thresholds: list | None) -> list[dict]:
+    """Score→tier bands for the page, read from the served ``scores.json``
+    thresholds (DR 0017) so the page can't drift from what actually shipped.
+    Returns ``[]`` if the serving run hasn't recorded thresholds yet."""
+    if not thresholds:
+        return []
     bands: list[dict] = []
     lo = 0.0
-    for threshold, tier in RISK_TIER_THRESHOLDS:
+    for threshold, tier in thresholds:
         hi = None if threshold > 1.0 else round(threshold, 4)
         band: dict = {"label": tier, "min": round(lo, 4), "max": hi}
         if shares is not None and tier in shares:
@@ -231,7 +239,7 @@ def main() -> None:
             "roc_auc": round(float(report.roc_auc), 4),
             "top_decile_lift": round(float(report.top_decile_lift), 2),
         },
-        "risk_tiers": risk_tier_bands(served_tier_shares()),
+        "risk_tiers": risk_tier_bands(*served_tier_info()),
         "operating_points": [
             {
                 "frac": float(row.inspect_top_frac),

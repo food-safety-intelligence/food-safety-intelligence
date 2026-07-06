@@ -109,24 +109,22 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
   return (
     <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse table-fixed">
           <thead>
-            <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
-              <th className="py-2.5 px-4 font-medium">Inspect top</th>
-              <th className="py-2.5 px-4 font-medium">Flagged</th>
-              <th className="py-2.5 px-4 font-medium">Precision (hit rate)</th>
-              <th className="py-2.5 px-4 font-medium">Recall (events caught)</th>
-              <th className="py-2.5 px-4 font-medium">Lift</th>
+            <tr className="text-center text-sage text-[11px] uppercase border-b border-line bg-tint/40">
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Inspect top</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Flagged</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Precision (hit rate)</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Recall (events caught)</th>
             </tr>
           </thead>
-          <tbody className="num text-ink/85">
+          <tbody className="num text-ink/85 text-center">
             {rows.map((p) => (
               <tr key={p.frac} className="border-b border-line last:border-b-0">
                 <td className="py-2.5 px-4">{Math.round(p.frac * 100)}%</td>
                 <td className="py-2.5 px-4">{p.n_flagged.toLocaleString("en-US")}</td>
                 <td className="py-2.5 px-4">{Math.round(p.precision * 100)}%</td>
                 <td className="py-2.5 px-4">{Math.round(p.recall * 100)}%</td>
-                <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
               </tr>
             ))}
           </tbody>
