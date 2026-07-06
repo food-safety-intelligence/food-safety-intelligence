@@ -109,7 +109,7 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
   return (
     <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse table-fixed">
           <thead>
             <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
               <th className="py-2.5 px-4 font-medium">Inspect top</th>
