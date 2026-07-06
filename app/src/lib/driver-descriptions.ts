@@ -10,11 +10,11 @@
 
 const EXACT: Record<string, string> = {
   was_fail:
-    "Whether this establishment failed its current inspection — the strongest near-term signal of forward risk.",
+    "Whether this establishment failed its current inspection: the strongest near-term signal of forward risk.",
   n_priority_this_inspection:
-    "Priority (code 1–29) violations cited at the current inspection — the serious, higher-risk hazards.",
+    "Priority (code 1–29) violations cited at the current inspection: the serious, higher-risk hazards.",
   n_core_this_inspection:
-    "Core (lower-tier) violations at the current inspection — minor issues that still add up.",
+    "Core (lower-tier) violations at the current inspection: minor issues that still add up.",
   static_inspection_type:
     "The kind of inspection scheduled. Complaint-driven and re-inspections tend to surface more problems than routine canvasses.",
   static_risk_tier:
@@ -23,17 +23,17 @@ const EXACT: Record<string, string> = {
     "The kind of establishment (restaurant, grocery, school or hospital kitchen, etc.).",
   static_zip: "The establishment's ZIP-code area.",
   temporal_month:
-    "The month of the inspection — captures mild seasonal patterns in violation rates.",
+    "The month of the inspection: captures mild seasonal patterns in violation rates.",
   temporal_quarter:
-    "The quarter of the inspection — captures mild seasonal patterns in violation rates.",
+    "The quarter of the inspection: captures mild seasonal patterns in violation rates.",
   license_age_days:
-    "How long the business license has existed — very new and very old licenses can carry different risk.",
+    "How long the business license has existed: very new and very old licenses can carry different risk.",
   license_n_history_rows:
-    "How many license-history records exist (renewals, status changes) — a proxy for business continuity.",
+    "How many license-history records exist (renewals, status changes): a proxy for business continuity.",
   days_since_last_inspection:
-    "Time since the last inspection — long gaps give problems more room to develop unseen.",
+    "Time since the last inspection: long gaps give problems more room to develop unseen.",
   days_since_last_fail:
-    "Time since the most recent failed inspection — recent failures weigh more.",
+    "Time since the most recent failed inspection: recent failures weigh more.",
   prior_inspections: "Total inspections on record before this one.",
   prior_fails: "Total failed inspections across the establishment's prior history.",
   prior_priority_violations:
@@ -42,13 +42,13 @@ const EXACT: Record<string, string> = {
     "Core (lower-tier) violations across all prior inspections.",
   prior_fail_or_priority_events:
     "Past inspections that ended in a fail or a priority violation.",
-  prior_fails_365d: "Failed inspections in the last 12 months — recent failure history.",
+  prior_fails_365d: "Failed inspections in the last 12 months: recent failure history.",
   prior_priority_violations_365d:
-    "Priority violations cited in the last 12 months — recent serious history.",
+    "Priority violations cited in the last 12 months: recent serious history.",
   prev_priority_violations:
     "Priority violations cited at the immediately preceding inspection.",
   prior_pass_w_conditions:
-    "Past 'Pass with conditions' results — borderline passes that needed follow-up.",
+    "Past 'Pass with conditions' results: borderline passes that needed follow-up.",
   prior_complaint_inspections:
     "How many past inspections were triggered by a complaint rather than routine schedule.",
   prior_reinspections:
@@ -60,11 +60,11 @@ const EXACT: Record<string, string> = {
 const KW: Array<[RegExp, string]> = [
   [
     /(cooling|cool)/,
-    "Improper cooling of food cited in recent violations — a common cause of bacterial growth.",
+    "Improper cooling of food cited in recent violations: a common cause of bacterial growth.",
   ],
   [
     /temp/,
-    "Temperature-control problems (cold/hot holding) in recent violations — a leading cause of foodborne illness.",
+    "Temperature-control problems (cold/hot holding) in recent violations: a leading cause of foodborne illness.",
   ],
   [
     /(rodent|vermin|pest|rat|mouse|roach)/,
@@ -72,7 +72,7 @@ const KW: Array<[RegExp, string]> = [
   ],
   [
     /(soap|towel|handwash|hand[-_ ]?wash|sink|wash)/,
-    "Handwashing problems in recent violations — missing soap, paper towels, or sink access.",
+    "Handwashing problems in recent violations: missing soap, paper towels, or sink access.",
   ],
   [
     /(expired|expir|date)/,

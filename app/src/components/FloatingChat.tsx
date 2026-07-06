@@ -7,6 +7,7 @@ import { MessageCircle, X, Maximize2 } from "lucide-react";
 import { ChatInterface } from "@/components/ChatInterface";
 import { useChatScope } from "@/components/ChatScopeContext";
 import { Tooltip } from "@/components/Tooltip";
+import { Wordmark } from "@/components/Wordmark";
 
 /**
  * Site-wide chat launcher. Mounted once in the root layout, so it floats over
@@ -93,16 +94,19 @@ export function FloatingChat() {
               <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sage/15 flex-none">
                 <MessageCircle className="w-4 h-4 text-sage" strokeWidth={2} />
               </span>
-              {/* "Eatelligence" = Eat + intelligence; the sage "Eat" stem
-                  (sage-strong clears AA) plays up the pun. */}
               <span className="text-sm font-semibold tracking-tight truncate">
-                <span className="text-sage-strong">Eat</span>elligence
+                <Wordmark />
               </span>
             </span>
             <span className="flex items-center gap-1 flex-none">
               <Tooltip content="Open the full chat page" align="end">
                 <Link
-                  href="/chat"
+                  // Carry the persona so the full /chat page keeps the inspector /
+                  // caregiver framing. persona is page-scoped (cleared when the
+                  // For Inspectors / Caregivers page unmounts on navigation), so
+                  // without this the maximized chat would silently revert to the
+                  // generic framing mid-conversation.
+                  href={persona ? `/chat?persona=${persona}` : "/chat"}
                   aria-label="Open the full chat page"
                   className="p-1.5 rounded-full text-muted hover:text-teal hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
                 >

@@ -300,7 +300,7 @@ export function TrendChartModal({
         </div>
 
         <p className="text-2xs text-muted mt-3 leading-snug">
-          <TrendCaptionLead /> Zooming changes only what you see — not which visits set the
+          <TrendCaptionLead /> Zooming changes only what you see, not which visits set the
           direction. Select a point to open that inspection&apos;s record in a new tab.
         </p>
       </div>

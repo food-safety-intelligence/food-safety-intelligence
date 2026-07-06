@@ -16,6 +16,7 @@ interface CityContextValue {
   setCity: (c: City) => void;
   needsPick: boolean;
   dismissPick: () => void;
+  requestPick: () => void;
 }
 
 const CityContext = createContext<CityContextValue | null>(null);
@@ -60,8 +61,12 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
 
   const dismissPick = useCallback(() => setNeedsPick(false), []);
 
+  // Re-open the entry popup on demand (e.g. clicking the home logo), letting a
+  // returning visitor go back to the "choose a city" prompt.
+  const requestPick = useCallback(() => setNeedsPick(true), []);
+
   return (
-    <CityContext.Provider value={{ city, setCity, needsPick, dismissPick }}>
+    <CityContext.Provider value={{ city, setCity, needsPick, dismissPick, requestPick }}>
       {children}
     </CityContext.Provider>
   );
