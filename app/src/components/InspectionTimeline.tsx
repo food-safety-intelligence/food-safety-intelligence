@@ -177,14 +177,24 @@ export function InspectionTimeline({
           // always matches the number of items revealed on expand.
           const violations = e.comments ? parseViolations(e.comments) : [];
           const hasViolations = violations.length > 0;
-          // The row leads with the violation status so the counts line up down
-          // the column; the inspection type follows. Zero-violation rows read
-          // "No violations" and aren't expandable — there's nothing to reveal.
+          // Cities without a full comment sidecar (NYC, LA) never populate
+          // `comments`, but each event carries its top cited violation in
+          // `headline`. Show that so those rows read the real violation rather
+          // than a misleading "No violations". There's no fuller text to expand
+          // into, so headline-only rows stay non-expandable; an empty headline
+          // means the inspection genuinely recorded no violations.
+          const headlineText = (e.headline ?? "").trim();
+          // The row leads with the violation status so it lines up down the
+          // column; the inspection type follows. Only comment-backed rows are
+          // expandable (the chevron reveals the full violation list).
           const violationLabel = hasViolations
             ? `${violations.length} violation${violations.length === 1 ? "" : "s"}`
-            : "No violations";
+            : headlineText || "No violations";
           // Row body is identical whether or not the row expands; only the
-          // wrapper (interactive button vs. static div) and the chevron differ.
+          // wrapper (interactive button vs. static div) differs. The expand
+          // chevron sits on the LEFT of the text — its column is reserved on
+          // every row (rendered empty when a row isn't expandable) so the
+          // right-aligned dates line up in a clean column throughout.
           const rowInner = (
             <>
               <span
@@ -202,27 +212,31 @@ export function InspectionTimeline({
                     {formatInspectionDate(e.date)}
                   </span>
                 </span>
-                <span
-                  className={`block text-sm mt-0.5 ${
-                    isFail ? "text-ink/90" : "text-muted"
-                  }`}
-                >
-                  <span className={hasViolations && isFail ? "font-medium" : ""}>
-                    {violationLabel}
+                <span className="flex items-start justify-between gap-3">
+                  <span
+                    className={`block text-sm mt-0.5 ${
+                      isFail ? "text-ink/90" : "text-muted"
+                    }`}
+                  >
+                    <span className={hasViolations && isFail ? "font-medium" : ""}>
+                      {violationLabel}
+                    </span>
+                    {" · "}
+                    {e.type}
                   </span>
-                  {" · "}
-                  {e.type}
+                  {/* Expand chevron under the date (right), so the right-aligned
+                      dates stay a clean column and only expandable rows show it. */}
+                  {hasViolations && (
+                    <ChevronDown
+                      className={`shrink-0 w-4 h-4 mt-0.5 text-muted group-hover:text-ink transition-transform ${
+                        isOpen ? "rotate-180" : ""
+                      }`}
+                      strokeWidth={2}
+                      aria-hidden="true"
+                    />
+                  )}
                 </span>
               </span>
-              {hasViolations && (
-                <ChevronDown
-                  className={`shrink-0 w-4 h-4 mt-1 text-muted group-hover:text-ink transition-transform ${
-                    isOpen ? "rotate-180" : ""
-                  }`}
-                  strokeWidth={2}
-                  aria-hidden="true"
-                />
-              )}
             </>
           );
           return (

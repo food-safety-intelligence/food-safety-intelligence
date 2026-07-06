@@ -795,6 +795,18 @@ function ExpandedDetail({
   const drivers = bundle.restaurant.top_drivers;
   const maxMag = Math.max(1e-9, ...drivers.map((x) => Math.abs(x.shap)));
   const history = bundle.history.slice(0, 3);
+  // Colour each result by the city's OWN outcome semantics — Grade A/B/C for NYC
+  // and LA, Pass / Pass w-Conditions / Fail for Chicago — via the shared
+  // historyResults buckets (sage = good, amber = middle, terra = bad). Matching
+  // on the literal strings "Pass"/"Fail" would drop every NYC/LA grade into one
+  // undifferentiated colour.
+  const resultTextColor = (result: string): string => {
+    const cat = CITY_CONFIG[city].historyResults.find((c) => c.match(result));
+    if (!cat) return "text-muted";
+    if (cat.bg === "bg-sage") return "text-sage-strong";
+    if (cat.bg === "bg-terra") return "text-terra";
+    return "text-[#7A5A24]"; // amber / middle tier (Pass w/ Conditions, Grade B)
+  };
 
   return (
     <div className="px-4 sm:px-6 lg:pl-[82px] pb-5 pt-1 grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#FAF7F0]">
@@ -849,16 +861,11 @@ function ExpandedDetail({
               key={`${h.date}-${i}`}
               className="flex items-baseline gap-2.5 text-sm"
             >
-              <span className="num text-muted shrink-0">{h.date}</span>
+              <span className="num text-muted shrink-0">
+                {formatInspectionDate(h.date)}
+              </span>
               <span
-                className={cn(
-                  "font-semibold shrink-0",
-                  h.result === "Fail"
-                    ? "text-terra"
-                    : h.result === "Pass"
-                      ? "text-sage-strong"
-                      : "text-[#7A5A24]",
-                )}
+                className={cn("font-semibold shrink-0", resultTextColor(h.result))}
               >
                 {h.result || "—"}
               </span>
