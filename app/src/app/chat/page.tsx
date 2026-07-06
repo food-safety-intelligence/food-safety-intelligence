@@ -3,7 +3,7 @@ import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
 export const metadata = {
-  title: "Chat — Food Safety Chicago",
+  title: "Chat: Food Safety Chicago",
   description:
     "Conversational search for safe Chicago restaurants powered by the Food Safety AI agent.",
 };

@@ -15,7 +15,7 @@ export function DemoBanner() {
         <p className="text-sm leading-relaxed">
           <span className="font-semibold">This is a research preview.</span>{" "}
           Risk scores shown here are{" "}
-          <em className="serif italic text-lg mx-0.5">synthetic</em> —
+          <em className="serif italic text-lg mx-0.5">synthetic</em>:
           randomly generated for design review. The model is not yet trained.
           Don&apos;t make dining decisions on this page yet.
         </p>
