@@ -31,10 +31,11 @@ const COMMENTS_MARKER = " - Comments:";
 // ("CERTIFICATE.MUST PROVIDE", "TOMATO,ETC"). Insert one for readability when
 // punctuation is immediately followed by a letter or an opening paren. The
 // lookahead skips cases that already have a space and leaves digits alone (so
-// codes like 7-38-012 and any decimals are untouched). Display-only — the
+// codes like 7-38-012 and any decimals are untouched). LA labels each item
+// "# 23. …"; drop the leading hash so it reads as "23. …". Display-only — the
 // stored text stays verbatim.
 function tidySpacing(s: string): string {
-  return s.replace(/([.,;:)])(?=[A-Za-z(])/g, "$1 ");
+  return s.replace(/^#\s+/, "").replace(/([.,;:)])(?=[A-Za-z(])/g, "$1 ");
 }
 
 // Split the rejoined violation text (one violation per line) into its code/name
@@ -307,9 +308,11 @@ export function InspectionTimeline({
                           ) : (
                             <div className="flex items-start gap-2">
                               <span
-                                className="shrink-0 w-4 h-4 mt-0.5"
+                                className="shrink-0 w-4 h-4 mt-0.5 text-center text-muted leading-4"
                                 aria-hidden="true"
-                              />
+                              >
+                                {CITY_CONFIG[city].bulletViolations ? "•" : ""}
+                              </span>
                               <span className="font-medium text-ink/90">
                                 {v.title}
                               </span>

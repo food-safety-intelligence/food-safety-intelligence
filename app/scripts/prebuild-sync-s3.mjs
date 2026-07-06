@@ -60,9 +60,12 @@ async function fetchAndCache(key) {
 // the same reason inspection_history is sharded). Processing one shard at a
 // time keeps prebuild itself to ~1 MB resident. Iterating the fixed shard names
 // (00..ff) keeps the IAM ask to s3:GetObject only — no s3:ListBucket needed.
-async function syncComments() {
+// Re-shard a city's md5 comment shards (web-app-data/<s3Prefix>/<xx>.json) into
+// one file per license under <outSubdir>/. Chicago is at the bucket root
+// (comments/); NYC and LA hang off their city prefix (nyc/comments/, la/comments/).
+async function syncComments(s3Prefix, outSubdir) {
   const t0 = Date.now();
-  const outDir = path.join(CACHE_DIR, "comments-by-license");
+  const outDir = path.join(CACHE_DIR, outSubdir);
   // Start clean so a stale shard from an older data version can't linger.
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
@@ -74,7 +77,7 @@ async function syncComments() {
   let next = 0;
   async function worker() {
     while (next < shards.length) {
-      const key = `comments/${shards[next++]}.json`;
+      const key = `${s3Prefix}/${shards[next++]}.json`;
       let map;
       try {
         const res = await s3.send(
@@ -109,20 +112,21 @@ async function syncComments() {
 
   if (licenses === 0) {
     console.warn(
-      "  comments-by-license/         none fetched (no S3 creds?) — timeline will show no comments",
+      `  ${outSubdir.padEnd(28)} none fetched (no shards / no creds?) — timeline falls back to headlines`,
     );
     return;
   }
-  console.log(
-    `  comments-by-license/ (${licenses} licenses)  ${Date.now() - t0} ms`,
-  );
+  console.log(`  ${outSubdir.padEnd(28)} (${licenses} licenses)  ${Date.now() - t0} ms`);
 }
 
 async function main() {
   console.log(`[prebuild] syncing s3://${BUCKET}/${PREFIX}/ → ${CACHE_DIR}`);
   await mkdir(CACHE_DIR, { recursive: true });
   await Promise.all(KEYS.map(fetchAndCache));
-  await syncComments();
+  // One comment tree per city: Chicago at the root, NYC and LA under their prefix.
+  await syncComments("comments", "comments-by-license");
+  await syncComments("nyc/comments", "nyc/comments-by-license");
+  await syncComments("la/comments", "la/comments-by-license");
   console.log("[prebuild] done");
 }
 
