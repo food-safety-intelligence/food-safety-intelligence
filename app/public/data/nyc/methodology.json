@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-04T14:55:36.120518+00:00",
+  "generated_at": "2026-07-06T01:52:20.839380+00:00",
   "model_version": "nyc_logreg_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
@@ -25,26 +25,26 @@
     {
       "label": "Low",
       "min": 0.0,
-      "max": 0.2816,
-      "share": 0.4
+      "max": 0.205,
+      "share": 0.1734
     },
     {
       "label": "Moderate",
-      "min": 0.2816,
-      "max": 0.4805,
-      "share": 0.45
+      "min": 0.205,
+      "max": 0.41,
+      "share": 0.5834
     },
     {
       "label": "Elevated",
-      "min": 0.4805,
-      "max": 0.6817,
-      "share": 0.13
+      "min": 0.41,
+      "max": 0.82,
+      "share": 0.24
     },
     {
       "label": "High",
-      "min": 0.6817,
+      "min": 0.82,
       "max": null,
-      "share": 0.02
+      "share": 0.0032
     }
   ],
   "operating_points": [
