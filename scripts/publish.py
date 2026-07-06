@@ -26,6 +26,7 @@ The artifacts split into two tiers:
       web-app-data/inspection_history.json
       web-app-data/methodology.json
       web-app-data/comments/<xx>.json   (256 full-comment shards, if built)
+      web-app-data/{nyc,la}/{scores,inspection_history,methodology}.json  (preview cities)
 
   ARCHIVAL — never read by the app (the batch-score-to-JSON contract means the app
   never loads the model). Kept in S3 for rollback / re-scoring / provenance:
@@ -195,6 +196,15 @@ def main() -> None:
     for src in storage.glob(storage.join(args.src_web, "comments"), "*.json"):
         name = storage.basename(src)
         plan.append((src, storage.join(dest, "web-app-data", "comments", name), False))
+    # Preview-city web JSONs (nyc/, la/) — the app build pulls these from S3 too,
+    # mirroring the root city (see prebuild-sync-s3.mjs). search-index.json is a build
+    # artifact regenerated from scores.json, so it is skipped.
+    for city in ("nyc", "la"):
+        for src in storage.glob(storage.join(args.src_web, city), "*.json"):
+            name = storage.basename(src)
+            if name == "search-index.json":
+                continue
+            plan.append((src, storage.join(dest, "web-app-data", city, name), False))
 
     print(f"Publish target: {dest}")
     print(f"  model:  {model_src}")
