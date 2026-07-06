@@ -28,6 +28,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 from scipy.special import expit
@@ -477,6 +478,30 @@ def main():
     # Platt logit(p) = coef*margin + inter  ->  a = -coef, b = -inter; the intercept
     # is the TreeSHAP base margin (so intercept + Σshap == raw margin).
     calibration = {"a": -coef1, "b": -inter1, "intercept": float(base_margin)}
+
+    # Persist both models for rollback / provenance (S3-archival only; not app-read,
+    # scores.json is the served artifact). Versioned by data vintage (the snapshot's
+    # latest inspection date) so a rebuild on the same pull is idempotent. Published
+    # to S3 by `make publish-cities`; the raw pull snapshot is the reproducibility
+    # anchor (the SODA feed drifts over time).
+    models_dir = REPO / "data" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    ver = pd.Timestamp(ev["inspection_date"].max()).strftime("%Y%m%d")
+    for tag, clf, coef, inter, feats in [
+        (MODEL_VERSION, xgb1, coef1, inter1, FEATS_M1),
+        ("nyc_xgb_forecast_sigmoid", xgb2, coef2, inter2, PRIOR),
+    ]:
+        joblib.dump(
+            {
+                "model": clf,
+                "platt_coef": coef,
+                "platt_intercept": inter,
+                "features": list(feats),
+                "model_version": tag,
+            },
+            models_dir / f"{tag}_{ver}.joblib",
+        )
+    print(f"Saved models → {models_dir}/{MODEL_VERSION}_{ver}.joblib (+ forecast)")
 
     cols = [
         "license_id",

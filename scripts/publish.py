@@ -101,15 +101,19 @@ def _latest_model(models_dir: str, pattern: str) -> str:
     return max(candidates, key=_mtime)
 
 
-def _cities_web_plan(cities: str, src_web: str, dest: str) -> list[tuple[str, str, bool]]:
-    """Upload plan for just the named cities' web JSONs (scores, inspection_history,
-    methodology) and nothing else — no model, features, or parquets.
+def _cities_plan(
+    cities: str, src_web: str, data_dir: str, dest: str
+) -> list[tuple[str, str, bool]]:
+    """Upload plan for the named cities' artifacts: web JSONs (scores, inspection_history,
+    methodology) plus, for the preview cities, the model joblibs (rollback / provenance)
+    and the raw pull snapshot (the reproducibility anchor — the SODA / ArcGIS feed drifts
+    over time). No Chicago model / parquets here: Chicago goes through the full publish
+    path (``make publish``).
 
     ``cities`` is comma-separated: ``chicago`` (or an empty entry) is the root city;
-    ``nyc`` / ``la`` are the preview cities under their own prefix. This lets a preview
-    city's scores be refreshed in S3 without a Chicago retrain. ``search-index.json``
-    (a build artifact regenerated from scores.json) and the dev ``scores_mock`` fixture
-    are skipped.
+    ``nyc`` / ``la`` are the preview cities under their own prefix. ``search-index.json``
+    (a build artifact regenerated from scores.json), the dev ``scores_mock`` fixture, and
+    internal ``_*`` build-meta files are skipped.
     """
     plan: list[tuple[str, str, bool]] = []
     for raw in cities.split(","):
@@ -125,11 +129,16 @@ def _cities_web_plan(cities: str, src_web: str, dest: str) -> list[tuple[str, st
         )
         for src in storage.glob(src_dir, "*.json"):
             name = storage.basename(src)
-            # Skip the dev fixture, the build-regenerated search index, and internal
-            # `_*` build-meta files (gitignored provenance the app never reads).
             if name.startswith("_") or name in ("scores_mock.json", "search-index.json"):
                 continue
             plan.append((src, storage.join(base, name), False))
+        if not prefix:
+            continue  # Chicago's models / processed go through the full publish path
+        # Preview-city model joblibs (versioned, never overwrite) + raw pull snapshot.
+        for src in storage.glob(storage.join(data_dir, "models"), f"{prefix}_*.joblib"):
+            plan.append((src, storage.join(dest, "models", storage.basename(src)), False))
+        for src in storage.glob(storage.join(data_dir, "raw"), f"{prefix}_*.parquet"):
+            plan.append((src, storage.join(dest, "processed", storage.basename(src)), False))
     return plan
 
 
@@ -215,9 +224,10 @@ def main() -> None:
         "--cities",
         default=None,
         help=(
-            "publish ONLY the named cities' web JSONs (comma-separated, e.g. 'nyc,la'), "
-            "skipping the model / features / parquet publish entirely. Use to refresh a "
-            "preview city's scores in S3 without a Chicago retrain. 'chicago' = root city."
+            "publish ONLY the named cities' artifacts (comma-separated, e.g. 'nyc,la'): "
+            "web JSONs plus, for preview cities, the model joblibs and raw pull snapshot. "
+            "Skips the Chicago model / features / parquet publish. Use to refresh a preview "
+            "city in S3 without a Chicago retrain. 'chicago' = root web JSONs only."
         ),
     )
     args = ap.parse_args()
@@ -229,9 +239,9 @@ def main() -> None:
     # Cities-only mode: publish just the named cities' web JSONs and return, so a
     # preview city can be refreshed in S3 without the (Chicago) model + parquets.
     if args.cities:
-        plan = _cities_web_plan(args.cities, args.src_web, dest)
+        plan = _cities_plan(args.cities, args.src_web, str(DATA), dest)
         if not plan:
-            raise SystemExit(f"No web JSONs found for cities {args.cities!r} under {args.src_web}.")
+            raise SystemExit(f"No artifacts found for cities {args.cities!r} under {args.src_web}.")
         print(f"Publish target: {dest}   (cities-only: {args.cities})")
         _run_uploads(plan, dry_run=args.dry_run, force=args.force, dest=dest)
         return
