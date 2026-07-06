@@ -117,7 +117,7 @@ Three layers, in this order — A and B are required, C is a stretch:
 - Yelp Open Dataset + Yelp fuzzy join
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
-- Real-time ingestion, authentication, multi-city support
+- Real-time ingestion, authentication
 - **A scheduler for periodic ingestion (Airflow, Prefect, cron, Fargate timer)**
   — the incremental ingestion *capability* (`ingest_raw.py --incremental`:
   watermark + lookback + upsert on the natural key) is now in scope for Phase 2.
@@ -151,7 +151,13 @@ when someone asks "what about X?" the answer is "noted, post-demo."
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
 - NOAA weather features, Yelp Open Dataset + fuzzy join
 - Production fairness audit (disparate-impact tests, reweighting)
-- Multi-city support beyond Chicago
+- More cities beyond the three now shipped. Chicago is the primary/production
+  city; **NYC and LA are live as research-preview cities** (one static build +
+  runtime city switch, per-city diffs in `app/src/lib/city.ts`), each served by
+  the same two-model XGBoost + SHAP pipeline as Chicago (Model 1 risk score +
+  Model 2 forecast-only trend). Adding a fourth city is the roadmap item; the
+  runbook is `docs/adding-a-city.md`. The chat agent's restaurant-risk answers
+  stay Chicago-only.
 - Auth on the chat endpoint (the Cognito upgrade path is noted in
   `app/src/lib/agent-api.ts`)
 
