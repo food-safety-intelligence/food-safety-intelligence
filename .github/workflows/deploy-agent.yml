@@ -49,7 +49,8 @@ concurrency:
 
 permissions:
   id-token: write # mint the OIDC token AWS exchanges for temporary creds
-  contents: write # commit the wired guardrail version back after an auto-reprovision
+  contents: write # push a branch with the wired guardrail version after an auto-reprovision
+  pull-requests: write # open the PR that lands that wired version onto protected main
 
 # inputs.* are empty on a push event, so fall back to the defaults.
 env:
@@ -277,16 +278,27 @@ jobs:
 
       # Persist the guardrail version the auto-reprovision wired, so an unrelated later
       # deploy doesn't re-wire the runtime to a stale version from the committed file.
-      # [skip ci] avoids re-triggering this workflow. Requires branch protection to
-      # allow the github-actions bot to push to main (or swap in a PAT).
-      - name: Commit wired guardrail version (if changed)
+      # `main` is protected (no direct pushes), so this opens a PR with the bump
+      # instead of pushing — a human merges it. Non-fatal: the deploy already
+      # succeeded above, so a failure to open the PR must never fail the run (that
+      # would flag a healthy deploy red, which is exactly the confusion this fixes).
+      - name: Open PR to wire the reprovisioned guardrail version (if changed)
         if: steps.cg.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if git diff --quiet -- agentcore-deploy/agentcore/agentcore.json; then
-            echo "agentcore.json unchanged — nothing to commit"; exit 0
+            echo "agentcore.json unchanged — nothing to wire"; exit 0
           fi
+          ver=$(python3 -c "import json;e=json.load(open('agentcore-deploy/agentcore/agentcore.json'))['runtimes'][0]['envVars'];print(next((v['value'] for v in e if v['name']=='FSI_BEDROCK_GUARDRAIL_VERSION'),''))")
+          branch="bot/wire-guardrail-v${ver}-${GITHUB_SHA::7}"
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
           git add agentcore-deploy/agentcore/agentcore.json
-          git commit -m 'chore(agent): wire guardrail version after auto-reprovision [skip ci]'
-          git push origin HEAD:main
+          git commit -m "fix(agent): wire reprovisioned guardrail version ${ver}"
+          git push origin "$branch"
+          gh pr create --base main --head "$branch" \
+            --title "fix(agent): wire reprovisioned guardrail version ${ver}" \
+            --body "Automated by the deploy workflow (run ${GITHUB_RUN_ID}). The deploy reprovisioned the Bedrock guardrail to version ${ver}, gated it, and deployed it live. This pins agentcore.json to that version so a later non-reprovision deploy doesn't revert the runtime to a stale version. Safe to merge once checks pass."
