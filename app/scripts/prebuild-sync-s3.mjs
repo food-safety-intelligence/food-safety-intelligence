@@ -23,13 +23,24 @@ const BUCKET = process.env.FSI_S3_BUCKET ?? "food-safety-intelligence-data";
 const REGION = process.env.FSI_S3_REGION ?? "us-east-1";
 const PREFIX = "web-app-data";
 const CACHE_DIR = "/tmp/fsi-build-cache";
-const KEYS = ["scores.json", "inspection_history.json"];
+// Chicago at the root, then the preview cities (NYC, LA) under their own prefix.
+// All three are S3-backed the same way: pulled to the build cache, with the
+// committed public/data/<key> copy as the offline fallback.
+const KEYS = [
+  "scores.json",
+  "inspection_history.json",
+  "nyc/scores.json",
+  "nyc/inspection_history.json",
+  "la/scores.json",
+  "la/inspection_history.json",
+];
 
 const s3 = new S3Client({ region: REGION });
 
 async function fetchAndCache(key) {
   const t0 = Date.now();
   const out = path.join(CACHE_DIR, key);
+  await mkdir(path.dirname(out), { recursive: true }); // key may be nyc/… or la/…
   let text;
   try {
     const res = await s3.send(
