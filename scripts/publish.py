@@ -56,6 +56,7 @@ product — and changes only on a data refresh, so it is skipped if already in S
 Run:
     PYTHONPATH=src uv run python scripts/publish.py --dry-run        # preview the plan
     PYTHONPATH=src uv run python scripts/publish.py                  # publish latest -> default bucket
+    PYTHONPATH=src uv run python scripts/publish.py --cities nyc,la  # preview cities' JSON only (no model)
     PYTHONPATH=src uv run python scripts/publish.py \\
         --model data/models/baseline_sigmoid_20260627_ac236faed.joblib \\
         --scores-json app/public/data/scores.json \\
@@ -98,6 +99,62 @@ def _latest_model(models_dir: str, pattern: str) -> str:
         return filesystem.get_file_info(path).mtime.timestamp()
 
     return max(candidates, key=_mtime)
+
+
+def _cities_web_plan(cities: str, src_web: str, dest: str) -> list[tuple[str, str, bool]]:
+    """Upload plan for just the named cities' web JSONs (scores, inspection_history,
+    methodology) and nothing else — no model, features, or parquets.
+
+    ``cities`` is comma-separated: ``chicago`` (or an empty entry) is the root city;
+    ``nyc`` / ``la`` are the preview cities under their own prefix. This lets a preview
+    city's scores be refreshed in S3 without a Chicago retrain. ``search-index.json``
+    (a build artifact regenerated from scores.json) and the dev ``scores_mock`` fixture
+    are skipped.
+    """
+    plan: list[tuple[str, str, bool]] = []
+    for raw in cities.split(","):
+        city = raw.strip()
+        if not city:
+            continue
+        prefix = "" if city == "chicago" else city
+        src_dir = storage.join(src_web, prefix) if prefix else src_web
+        base = (
+            storage.join(dest, "web-app-data", prefix)
+            if prefix
+            else storage.join(dest, "web-app-data")
+        )
+        for src in storage.glob(src_dir, "*.json"):
+            name = storage.basename(src)
+            # Skip the dev fixture, the build-regenerated search index, and internal
+            # `_*` build-meta files (gitignored provenance the app never reads).
+            if name.startswith("_") or name in ("scores_mock.json", "search-index.json"):
+                continue
+            plan.append((src, storage.join(base, name), False))
+    return plan
+
+
+def _run_uploads(
+    plan: list[tuple[str, str, bool]], *, dry_run: bool, force: bool, dest: str
+) -> None:
+    """Execute an upload plan of ``(src, dest, skip_if_exists)`` tuples."""
+    uploaded = 0
+    for src, dst, skip_if_exists in plan:
+        if not storage.exists(src):
+            raise SystemExit(
+                f"Missing local artifact: {src}. "
+                "Run the build (make features retrain history) before publishing."
+            )
+        if skip_if_exists and not force and storage.exists(dst):
+            print(f"  SKIP  {dst}  (already present; --force to re-upload)")
+            continue
+        print(f"  {'PLAN' if dry_run else 'PUT '}  {src} -> {dst}")
+        if not dry_run:
+            storage.copy(src, dst)
+            uploaded += 1
+    if dry_run:
+        print("Dry run — nothing uploaded.")
+    else:
+        print(f"Publish complete: {uploaded} artifact(s) written to {dest}.")
 
 
 def main() -> None:
@@ -154,11 +211,30 @@ def main() -> None:
         action="store_true",
         help="print the upload plan and transfer nothing",
     )
+    ap.add_argument(
+        "--cities",
+        default=None,
+        help=(
+            "publish ONLY the named cities' web JSONs (comma-separated, e.g. 'nyc,la'), "
+            "skipping the model / features / parquet publish entirely. Use to refresh a "
+            "preview city's scores in S3 without a Chicago retrain. 'chicago' = root city."
+        ),
+    )
     args = ap.parse_args()
 
     dest = args.dest.rstrip("/")
     if not storage.is_s3(dest):
         print(f"warning: --dest {dest} is not an s3:// URI; publishing to a local path.")
+
+    # Cities-only mode: publish just the named cities' web JSONs and return, so a
+    # preview city can be refreshed in S3 without the (Chicago) model + parquets.
+    if args.cities:
+        plan = _cities_web_plan(args.cities, args.src_web, dest)
+        if not plan:
+            raise SystemExit(f"No web JSONs found for cities {args.cities!r} under {args.src_web}.")
+        print(f"Publish target: {dest}   (cities-only: {args.cities})")
+        _run_uploads(plan, dry_run=args.dry_run, force=args.force, dest=dest)
+        return
 
     model_src = args.model or _latest_model(str(DATA / "models"), args.model_glob)
 
@@ -209,25 +285,7 @@ def main() -> None:
     print(f"Publish target: {dest}")
     print(f"  model:  {model_src}")
     print(f"  scores: {args.scores_json}")
-    uploaded = 0
-    for src, dst, skip_if_exists in plan:
-        if not storage.exists(src):
-            raise SystemExit(
-                f"Missing local artifact: {src}. "
-                "Run the build (make features retrain history) before publishing."
-            )
-        if skip_if_exists and not args.force and storage.exists(dst):
-            print(f"  SKIP  {dst}  (already present; --force to re-upload)")
-            continue
-        print(f"  {'PLAN' if args.dry_run else 'PUT '}  {src} -> {dst}")
-        if not args.dry_run:
-            storage.copy(src, dst)
-            uploaded += 1
-
-    if args.dry_run:
-        print("Dry run — nothing uploaded.")
-    else:
-        print(f"Publish complete: {uploaded} artifact(s) written to {dest}.")
+    _run_uploads(plan, dry_run=args.dry_run, force=args.force, dest=dest)
 
 
 if __name__ == "__main__":
