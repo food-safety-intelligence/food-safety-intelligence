@@ -111,11 +111,11 @@ export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse table-fixed">
           <thead>
-            <tr className="text-center text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
-              <th className="py-2.5 px-4 font-medium">Inspect top</th>
-              <th className="py-2.5 px-4 font-medium">Flagged</th>
-              <th className="py-2.5 px-4 font-medium">Precision (hit rate)</th>
-              <th className="py-2.5 px-4 font-medium">Recall (events caught)</th>
+            <tr className="text-center text-sage text-[11px] uppercase border-b border-line bg-tint/40">
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Inspect top</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Flagged</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Precision (hit rate)</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Recall (events caught)</th>
             </tr>
           </thead>
           <tbody className="num text-ink/85 text-center">
