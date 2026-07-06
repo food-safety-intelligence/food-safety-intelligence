@@ -4,15 +4,66 @@
 // Both drive the same CityContext, so the whole app re-fetches the selected
 // city's data (DR 0016).
 
-import { startTransition } from "react";
-import { MapPin } from "lucide-react";
+import { startTransition, useCallback, useEffect } from "react";
+import { MapPin, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { CITIES, CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Wordmark } from "@/components/Wordmark";
 
+// Switch the active city, but reroute to the new city's map when the user is on
+// an establishment detail page. That page is keyed to a city-specific `?id=`
+// with no equivalent in another city, so switching in place would 404
+// ("Establishment not found"). Every other page is city-aware but not id-bound,
+// so it switches in place. trailingSlash is on (next.config), so usePathname()
+// returns "/restaurant/"; match both forms so the guard holds either way.
+// Shared by the header toggle AND the entry modal so both honour the guard.
+function useCitySwitch(): (c: City) => void {
+  const { city, setCity } = useCity();
+  const router = useRouter();
+  const pathname = usePathname();
+  const onDetailPage = pathname === "/restaurant" || pathname === "/restaurant/";
+
+  return useCallback(
+    (c: City) => {
+      // Only reroute on a real change — re-picking the current city should stay
+      // put, not bounce the user off the detail page to the map.
+      if (onDetailPage && c !== city) {
+        // Batch the city change and the navigation into one transition so React
+        // commits the destination (the map) directly, skipping an intermediate
+        // re-render of the detail page — which would otherwise remount the detail
+        // loader (keyed on city+id) and fire a doomed fetch for the new city's
+        // nonexistent bundle before we navigate away.
+        startTransition(() => {
+          setCity(c);
+          router.push(`/?city=${c}`);
+        });
+        return;
+      }
+      setCity(c);
+    },
+    [onDetailPage, city, setCity, router],
+  );
+}
+
 export function CityEntryModal() {
-  const { needsPick, setCity } = useCity();
+  const { needsPick, dismissPick } = useCity();
+  const switchCity = useCitySwitch();
+
+  // The header logo can re-open this popup (requestPick), so a returning visitor
+  // who already has a city must be able to back out without re-picking. Esc
+  // closes it; the close button below and a stored/URL city do the same. A first
+  // visitor who dismisses falls back to the default city, still switchable from
+  // the header.
+  useEffect(() => {
+    if (!needsPick) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") dismissPick();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [needsPick, dismissPick]);
+
   if (!needsPick) return null;
   return (
     <div
@@ -28,6 +79,14 @@ export function CityEntryModal() {
           Unsplash, self-hosted). */}
       <div className="absolute inset-0 bg-ink/65" aria-hidden />
       <div className="relative z-10 w-full max-w-md rounded-2xl bg-card border border-line soft-shadow p-6">
+        <button
+          type="button"
+          onClick={dismissPick}
+          aria-label="Close"
+          className="absolute right-2 top-2 inline-flex items-center justify-center size-11 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
         {/* Brand lockup on the entry screen, mirroring the header logo's text. */}
         <div className="mb-4">
           <div className="text-lg font-semibold tracking-tight">
@@ -47,7 +106,7 @@ export function CityEntryModal() {
             <button
               key={c}
               type="button"
-              onClick={() => setCity(c)}
+              onClick={() => switchCity(c)}
               className="flex items-center gap-3 rounded-xl border border-line px-4 py-3 text-left hover:border-sage hover:bg-sage/5 transition-colors min-h-[44px]"
             >
               <MapPin className="size-5 text-sage shrink-0" aria-hidden />
@@ -66,35 +125,8 @@ export function CityEntryModal() {
 }
 
 export function CityToggle() {
-  const { city, setCity } = useCity();
-  const router = useRouter();
-  const pathname = usePathname();
-
-  // The establishment detail page is keyed to a city-specific `?id=` that has no
-  // equivalent in another city, so switching city there would 404 ("Establishment
-  // not found"). From that page, send the user to the new city's map instead of
-  // leaving them on a dead link. Every other page is city-aware but not id-bound,
-  // so it switches in place. trailingSlash is on (next.config), so usePathname()
-  // returns "/restaurant/"; match both forms so the guard holds either way.
-  const onDetailPage = pathname === "/restaurant" || pathname === "/restaurant/";
-
-  function switchCity(c: City) {
-    // Only reroute on a real change — clicking the already-active tab should stay
-    // put, not bounce the user off the detail page to the map.
-    if (onDetailPage && c !== city) {
-      // Batch the city change and the navigation into one transition so React
-      // commits the destination (the map) directly, skipping an intermediate
-      // re-render of the detail page — which would otherwise remount the detail
-      // loader (keyed on city+id) and fire a doomed fetch for the new city's
-      // nonexistent bundle before we navigate away.
-      startTransition(() => {
-        setCity(c);
-        router.push(`/?city=${c}`);
-      });
-      return;
-    }
-    setCity(c);
-  }
+  const { city } = useCity();
+  const switchCity = useCitySwitch();
 
   return (
     <div

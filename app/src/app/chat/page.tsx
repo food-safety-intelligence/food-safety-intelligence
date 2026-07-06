@@ -1,4 +1,5 @@
-import { ChatInterface } from "@/components/ChatInterface";
+import { Suspense } from "react";
+import { ChatPageBody } from "./ChatPageBody";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SiteHeader } from "@/components/SiteHeader";
 
@@ -13,7 +14,11 @@ export default function ChatPage() {
     <div className="flex flex-col min-h-screen">
       <SiteHeader activeNav="chat" />
       <main className="flex-1 flex flex-col pt-4 min-h-0">
-        <ChatInterface />
+        {/* useSearchParams (in ChatPageBody) needs a Suspense boundary under
+            static export. */}
+        <Suspense fallback={null}>
+          <ChatPageBody />
+        </Suspense>
       </main>
       <SiteFooter />
     </div>

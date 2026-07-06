@@ -101,7 +101,12 @@ export function FloatingChat() {
             <span className="flex items-center gap-1 flex-none">
               <Tooltip content="Open the full chat page" align="end">
                 <Link
-                  href="/chat"
+                  // Carry the persona so the full /chat page keeps the inspector /
+                  // caregiver framing. persona is page-scoped (cleared when the
+                  // For Inspectors / Caregivers page unmounts on navigation), so
+                  // without this the maximized chat would silently revert to the
+                  // generic framing mid-conversation.
+                  href={persona ? `/chat?persona=${persona}` : "/chat"}
                   aria-label="Open the full chat page"
                   className="p-1.5 rounded-full text-muted hover:text-teal hover:bg-tint transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
                 >
