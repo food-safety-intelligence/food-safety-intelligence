@@ -13,7 +13,7 @@ export function SiteFooter() {
       <div className="max-w-[1240px] mx-auto px-8 py-8 grid grid-cols-12 gap-6 items-start text-sm text-muted">
         <div className="col-span-12 md:col-span-5">
           <div className="text-ink font-medium">
-            A research preview · UC Berkeley MIDS Capstone
+            UC Berkeley MIDS Capstone-Summer 2026
           </div>
           <p className="mt-2 leading-relaxed max-w-[40ch]">{cfg.footerBlurb}</p>
           <FeedbackFooterLink />

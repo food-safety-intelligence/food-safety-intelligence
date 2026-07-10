@@ -74,7 +74,6 @@ export function CityEntryModal() {
           <div className="text-lg font-semibold tracking-tight">
             <Wordmark />
           </div>
-          <div className="text-2xs text-muted tracking-wide">Food Safety</div>
         </div>
         <h2 id="city-pick-title" className="text-2xl font-light tracking-tight">
           Choose a city
