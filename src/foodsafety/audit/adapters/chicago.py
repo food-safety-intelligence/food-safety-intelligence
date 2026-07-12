@@ -27,7 +27,7 @@ from foodsafety.audit import frame
 from foodsafety.config import FEATURES_PATH
 from foodsafety.features.license_features import normalize_facility_type
 from foodsafety.io import storage
-from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL
+from foodsafety.models.baseline import ALL_FEATURES, FORECAST_FEATURES, LABEL_COL
 from foodsafety.models.xgb import (
     build_production_xgb,
     compute_scale_pos_weight,
@@ -50,17 +50,30 @@ class ChicagoAdapter:
     def __init__(self, features_path=FEATURES_PATH):
         self.features_path = features_path
 
-    def _score_test(self, split) -> np.ndarray:
-        """Refit the production recipe on train, calibrate on val, score test."""
+    def _refit_and_score(self, split, features: list[str]) -> np.ndarray:
+        """Refit the production recipe on ``features``, calibrate on val, score test.
+
+        ``features == ALL_FEATURES`` reproduces Model 1 (risk); ``FORECAST_FEATURES``
+        (current-inspection outcome dropped) reproduces Model 2 (the forecast basis).
+        """
         y_train = split.train[LABEL_COL].astype(int).to_numpy()
         y_val = split.val[LABEL_COL].astype(int).to_numpy()
 
-        x_train = prepare_xgb_features(split.train[ALL_FEATURES])
+        # prepare_xgb_features always selects the full ALL_FEATURES, so prepare on the
+        # full frame first, then subset columns to the model's feature list — the same
+        # order the retrain forecast path uses (prepare, then drop current-outcome).
+        x_train = prepare_xgb_features(split.train[ALL_FEATURES])[features]
         cat_dtypes = extract_categorical_dtypes(x_train)
-        x_val = prepare_xgb_features(split.val[ALL_FEATURES], categorical_dtypes=cat_dtypes)
-        x_test = prepare_xgb_features(split.test[ALL_FEATURES], categorical_dtypes=cat_dtypes)
+        x_val = prepare_xgb_features(split.val[ALL_FEATURES], categorical_dtypes=cat_dtypes)[
+            features
+        ]
+        x_test = prepare_xgb_features(split.test[ALL_FEATURES], categorical_dtypes=cat_dtypes)[
+            features
+        ]
 
-        xgb_est = build_production_xgb(scale_pos_weight=compute_scale_pos_weight(y_train))
+        xgb_est = build_production_xgb(
+            scale_pos_weight=compute_scale_pos_weight(y_train), features=features
+        )
         xgb_est.fit(x_train, y_train, verbose=False)
         # Platt (sigmoid) on the raw val margin — the shipped calibration contract.
         margin_val = xgb_est.predict(x_val, output_margin=True)
@@ -78,7 +91,8 @@ class ChicagoAdapter:
 
         split = temporal_split(features, train_end=TRAIN_END, val_end=VAL_END)
         test = split.test.reset_index(drop=True)
-        p_test = self._score_test(split)
+        p_test = self._refit_and_score(split, ALL_FEATURES)  # Model 1 (risk)
+        forecast = self._refit_and_score(split, FORECAST_FEATURES)  # Model 2 (forecast)
 
         # Deployed tier rule at the city's label prevalence; flagged = High.
         base_rate = float(features[LABEL_COL].mean())
@@ -102,7 +116,7 @@ class ChicagoAdapter:
                 # group audit uses); community-area boundaries are a later refinement.
                 "neighborhood": test["static_zip"].astype("string"),
                 "cuisine": pd.Series(pd.NA, index=test.index, dtype="string"),
-                "forecast_score": np.nan,  # Model 2 wired in a follow-up step
+                "forecast_score": forecast.astype("float64"),
             }
         )
         out = frame.add_tenure_bucket(out)

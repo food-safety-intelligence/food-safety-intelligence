@@ -275,3 +275,119 @@ def summary(results: dict[str, AxisResult]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows)
+
+
+# --------------------------------------------------------------------------- #
+# Model 2 (forecast) — the lighter lens: calibration + coverage by group only.
+# The forecast score is a probability with no flagging operating point, so FPR /
+# FNR do not apply; we check whether it is equally well-calibrated across groups
+# and whether its availability is skewed.
+# --------------------------------------------------------------------------- #
+
+
+@dataclass
+class ForecastResult:
+    axis: str
+    column: str
+    group_table: pd.DataFrame  # per group: n, prevalence, mean_forecast, mean_obs, ece
+    ece_gap: float
+    ci_low: float
+    ci_high: float
+    finding: bool
+    coverage: float
+
+
+def _forecast_group_ece(fc: np.ndarray, y: np.ndarray, g: np.ndarray, n_groups: int, min_pos: int):
+    ece = np.full(n_groups, np.nan)
+    for k in range(n_groups):
+        mk = g == k
+        if int((y[mk] == 1).sum()) >= min_pos:
+            ece[k] = _ece(y[mk], fc[mk])
+    return ece
+
+
+def audit_forecast_axis(
+    frame: pd.DataFrame,
+    axis: config.Axis,
+    *,
+    score_col: str = "forecast_score",
+    n_bootstrap: int = config.N_BOOTSTRAP,
+    seed: int = RANDOM_STATE,
+) -> ForecastResult:
+    """Calibration-by-group audit of the forecast score for one axis."""
+    col = axis.column
+    sub = frame[frame[col].notna() & frame[score_col].notna()]
+    coverage = float(len(sub) / len(frame)) if len(frame) else 0.0
+
+    rows = []
+    for name, grp in sub.groupby(col, observed=True):
+        y = grp["y_true"].to_numpy()
+        fc = grp[score_col].to_numpy()
+        pos = int((y == 1).sum())
+        reliable = len(grp) >= config.MIN_GROUP_N and pos >= config.MIN_GROUP_POSITIVES
+        rows.append(
+            {
+                "group": name,
+                "n": int(len(grp)),
+                "positives": pos,
+                "prevalence": round(float(y.mean()), 4),
+                "mean_forecast": round(float(fc.mean()), 4),
+                "mean_obs": round(float(y.mean()), 4),
+                "ece": round(_ece(y, fc), 4) if reliable else float("nan"),
+                "reliable": reliable,
+            }
+        )
+    gt = pd.DataFrame(rows).sort_values("n", ascending=False).reset_index(drop=True)
+    reliable_groups = gt[gt["reliable"]]["group"].tolist()
+    if len(reliable_groups) < 2:
+        return ForecastResult(
+            axis.key, col, gt, float("nan"), float("nan"), float("nan"), False, coverage
+        )
+
+    rsub = sub[sub[col].isin(reliable_groups)]
+    g, _ = pd.factorize(rsub[col])
+    n_groups = len(reliable_groups)
+    y = rsub["y_true"].to_numpy()
+    fc = rsub[score_col].to_numpy()
+    point = _range(_forecast_group_ece(fc, y, g, n_groups, config.MIN_GROUP_POSITIVES))
+
+    rng = np.random.default_rng(seed)
+    n = len(y)
+    boot = [
+        _range(_forecast_group_ece(fc[idx], y[idx], g[idx], n_groups, config.MIN_GROUP_POSITIVES))
+        for idx in (rng.integers(0, n, n) for _ in range(n_bootstrap))
+    ]
+    arr = np.asarray(boot, dtype=float)
+    arr = arr[~np.isnan(arr)]
+    lo, hi = np.percentile(arr, [2.5, 97.5]) if arr.size else (np.nan, np.nan)
+    finding = bool(point > config.ECE_GAP_MAX and lo > config.ECE_GAP_MAX)
+    return ForecastResult(
+        axis.key,
+        col,
+        gt,
+        round(float(point), 4) if not np.isnan(point) else float("nan"),
+        round(float(lo), 4) if not np.isnan(lo) else float("nan"),
+        round(float(hi), 4) if not np.isnan(hi) else float("nan"),
+        finding,
+        coverage,
+    )
+
+
+def audit_forecast(
+    frame: pd.DataFrame,
+    axes: tuple[config.Axis, ...] = config.AXES,
+    *,
+    score_col: str = "forecast_score",
+    n_bootstrap: int = config.N_BOOTSTRAP,
+    seed: int = RANDOM_STATE,
+) -> dict[str, ForecastResult]:
+    """Forecast calibration audit for every axis, if a forecast score is present."""
+    if score_col not in frame.columns or frame[score_col].notna().sum() == 0:
+        return {}
+    out: dict[str, ForecastResult] = {}
+    for ax in axes:
+        if ax.column in frame.columns and frame[ax.column].notna().sum() > 0:
+            out[ax.key] = audit_forecast_axis(
+                frame, ax, score_col=score_col, n_bootstrap=n_bootstrap, seed=seed
+            )
+    return out

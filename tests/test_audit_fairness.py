@@ -105,6 +105,22 @@ def test_single_group_returns_empty_gaps():
     assert not res.any_finding
 
 
+def test_forecast_calibration_gap_is_flagged():
+    # Group A forecast well-calibrated (0.5 == prevalence); group B over-confident.
+    a = _group("A", 100, 100, pos_flagged=50, neg_flagged=50, score=0.5)
+    b = _group("B", 100, 100, pos_flagged=50, neg_flagged=50, score=0.5)
+    a["forecast_score"] = 0.5
+    b["forecast_score"] = 0.9
+    res = fairness.audit_forecast_axis(_frame(a, b), AX, n_bootstrap=200)
+    assert res.finding
+    assert res.coverage == 1.0
+
+
+def test_audit_forecast_empty_without_score():
+    a = _group("A", 100, 100, pos_flagged=80, neg_flagged=10, score=0.5)
+    assert fairness.audit_forecast(_frame(a)) == {}  # no forecast_score column
+
+
 def test_flagged_mask_uses_configured_tiers():
     tiers = pd.Series(["High", "Elevated", "Low", "Moderate"])
     prim = fairness.flagged_mask(tiers)
