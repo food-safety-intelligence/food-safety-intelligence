@@ -62,6 +62,21 @@ def test_below_floor_group_not_audited():
     assert res.n_audited_groups == 2
 
 
+def test_low_positive_group_audits_parity_but_not_odds():
+    # A large group with few positives: audited for parity, but FNR/calibration are
+    # masked (not reliable) — this is the split-noise-floor behaviour that lets
+    # sparse geographic groups (e.g. ZIP) still contribute a flag-rate comparison.
+    a = _group("A", 100, 100, pos_flagged=80, neg_flagged=10, score=0.5)
+    b = _group("B", 100, 100, pos_flagged=80, neg_flagged=10, score=0.5)
+    sparse = _group("SPARSE", 10, 300, pos_flagged=5, neg_flagged=15, score=0.2)
+    res = fairness.audit_axis(_frame(a, b, sparse), AX, n_bootstrap=100)
+    gt = res.group_table.set_index("group")
+    assert gt.loc["SPARSE", "audited"]  # n = 310 >= floor
+    assert not gt.loc["SPARSE", "odds_reliable"]  # only 10 positives
+    assert pd.isna(gt.loc["SPARSE", "fnr"])  # FNR masked for the sparse group
+    assert res.n_audited_groups == 3  # it still counts for the parity comparison
+
+
 def test_calibration_gap_is_flagged():
     # Group A well-calibrated (score == prevalence 0.5); group B badly over-confident
     # (score 0.9 but prevalence 0.5) -> large ECE gap.

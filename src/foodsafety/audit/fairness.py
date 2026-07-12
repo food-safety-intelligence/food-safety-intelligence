@@ -53,9 +53,21 @@ def _range(vals: np.ndarray) -> float:
 
 
 def _gaps_from_arrays(
-    y: np.ndarray, flagged: np.ndarray, score: np.ndarray, g: np.ndarray, n_groups: int
+    y: np.ndarray,
+    flagged: np.ndarray,
+    score: np.ndarray,
+    g: np.ndarray,
+    n_groups: int,
+    *,
+    min_pos: int = config.MIN_GROUP_POSITIVES,
 ) -> dict[str, float]:
-    """The four across-group gaps for one axis, from raw arrays (bootstrap-hot)."""
+    """The four across-group gaps for one axis, from raw arrays (bootstrap-hot).
+
+    Flag rate / FPR / disparate-impact ratio only need the row-count floor (applied
+    upstream when selecting audited groups). FNR and calibration condition on the
+    positives, so a group with fewer than ``min_pos`` positives is masked (NaN) for
+    those two metrics — it still counts for parity.
+    """
     flag_rate = np.full(n_groups, np.nan)
     fpr = np.full(n_groups, np.nan)
     fnr = np.full(n_groups, np.nan)
@@ -69,9 +81,9 @@ def _gaps_from_arrays(
         neg, pos = yk == 0, yk == 1
         if neg.any():
             fpr[k] = flk[neg].mean()
-        if pos.any():
+        if int(pos.sum()) >= min_pos:  # FNR / calibration need enough positives
             fnr[k] = 1.0 - flk[pos].mean()
-        ece[k] = _ece(yk, sck)
+            ece[k] = _ece(yk, sck)
     valid_fr = flag_rate[~np.isnan(flag_rate)]
     top = valid_fr.max() if valid_fr.size else np.nan
     di_ratio = (valid_fr.min() / top) if (valid_fr.size >= 2 and top > 0) else float("nan")
@@ -135,7 +147,9 @@ def group_table(
         fl = grp["_flagged"].to_numpy()
         sc = grp["y_score"].to_numpy()
         pos = int((y == 1).sum())
-        audited = len(grp) >= config.MIN_GROUP_N and pos >= config.MIN_GROUP_POSITIVES
+        # Parity/FPR audit on the row-count floor; FNR/calibration also need positives.
+        audited = len(grp) >= config.MIN_GROUP_N
+        odds_reliable = audited and pos >= config.MIN_GROUP_POSITIVES
         rows.append(
             {
                 "group": name,
@@ -144,11 +158,12 @@ def group_table(
                 "prevalence": round(float(y.mean()), 4),
                 "flag_rate": round(float(fl.mean()), 4),
                 "fpr": round(float(fl[y == 0].mean()), 4) if (y == 0).any() else float("nan"),
-                "fnr": round(1.0 - float(fl[y == 1].mean()), 4) if (y == 1).any() else float("nan"),
-                "ece": round(_ece(y, sc), 4),
+                "fnr": round(1.0 - float(fl[y == 1].mean()), 4) if odds_reliable else float("nan"),
+                "ece": round(_ece(y, sc), 4) if odds_reliable else float("nan"),
                 "mean_pred": round(float(sc.mean()), 4),
                 "mean_obs": round(float(y.mean()), 4),
                 "audited": audited,
+                "odds_reliable": odds_reliable,
             }
         )
     out = pd.DataFrame(rows).sort_values("n", ascending=False).reset_index(drop=True)
