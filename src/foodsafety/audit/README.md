@@ -199,18 +199,27 @@ owner sign-off — a follow-up, not this audit.** No stub is written for it now.
 
 ## Per-city results
 
-Filled in as each city is audited. Each city gets: the three lenses per primary
-axis, the secondary-variable correlations, the mitigation cost analysis, and a
-plain-English verdict.
+Run 2026-07-12 (`notebooks/08_fairness_census_audit.ipynb`). Full per-axis numbers
+live in `reports/fairness/fairness_audit_<city>.json`; the narrative and the
+cross-city table live in `docs/fairness_audit.md`. Headline: **every demographic
+finding is parity-only — the FPR / FNR / calibration lenses stay clean**, except
+the one signal below.
 
 ### Chicago
-
-_Pending._
+6,222 test rows, prevalence 10.5%, Model 1 test PR-AUC 0.382. Parity findings on
+neighborhood / race / poverty / foreign-born / limited-English / facility type; no
+equalized-odds or calibration finding. Neighborhood and limited-English track
+prevalence (prevalence-driven); race/poverty gaps mostly do not persist at the
+Elevated+High operating point (thin High-tier counts).
 
 ### New York City
-
-_Pending._
+9,456 test rows, prevalence 41%, Model 1 test PR-AUC 0.583. Parity findings on the
+demographic axes and cuisine. **The one truth-conditioned finding in the whole
+audit: a calibration (ECE) gap across cuisines** — flagged for follow-up. Cuisine
+is native (DOHMH), 99.9% coverage.
 
 ### Los Angeles
-
-_Pending._
+7,197 test rows, prevalence 8.7%, Model 1 test PR-AUC 0.187. Parity findings on
+neighborhood / income / race / foreign-born / limited-English / tenure; no
+equalized-odds or calibration finding. Coordinates geocoded with a zip-centroid
+fallback; cuisine not available.
