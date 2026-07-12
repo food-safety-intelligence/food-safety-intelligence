@@ -31,6 +31,7 @@ for _tool in [
     "find_restaurants",
     "get_safety_score",
     "explain_restaurant",
+    "look_up_establishment",
     "find_reviews",
     "find_inspection_records",
     "food_safety_info",
@@ -127,6 +128,7 @@ def _load_handler(tool_name: str):
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
 _records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
@@ -180,6 +182,30 @@ def explain_restaurant(license_id: str) -> dict:
     Call for the 2-3 lowest predicted-risk results.
     """
     return _explain_handler.handler({"license_id": license_id, "city": _ACTIVE_CITY.get()}, None)
+
+
+@tool
+def look_up_establishment(names: list) -> list:
+    """
+    Look up one or more establishments BY NAME in the ACTIVE CITY's inspection
+    data and return each one's authoritative record (address, ZIP, facility type,
+    last inspection, risk score/tier/trend, license_id) straight from the city
+    data. Use this in general chat when the user names a place directly ("what's
+    the address of Lou Malnati's?", "compare Giordano's and Pequod's") — it does
+    NOT need find_restaurants first. Pass ALL the names in one call.
+
+    Always call this before stating any fact about a named establishment, so the
+    address and every other detail come from the data, not from memory. Each
+    result has a `status`: "matched" (use `match`), "ambiguous" (several venues
+    share the name — ask the user which, by address/neighborhood, using
+    `candidates`), or "no_inspection_record" (say there is no city record and
+    give no address or score). On a detail page where a license_id is already
+    provided, use explain_restaurant instead of this.
+
+    Args:
+        names: establishment names to look up, e.g. ["Lou Malnati's", "Pequod's"]
+    """
+    return _lookup_handler.handler({"names": names, "city": _ACTIVE_CITY.get()}, None)
 
 
 @tool
@@ -417,6 +443,7 @@ def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent
             find_restaurants,
             get_safety_score,
             explain_restaurant,
+            look_up_establishment,
             find_reviews,
             find_inspection_records,
             food_safety_info,

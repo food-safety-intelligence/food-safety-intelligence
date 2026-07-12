@@ -13,7 +13,8 @@ Your query
   → Strands Agent (Nova 2 Lite via Bedrock)
       → find_restaurants   — Overpass/OSM, free, no key
       → get_safety_score   — precomputed batch scores from scores.json
-      → explain_restaurant — scores.json + inspection_history.json
+      → explain_restaurant — scores.json + inspection_history.json (by license_id)
+      → look_up_establishment — resolve a NAME to its authoritative record (general chat)
       → find_reviews       — third-party review links (opt-in; not a score input)
       → find_inspection_records — authoritative city-record links (compare/list/area)
       → food_safety_info   — general food-safety facts + authoritative citations
@@ -81,16 +82,83 @@ a request-time-inference one.
 | Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
 | Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
 
-All three run the **same** six `handler.py` files (and share `city_context.py`).
+All three run the **same** seven `handler.py` files (and share `city_context.py`
+plus the `scores_match.py` matcher).
 
 ### Tools
 
-The agent calls the tools in order: `find_restaurants` → `get_safety_score` →
-`explain_restaurant` (for the lowest-risk few). `find_reviews` and
-`food_safety_info` are optional add-ons outside that sequence — `find_reviews`
-when the user asks what reviewers say, `food_safety_info` for a general
-food-safety / foodborne-illness question (which does NOT run the restaurant
-sequence). Each handler takes `handler(event, _ctx)`.
+Each handler takes `handler(event, _ctx)`. Which tools apply depends on how the
+user arrived and what identity you already hold:
+
+- **Discovery** ("safe sushi near Wicker Park") — the ordered sequence
+  `find_restaurants` → `get_safety_score` → `explain_restaurant` (for the
+  lowest-risk few).
+- **A named establishment in general chat** ("what's the address of Lou
+  Malnati's?", "compare Giordano's and Pequod's") — skip `find_restaurants` and
+  call `look_up_establishment` with the name(s). On a confident match, answer
+  from it; chain to `explain_restaurant` (with the returned `license_id`) if the
+  user wants the full inspection history. When several venues share the name it
+  returns candidates to disambiguate first.
+- **A scoped detail page** — the web app injects the exact `license_id` into the
+  query (see `app/src/lib/agent-api.ts`), so answer with
+  `explain_restaurant(license_id)` directly; do **not** re-resolve the venue by
+  name or run the discovery sequence.
+- **Optional, any mode** — `find_reviews` (only when asked what reviewers say),
+  `find_inspection_records` (a link to the city's own records), and
+  `food_safety_info` (a general food-safety question — does NOT run the
+  restaurant sequence).
+
+**Availability & plurality** — which tools apply in each mode, and whether one
+call handles several establishments or the agent calls the tool once per venue:
+
+| Tool | Discovery | Named (general) | Scoped page | One call handles… |
+|---|:-:|:-:|:-:|---|
+| `find_restaurants` | ✓ | — | — | a whole area (returns many) |
+| `get_safety_score` | ✓ | — | — | **a list** of restaurants |
+| `look_up_establishment` | — | ✓ | — | **a list** of names |
+| `explain_restaurant` | ✓ (few) | ✓ (after match) | ✓ (the pinned id) | one venue (per `license_id`) |
+| `find_inspection_records` | ✓ | ✓ | ✓ | **a set** of `license_id`s / an area |
+| `find_reviews` | on ask | on ask | on ask | one venue (per place) |
+| `food_safety_info` | ✓ | ✓ | ✓ | one general question |
+
+The batch tools (`get_safety_score`, `look_up_establishment`,
+`find_inspection_records`) take a list, so a "compare A and B" request resolves
+in one call instead of a call per venue. `explain_restaurant` and `find_reviews`
+are single-venue — the agent calls them once per establishment. On a scoped page
+the strongest identity signal (the exact `license_id`) is already in hand, so the
+fuzzy tools are a downgrade there: `explain_restaurant` is a direct lookup with
+no mismatch risk and the full history.
+
+**When the agent asks the user (vs. answers directly)** — every tool is a
+read-only lookup or link builder (no writes, nothing irreversible), so the agent
+never asks "are you sure?" for a side effect. It pauses for user input in only
+four cases:
+
+- **Disambiguation (must ask).** `look_up_establishment` returns
+  `status="ambiguous"` when several venues share a name (e.g. many "Subway"s).
+  The agent lists the `candidates` by address / neighborhood, asks which one, and
+  only then continues — chaining to `explain_restaurant` with the chosen
+  `license_id` for detail. It never guesses one.
+- **A location it can't place (must ask).** When `find_restaurants` can't resolve
+  the area (`reason="location_not_recognized"`), the agent says it couldn't
+  locate that area and asks for a major neighborhood name or lat/lon — it does
+  **not** silently widen to a whole-city search. (A discovery query with *no*
+  area given does default to a whole-city search rather than asking.)
+- **Opt-in before an optional action (offer, act only on "yes").** Diner reviews
+  are never volunteered: the agent may add one short offer to pull them and calls
+  `find_reviews` only if the user accepts. Reviews stay separate from the risk
+  signal.
+- **Out-of-scope / personal-medical (decline, then offer).** For a request
+  outside scope (recipes, code, another city) or a personal medical question, the
+  agent declines and offers what it *can* do ("I can look up an establishment's
+  predicted risk, or answer a general food-safety question with a cited source —
+  want me to?").
+
+What the agent does **not** do: ask the user to confirm an *unambiguous* match
+(it states the resolved `dba_name` + `address` inline so a wrong match is
+visible, then answers), or ask the user to supply a fact a tool can look up (it
+looks it up rather than asking "what's the address?"). These behaviours are set
+in `system_prompt.txt`.
 
 **1. `find_restaurants`** — OpenStreetMap/Overpass lookup (no key).
 
@@ -137,7 +205,30 @@ sequence). Each handler takes `handler(event, _ctx)`.
     (Out of Business / No Entry / Not Ready / Business Not Located) so they are
     **not** miscounted as passes *(the `other` bucket: #56)*.
 
-**4. `find_reviews`** — optional third-party diner reviews (only on request).
+**4. `look_up_establishment`** — resolve a NAME to its authoritative record
+(general chat; no `find_restaurants` step).
+
+- *Input*: `{"names": ["Lou Malnati's", "Pequod's"]}` — batches all names in one
+  call (a single `"name"` is also accepted).
+- *Output*: `list`, one result per name (order preserved), each
+  `{query, status, match, candidates, truncated}`:
+  - `status="matched"`: `match` is the authoritative record — `dba_name`,
+    `address` (`address_source="city_inspection_record"`), `zip`, `facility_type`,
+    `neighborhood`, `risk_score`/`risk_tier`/`trend`, brief `top_drivers`,
+    `last_inspection` `{date, result}`, and `license_id` (chain to
+    `explain_restaurant` with it for the full history).
+  - `status="ambiguous"`: several venues share the name — `candidates` (capped at
+    8, `truncated: true` if more) each carry `license_id`, `dba_name`, `address`,
+    `neighborhood`, `zip`, `risk_tier` so the agent asks which one. It never
+    guesses one.
+  - `status="no_inspection_record"`: no city record for that name — `match` is
+    `null` and the agent invents no address or score.
+- *Boundary — authoritative, never fabricated*: the matched `address` is the
+  city's own record (unlike an OpenStreetMap-only address), so the agent may
+  state it as the address on file. This is the general-chat counterpart to the
+  scoped page's `explain_restaurant(license_id)`.
+
+**5. `find_reviews`** — optional third-party diner reviews (only on request).
 
 - *Input*: `{"name": "...", "address": "...", "topics": [...]}` — `topics` is a
   subset of `cleanliness`, `pests`, `food_quality`, `illness` (empty = all).
@@ -151,7 +242,7 @@ sequence). Each handler takes `handler(event, _ctx)`.
   carries `disclaimer`, and the prompt forbids using a review to set or change a
   score or tier.
 
-**5. `find_inspection_records`** — authoritative city-record link for a set of
+**6. `find_inspection_records`** — authoritative city-record link for a set of
 establishments in the active city (opt-in; compare / list / area).
 
 - *Input* (exactly one filter): `{"license_ids": [...]}` for named places (the
@@ -171,7 +262,7 @@ establishments in the active city (opt-in; compare / list / area).
   carries no disclaimer. It complements the agent's own comparison; it does not
   replace it.
 
-**6. `food_safety_info`** — general food-safety education with cited sources.
+**7. `food_safety_info`** — general food-safety education with cited sources.
 
 - *Input*: `{"query": "...", "topics": [...]}` — `query` is the user's general
   question; `topics` is an optional explicit subset of the topic registry keys
@@ -217,6 +308,46 @@ Independent layers keep the agent on-task and prevent fabrication:
    an explicit error object the prompt knows how to relay (#56), and
    `food_safety_info` can only cite URLs from a curated allow-list.
 
+### Example: a query end to end
+
+Putting the architecture together — here is what a real request looks like from
+the user's side and what the agent does under the framing above.
+
+**1. Discovery — "low-risk sushi near Wicker Park" (Chicago `/chat`):**
+
+1. `find_restaurants(neighborhood="Wicker Park", cuisine="sushi")` → candidate
+   venues from OpenStreetMap (name, address, coordinates).
+2. `get_safety_score([…those venues…])` → each is matched to the city's
+   `scores.json`; a match returns its **precomputed** `risk_score` / `risk_tier` /
+   drivers **and the authoritative city address**, and the list comes back sorted
+   lowest-risk first. A venue with no match returns a no-record result (no number).
+3. `explain_restaurant(license_id)` for the 2-3 lowest-risk venues → full SHAP
+   drivers + inspection history and summary.
+4. The agent replies with a numbered list, lowest predicted risk first — each
+   line: name, the city-record address, risk tier, a 1-2 sentence driver summary —
+   and closes with the prediction-not-a-verdict caveat. No model ran at request
+   time; every number came from a tool.
+
+**2. A named establishment — "what's the address of Lou Malnati's?":**
+
+- `look_up_establishment(["Lou Malnati's"])`. One match → the agent states the
+  identity from the city record ("Lou Malnati's Pizzeria, 805 S State St") and
+  answers, no confirmation step; if the user then wants its history it chains to
+  `explain_restaurant` with the returned `license_id`.
+- Several venues share the name ("Subway") → the lookup returns `ambiguous`
+  candidates and the agent lists them by address and **asks which one** first (see
+  "When the agent asks the user" above).
+
+**3. A scoped detail page — "when was it last inspected?":** the web app injects
+the venue's exact `license_id` into the query, so the agent skips discovery and
+calls `explain_restaurant(license_id)` directly, answering from that venue's
+inspection history.
+
+Across all three the same invariants hold: the active city scopes every lookup,
+no score is computed at request time, and **no establishment fact is stated
+without a tool result behind it** — which is exactly what the evaluation below
+checks.
+
 ### Evaluation
 
 A behavioural eval harness (`agents/eval/`) exercises the guardrails on
@@ -225,16 +356,24 @@ cross-city / out-of-scope location, a general food-safety question (must answer
 WITH a cited source), a personal medical question (must steer to a professional),
 per-city grade framing, and a tool outage — and checks the response follows the
 rules (no yes/no verdict, no invented score, scope refusal, cited general facts,
-graceful failure). It also
-runs deterministic gates with no Bedrock: a citation **allow-list** check (every
-citable URL is https + on the allow-list) and, opt-in via `--links`, a **live
-link-resolution** check that fetches every citation URL to catch dead links.
+graceful failure). It also runs deterministic gates with no Bedrock:
+- **faithfulness** (`--faithfulness`) — `get_safety_score` relays `scores.json`
+  exactly (same score / tier / license_id / trend, no recompute);
+- **authoritative-address relay** (`--identity`) — a matched venue returns the
+  **city record's** address, not the OpenStreetMap stub's (the anti-hallucination
+  guard: it feeds a wrong address, matched by name+coords, and asserts the tool
+  overrides it);
+- **name lookup** (`--lookup`) — a name resolves to the right record, and a
+  nonsense name returns a clean no-record result (never a fabricated one);
+- a citation **allow-list** check (every citable URL is https + on the allow-list);
+- opt-in via `--links`, a **live link-resolution** check that fetches every
+  citation URL to catch dead links.
 
 **In CI:** the **Agent (deterministic checks)** job (`.github/workflows/ci.yml`)
 runs the no-Bedrock, no-network parts on every PR — each tool's pytest suite (as
 separate invocations, since the tool dirs share a `handler` module name and
 collide in one run) plus `run_eval.py --self-test`, `--faithfulness` (vs the
-committed `scores.json`), and `--citations`. The Bedrock-graded `--judge`
+committed `scores.json`), `--identity`, `--lookup`, and `--citations`. The Bedrock-graded `--judge`
 guardrail suite and the network `--links` check stay **manual** (paid; run from
 the SageMaker execution role via the `eval-agent` skill).
 
@@ -392,8 +531,8 @@ Deploy with the wrapper script (defaults: region `us-west-2`, the deploy account
 ./scripts/deploy_aws.sh [region] [account-id]
 ```
 
-This zips `agents/` (entrypoint + the six `tools/` handlers + `system_prompt.txt` +
-`city_context.py`), deploys/updates the `foodsafetyagent` runtime, and points the
+This zips `agents/` (entrypoint + the seven `tools/` handlers + `system_prompt.txt` +
+`city_context.py` + `scores_match.py`), deploys/updates the `foodsafetyagent` runtime, and points the
 `food-safety-agent-proxy` Lambda at it — the request path is CloudFront `/api/agent`
 → ALB → that Lambda → the runtime. The runtime warms each covered city's precomputed
 `scores.json` from S3 at startup and reads it for scoring; it never calls the model
