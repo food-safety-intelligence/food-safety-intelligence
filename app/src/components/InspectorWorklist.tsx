@@ -486,8 +486,8 @@ export function InspectorWorklist() {
               <h2 className="text-base font-bold">Rising fast</h2>
             </div>
             <p className="text-xs text-muted mt-1.5 mb-3">
-              Steepest score increase over an establishment's last few visits,
-              worth a look even below the High tier.
+              Steepest score increase over an establishment&apos;s last few
+              visits, worth a look even below the High tier.
             </p>
             <div className="flex flex-col gap-0.5">
               {risingFast.map((r) => (
