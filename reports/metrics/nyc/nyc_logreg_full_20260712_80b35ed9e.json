@@ -7,8 +7,8 @@
   "label": "y_next_bc",
   "n_features": 29,
   "data_vintage": "20260701",
-  "run_id": "20260712_58a073c6e",
-  "git_commit": "58a073c6e90865dc15bcde9726c2a904c5d59ecf",
+  "run_id": "20260712_80b35ed9e",
+  "git_commit": "80b35ed9e4f0276c86b1aa51a7e097e9e6c0a547",
   "git_dirty": true,
   "feature_set_version": "80db8fd80368",
   "raw_snapshots": {

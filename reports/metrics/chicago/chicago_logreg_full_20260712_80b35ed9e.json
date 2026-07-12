@@ -1,0 +1,40 @@
+{
+  "model": "chicago_logreg_full",
+  "city": "chicago",
+  "variant": "logreg_full",
+  "estimator": "logreg",
+  "calibration": "sigmoid (platt)",
+  "label": "y_fail_or_critical_next_180d",
+  "n_features": 36,
+  "data_vintage": "20251212",
+  "run_id": "20260712_80b35ed9e",
+  "git_commit": "80b35ed9e4f0276c86b1aa51a7e097e9e6c0a547",
+  "git_dirty": true,
+  "feature_set_version": "68fe2ae76184",
+  "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3",
+  "train_window": {
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01"
+  },
+  "split": {
+    "train_n": 79268,
+    "val_n": 16564,
+    "test_n": 7008,
+    "test_prevalence": 0.1079
+  },
+  "test": {
+    "n": 7008,
+    "positive_rate": 0.107877,
+    "pr_auc": 0.371581,
+    "roc_auc": 0.799593,
+    "precision_at_5pct": 0.504274,
+    "precision_at_10pct": 0.415121,
+    "precision_at_20pct": 0.308131,
+    "recall_at_5pct": 0.234127,
+    "recall_at_10pct": 0.384921,
+    "recall_at_20pct": 0.571429,
+    "top_decile_lift": 3.848108,
+    "brier_score": 0.08154,
+    "log_loss": 0.281527
+  }
+}

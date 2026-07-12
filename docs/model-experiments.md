@@ -7,9 +7,9 @@
 - Conventions: commit code before a tracked run (provenance), machine metrics land in
   `reports/metrics/<run>.json`, decisions in `docs/decisions/`, and feature-contract
   version bumps in [`interface_contracts.md`](interface_contracts.md#feature-contract-changelog).
-- The **Chicago** log is below; the **NYC + LA** ablations are a separate section at the
-  end (different data, label, and metric basis). City runs land in
-  `reports/metrics/nyc/` and `reports/metrics/la/`.
+- The Chicago experiment **log** is below; a **cross-city ablation** section (Chicago, NYC,
+  and LA in one parallel frame) is at the end. Ablation runs land in
+  `reports/metrics/{chicago,nyc,la}/`.
 - **Metric basis matters.** "served" = baseline LogReg + sigmoid, review-time-filtered
   test (n≈7,008); "honest test" = unfiltered test (n≈13,812). The two bases are not
   directly comparable; each row says which it used.
@@ -134,31 +134,45 @@ gains are product/operating-point, not model capacity.
 
 ---
 
-# NYC + LA ablations (Phase 2 cities, DR 0016)
+# Cross-city ablations (Chicago, NYC, LA)
 
-NYC and LA shipped as single served configs (DR 0016) with no ablation record —
-unlike Chicago above. This section fills that gap. All runs come from
-`scripts/run_city_ablations.py`, which reuses each city's **own** `build_events`
-+ `fit_xgb_platt` (so numbers match production), holds the served temporal split
-fixed, and evaluates every variant on the **same** held-out test set. Each run is
-a tracked JSON under `reports/metrics/{nyc,la}/<city>_<variant>_<run_id>.json`
-(git SHA + raw-snapshot content hash via `snapshot_provenance`). The runner never
-rewrites committed app JSON — it only fits + evaluates.
+All three cities' served models now sit in one parallel ablation frame, from
+`scripts/run_city_ablations.py`. Each city reuses its **own** production code (so
+numbers match the served model), holds its served temporal split fixed, and
+evaluates every variant on the **same** held-out test set. Each run is a tracked
+JSON under `reports/metrics/<city>/<city>_<variant>_<run_id>.json` (all from
+run_id `20260712_80b35ed9e`). The runner never rewrites committed app JSON.
 
-**Both cities predict "next inspection graded B/C"** (event-anchored, DR 0016) —
-a *different label* from Chicago's forward-180-day fail-or-critical, so the raw
-numbers are **not** comparable to the Chicago log. Basis: single temporal split
-(train / val / test on the served cutoffs); XGB uses the served depth-3 config,
-LogReg mirrors Chicago's baseline (median-impute + scale + balanced logistic,
-sigmoid-calibrated on val). Data vintage (latest inspection in the snapshot):
-`20260701` (NYC) / `20260331` (LA).
+**The frames are parallel by analogy, not identical numbers** — the cities differ
+in pipeline, label, and feature taxonomy, so compare the *shape* across cities,
+never the absolute values:
 
-**Caveat (weaker than the Chicago claims):** these are a **single split**, not
-expanding-window CV. NYC/LA have only ~3 post-COVID years, so CV folds are thin;
-read the deltas as directional, not gate-passing. Chicago's stronger "kept/
-reverted" verdicts all required CV — that bar isn't met here yet.
+| | Chicago | NYC / LA |
+|---|---|---|
+| Source | `features.parquet` pipeline | inline `build_events` from a raw SODA/ArcGIS snapshot |
+| Label | fail-or-critical within 180d | next inspection graded B/C |
+| Served fit | depth-3 monotone XGB + Platt | XGB + Platt |
+| "prior-only" variant | `xgb_forecast_only` (drop current-outcome) | `xgb_prior_only` |
+| "current-only" variant | `xgb_current_outcome_only` (3 cols) | `xgb_current_only` |
+| "drop text layer" | `xgb_no_keywords` (the 12 `flag_kw_*`) | `xgb_no_theme_sev` (crosswalk theme/severity) |
 
-### NYC — test n=9,456, base rate 41.0% (`nyc_*_20260712_58a073c6e.json`)
+**Caveat:** these are a **single split**, not expanding-window CV. Chicago's
+richer CV-gated verdicts are in the log above; NYC/LA have only ~3 post-COVID
+years, so CV folds are thin. Read the deltas as directional. As a sanity check,
+Chicago's `served_xgb_full` here (PR-AUC **0.382**) reproduces the served model
+(DR 0009) — the ablation fits match production.
+
+### Chicago — test n=7,008, base rate 10.8% (`chicago_*_20260712_80b35ed9e.json`)
+
+| Variant | n_feat | PR-AUC | ROC-AUC | P@10% | top-decile lift | Brier |
+|---|---|---|---|---|---|---|
+| **served_xgb_full** (ALL_FEATURES) | 36 | **0.382** | **0.806** | **0.415** | **3.85** | **0.081** |
+| xgb_forecast_only (drop current-outcome) | 33 | 0.336 | 0.775 | 0.359 | 3.33 | 0.084 |
+| xgb_current_outcome_only (`was_fail` + priority/core counts) | 3 | 0.324 | 0.752 | 0.377 | 3.49 | 0.085 |
+| xgb_no_keywords (drop the 12 `flag_kw_*`) | 24 | 0.371 | 0.803 | 0.412 | 3.82 | 0.081 |
+| logreg_full | 36 | 0.372 | 0.800 | 0.415 | 3.85 | 0.082 |
+
+### NYC — test n=9,456, base rate 41.0% (`nyc_*_20260712_80b35ed9e.json`)
 
 | Variant | n_feat | PR-AUC | ROC-AUC | P@10% | top-decile lift | Brier |
 |---|---|---|---|---|---|---|
@@ -169,7 +183,7 @@ reverted" verdicts all required CV — that bar isn't met here yet.
 | xgb_plus_keywords (+Chicago's 12 Layer-B regex flags) | 41 | 0.580 | 0.674 | 0.683 | 1.67 | 0.221 |
 | logreg_full | 29 | 0.561 | 0.666 | 0.641 | 1.56 | 0.224 |
 
-### LA — test n=7,197, base rate 8.7% (`la_*_20260712_58a073c6e.json`)
+### LA — test n=7,197, base rate 8.7% (`la_*_20260712_80b35ed9e.json`)
 
 | Variant | n_feat | PR-AUC | ROC-AUC | P@10% | top-decile lift | Brier |
 |---|---|---|---|---|---|---|
@@ -183,47 +197,38 @@ reverted" verdicts all required CV — that bar isn't met here yet.
 (LA's low PR-AUC is the 8.7% base rate — read the base-rate-invariant top-decile
 lift 2.52× and ROC 0.72 instead.)
 
-## Reading the pattern (cities)
+## Reading the pattern (cross-city)
 
-- **The full XGB feature set wins in both cities** — no single family matches it,
-  so PRIOR and CURRENT are **complementary**, not substitutes.
-- **Prior history beats the current inspection alone — the *opposite* of
-  Chicago.** In Chicago the current visit's own outcome (`was_fail` +
-  `n_priority_this_inspection`) was the single biggest lever; in NYC and LA
-  `xgb_prior_only` (0.540 / 0.161 PR-AUC) beats `xgb_current_only` (0.489 /
-  0.152). The likely cause: NYC and LA inspect **roughly annually**, so the
-  "current" snapshot is staler and the prior track record carries relatively
-  more. (LA is closer — `current_only` actually has the higher ROC, 0.695 vs
-  0.667 — but loses on PR-AUC and precision@10%.)
-- **The theme + severity-tier layer is marginal**, echoing Chicago's "text is
-  redundant with the structured codes" finding: dropping the crosswalk theme +
-  severity features costs only **+0.008 PR-AUC (NYC)** and **+0.003 (LA)** — 12
-  features recover ~99% of the 28–29-feature model. Defensible to keep for the
-  driver labels, but it is not where the signal lives. Note these features come
-  from mapping the native violation **code** → theme + severity tier via
-  `reference/violation_crosswalk.csv` (structured categorization), **not** from
-  Chicago-style regex keyword flags on free text — NYC/LA have no keyword layer,
-  and the crosswalk themes already cover the same hazard categories.
-- **Chicago's keyword flags don't transfer to NYC/LA** (`xgb_plus_keywords`).
-  Chicago **ships** the 12 Layer-B `flag_kw_*` flags (they're in Chicago's served
-  feature contract — `baseline.py` ALL_FEATURES); this variant tests bolting that
-  *same* Chicago-tuned regex set onto the NYC/LA models. It doesn't help:
-  appending the 12 flags (temperature, rodent, cross-contamination, no soap…) is
-  flat-to-slightly-negative — NYC 0.583 → **0.580** PR-AUC (P@10 0.693 → 0.683),
-  LA 0.187 → **0.183** (P@10 ~flat) — both down a hair, within noise, for 12
-  extra columns. Two transfer-specific reasons: NYC/LA already encode these
-  hazards via the crosswalk theme/severity features, and the regexes are tuned to
-  Chicago's phrasing so they don't fire the same way on NYC/LA text (see the
-  caveat in `keyword_flags.py`). **This says nothing about the flags' value in
-  Chicago** (not measured here) — only that **NYC/LA don't need their own keyword
-  layer.**
-- **XGBoost beats LogReg in both cities** (+0.022 / +0.021 PR-AUC; better
-  precision@10% and Brier), confirming XGB as the right served estimator for the
-  new cities — the reverse of Chicago's v33 operating-point table, and consistent
-  with Chicago's own 2026-06-27 XGB promotion.
+- **The full feature set wins in all three cities** — no single family matches it,
+  so history and the current inspection are **complementary**, not substitutes.
+- **The dominant family flips across cities.** In **Chicago** the current
+  inspection's own outcome is the biggest lever: dropping it
+  (`xgb_forecast_only`) is the largest single cut (0.382 → **0.336**, −0.046), and
+  just the 3 current-outcome columns alone (`xgb_current_outcome_only`) already
+  reach **0.324** PR-AUC (85% of the full model). In **NYC and LA it's the
+  reverse** — `xgb_prior_only` (0.540 / 0.161) beats `xgb_current_only` (0.489 /
+  0.152). The likely cause: NYC/LA inspect **roughly annually**, so the "current"
+  snapshot is staler and the prior track record carries relatively more.
+- **Keyword flags help a little in Chicago, not at all when transferred.** Now
+  measured in one frame: dropping Chicago's 12 `flag_kw_*` (`xgb_no_keywords`)
+  costs **+0.011 PR-AUC** (0.382 → 0.371) — small but positive, which is why
+  Chicago ships them. Bolting that *same* Chicago-tuned regex set onto NYC/LA
+  (`xgb_plus_keywords`) is instead flat-to-slightly-negative — NYC 0.583 →
+  **0.580**, LA 0.187 → **0.183**. The transfer fails because NYC/LA already
+  encode those hazards via their crosswalk theme/severity features, and the
+  regexes are tuned to Chicago's phrasing (see the caveat in `keyword_flags.py`).
+  So **Chicago keeps its keyword layer; NYC/LA don't need one.**
+- **NYC/LA's crosswalk theme + severity layer is also marginal** — dropping it
+  (`xgb_no_theme_sev`) costs only +0.008 (NYC) / +0.003 (LA) PR-AUC; 12 features
+  recover ~99% of the model. It's the code→category analog of Chicago's structured
+  codes (from `reference/violation_crosswalk.csv`), not free-text NLP. Worth
+  keeping for the driver labels, but not where the signal lives.
+- **XGBoost beats LogReg in all three cities** (Chicago +0.010: 0.382 vs 0.372;
+  NYC +0.022; LA +0.021 PR-AUC), consistent with Chicago's 2026-06-27 XGB
+  promotion (DR 0009). XGB is the right served estimator everywhere.
 
-**Net:** the served config (full XGB + Platt) is the right call for both cities;
-the ablations show the signal is carried by inspection history + current outcome
-together, with the text layer a small extra. Next step if pursued: expanding-
-window CV on the thin post-COVID windows before treating any of this as a
-gate-passing verdict.
+**Net:** the served config (full XGB + Platt) is the right call for every city;
+the signal is carried by inspection history + current outcome together, with the
+text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
+NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
+windows before treating those deltas as gate-passing verdicts.
