@@ -1,0 +1,45 @@
+{
+  "model": "la_xgb_plus_keywords",
+  "city": "la",
+  "variant": "xgb_plus_keywords",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_next_bad",
+  "n_features": 40,
+  "data_vintage": "20260331",
+  "run_id": "20260712_58a073c6e",
+  "git_commit": "58a073c6e90865dc15bcde9726c2a904c5d59ecf",
+  "git_dirty": true,
+  "feature_set_version": "9084bb75c54a",
+  "raw_snapshots": {
+    "data/raw/la_inspections.parquet": "9c89cef283490b6be782570bb73f5098b1f8f3b7e15f2a68030013c20b582800",
+    "data/raw/la_violations.parquet": "8a0dd3fb3165a2f67df508f7966ba1a356e1735bf23f6f221cf7915c8aadaa08"
+  },
+  "train_window": {
+    "train_start": "2023-04-01",
+    "train_end": "2024-07-01",
+    "val_end": "2025-01-01"
+  },
+  "split": {
+    "train_n": 36900,
+    "val_n": 7374,
+    "test_n": 7197,
+    "test_prevalence": 0.0866
+  },
+  "base_rate": 0.087,
+  "test": {
+    "n": 7197,
+    "positive_rate": 0.086564,
+    "pr_auc": 0.182644,
+    "roc_auc": 0.722184,
+    "precision_at_5pct": 0.236111,
+    "precision_at_10pct": 0.216667,
+    "precision_at_20pct": 0.197222,
+    "recall_at_5pct": 0.136437,
+    "recall_at_10pct": 0.250401,
+    "recall_at_20pct": 0.455859,
+    "top_decile_lift": 2.50297,
+    "brier_score": 0.075467,
+    "log_loss": 0.271948
+  }
+}

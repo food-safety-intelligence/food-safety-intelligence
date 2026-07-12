@@ -40,6 +40,7 @@ from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.tracking import snapshot_provenance
 from foodsafety.utils.time import temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
@@ -668,6 +669,42 @@ def main():
     }
     (OUT / "methodology.json").write_text(json.dumps(methodology, indent=2))
     print("Wrote methodology.json")
+
+    # ---- tracked experiment record (reports/metrics/nyc/) ----
+    # Diffable, git-committed ledger of the SERVED NYC model, alongside Chicago's
+    # baseline/ and xgb/ reports. Dataset identity is the raw-pull snapshot hash
+    # (the reproducibility anchor — the SODA feed drifts), stamped via
+    # snapshot_provenance so same-commit reruns share a run_id and don't collide.
+    prov = snapshot_provenance([RAW], FEATS_M1, REPO)
+    run_id = prov["run_id"]
+    metrics_dir = REPO / "reports" / "metrics" / "nyc"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    report = {
+        "model": MODEL_VERSION,
+        "city": "nyc",
+        "calibration": "xgboost + platt (sigmoid) on val",
+        "label": "y_next_bc (next inspection graded B/C, score >= 14)",
+        "data_vintage": ver,
+        **prov,
+        "train_window": {
+            "train_start": NYC_TRAIN_START,
+            "train_end": TRAIN_END,
+            "val_end": VAL_END,
+        },
+        "split": {
+            "train_n": int(len(sp.train)),
+            "val_n": int(len(sp.val)),
+            "test_n": int(len(sp.test)),
+            "test_prevalence": round(float(sp.test.y_next_bc.mean()), 4),
+        },
+        "base_rate": NYC_BASE_RATE,
+        "tier_thresholds": [c for c, _ in thr[:3]],
+        "n_establishments": int(len(out)),
+        "test": test_metrics,
+        "operating_points": op,
+    }
+    (metrics_dir / f"nyc_{run_id}.json").write_text(json.dumps(report, indent=2))
+    print(f"Saved metrics report → {metrics_dir}/nyc_{run_id}.json")
 
     # stash the NYC tier thresholds + metrics for the DR / Phase 2 config
     (OUT / "_nyc_build_meta.json").write_text(

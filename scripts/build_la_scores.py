@@ -54,6 +54,7 @@ from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.tracking import snapshot_provenance
 from foodsafety.utils.time import temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
@@ -795,6 +796,42 @@ def main():
     }
     (OUT / "methodology.json").write_text(json.dumps(methodology, indent=2))
     print("Wrote methodology.json")
+
+    # ---- tracked experiment record (reports/metrics/la/) ----
+    # Diffable, git-committed ledger of the SERVED LA model, alongside Chicago's
+    # baseline/ and xgb/ reports. Dataset identity is the raw inspections +
+    # violations snapshot hashes (the reproducibility anchor — the feed drifts),
+    # stamped via snapshot_provenance so same-commit reruns don't collide.
+    prov = snapshot_provenance([RAW_INSP, RAW_VIOL], FEATS_M1, REPO)
+    run_id = prov["run_id"]
+    metrics_dir = REPO / "reports" / "metrics" / "la"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    report = {
+        "model": MODEL_VERSION,
+        "city": "la",
+        "calibration": "xgboost + platt (sigmoid) on val",
+        "label": "y_next_bad (next inspection graded B/C, score below 90)",
+        "data_vintage": ver,
+        **prov,
+        "train_window": {
+            "train_start": LA_TRAIN_START,
+            "train_end": TRAIN_END,
+            "val_end": VAL_END,
+        },
+        "split": {
+            "train_n": int(len(sp.train)),
+            "val_n": int(len(sp.val)),
+            "test_n": int(len(sp.test)),
+            "test_prevalence": round(float(sp.test.y_next_bad.mean()), 4),
+        },
+        "base_rate": LA_BASE_RATE,
+        "tier_thresholds": [c for c, _ in thr[:3]],
+        "n_establishments": int(len(out)),
+        "test": test_metrics,
+        "operating_points": op,
+    }
+    (metrics_dir / f"la_{run_id}.json").write_text(json.dumps(report, indent=2))
+    print(f"Saved metrics report → {metrics_dir}/la_{run_id}.json")
 
     (OUT / "_la_build_meta.json").write_text(
         json.dumps(
