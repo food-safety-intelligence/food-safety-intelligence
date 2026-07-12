@@ -33,6 +33,15 @@ dev = [
     "jupyterlab>=4.0",
     "ipykernel>=6.29",
 ]
+# Audit-only tooling (foodsafety.audit): the census/TIGER spatial join for the
+# fairness disparate-impact audit. Deliberately NOT in the core deps — census is
+# never a model feature, a serving dependency, or something the app or CI needs.
+# Install only when running the audit: `uv sync --extra audit`.
+audit = [
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyogrio>=0.7",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -94,6 +103,13 @@ omit = [
     # CI (to exercise the handlers), but its own lines aren't scored; half of
     # them are the Bedrock-judge / live-link paths CI can't reach anyway.
     "agents/eval/*",
+    # Untestable in CI: the census join needs geopandas (the `audit` extra),
+    # network access to Census/TIGER, and a CENSUS_API_KEY; the city adapters need
+    # the S3 model/features data and each city's live build pipeline. CI can't
+    # exercise a line. The scored audit logic (fairness/frame/report/mitigation) IS
+    # unit-tested; excluded so the floor reflects that.
+    "src/foodsafety/audit/census.py",
+    "src/foodsafety/audit/adapters/*",
 ]
 
 [tool.coverage.report]
