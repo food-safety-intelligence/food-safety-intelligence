@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { BackToSearch } from "@/components/BackToSearch";
 import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
@@ -235,10 +236,6 @@ export function InspectorWorklist() {
     return counts;
   }, [index, activeRows]);
 
-  const asOfLabel = index?.as_of_date
-    ? formatInspectionDate(index.as_of_date)
-    : null;
-
   // "Why trust this ranking" numbers, straight from the active city's
   // methodology.json. The top-decile operating point gives the model-ranked
   // hit rate + its lift over random; test.prevalence is the base rate a random
@@ -268,11 +265,12 @@ export function InspectorWorklist() {
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
+      <BackToSearch className="inline-flex items-center gap-2 text-sm text-teal hover:underline mb-6" />
       {/* ---- Page intro + stat cards ---- */}
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="max-w-[640px]">
           <p className="text-2xs tracking-[0.2em] uppercase text-muted">
-            Inspector worklist{asOfLabel ? ` · as of ${asOfLabel}` : ""}
+            Inspector worklist
           </p>
           <h1 className="serif text-5xl mt-2.5 mb-3.5">
             Inspect where it matters&nbsp;most.

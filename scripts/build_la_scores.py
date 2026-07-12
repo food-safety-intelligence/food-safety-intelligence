@@ -364,7 +364,7 @@ def la_labels(theme_cols, sev_cols) -> dict:
         "prior_inspections": "{value} prior inspections on record",
         "prior_bad": "{value} prior inspections graded B or C",
         "prior_n_critical": "{value} major/critical violations in prior inspections",
-        "prior_mean_score": "Average past inspection score: {value}/100",
+        "prior_mean_score": "Average past inspection score: {value:.1f}/100",
         "prior_bad_rate": "Past B/C rate: {value}",
         "prev_score": "Previous inspection score: {value}/100",
         "prev_is_bad": {True: "Previous inspection was B or C", False: "Previous inspection was A"},

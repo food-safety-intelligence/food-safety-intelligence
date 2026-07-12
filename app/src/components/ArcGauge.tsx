@@ -1,5 +1,5 @@
 import type { RiskTier } from "@/lib/scores";
-import { TIER_HEX } from "@/lib/scores";
+import { TIER_FG_VAR, TIER_HEX } from "@/lib/scores";
 
 /**
  * 270° arc gauge — the design's score-screen.png centerpiece. Renders the
@@ -45,6 +45,10 @@ export function ArcGauge({
 
   const display = Math.round(frac * 100);
   const color = TIER_HEX[tier];
+  // Centre number takes the tier's foreground colour so the score reads as its
+  // risk tier (the darker pill-text palette, not the lighter arc fill — see
+  // TIER_FG_VAR).
+  const numberColor = TIER_FG_VAR[tier];
 
   return (
     <svg
@@ -90,7 +94,7 @@ export function ArcGauge({
         fontFamily="var(--font-plex-sans), 'IBM Plex Sans', sans-serif"
         fontSize={size * 0.32}
         fontWeight={600}
-        fill="#2B3239"
+        fill={numberColor}
       >
         {display}
       </text>
