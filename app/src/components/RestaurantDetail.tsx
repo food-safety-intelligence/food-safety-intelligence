@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, Heart, MessageSquarePlus } from "lucide-react";
+import { Heart, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BackToSearch } from "@/components/BackToSearch";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
 import { InspectionTimeline } from "@/components/InspectionTimeline";
@@ -101,13 +102,7 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
         name={restaurant.dba_name}
       />
       <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Back to search
-        </Link>
+        <BackToSearch className="inline-flex items-center gap-2 text-sm text-teal hover:underline" />
       </div>
 
       {is_mock && <DemoBanner />}
@@ -339,13 +334,7 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
         </section>
 
         <div className="text-center mt-10">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Back to search
-          </Link>
+          <BackToSearch className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors" />
         </div>
       </main>
     </>
@@ -379,13 +368,7 @@ function DetailNotFound() {
         We couldn&apos;t find a food establishment for this link. It may have been
         removed from the dataset, or the link may be incomplete.
       </p>
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-        Back to search
-      </Link>
+      <BackToSearch className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors" />
     </main>
   );
 }

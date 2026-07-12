@@ -1,5 +1,4 @@
 import {
-  ArrowLeft,
   BookMarked,
   BookOpen,
   ClipboardList,
@@ -15,6 +14,7 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
+import { BackToSearch } from "@/components/BackToSearch";
 import { CityGate } from "@/components/CityGate";
 import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
@@ -220,15 +220,11 @@ export default async function HowItWorksPage() {
           residual overhang from intrinsic-width content (operating-points table)
           without clipping text. Desktop keeps the 820 reading cap. */}
       <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
-        <CityGate nyc={<HowItWorksNyc />} la={<HowItWorksLa />}>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-xs text-teal hover:underline"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Back to search
-        </Link>
+        {/* Back link lives outside CityGate so Chicago, NYC, and LA all get it
+            (each city's methodology subtree starts at its own hero). */}
+        <BackToSearch className="inline-flex items-center gap-2 text-xs text-teal hover:underline" />
 
+        <CityGate nyc={<HowItWorksNyc />} la={<HowItWorksLa />}>
         {/* Hero band — the shared MethodologyHero card (soft cream→white wash +
             faint sage glow), so Chicago, NYC, and LA open identically. The
             headline metrics sit here as stat cards so the page leads with what
