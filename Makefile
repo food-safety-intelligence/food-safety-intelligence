@@ -15,7 +15,7 @@
 # Publish a local build to S3:  make features retrain history && make publish
 # The EDA / label-construction steps still run from notebooks/0{1,2}_*.ipynb.
 
-.PHONY: help data data-incremental features retrain history publish normalize test lint clean
+.PHONY: help data data-incremental features retrain history publish publish-cities normalize test lint clean
 
 help:
 	@echo "Python pipeline (working today):"
@@ -53,6 +53,10 @@ history:
 
 publish:
 	PYTHONPATH=src $(PYTHON) scripts/publish.py
+
+# Publish only the preview cities' web JSON to S3 (no Chicago model/parquets needed).
+publish-cities:
+	PYTHONPATH=src $(PYTHON) scripts/publish.py --cities nyc,la
 
 normalize:
 	$(PYTHON) scripts/normalize_notebooks.py

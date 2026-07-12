@@ -1,9 +1,12 @@
 """Build NYC's scores.json in the exact Chicago schema (Phase 1, DR 0016).
 
-NYC served model mirrors Chicago's production model: a LogisticRegression
-pipeline + sigmoid (Platt) calibration, so the SHAP-waterfall + calibration-
-triple + tier machinery in `foodsafety.serve` / `foodsafety.explain` reuse
-unchanged. XGBoost stays only as the feasibility comparator (not served).
+NYC served model mirrors Chicago's production model: an XGBoost risk model
+(depth-3) + Platt-on-margin calibration + native TreeSHAP drivers, so the
+SHAP-waterfall + calibration-triple + tier machinery in `foodsafety.serve` /
+`foodsafety.explain` reuse unchanged. Model 1 (risk) and Model 2 (forecast-only
+trend basis) are both XGBoost; the forecast model uses a regularized shallow
+config suited to its thin prior-history feature set. Both beat the LogReg
+baseline on both gate metrics on NYC's own temporal splits.
 
 Label: event-anchored — predict whether an establishment's NEXT scored
 inspection is graded B/C (score >= 14). Post-COVID training window (NYC halted
@@ -21,24 +24,23 @@ per-establishment detail bundles (both build-time, gitignored).
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.calibration import CalibratedClassifierCV
-from sklearn.compose import ColumnTransformer
-from sklearn.frozen import FrozenEstimator
-from sklearn.impute import SimpleImputer
+from scipy.special import expit
 from sklearn.linear_model import LogisticRegression
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
 
 from foodsafety.config import RANDOM_STATE
-from foodsafety.explain.shap_drivers import linear_contributions, top_drivers_for_row
+from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
-from foodsafety.serve.predict_batch import write_scores_json
+from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.tracking import snapshot_provenance
 from foodsafety.utils.time import temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
@@ -103,11 +105,15 @@ BC_THRESHOLD = 14
 # NYC halted inspections Mar 2020; grades/scores only normalise from 2022. Train
 # on 2022-07-01+ anchors (post-COVID steady state) — the analog of Chicago's 2019
 # cutoff. Earlier scored events are still used as burn-in for prior_* history.
+# NYC label prevalence (P next graded B/C) on the held-out test set — the base
+# rate the unified tier rule anchors on (DR 0017). Fixed so tier cutoffs stay
+# stable across rescores; printed at runtime (test base) to spot large drift.
+NYC_BASE_RATE = 0.41
 NYC_TRAIN_START = "2022-07-01"
 TRAIN_END = "2024-10-01"
 VAL_END = "2025-04-01"
 TREND_K = 5
-MODEL_VERSION = "nyc_logreg_sigmoid"
+MODEL_VERSION = "nyc_xgb_sigmoid"
 
 
 # ----------------------------------------------------------------- feature build
@@ -130,8 +136,56 @@ def _short_action(a: object) -> str:
     return "Inspection"
 
 
-def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> dict:
-    """dict keyed by camis -> [{date, type, result, headline, score}] newest-first.
+def _violation_lines(grp: pd.DataFrame) -> str:
+    """Full cited-violation list for one inspection, critical first, one per line,
+    deduped by code. Critical citations are flagged. This is the comment-shard text
+    the detail-page timeline expands to (Chicago-parity); `headline` is just its
+    first line, truncated. Empty when the inspection cited nothing."""
+    v = grp.dropna(subset=["violation_description"])
+    best: dict[str, tuple[str, bool]] = {}  # code -> (description, is_critical)
+    order: list[str] = []
+    for code, desc, cf in zip(
+        v["violation_code"], v["violation_description"], v["critical_flag"], strict=False
+    ):
+        c = str(code)
+        crit = str(cf) == "Critical"
+        if c not in best:
+            best[c] = (str(desc), crit)
+            order.append(c)
+        elif crit and not best[c][1]:
+            best[c] = (best[c][0], True)
+    # Critical first; stable within each group so the grp's own ordering is kept.
+    order.sort(key=lambda c: not best[c][1])
+    return "\n".join(f"{best[c][0]} (critical)" if best[c][1] else best[c][0] for c in order)
+
+
+def _shard_of(license_id: str) -> str:
+    # md5 first two hex chars → 256 even buckets. Must match the web app's shard
+    # scheme (scores-server.ts / prebuild-sync-s3.mjs) so the build reads the right file.
+    return hashlib.md5(license_id.encode()).hexdigest()[:2]
+
+
+def write_comment_shards(comments: dict[str, list[str]], out_dir: Path) -> int:
+    """Write the full violation text as 256 md5 shards ({license: [text_per_event]}),
+    mirroring Chicago's export_inspection_history.py so prebuild-sync-s3.mjs re-shards
+    them per license at build. Licenses whose every inspection cited nothing are
+    skipped (a missing shard entry → the timeline falls back to the headline)."""
+    shards: dict[str, dict[str, list[str]]] = {}
+    for lid, arr in comments.items():
+        if any(arr):
+            shards.setdefault(_shard_of(lid), {})[lid] = arr
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for sh, by_license in shards.items():
+        (out_dir / f"{sh}.json").write_text(json.dumps(by_license, separators=(",", ":")))
+    return sum(len(m) for m in shards.values())
+
+
+def build_history(
+    raw: pd.DataFrame, forecast_by_event: dict | None = None
+) -> tuple[dict, dict[str, list[str]]]:
+    """(history, comments). history is keyed by camis ->
+    [{date, type, result, headline, score}] newest-first; comments is keyed the
+    same, each an event-aligned list of the full cited-violation text.
 
     Mirrors Chicago's inspection_history.json shape. NYC `result` is the letter
     grade (A/B/C, derived from the score when the grade cell is blank on the
@@ -171,11 +225,16 @@ def build_history(raw: pd.DataFrame, forecast_by_event: dict | None = None) -> d
                 "result": result,
                 "headline": headline,
                 "score": None if fc is None else round(float(fc), 6),
+                # Rides along on the event so the date-sort below keeps it aligned;
+                # popped into `comments` (and out of the history payload) after.
+                "_comment": _violation_lines(grp),
             }
         )
+    comments: dict[str, list[str]] = {}
     for k in hist:
         hist[k].sort(key=lambda e: e["date"], reverse=True)
-    return hist
+        comments[k] = [e.pop("_comment") for e in hist[k]]
+    return hist, comments
 
 
 def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[str], pd.DataFrame]:
@@ -293,7 +352,7 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
         "prior_inspections": "{value} prior inspections on record",
         "prior_bad": "{value} prior inspections graded B/C",
         "prior_n_critical": "{value} critical violations in prior inspections",
-        "prior_mean_score": "Average past inspection score: {value}",
+        "prior_mean_score": "Average past inspection score: {value:.1f}",
         "prior_bad_rate": "Past B/C rate: {value}",
         "prev_score": "Previous inspection score: {value}",
         "prev_is_bad": {True: "Previous inspection was B/C", False: "Previous inspection was A"},
@@ -310,29 +369,64 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
 
 
 # --------------------------------------------------------------------- fit + calibrate
-def fit_calibrated(train, val, feats, label="y_next_bc"):
-    num = Pipeline([("imputer", SimpleImputer(strategy="median")), ("scaler", StandardScaler())])
-    pre = ColumnTransformer(
-        [("num", num, feats)], sparse_threshold=0.0, verbose_feature_names_out=True
+def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False):
+    """Fit XGB + Platt-on-margin calibration, mirroring Chicago's serve path.
+
+    Returns ``(xgb, coef, inter)``: the calibrated risk is
+    ``expit(coef * raw_margin + inter)`` (see ``xgb_proba``), and TreeSHAP drivers
+    come from ``tree_contributions(xgb, ...)``. The risk model (Model 1) uses the
+    gate-validated depth-3 config; ``regularized=True`` gives the forecast-only
+    model (Model 2) a shallower, heavily-regularized config for its thin
+    prior-history feature set (deeper trees over-fit that set — see gate CV).
+    Non-monotone: NYC/LA feature names don't map to Chicago's monotone direction
+    conventions, and the non-monotone config is the one that won the gate.
+    """
+    y = train[label].astype(int)
+    spw = (len(y) - float(y.sum())) / max(float(y.sum()), 1.0)
+    common = dict(
+        scale_pos_weight=spw,
+        missing=np.nan,
+        random_state=RANDOM_STATE,
+        n_jobs=4,
+        eval_metric="aucpr",
     )
-    base = Pipeline(
-        [
-            ("preprocess", pre),
-            (
-                "model",
-                LogisticRegression(
-                    class_weight="balanced",
-                    solver="liblinear",
-                    max_iter=3000,
-                    random_state=RANDOM_STATE,
-                ),
-            ),
-        ]
+    if regularized:
+        clf = XGBClassifier(
+            n_estimators=120,
+            max_depth=2,
+            learning_rate=0.03,
+            subsample=0.7,
+            colsample_bytree=0.7,
+            reg_lambda=8.0,
+            reg_alpha=1.0,
+            min_child_weight=30,
+            gamma=1.0,
+            **common,
+        )
+    else:
+        clf = XGBClassifier(
+            n_estimators=400,
+            max_depth=3,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            reg_lambda=1.0,
+            min_child_weight=5,
+            **common,
+        )
+    clf.fit(train[feats], y)
+    # Platt on the raw margin (1-D logistic) — the {a, b} the app waterfall expects
+    # live in margin space, unlike CalibratedClassifierCV's double-squash.
+    margin_val = clf.predict(val[feats], output_margin=True)
+    platt = LogisticRegression(C=1e10, solver="lbfgs").fit(
+        margin_val.reshape(-1, 1), val[label].astype(int)
     )
-    base.fit(train[feats], train[label].astype(int))
-    cal = CalibratedClassifierCV(FrozenEstimator(base), method="sigmoid")
-    cal.fit(val[feats], val[label].astype(int))
-    return base, cal
+    return clf, float(platt.coef_[0, 0]), float(platt.intercept_[0])
+
+
+def xgb_proba(clf, coef, inter, X):
+    """Calibrated positive-class probability: Platt on the raw XGB margin."""
+    return expit(coef * clf.predict(X, output_margin=True) + inter)
 
 
 def last_k_trend(events_scored: pd.DataFrame, anchors: pd.DataFrame, k: int) -> pd.Series:
@@ -372,18 +466,19 @@ def main():
         f"| test base {sp.test.y_next_bc.mean():.3f}"
     )
 
-    base1, cal1 = fit_calibrated(sp.train, sp.val, FEATS_M1)
-    base2, cal2 = fit_calibrated(sp.train, sp.val, PRIOR)  # forecast-only for trend
+    xgb1, coef1, inter1 = fit_xgb_platt(sp.train, sp.val, FEATS_M1)
+    # forecast-only trend model: thin PRIOR set -> regularized shallow config
+    xgb2, coef2, inter2 = fit_xgb_platt(sp.train, sp.val, PRIOR, regularized=True)
     y_test = sp.test["y_next_bc"].astype(int).values
-    p_test = cal1.predict_proba(sp.test[FEATS_M1])[:, 1]
+    p_test = xgb_proba(xgb1, coef1, inter1, sp.test[FEATS_M1])
     test_metrics = evaluate(y_test, p_test).to_dict()
     print(
         "Model 1 test:", {k: test_metrics[k] for k in ("pr_auc", "roc_auc", "precision_at_10pct")}
     )
 
     # ---- score EVERY establishment's latest scored inspection (serving anchor)
-    ev["risk_score"] = cal1.predict_proba(ev[FEATS_M1])[:, 1]
-    ev["forecast_risk"] = cal2.predict_proba(ev[PRIOR])[:, 1]
+    ev["risk_score"] = xgb_proba(xgb1, coef1, inter1, ev[FEATS_M1])
+    ev["forecast_risk"] = xgb_proba(xgb2, coef2, inter2, ev[PRIOR])
     # Collapse reopened establishments: a reopen mints a new record id at the same
     # name+address, which would otherwise render as duplicate map/search pins. Dedup
     # on a normalised name+address key, keeping the most recently inspected; mirrors
@@ -404,8 +499,10 @@ def main():
     latest = latest[~_estab.duplicated(keep="last")].copy()
     print(f"serving rows (latest per establishment): {len(latest):,}")
 
-    # SHAP drivers via the reused linear-contributions machinery + NYC labels
-    contribs = linear_contributions(cal1, latest[FEATS_M1], original_features=FEATS_M1)
+    # SHAP drivers via native TreeSHAP (margin space) — same machinery as Chicago's
+    # served XGB. base_margin is shipped as calibration.intercept below.
+    contribs, base_margin = tree_contributions(xgb1, latest[FEATS_M1], FEATS_M1)
+    contribs.index = latest.index
     drivers = []
     for i, row in latest.iterrows():
         ds = top_drivers_for_row(row[FEATS_M1], contribs.loc[i], k=5, labels=labels)
@@ -418,29 +515,44 @@ def main():
     )
     latest["as_of_date"] = latest["inspection_date"]
 
-    # ---- recalibrate tiers to NYC's score distribution
-    q = latest["risk_score"].quantile([0.4, 0.85, 0.98]).round(4).tolist()
+    # ---- tier with the unified cross-city rule (DR 0017): cutoffs anchored to
+    # NYC's own base rate, not per-city quantiles. Same rule as Chicago / LA.
+    latest["risk_tier"], thr = assign_risk_tiers(latest["risk_score"], NYC_BASE_RATE)
     print(
         f"NYC risk_score dist: p50={latest.risk_score.median():.3f} "
         f"p90={latest.risk_score.quantile(0.9):.3f} max={latest.risk_score.max():.3f}"
     )
-    print(f"NYC tier thresholds (p40/p85/p98): {q}")
-    thr = [(q[0], "Low"), (q[1], "Moderate"), (q[2], "Elevated"), (1.01, "High")]
-
-    def tier(s):
-        for t, name in thr:
-            if s < t:
-                return name
-        return "High"
-
-    latest["risk_tier"] = latest["risk_score"].apply(tier)
+    print(f"NYC tier thresholds (base={NYC_BASE_RATE}): {thr}")
     print("tier counts:", latest["risk_tier"].value_counts().to_dict())
 
-    calibration = {
-        "a": float(cal1.calibrated_classifiers_[0].calibrators[0].a_),
-        "b": float(cal1.calibrated_classifiers_[0].calibrators[0].b_),
-        "intercept": float(base1.named_steps["model"].intercept_[0]),
-    }
+    # App waterfall formula: logit = -(a*margin + b), margin = intercept + Σshap.
+    # Platt logit(p) = coef*margin + inter  ->  a = -coef, b = -inter; the intercept
+    # is the TreeSHAP base margin (so intercept + Σshap == raw margin).
+    calibration = {"a": -coef1, "b": -inter1, "intercept": float(base_margin)}
+
+    # Persist both models for rollback / provenance (S3-archival only; not app-read,
+    # scores.json is the served artifact). Versioned by data vintage (the snapshot's
+    # latest inspection date) so a rebuild on the same pull is idempotent. Published
+    # to S3 by `make publish-cities`; the raw pull snapshot is the reproducibility
+    # anchor (the SODA feed drifts over time).
+    models_dir = REPO / "data" / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    ver = pd.Timestamp(ev["inspection_date"].max()).strftime("%Y%m%d")
+    for tag, clf, coef, inter, feats in [
+        (MODEL_VERSION, xgb1, coef1, inter1, FEATS_M1),
+        ("nyc_xgb_forecast_sigmoid", xgb2, coef2, inter2, PRIOR),
+    ]:
+        joblib.dump(
+            {
+                "model": clf,
+                "platt_coef": coef,
+                "platt_intercept": inter,
+                "features": list(feats),
+                "model_version": tag,
+            },
+            models_dir / f"{tag}_{ver}.joblib",
+        )
+    print(f"Saved models → {models_dir}/{MODEL_VERSION}_{ver}.joblib (+ forecast)")
 
     cols = [
         "license_id",
@@ -463,6 +575,7 @@ def main():
         model_version=MODEL_VERSION,
         label_window_days=0,
         calibration=calibration,
+        risk_tier_thresholds=thr,
     )
     print(f"\nWrote {OUT / 'scores.json'}  ({len(out):,} establishments)")
 
@@ -472,9 +585,13 @@ def main():
         (r.license_id, pd.Timestamp(r.inspection_date).strftime("%Y-%m-%d")): r.forecast_risk
         for r in ev.itertuples(index=False)
     }
-    hist = build_history(raw, forecast_by_event)
+    hist, comments = build_history(raw, forecast_by_event)
     (OUT / "inspection_history.json").write_text(json.dumps(hist, separators=(",", ":")))
     print(f"Wrote inspection_history.json ({len(hist):,} establishments)")
+    # Full violation text, md5-sharded (Chicago-parity). Gitignored; publish.py
+    # uploads to web-app-data/nyc/comments/ and prebuild-sync-s3.mjs pulls it.
+    n_c = write_comment_shards(comments, OUT / "comments")
+    print(f"Wrote comment shards for {n_c:,} establishments → {OUT / 'comments'}")
 
     # ---- search-index.json (client-side search) ----
     def top_driver(drivers):
@@ -540,32 +657,62 @@ def main():
             "(ROC-AUC ~0.66 vs ~0.78); its data window is only ~3 post-COVID years."
         ),
         "risk_tiers": [
-            {"label": "Low", "min": 0.0, "max": q[0], "share": round(shares.get("Low", 0), 4)},
             {
-                "label": "Moderate",
-                "min": q[0],
-                "max": q[1],
-                "share": round(shares.get("Moderate", 0), 4),
-            },
-            {
-                "label": "Elevated",
-                "min": q[1],
-                "max": q[2],
-                "share": round(shares.get("Elevated", 0), 4),
-            },
-            {"label": "High", "min": q[2], "max": None, "share": round(shares.get("High", 0), 4)},
+                "label": name,
+                "min": round(lo, 4),
+                "max": (None if cut > 1.0 else round(cut, 4)),
+                "share": round(shares.get(name, 0), 4),
+            }
+            for (cut, name), lo in zip(thr, [0.0, thr[0][0], thr[1][0], thr[2][0]], strict=True)
         ],
         "operating_points": op,
     }
     (OUT / "methodology.json").write_text(json.dumps(methodology, indent=2))
     print("Wrote methodology.json")
 
+    # ---- tracked experiment record (reports/metrics/nyc/) ----
+    # Diffable, git-committed ledger of the SERVED NYC model, alongside Chicago's
+    # baseline/ and xgb/ reports. Dataset identity is the raw-pull snapshot hash
+    # (the reproducibility anchor — the SODA feed drifts), stamped via
+    # snapshot_provenance so same-commit reruns share a run_id and don't collide.
+    prov = snapshot_provenance([RAW], FEATS_M1, REPO)
+    run_id = prov["run_id"]
+    metrics_dir = REPO / "reports" / "metrics" / "nyc"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    report = {
+        "model": MODEL_VERSION,
+        "city": "nyc",
+        "calibration": "xgboost + platt (sigmoid) on val",
+        "label": "y_next_bc (next inspection graded B/C, score >= 14)",
+        "data_vintage": ver,
+        **prov,
+        "train_window": {
+            "train_start": NYC_TRAIN_START,
+            "train_end": TRAIN_END,
+            "val_end": VAL_END,
+        },
+        "split": {
+            "train_n": int(len(sp.train)),
+            "val_n": int(len(sp.val)),
+            "test_n": int(len(sp.test)),
+            "test_prevalence": round(float(sp.test.y_next_bc.mean()), 4),
+        },
+        "base_rate": NYC_BASE_RATE,
+        "tier_thresholds": [c for c, _ in thr[:3]],
+        "n_establishments": int(len(out)),
+        "test": test_metrics,
+        "operating_points": op,
+    }
+    (metrics_dir / f"nyc_{run_id}.json").write_text(json.dumps(report, indent=2))
+    print(f"Saved metrics report → {metrics_dir}/nyc_{run_id}.json")
+
     # stash the NYC tier thresholds + metrics for the DR / Phase 2 config
     (OUT / "_nyc_build_meta.json").write_text(
         json.dumps(
             {
                 "model_version": MODEL_VERSION,
-                "tier_thresholds": q,
+                "tier_thresholds": [c for c, _ in thr[:3]],
+                "base_rate": NYC_BASE_RATE,
                 "train_start": NYC_TRAIN_START,
                 "split": {"train_end": TRAIN_END, "val_end": VAL_END},
                 "test_metrics": test_metrics,

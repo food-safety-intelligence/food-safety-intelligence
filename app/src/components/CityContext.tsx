@@ -8,6 +8,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { type City, DEFAULT_CITY, isCity } from "@/lib/city";
+import { safeGet, safeSet } from "@/lib/safe-storage";
 
 const STORAGE_KEY = "fsi.city";
 
@@ -16,6 +17,7 @@ interface CityContextValue {
   setCity: (c: City) => void;
   needsPick: boolean;
   dismissPick: () => void;
+  requestPick: () => void;
 }
 
 const CityContext = createContext<CityContextValue | null>(null);
@@ -24,7 +26,7 @@ function readInitial(): { city: City; needsPick: boolean } {
   if (typeof window === "undefined") return { city: DEFAULT_CITY, needsPick: false };
   const url = new URLSearchParams(window.location.search).get("city");
   if (isCity(url)) return { city: url, needsPick: false };
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = safeGet("local", STORAGE_KEY);
   if (isCity(stored)) return { city: stored, needsPick: false };
   return { city: DEFAULT_CITY, needsPick: true };
 }
@@ -47,11 +49,31 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  // Browser back/forward changes the URL but not React state, and the provider
+  // lives in the root layout so it never remounts to re-run the effect above.
+  // The URL `?city=` is the source of truth (precedence note at top), so on a
+  // history navigation re-read it and follow an explicit choice — otherwise the
+  // data, map, and copy would keep showing the city from before the back/forward
+  // while the URL says otherwise (and a refresh would then flip it). A URL with
+  // no `?city=` (a param-less page) leaves the current city as-is: localStorage
+  // is the tiebreaker there, matching what a refresh of that URL would resolve.
+  useEffect(() => {
+    const onPopState = () => {
+      const url = new URLSearchParams(window.location.search).get("city");
+      if (isCity(url)) {
+        setCityState(url);
+        setNeedsPick(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const setCity = useCallback((c: City) => {
     setCityState(c);
     setNeedsPick(false);
     if (typeof window !== "undefined") {
-      window.localStorage.setItem(STORAGE_KEY, c);
+      safeSet("local", STORAGE_KEY, c);
       const url = new URL(window.location.href);
       url.searchParams.set("city", c);
       window.history.replaceState(null, "", url.toString());
@@ -60,8 +82,12 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
 
   const dismissPick = useCallback(() => setNeedsPick(false), []);
 
+  // Re-open the entry popup on demand (e.g. clicking the home logo), letting a
+  // returning visitor go back to the "choose a city" prompt.
+  const requestPick = useCallback(() => setNeedsPick(true), []);
+
   return (
-    <CityContext.Provider value={{ city, setCity, needsPick, dismissPick }}>
+    <CityContext.Provider value={{ city, setCity, needsPick, dismissPick, requestPick }}>
       {children}
     </CityContext.Provider>
   );

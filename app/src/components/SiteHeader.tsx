@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { MapPin } from "lucide-react";
 import { CityToggle } from "@/components/CityPicker";
+import { DataAsOfChip } from "@/components/DataAsOfChip";
+import { HomeLogo } from "@/components/HomeLogo";
 
 /**
  * Top-of-page header. Server component — no client interactivity needed.
@@ -30,25 +31,27 @@ const NAV: { id: NavItem; label: string; href: string }[] = [
   { id: "sources", label: "Sources", href: "/sources" },
 ];
 
-export function SiteHeader({ activeNav = "search" }: { activeNav?: NavItem }) {
+export function SiteHeader({
+  activeNav = "search",
+  showAsOf = true,
+}: {
+  activeNav?: NavItem;
+  // The data-freshness chip rides in the header on every data-backed page.
+  // Pages with no city data (e.g. the feedback form) opt out with showAsOf={false}.
+  showAsOf?: boolean;
+}) {
   return (
     <header className="pt-6">
       {/* Wraps on narrow screens (logo on top, nav below) so the four nav
           pills never overflow the viewport on mobile; single row on desktop. */}
       <div className="max-w-[1240px] mx-auto px-4 sm:px-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <Link href="/" className="flex items-center gap-3 group">
-          <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-sage/15">
-            <MapPin className="w-[18px] h-[18px] text-sage" strokeWidth={2} />
-          </span>
-          <div className="leading-tight">
-            <div className="text-lg font-semibold tracking-tight group-hover:text-teal transition-colors">
-              Food Safety
-            </div>
-            <div className="text-2xs text-muted tracking-wide">
-              public-data preview
-            </div>
-          </div>
-        </Link>
+        {/* Left cluster: brand + the "Data as of …" freshness chip. Grouped so
+            justify-between keeps them together on the left and the nav on the
+            right; the chip wraps under the logo on narrow screens. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <HomeLogo />
+          {showAsOf && <DataAsOfChip />}
+        </div>
         <nav className="flex flex-wrap items-center gap-1 text-sm">
           <CityToggle />
           {NAV.map((item) => {

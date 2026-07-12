@@ -63,18 +63,24 @@ _BLOCK_MESSAGE = (
 _DENIED_TOPICS = [
     {
         "name": "PersonalisedMedicalAdvice",
-        # Bedrock topic classifiers key on the EXAMPLES. Two lessons learned by
-        # apply-guardrail testing: (1) an "immune system" example blocked caregiver
-        # food-safety queries; (2) examples that name an ILLNESS ("food poisoning",
-        # "stomach bug") made the classifier trip on the illness term, blocking
-        # general education ("how common is food poisoning?"). So examples target only
-        # PERSONAL treatment-seeking ("what should I take", "diagnose me") with no
-        # generic disease terms, and the definition explicitly allows general
-        # education + ranking. ≤200-char definition cap.
+        # Bedrock topic classifiers key on the definition + examples. Lessons from
+        # apply-guardrail testing:
+        #  - Name ONLY what to deny in the definition. An earlier version added
+        #    "...ranking restaurants by risk are allowed"; naming "risk" there pulled
+        #    risk-ranking queries INTO the topic and blocked the core "food safety
+        #    risk for <venue>" lookup. So the definition is treatment/diagnosis/
+        #    medication only — no "risk", "food-safety", or disease words.
+        #  - Examples target PERSONAL treatment-seeking ("what should I take",
+        #    "diagnose me") with no generic disease terms (an illness word made the
+        #    classifier trip on "how common is food poisoning?").
+        #  - The topic does NOT try to block a personal "is it safe for ME given my
+        #    health condition" ruling: the classifier can't separate it from the
+        #    legitimate third-person caregiver query ("safest options for someone
+        #    immunocompromised") without re-blocking that too. That nuance is left to
+        #    the system prompt, which steers personal-medical queries to a care team.
+        # ≤200-char definition cap.
         "definition": (
-            "Seeking a personal medical diagnosis, treatment, or medication for "
-            "oneself. General food-safety education and ranking restaurants by risk "
-            "are allowed."
+            "Seeking a personal medical diagnosis, treatment, or medication for oneself."
         ),
         "examples": [
             "What medicine should I take for how I feel after eating here?",

@@ -1,12 +1,23 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowUp, RotateCcw, AlertCircle, MapPin, Store, X } from "lucide-react";
+import {
+  ArrowUp,
+  RotateCcw,
+  AlertCircle,
+  MapPin,
+  Store,
+  X,
+  ClipboardList,
+  HeartPulse,
+} from "lucide-react";
 import { queryAgent, scopedInputBudget } from "@/lib/agent-api";
-import type { ChatEstablishment } from "@/components/ChatScopeContext";
+import { safeGet, safeRemove, safeSet } from "@/lib/safe-storage";
+import type { ChatEstablishment, ChatPersona } from "@/components/ChatScopeContext";
 import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
+import { Wordmark } from "@/components/Wordmark";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,16 +33,16 @@ const SESSION_KEY = "fsi_chat_session";
 
 function getOrCreateSessionId(): string {
   if (typeof window === "undefined") return crypto.randomUUID();
-  const stored = sessionStorage.getItem(SESSION_KEY);
+  const stored = safeGet("session", SESSION_KEY);
   if (stored && stored.length >= 33) return stored;
   const id = crypto.randomUUID(); // 36 chars, satisfies AgentCore min-33 requirement
-  sessionStorage.setItem(SESSION_KEY, id);
+  safeSet("session", SESSION_KEY, id);
   return id;
 }
 
 function resetSession(): string {
   const id = crypto.randomUUID();
-  sessionStorage.setItem(SESSION_KEY, id);
+  safeSet("session", SESSION_KEY, id);
   return id;
 }
 
@@ -80,7 +91,7 @@ const MESSAGES_KEY = "fsi_chat_messages";
 function loadMessages(): Message[] {
   if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(sessionStorage.getItem(MESSAGES_KEY) || "[]");
+    const parsed = JSON.parse(safeGet("session", MESSAGES_KEY) || "[]");
     if (!Array.isArray(parsed)) return [];
     // Validate shape before these reach render and the agent-history payload —
     // sessionStorage is user-writable and the stored schema could drift.
@@ -97,15 +108,12 @@ function loadMessages(): Message[] {
 
 function saveMessages(messages: Message[]): void {
   if (typeof window === "undefined") return;
-  try {
-    sessionStorage.setItem(MESSAGES_KEY, JSON.stringify(messages));
-  } catch {
-    // Best-effort: ignore quota / serialization failures.
-  }
+  // Best-effort: safeSet swallows quota / private-mode failures.
+  safeSet("session", MESSAGES_KEY, JSON.stringify(messages));
 }
 
 function clearMessages(): void {
-  if (typeof window !== "undefined") sessionStorage.removeItem(MESSAGES_KEY);
+  safeRemove("session", MESSAGES_KEY);
 }
 
 // ─── Markdown-lite renderer ───────────────────────────────────────────────────
@@ -206,6 +214,84 @@ const LEARN_QUERIES = [
   "How does norovirus spread?",
 ];
 
+// Persona-specific chip pools (For Inspectors / For Caregivers chat entry
+// points — see ChatScopeContext's ChatPersona). Same "3 place-flavored + 3
+// topic" shape as the default pools above, but with the phrasing this
+// audience actually asks: inspectors think in worklists and violation
+// history, caregivers think in vulnerable-diner risk (see the For Caregivers
+// page's own kitchen-vs-administrative framing).
+const INSPECTOR_QUERIES_BY_CITY: Record<City, string[]> = {
+  chicago: [
+    "Which High-risk establishments in Logan Square haven't been inspected in 90+ days?",
+    "Show repeat priority-violation patterns near Pilsen",
+    "Compare inspection records for the highest-risk places in River North",
+    "Worsening-trend establishments in the Loop",
+    "High-risk places in Wicker Park overdue for a reinspection",
+    "Compliance history for the riskiest kitchens in Uptown",
+  ],
+  nyc: [
+    "Which High-risk establishments in Harlem haven't been inspected in 90+ days?",
+    "Show repeat priority-violation patterns near Astoria",
+    "Compare inspection records for the highest-risk places in Midtown",
+    "Worsening-trend establishments in Williamsburg",
+    "High-risk places in Flushing overdue for a reinspection",
+    "Compliance history for the riskiest kitchens in the Lower East Side",
+  ],
+  la: [
+    "Which High-risk establishments in Koreatown haven't been inspected in 90+ days?",
+    "Show repeat priority-violation patterns near Boyle Heights",
+    "Compare inspection records for the highest-risk places in Downtown LA",
+    "Worsening-trend establishments in Silver Lake",
+    "High-risk places in Hollywood overdue for a reinspection",
+    "Compliance history for the riskiest kitchens in Santa Monica",
+  ],
+};
+
+const INSPECTOR_TOPIC_QUERIES = [
+  "What's the difference between a priority and a core violation?",
+  "How is the 180-day risk window calculated?",
+  "Which drivers most often predict a failed reinspection?",
+  "How should I prioritize a worklist by risk and time since last inspection?",
+  "How does the risk score differ from an official inspection result?",
+  "Which violation codes count as priority (1-29)?",
+];
+
+const CAREGIVER_QUERIES_BY_CITY: Record<City, string[]> = {
+  chicago: [
+    "Low-risk sushi near Wicker Park for someone immunocompromised",
+    "Any High-risk daycare or school kitchens in Logan Square?",
+    "Low-risk options near River North for an elderly parent",
+    "Safest options in Lincoln Park for a chemo patient",
+    "Low-risk kid-friendly spots in Pilsen",
+    "Safest Thai food near the Loop for a transplant recipient",
+  ],
+  nyc: [
+    "Low-risk sushi near the Lower East Side for someone immunocompromised",
+    "Any High-risk daycare or school kitchens in Harlem?",
+    "Low-risk options near Midtown for an elderly parent",
+    "Safest options in Williamsburg for a chemo patient",
+    "Low-risk kid-friendly spots in Astoria",
+    "Safest Thai food near Flushing for a transplant recipient",
+  ],
+  la: [
+    "Low-risk sushi near Silver Lake for someone immunocompromised",
+    "Any High-risk daycare or school kitchens in Koreatown?",
+    "Low-risk options near Downtown LA for an elderly parent",
+    "Safest options in Santa Monica for a chemo patient",
+    "Low-risk kid-friendly spots in Boyle Heights",
+    "Safest Thai food near Hollywood for a transplant recipient",
+  ],
+};
+
+const CAREGIVER_TOPIC_QUERIES = [
+  "Which foods carry the highest Listeria risk for someone immunocompromised?",
+  "What violation types matter most when choosing food for a chemo patient?",
+  "How should I weigh the risk score for an elderly relative vs. a healthy adult?",
+  "What temperature-related violations should I watch for?",
+  "How common is foodborne illness for young children?",
+  "What precautions matter most for a transplant recipient?",
+];
+
 const SUGGEST_SEED_KEY = "fsi_chat_suggest_seed";
 
 // Small seeded RNG (mulberry32): a given seed always yields the same picks, so
@@ -230,28 +316,36 @@ function seededSample(pool: readonly string[], n: number, rng: () => number): st
   return copy.slice(0, n);
 }
 
-// 3 "find a place" + 3 "learn", interleaved so both jobs show at a glance.
-function pickSuggestions(seed: number, city: City): string[] {
+// 3 "find a place"/worklist + 3 "learn"/topic, interleaved so both jobs show
+// at a glance. persona swaps in the inspector/caregiver pools above; the
+// default (no persona) is the general find+learn mix.
+function pickSuggestions(seed: number, city: City, persona: ChatPersona | null): string[] {
   const rng = mulberry32(seed);
-  const find = seededSample(FIND_QUERIES_BY_CITY[city], 3, rng);
-  const learn = seededSample(LEARN_QUERIES, 3, rng);
-  return [find[0], learn[0], find[1], learn[1], find[2], learn[2]];
+  const [placePool, topicPool] =
+    persona === "inspector"
+      ? [INSPECTOR_QUERIES_BY_CITY[city], INSPECTOR_TOPIC_QUERIES]
+      : persona === "caregiver"
+        ? [CAREGIVER_QUERIES_BY_CITY[city], CAREGIVER_TOPIC_QUERIES]
+        : [FIND_QUERIES_BY_CITY[city], LEARN_QUERIES];
+  const place = seededSample(placePool, 3, rng);
+  const topic = seededSample(topicPool, 3, rng);
+  return [place[0], topic[0], place[1], topic[1], place[2], topic[2]];
 }
 
 // One rotation seed per chat session, stored next to the session id so the popup
 // and the full /chat page (same session) agree, and a brand-new chat rotates.
 function getOrCreateSuggestSeed(): number {
   if (typeof window === "undefined") return 0;
-  const stored = sessionStorage.getItem(SUGGEST_SEED_KEY);
+  const stored = safeGet("session", SUGGEST_SEED_KEY);
   if (stored !== null) return Number(stored);
   const seed = Math.floor(Math.random() * 2 ** 31);
-  sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  safeSet("session", SUGGEST_SEED_KEY, String(seed));
   return seed;
 }
 
 function rotateSuggestSeed(): number {
   const seed = Math.floor(Math.random() * 2 ** 31);
-  if (typeof window !== "undefined") sessionStorage.setItem(SUGGEST_SEED_KEY, String(seed));
+  safeSet("session", SUGGEST_SEED_KEY, String(seed));
   return seed;
 }
 
@@ -317,10 +411,13 @@ function TypingIndicator() {
 export function ChatInterface({
   compact = false,
   establishment,
+  persona = null,
 }: {
   compact?: boolean;
   /** Establishment whose detail page is in view; scopes "this restaurant". */
   establishment?: ChatEstablishment | null;
+  /** Audience the chat was opened for (For Inspectors / For Caregivers). */
+  persona?: ChatPersona | null;
 } = {}) {
   const { city } = useCity();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -380,14 +477,15 @@ export function ChatInterface({
     if (saved.length) setMessages(saved);
   }, []);
 
-  // Re-pick the starter chips when the city changes — the "find" prompts name
-  // real neighborhoods, so they're city-specific (same seed → stable per session).
-  // The seed comes from sessionStorage (browser-only), so this can't be derived
-  // during render; the setState here mirrors the mount effect above.
+  // Re-pick the starter chips when the city or persona changes — the "find"
+  // prompts name real neighborhoods, so they're city-specific, and the pool
+  // itself swaps per persona (same seed → stable per session). The seed comes
+  // from sessionStorage (browser-only), so this can't be derived during
+  // render; the setState here mirrors the mount effect above.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city));
-  }, [city]);
+    setSuggestions(pickSuggestions(getOrCreateSuggestSeed(), city, persona));
+  }, [city, persona]);
 
   // Persist the transcript so it survives the popup -> /chat expand. Skip the
   // first run so the initial empty render can't overwrite a saved transcript
@@ -429,6 +527,7 @@ export function ChatInterface({
         history,
         scoped ?? undefined,
         city,
+        persona ?? undefined,
       );
       setMessages((prev) => [...prev, { role: "agent", content: result }]);
     } catch (err) {
@@ -455,7 +554,7 @@ export function ChatInterface({
     clearMessages();
     sessionIdRef.current = resetSession();
     // A new chat rotates the starter chips to a fresh set.
-    setSuggestions(pickSuggestions(rotateSuggestSeed(), city));
+    setSuggestions(pickSuggestions(rotateSuggestSeed(), city, persona));
     setInput("");
     inputRef.current?.focus();
   }
@@ -464,6 +563,30 @@ export function ChatInterface({
 
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* ── Persona notice ───────────────────────────────────────────────────────
+          Shown while the chat was opened from the For Inspectors or For
+          Caregivers page (see RegisterChatPersona). Purely informational — the
+          persona itself isn't user-dismissible, since it tracks the page in
+          view and clears automatically on navigating away; the icon + label
+          carry the meaning without relying on colour. */}
+      {persona && (
+        // items-start + wrapping copy: the panel is a fixed ~384px card, so a
+        // one-line sentence truncated mid-word; let it wrap to ~2 lines and keep
+        // the icon aligned to the first line.
+        <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2 border-b border-line bg-sage/5">
+          {persona === "inspector" ? (
+            <ClipboardList className="w-4 h-4 mt-0.5 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
+          ) : (
+            <HeartPulse className="w-4 h-4 mt-0.5 text-sage-strong flex-none" strokeWidth={2} aria-hidden />
+          )}
+          <p className="min-w-0 flex-1 text-sm text-ink leading-snug">
+            {persona === "inspector"
+              ? "Answering with inspector-focused framing: violation history, compliance drivers, and worklist triage."
+              : "Answering with caregiver-focused framing: someone immunocompromised, elderly, a child, or critically ill."}
+          </p>
+        </div>
+      )}
+
       {/* ── Scope chip ─────────────────────────────────────────────────────────
           Shown while a detail page is in view: the chat scopes "this restaurant"
           to it. The icon + "Asking about" label carry the meaning without relying
@@ -499,16 +622,18 @@ export function ChatInterface({
         </div>
       )}
 
-      {/* Notice for a city whose chat backend isn't live yet (chatSupported:false,
-          currently LA — DR 0016). Be honest: general food-safety questions work,
-          establishment lookups for this city don't. */}
+      {/* Notice for a city whose chat backend isn't live yet
+          (chatSupported:false). Every current city (Chicago, NYC, LA) is
+          supported, so this stays dormant; it's the honest fallback for a future
+          city added before its agent is live — general food-safety questions
+          work, establishment lookups for that city don't. */}
       {!CITY_CONFIG[city].chatSupported && (
         <div className="flex-none flex items-start gap-2 px-4 md:px-8 py-2.5 border-b border-line bg-amber/10 text-xs text-ink/80">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber" aria-hidden />
           <span>
             You&apos;re viewing <strong>{CITY_CONFIG[city].label}</strong>. The
             assistant can&apos;t look up a specific {CITY_CONFIG[city].label} place
-            yet — general food-safety questions still work.
+            yet. General food-safety questions still work.
           </span>
         </div>
       )}
@@ -527,16 +652,17 @@ export function ChatInterface({
                   <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-sage/15 mb-4">
                     <MapPin className="w-5 h-5 text-sage" strokeWidth={2} />
                   </span>
-                  {/* "Eatelligence" = Eat + intelligence; sage "Eat" stem
-                      (sage-strong clears AA) plays up the pun. */}
                   <h2 className="text-2xl font-semibold tracking-tight mb-2">
-                    <span className="text-sage-strong">Eat</span>elligence
+                    <Wordmark />
                   </h2>
                 </>
               )}
               <p className={`text-base text-muted max-w-[42ch] leading-relaxed ${compact ? "mb-5" : "mb-8"}`}>
-                Ask about a specific place, a neighborhood or cuisine, or food
-                safety in general.
+                {persona === "inspector"
+                  ? "Ask about a worklist, a compliance or violation history, or general food-safety guidance."
+                  : persona === "caregiver"
+                    ? "Ask about a specific place for someone immunocompromised, elderly, a child, or critically ill, or food safety in general."
+                    : "Ask about a specific place, a neighborhood or cuisine, or food safety in general."}
               </p>
               <div className="flex flex-wrap gap-2 justify-center">
                 {(compact ? suggestions.slice(0, 4) : suggestions).map((s) => (
@@ -579,14 +705,22 @@ export function ChatInterface({
               placeholder={
                 scoped
                   ? `Ask about ${scoped.name}…`
-                  : "Ask about a neighborhood, cuisine, or risk level…"
+                  : persona === "inspector"
+                    ? "Ask about a worklist, compliance history, or violation pattern…"
+                    : persona === "caregiver"
+                      ? "Ask about a place, or food safety for someone vulnerable…"
+                      : "Ask about a neighborhood, cuisine, or risk level…"
               }
-              disabled={loading}
+              // Stays editable while a response is in flight so the user can
+              // type their next question during the wait. Submitting is still
+              // gated on `loading` (the send button below and the Enter handler
+              // both no-op until the response returns), so this only frees up
+              // typing, never an early send.
               aria-label="Chat input"
               // When scoped, the context tag is prepended to the wire query;
               // cap the user's text so tag + text stay within the proxy's limit.
               maxLength={scoped ? scopedInputBudget(scoped) : undefined}
-              className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto disabled:opacity-50"
+              className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">

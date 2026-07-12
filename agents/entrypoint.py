@@ -31,6 +31,7 @@ for _tool in [
     "find_restaurants",
     "get_safety_score",
     "explain_restaurant",
+    "look_up_establishment",
     "find_reviews",
     "find_inspection_records",
     "food_safety_info",
@@ -59,6 +60,8 @@ os.environ.setdefault("DATA_PREFIX", "web-app-data")
 # tags the query, invoke() sets it, and the @tool wrappers pass it to handlers
 # (the LLM never chooses the city). Defaults to Chicago.
 import contextvars  # noqa: E402
+
+import city_context  # noqa: E402 — shared per-city framing (see run_local.py too)
 
 _ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
 
@@ -125,6 +128,7 @@ def _load_handler(tool_name: str):
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
 _records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
@@ -181,6 +185,30 @@ def explain_restaurant(license_id: str) -> dict:
 
 
 @tool
+def look_up_establishment(names: list) -> list:
+    """
+    Look up one or more establishments BY NAME in the ACTIVE CITY's inspection
+    data and return each one's authoritative record (address, ZIP, facility type,
+    last inspection, risk score/tier/trend, license_id) straight from the city
+    data. Use this in general chat when the user names a place directly ("what's
+    the address of Lou Malnati's?", "compare Giordano's and Pequod's") — it does
+    NOT need find_restaurants first. Pass ALL the names in one call.
+
+    Always call this before stating any fact about a named establishment, so the
+    address and every other detail come from the data, not from memory. Each
+    result has a `status`: "matched" (use `match`), "ambiguous" (several venues
+    share the name — ask the user which, by address/neighborhood, using
+    `candidates`), or "no_inspection_record" (say there is no city record and
+    give no address or score). On a detail page where a license_id is already
+    provided, use explain_restaurant instead of this.
+
+    Args:
+        names: establishment names to look up, e.g. ["Lou Malnati's", "Pequod's"]
+    """
+    return _lookup_handler.handler({"names": names, "city": _ACTIVE_CITY.get()}, None)
+
+
+@tool
 def find_reviews(name: str, address: str = "", topics: list | None = None) -> dict:
     """
     Find THIRD-PARTY diner reviews (Yelp/Google/web) for one restaurant, focused on
@@ -209,23 +237,24 @@ def find_inspection_records(
     radius_m: float | None = None,
 ) -> dict:
     """
-    Build a link to the AUTHORITATIVE Chicago Food Inspections records for a SET of
-    establishments — a comparison, a short list, or an area. This is the city's own
-    data (the source behind the risk score), so it needs no disclaimer. Use it when
-    the user compares/lists several places, or asks about an area, and would want to
-    see or verify the underlying city records. Returns a {url, mode, note} link the
-    user clicks through to — nothing is fetched.
+    Build a link to the ACTIVE CITY's AUTHORITATIVE food-inspection records for a
+    SET of establishments — a comparison, a short list, or an area. This is the
+    city's own data (the source behind the risk score), so it needs no disclaimer.
+    Use it when the user compares/lists several places, or asks about an area, and
+    would want to see or verify the underlying city records. Returns a {url, mode,
+    note} link the user clicks through to — nothing is fetched. (Chicago and NYC
+    return a filtered grid; LA returns its county inspections page.)
 
     Provide EXACTLY ONE filter:
       license_ids: the establishments to compare/list. Use the license_id values
         get_safety_score returned, and pass ONLY non-null ones (a place with no
         inspection record has none). Preferred for named places.
-      zip_code: a Chicago ZIP, for "records in <ZIP>".
+      zip_code: a ZIP in the active city, for "records in <ZIP>".
       lat + lon + radius_m: a point and radius in metres, for "records near here".
 
     Args:
         license_ids: license_id strings from get_safety_score (non-null only)
-        zip_code: Chicago ZIP code (area mode)
+        zip_code: a ZIP in the active city (area mode)
         lat: latitude of the area centre (with lon + radius_m)
         lon: longitude of the area centre (with lat + radius_m)
         radius_m: search radius in metres (with lat + lon)
@@ -237,6 +266,7 @@ def find_inspection_records(
             "lat": lat,
             "lon": lon,
             "radius_m": radius_m,
+            "city": _ACTIVE_CITY.get(),
         },
         None,
     )
@@ -258,7 +288,9 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
         query: The user's general food-safety question, passed through verbatim
         topics: Optional explicit subset of topic keys; omit to match on the query
     """
-    return _info_handler.handler({"query": query, "topics": topics or []}, None)
+    return _info_handler.handler(
+        {"query": query, "topics": topics or [], "city": _ACTIVE_CITY.get()}, None
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -361,7 +393,20 @@ def _coerce_history(raw: object) -> list[dict]:
     return cleaned
 
 
-def _build_agent(messages: list[dict] | None = None) -> Agent:
+# Persona a request can be tagged with (frontend: the For Inspectors / For
+# Caregivers pages), and which system-prompt section each one activates by
+# default. See the matching sections in system_prompt.txt.
+_PERSONA_LABELS = {
+    "inspector": "Food-safety inspector",
+    "caregiver": "Caregiver (immunocompromised, elderly, child, or critically ill patient)",
+}
+_PERSONA_SECTIONS = {
+    "inspector": "INSPECTOR CONTEXT",
+    "caregiver": "CAREGIVER / IMMUNOCOMPROMISED CONTEXT",
+}
+
+
+def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent:
     """Build a fresh agent for ONE request.
 
     The model is shared (stateless), but each invocation gets its OWN Agent so its
@@ -376,13 +421,21 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     # Tell the model which city this request is scoped to (multi-city, DR 0016).
     # The tools already read the right city's data; this keeps the model's
     # framing + "no record" wording aligned to the active city.
-    city = _ACTIVE_CITY.get()
-    city_label = {"nyc": "New York City", "la": "Los Angeles"}.get(city, "Chicago")
-    city_prefix = (
-        f"ACTIVE CITY: {city_label}. Scope every restaurant lookup and every "
-        f"'no record' statement to {city_label}; do not mention or use the other "
-        f"city's establishments for this request.\n\n"
-    )
+    # ACTIVE CITY block: per-city grade framing + scope. Shared with run_local.py
+    # via city_context so the deployed agent and the eval frame a request identically.
+    city_prefix = city_context.city_prefix(_ACTIVE_CITY.get())
+    # Tell the model which audience opened this chat (frontend: the For
+    # Inspectors / For Caregivers pages), so the relevant system-prompt section
+    # applies by default rather than only when the user's own words trigger it
+    # (e.g. a caregiver who never says "immunocompromised").
+    persona_prefix = ""
+    if persona in _PERSONA_LABELS:
+        persona_prefix = (
+            f"ACTIVE PERSONA: {_PERSONA_LABELS[persona]}. The user opened this chat "
+            f'from the For {persona.title()}s page. Apply the "{_PERSONA_SECTIONS[persona]}" '
+            f"rules below by default for this conversation, even if they don't use "
+            f"those words themselves. All FRAMING & GUARDRAILS rules still apply.\n\n"
+        )
     return Agent(
         model=model,
         messages=messages or [],
@@ -390,11 +443,12 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
             find_restaurants,
             get_safety_score,
             explain_restaurant,
+            look_up_establishment,
             find_reviews,
             find_inspection_records,
             food_safety_info,
         ],
-        system_prompt=city_prefix + SYSTEM_PROMPT,
+        system_prompt=city_prefix + persona_prefix + SYSTEM_PROMPT,
     )
 
 
@@ -427,9 +481,15 @@ def invoke(payload: dict) -> dict:
     query, city = _extract_city(query, payload.get("city"))
     _ACTIVE_CITY.set(city)
 
+    # Persona (For Inspectors / For Caregivers chat entry points): same
+    # precedence and marker mechanism as city, extracted from what's left of the
+    # query after the city marker above (frontend emits city marker first, then
+    # persona marker, then the establishment-scope tag / user text).
+    query, persona = _extract_persona(query, payload.get("persona"))
+
     # Fresh, isolated agent per request, seeded with the caller's prior turns so
     # follow-up questions have context. History is client-supplied and validated.
-    agent = _build_agent(_coerce_history(payload.get("history")))
+    agent = _build_agent(_coerce_history(payload.get("history")), persona)
     result = agent(query)
     return {"result": str(result)}
 
@@ -449,6 +509,25 @@ def _extract_city(query: str, field: object) -> tuple[str, str]:
     if m:
         return query[m.end() :], m.group(1)
     return query, "chicago"
+
+
+_PERSONA_MARKER = re.compile(r"^\s*\[\[persona:(inspector|caregiver)\]\]\s*")
+
+
+def _extract_persona(query: str, field: object) -> tuple[str, str]:
+    """Resolve the request persona and strip its marker from the query.
+
+    Mirrors ``_extract_city``: an explicit `persona` payload field takes
+    precedence over a leading `[[persona:...]]` marker (the frontend's fallback
+    for the deployed proxy, which forwards only the query string). Unknown or
+    missing → "" (no persona framing — the default, unscoped chat).
+    """
+    if isinstance(field, str) and field.lower() in _PERSONA_LABELS:
+        return _PERSONA_MARKER.sub("", query), field.lower()
+    m = _PERSONA_MARKER.match(query)
+    if m:
+        return query[m.end() :], m.group(1)
+    return query, ""
 
 
 # ---------------------------------------------------------------------------

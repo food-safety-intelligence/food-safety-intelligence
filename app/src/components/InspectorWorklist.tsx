@@ -11,10 +11,12 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { BackToSearch } from "@/components/BackToSearch";
 import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
-import { type City, dataUrl } from "@/lib/city";
+import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
@@ -22,13 +24,7 @@ import type {
   SearchIndex,
   SearchIndexRow,
 } from "@/lib/scores";
-import {
-  ALL_TIERS,
-  isAllTiers,
-  parseTiers,
-  TIER_HEX,
-  TREND_STABLE_BAND,
-} from "@/lib/scores";
+import { ALL_TIERS, isAllTiers, parseTiers, TIER_HEX } from "@/lib/scores";
 import { cn, formatInspectionDate } from "@/lib/utils";
 
 /**
@@ -59,14 +55,23 @@ const SORTS: { key: InspectorSort; label: string }[] = [
 const OVERDUE_DAYS = 300;
 /** Rows revealed initially / added per "Show more" click. */
 const QUEUE_PAGE = 50;
-/** Worsening threshold for the stat card — matches the payload's totals rule. */
-const WORSENING_SLOPE = 0.001;
 
 function daysSince(iso: string | null | undefined, now: number): number | null {
   if (!iso) return null;
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return null;
   return Math.max(0, Math.floor((now - t) / 86_400_000));
+}
+
+/** Just the fields the "Why trust this ranking" card reads from the active
+ *  city's methodology.json — the same file the How-it-works page renders, so
+ *  the two pages can't drift. Extra fields in the JSON are ignored. Declared
+ *  locally (not imported from methodology-server) because that loader is
+ *  server-only; the How-it-works city components fetch client-side the same way. */
+interface WorklistMethodology {
+  test: { prevalence: number };
+  headline: { top_decile_lift: number };
+  operating_points: { frac: number; precision: number; lift: number }[];
 }
 
 export function InspectorWorklist() {
@@ -84,7 +89,9 @@ export function InspectorWorklist() {
   // City-scoped data — the header's CityToggle switches it. Expanded rows and
   // the route reset with the city (license ids are per-city).
   const { city } = useCity();
+  const cfg = CITY_CONFIG[city];
   const [index, setIndex] = useState<SearchIndex | null>(null);
+  const [meth, setMeth] = useState<WorklistMethodology | null>(null);
   const [failed, setFailed] = useState(false);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [route, setRoute] = useState<string[]>([]);
@@ -97,6 +104,7 @@ export function InspectorWorklist() {
   if (city !== prevCity) {
     setPrevCity(city);
     setIndex(null);
+    setMeth(null);
     setFailed(false);
     setExpanded({});
     setRoute([]);
@@ -104,17 +112,31 @@ export function InspectorWorklist() {
   }
 
   useEffect(() => {
-    let alive = true;
-    fetch(dataUrl(city, "search-index.json"))
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      )
-      .then((d: SearchIndex) => {
-        if (alive) setIndex(d);
-      })
+    const controller = new AbortController();
+    fetchJson<SearchIndex>(dataUrl(city, "search-index.json"), {
+      signal: controller.signal,
+    })
+      .then((d) => setIndex(d))
       .catch(() => {
-        if (alive) setFailed(true);
+        // A transient blip on the multi-MB index is retried inside fetchJson;
+        // only a genuine, retries-exhausted failure marks the worklist failed.
+        if (!controller.signal.aborted) setFailed(true);
       });
+    return () => controller.abort();
+  }, [city]);
+
+  // Backtest metrics for the "Why trust this ranking" card, read from the same
+  // methodology.json the How-it-works page renders (per active city). Secondary
+  // to the worklist itself, so a fetch failure just leaves the card blank rather
+  // than erroring the page.
+  useEffect(() => {
+    let alive = true;
+    fetch(dataUrl(city, "methodology.json"))
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: WorklistMethodology) => {
+        if (alive) setMeth(d);
+      })
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -173,19 +195,24 @@ export function InspectorWorklist() {
     });
   }, [activeRows, activeTiers, sort, now]);
 
+  // "Worsening" uses the same source-of-truth band as the per-row trend pill
+  // (CITY_CONFIG.trendStableBand) and the producer's payload totals
+  // (predict_batch.py, DR 0011) — so the stat card equals the count of
+  // "Worsening" pills the inspector sees in the list below, not a stale cutoff.
   const worseningCount = useMemo(
     () =>
-      activeRows.filter((r) => (r.trend_slope ?? 0) > WORSENING_SLOPE).length,
-    [activeRows],
+      activeRows.filter((r) => (r.trend_slope ?? 0) > cfg.trendStableBand)
+        .length,
+    [activeRows, cfg],
   );
 
   const risingFast = useMemo(
     () =>
       activeRows
-        .filter((r) => (r.trend_slope ?? 0) > TREND_STABLE_BAND)
+        .filter((r) => (r.trend_slope ?? 0) > cfg.trendStableBand)
         .sort((a, b) => (b.trend_slope ?? 0) - (a.trend_slope ?? 0))
         .slice(0, 3),
-    [activeRows],
+    [activeRows, cfg],
   );
 
   const rowById = useMemo(() => {
@@ -207,32 +234,55 @@ export function InspectorWorklist() {
     return counts;
   }, [index, activeRows]);
 
-  const asOfLabel = index?.as_of_date
-    ? formatInspectionDate(index.as_of_date)
-    : null;
+  // "Why trust this ranking" numbers, straight from the active city's
+  // methodology.json. The top-decile operating point gives the model-ranked
+  // hit rate + its lift over random; test.prevalence is the base rate a random
+  // visit would hit. Null until the metrics load (or if they fail to).
+  const trust = useMemo(() => {
+    if (!meth) return null;
+    const top10 = meth.operating_points.find(
+      (p) => Math.round(p.frac * 100) === 10,
+    );
+    if (!top10) return null;
+    const modelHit = top10.precision;
+    const randomHit = meth.test.prevalence;
+    const lift = top10.lift || meth.headline.top_decile_lift;
+    return {
+      lift,
+      modelHit,
+      randomHit,
+      // Bars carry the comparison, not the absolute precision: anchor the model
+      // bar wide and scale the random bar by 1/lift so the visual ratio equals
+      // the real lift (e.g. a ~1.6x city shows near-equal bars, honestly).
+      modelPct: 88,
+      randomPct: lift > 0 ? Math.round(88 / lift) : 0,
+    };
+  }, [meth]);
 
   const visible = rows.slice(0, visibleCount);
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
+      <BackToSearch className="inline-flex items-center gap-2 text-sm text-teal hover:underline mb-6" />
       {/* ---- Page intro + stat cards ---- */}
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="max-w-[640px]">
           <p className="text-2xs tracking-[0.2em] uppercase text-muted">
-            Inspector worklist{asOfLabel ? ` · as of ${asOfLabel}` : ""}
+            Inspector worklist
           </p>
           <h1 className="serif text-5xl mt-2.5 mb-3.5">
             Inspect where it matters&nbsp;most.
           </h1>
           <p className="text-md text-muted">
-            Establishments ranked by their modeled probability of a{" "}
+            Establishments ranked by how likely each is to{" "}
             <strong className="text-ink font-semibold">
-              failed inspection or critical violation
-            </strong>{" "}
-            in the next 180 days. Working from the top of this list surfaces
-            roughly{" "}
-            <span className="serif italic text-terra text-lg">4× more</span>{" "}
-            failures per visit than inspecting at random.
+              {cfg.outcomeSentence}
+            </strong>
+            {". "}Working from the top of this list surfaces{" "}
+            <span className="serif italic text-terra text-lg">
+              {trust ? `${trust.lift.toFixed(1)}×` : "several times"}
+            </span>{" "}
+            more {cfg.outcomeNoun} per visit than inspecting at random.
           </p>
         </div>
         <div className="flex flex-wrap gap-2.5">
@@ -243,7 +293,7 @@ export function InspectorWorklist() {
           />
           <StatCard
             value={index ? worseningCount.toLocaleString() : "—"}
-            label="Worsening trend (90 d)"
+            label="Worsening trend (up to past 5 visits)"
             valueClass="text-coral"
           />
           {/* Deviates from the handoff's "Scored citywide": counts active
@@ -386,30 +436,30 @@ export function InspectorWorklist() {
               Why trust this ranking
             </p>
             <p className="serif text-4xl leading-none mt-3 mb-1">
-              ~4×
+              {trust ? `${trust.lift.toFixed(1)}×` : "—"}
               <span className="font-sans text-lg font-medium opacity-80 ml-2">
                 better than random
               </span>
             </p>
             <p className="text-sm leading-relaxed opacity-75 mt-2.5">
-              In backtests, visits drawn from the top of this list found
-              failures or critical violations about four times as often as
-              visits chosen at random. Predicts <em>where to look first</em> —
-              it is not a verdict on any establishment.
+              In backtests, visits drawn from the top of this list found{" "}
+              {cfg.outcomeNoun}{" "}
+              {trust ? `${trust.lift.toFixed(1)} times` : "several times"} as
+              often as visits chosen at random. Predicts{" "}
+              <em>where to look first</em>. It is not a verdict on any
+              establishment.
             </p>
             <div className="mt-4 flex flex-col gap-2">
-              {/* Placeholder hit-rates from the design handoff — replace with
-                  real backtest numbers before this page ships (DR 0015). */}
               <LiftBar
-                label="Model-ranked visits — hit rate"
-                value="~41%"
-                pct={82}
+                label="Model-ranked visits: hit rate"
+                value={trust ? `${(trust.modelHit * 100).toFixed(0)}%` : "—"}
+                pct={trust ? trust.modelPct : 0}
                 barClass="bg-coral"
               />
               <LiftBar
-                label="Random visits — hit rate"
-                value="~10%"
-                pct={20}
+                label="Random visits: hit rate"
+                value={trust ? `${(trust.randomHit * 100).toFixed(0)}%` : "—"}
+                pct={trust ? trust.randomPct : 0}
                 barClass="bg-cream/45"
               />
             </div>
@@ -434,8 +484,8 @@ export function InspectorWorklist() {
               <h2 className="text-base font-bold">Rising fast</h2>
             </div>
             <p className="text-xs text-muted mt-1.5 mb-3">
-              Steepest score increase over the last 90 days — worth a look even
-              below the High tier.
+              Steepest score increase over an establishment&apos;s last few
+              visits, worth a look even below the High tier.
             </p>
             <div className="flex flex-col gap-0.5">
               {risingFast.map((r) => (
@@ -452,9 +502,11 @@ export function InspectorWorklist() {
                       {r.address}
                     </span>
                   </span>
-                  <span className="num text-xs font-semibold text-terra shrink-0">
-                    +{((r.trend_slope ?? 0) * 90).toFixed(2)} / 90d
-                  </span>
+                  <TrendIndicator
+                    slope={r.trend_slope}
+                    compact
+                    className="shrink-0"
+                  />
                 </Link>
               ))}
               {index && risingFast.length === 0 && (
@@ -476,7 +528,7 @@ export function InspectorWorklist() {
             </p>
             {route.length === 0 ? (
               <div className="mt-3.5 border-[1.5px] border-dashed border-line rounded-2xl p-4.5 text-center text-xs text-muted">
-                No stops yet — expand a row and press{" "}
+                No stops yet. Expand a row and press{" "}
                 <strong className="text-ink">Add to today&apos;s route</strong>
               </div>
             ) : (
@@ -509,9 +561,9 @@ export function InspectorWorklist() {
           {/* Honest-use note */}
           <aside className="border border-line rounded-3xl px-5 py-4 text-xs text-muted leading-relaxed bg-tint">
             <strong className="text-ink">A ranking, not a judgment.</strong>{" "}
-            Scores are calibrated probabilities from public inspection, license
-            and 311 data. They prioritize limited inspection capacity — every
-            establishment still gets its regular cadence.
+            Scores are calibrated probabilities from public food-safety
+            inspection records. They prioritize limited inspection capacity.
+            Every establishment still gets its regular cadence.
           </aside>
         </div>
       </div>
@@ -741,6 +793,18 @@ function ExpandedDetail({
   const drivers = bundle.restaurant.top_drivers;
   const maxMag = Math.max(1e-9, ...drivers.map((x) => Math.abs(x.shap)));
   const history = bundle.history.slice(0, 3);
+  // Colour each result by the city's OWN outcome semantics — Grade A/B/C for NYC
+  // and LA, Pass / Pass w-Conditions / Fail for Chicago — via the shared
+  // historyResults buckets (sage = good, amber = middle, terra = bad). Matching
+  // on the literal strings "Pass"/"Fail" would drop every NYC/LA grade into one
+  // undifferentiated colour.
+  const resultTextColor = (result: string): string => {
+    const cat = CITY_CONFIG[city].historyResults.find((c) => c.match(result));
+    if (!cat) return "text-muted";
+    if (cat.bg === "bg-sage") return "text-sage-strong";
+    if (cat.bg === "bg-terra") return "text-terra";
+    return "text-[#7A5A24]"; // amber / middle tier (Pass w/ Conditions, Grade B)
+  };
 
   return (
     <div className="px-4 sm:px-6 lg:pl-[82px] pb-5 pt-1 grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#FAF7F0]">
@@ -795,21 +859,17 @@ function ExpandedDetail({
               key={`${h.date}-${i}`}
               className="flex items-baseline gap-2.5 text-sm"
             >
-              <span className="num text-muted shrink-0">{h.date}</span>
+              <span className="num text-muted shrink-0">
+                {formatInspectionDate(h.date)}
+              </span>
               <span
-                className={cn(
-                  "font-semibold shrink-0",
-                  h.result === "Fail"
-                    ? "text-terra"
-                    : h.result === "Pass"
-                      ? "text-sage-strong"
-                      : "text-[#7A5A24]",
-                )}
+                className={cn("font-semibold shrink-0", resultTextColor(h.result))}
               >
                 {h.result || "—"}
               </span>
               <span className="text-muted truncate">
-                {h.headline || "No violations recorded"}
+                {/* LA labels items "# 23. …"; drop the leading hash for display. */}
+                {h.headline.replace(/^#\s+/, "") || "No violations recorded"}
               </span>
             </div>
           ))}

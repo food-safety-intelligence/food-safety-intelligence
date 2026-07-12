@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import type { HomeSort, HomeView, RiskTier, SearchIndex } from "@/lib/scores";
 import {
   ALL_TIERS,
@@ -20,6 +20,7 @@ import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
 import { useCity } from "@/components/CityContext";
 import { CITY_CONFIG, dataUrl } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/utils";
 
 // How long to wait after the last keystroke before pushing `?q=` to the URL.
@@ -76,25 +77,31 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
   // resolves — we never render Chicago pins while NYC loads, without resetting
   // state from the effect body.
   const [loaded, setLoaded] = useState<{ city: string; index: SearchIndex } | null>(null);
+  // Distinguish "still loading" from "load failed": a failure means search /
+  // filter / sort would silently do nothing, so we surface a retry affordance
+  // instead of leaving the controls looking dead. `reloadKey` re-runs the fetch.
+  const [indexError, setIndexError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
-    let alive = true;
-    fetch(dataUrl(city, "search-index.json"))
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      )
-      .then((d: SearchIndex) => {
-        if (alive) setLoaded({ city, index: d });
+    const controller = new AbortController();
+    fetchJson<SearchIndex>(dataUrl(city, "search-index.json"), {
+      signal: controller.signal,
+    })
+      .then((d) => {
+        setLoaded({ city, index: d });
+        setIndexError(false);
       })
       .catch(() => {
-        /* keep initialView as the fallback if the index can't load */
+        // Ignore aborts (unmount / city switch); a real failure — after the
+        // retries in fetchJson — surfaces the retry affordance below.
+        if (!controller.signal.aborted) setIndexError(true);
       });
-    return () => {
-      alive = false;
-    };
-  }, [city]);
+    return () => controller.abort();
+  }, [city, reloadKey]);
 
   const index = loaded?.city === city ? loaded.index : null;
-  const indexLoading = index === null;
+  // Loading only while we don't yet have this city's index AND haven't given up.
+  const indexLoading = index === null && !indexError;
   const view = index
     ? computeHomeView(index, {
         q: query,
@@ -197,6 +204,11 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
     router.replace(hrefFor({ sort: s }), { scroll: false });
   };
 
+  const retryIndex = () => {
+    setIndexError(false);
+    setReloadKey((k) => k + 1);
+  };
+
   const { listRows, pins, matchCount, total, tierCounts } = view;
   const capped = matchCount > listRows.length;
   const visibleRows = listRows.slice(0, visibleCount);
@@ -281,6 +293,34 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   </button>
                 ))}
               </div>
+
+              {/* Load status for the client search index. Until it arrives,
+                  search / tier / sort filter the server's default view only, so
+                  a click can look like it did nothing — say so rather than leave
+                  the controls silently unresponsive. On failure, offer a retry:
+                  without the index those controls stay dead for the session. */}
+              {indexError ? (
+                <div
+                  role="status"
+                  className="flex items-center gap-2 px-2 pb-1 pt-0.5 text-2xs text-terra"
+                >
+                  <span>Couldn&apos;t load the full list.</span>
+                  <button
+                    onClick={retryIndex}
+                    className="underline underline-offset-2 font-medium hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : indexLoading ? (
+                <div
+                  role="status"
+                  className="flex items-center gap-1.5 px-2 pb-1 pt-0.5 text-2xs text-muted"
+                >
+                  <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                  <span>Loading all establishments…</span>
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -356,7 +396,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   </>
                 ) : sort === "low" ? (
                   <>
-                    Lowest {listRows.length.toLocaleString()} by risk — a weaker
+                    Lowest {listRows.length.toLocaleString()} by risk: a weaker
                     signal, not a safety guarantee
                   </>
                 ) : (

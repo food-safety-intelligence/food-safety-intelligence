@@ -25,13 +25,13 @@ export const GLOSSARY = {
     id: "priority-violations",
     term: "Priority violation",
     short:
-      "Chicago's serious tier (codes 1–29): the hazards most likely to cause foodborne illness — temperature abuse, handwashing failures, cross-contamination, sewage/plumbing. A priority violation in the next 180 days is part of what the model predicts.",
+      "Chicago's serious tier (codes 1–29): the hazards most likely to cause foodborne illness (temperature abuse, handwashing failures, cross-contamination, sewage/plumbing). A priority violation in the next 180 days is part of what the model predicts.",
   },
   "core-violations": {
     id: "core-violations",
     term: "Core violation",
     short:
-      "Lower-tier violations (codes 30+): important but less immediately hazardous — labeling, maintenance, equipment, and documentation issues.",
+      "Lower-tier violations (codes 30+): important but less immediately hazardous (labeling, maintenance, equipment, and documentation issues).",
   },
   "inspection-types": {
     id: "inspection-types",
@@ -43,7 +43,7 @@ export const GLOSSARY = {
     id: "chicago-risk",
     term: "Chicago risk category",
     short:
-      "Chicago assigns each establishment a Risk 1 (High) / 2 (Medium) / 3 (Low) category by how hazardous its food operations are, set at licensing before any inspection. It's an input to our model — not our output score.",
+      "Chicago assigns each establishment a Risk 1 (High) / 2 (Medium) / 3 (Low) category by how hazardous its food operations are, set at licensing before any inspection. It's an input to our model, not our output score.",
   },
   "risk-tiers": {
     id: "risk-tiers",
@@ -55,13 +55,13 @@ export const GLOSSARY = {
     id: "current-inspection",
     term: "Current inspection result",
     short:
-      "Whether the establishment passed or failed the inspection on record as of this score — the model's strongest near-term signal. It describes that latest visit, not a prediction; the score is about the next 180 days.",
+      "Whether the establishment passed or failed the inspection on record as of this score: the model's strongest near-term signal. It describes that latest visit, not a prediction; the score is about the next 180 days.",
   },
   "risk-score": {
     id: "risk-score",
     term: "Risk score",
     short:
-      "The headline 0–100 prediction on the gauge — the production model's estimate that the establishment has a Fail or priority violation in the next 180 days. It counts the latest inspection's own result, so it can differ from the trend chart's last point.",
+      "The headline 0–100 prediction on the gauge: the production model's estimate that the establishment has a Fail or priority violation in the next 180 days. It counts the latest inspection's own result, so it can differ from the trend chart's last point.",
     // Link to the richer "Reading the score" prose, not just the one-line entry.
     href: "/how-it-works#reading-the-score",
   },

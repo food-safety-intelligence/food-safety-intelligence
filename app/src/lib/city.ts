@@ -45,6 +45,11 @@ export interface CityConfig {
   trendStableBand: number;
   /** Whether the chat agent has data for this city (backend is Chicago-only). */
   chatSupported: boolean;
+  /** Bullet each violation in the expanded inspection-history list. NYC's
+   * violations are full sentences with no leading marker (unlike Chicago's
+   * "2." codes or LA's "# 23." numbers), so they need a bullet to read as a
+   * list. Omitted (falsy) where the text already carries its own marker. */
+  bulletViolations?: boolean;
 }
 
 /** Parse the numeric inspection score out of an LA history `result` string —
@@ -67,7 +72,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place will see a failed inspection or priority violation in the next six months",
     sourceBlurb:
-      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months — and show you exactly why.",
+      "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months, and show you exactly why.",
     cityState: "Chicago, IL",
     healthDept: "Chicago Department of Public Health",
     riskLabel: "Predicted 180-day risk",
@@ -99,7 +104,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place's next inspection is graded B or C (a score of 14 or more points)",
     sourceBlurb:
-      "New York City publishes every restaurant inspection its Health Department conducts, each carrying a letter grade (A / B / C). We use inspection history since the post-COVID restart to estimate the chance a place's next inspection is graded B or C — and show you exactly why. NYC is a research-preview second city with a weaker signal than Chicago.",
+      "New York City publishes every restaurant inspection its Health Department conducts, each carrying a letter grade (A / B / C). We use inspection history since the post-COVID restart to estimate the chance a place's next inspection is graded B or C, and show you exactly why. NYC is a research-preview second city with a weaker signal than Chicago.",
     cityState: "New York, NY",
     healthDept: "New York City Department of Health and Mental Hygiene",
     riskLabel: "Predicted next-inspection risk",
@@ -116,6 +121,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     ],
     outcomeNoun: "B or C grades",
     isBadOutcome: (r) => r.startsWith("Grade B") || r.startsWith("Grade C"),
+    // NYC violation lines are plain sentences — bullet them so they separate.
+    bulletViolations: true,
     // Empirically NYC's forecast-slope magnitudes sit on the same scale as
     // Chicago's, so 0.0003 gives the most honest split (~9% Worsening / ~2%
     // Improving / ~74% Stable). NYC's slope is intrinsically upward-biased
@@ -140,7 +147,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     predictionBlurb:
       "the chance a place's next inspection is graded B or C (a score below 90 out of 100)",
     sourceBlurb:
-      "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C — and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
+      "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C, and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
     cityState: "Los Angeles, CA",
     healthDept: "Los Angeles County Department of Public Health",
     riskLabel: "Predicted next-inspection risk",
@@ -166,7 +173,7 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // the score so ungraded-but-low inspections still count toward the headline.
     isBadOutcome: (r) => { const s = laScore(r); return s !== null ? s < 90 : /^Grade [BC]/.test(r); },
     // LA's forecast-slope magnitudes sit on the same scale as Chicago's and NYC's
-    // (the forecast model is the same prior-history LogReg), so 0.0003 gives the
+    // (the forecast model is a prior-history XGBoost), so 0.0003 gives the
     // same honest Worsening / Stable / Improving split.
     trendStableBand: 0.0003,
     // Enabled: LA data is in S3 and merging this PR redeploys the agent LA-aware

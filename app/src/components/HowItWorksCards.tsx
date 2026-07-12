@@ -51,7 +51,7 @@ export function MethodologyHero({
         <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">{eyebrow}</p>
         <h1 className="text-5xl font-light leading-[1.05] tracking-tight">{title}</h1>
         <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">{children}</p>
-        <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">{stats}</dl>
+        <dl className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3">{stats}</dl>
       </div>
     </header>
   );
@@ -59,8 +59,8 @@ export function MethodologyHero({
 
 // Friendly labels for the served model slug (mirrors the Chicago page's map).
 const MODEL_TYPE_LABELS: Record<string, string> = {
-  la_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",
-  nyc_logreg_sigmoid: "Calibrated logistic regression (Platt-scaled)",
+  la_xgb_sigmoid: "Gradient-boosted trees (XGBoost)",
+  nyc_xgb_sigmoid: "Gradient-boosted trees (XGBoost)",
 };
 
 interface Methodology {
@@ -86,6 +86,96 @@ function CardSectionLabel({ id, number, icon: Icon, children }: {
   );
 }
 
+type OpPoint = {
+  frac: number;
+  n_flagged: number;
+  precision: number;
+  recall: number;
+  lift: number;
+};
+
+// The five top-K slices shown on every city's methodology table. NYC/LA carry
+// extra fracs (15 / 25 / 40%) in their data; we render the same five everywhere
+// so the tables read consistently and stay uncrowded.
+const SHOWN_FRACS = [0.05, 0.1, 0.2, 0.3, 0.5];
+
+/**
+ * The shared "inspect the top K%" operating-points table, used by all three
+ * cities so columns, styling, and number formatting can't drift. Headers pair
+ * each metric with a plain gloss (hit rate / events caught).
+ */
+export function OperatingPointsTable({ ops }: { ops: OpPoint[] }) {
+  const rows = ops.filter((p) => SHOWN_FRACS.some((f) => Math.abs(p.frac - f) < 1e-9));
+  return (
+    <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse table-fixed">
+          <thead>
+            <tr className="text-center text-sage text-[11px] uppercase border-b border-line bg-tint/40">
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Inspect top</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Flagged</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Precision (hit rate)</th>
+              <th className="py-2.5 px-2 font-medium whitespace-nowrap">Recall (events caught)</th>
+            </tr>
+          </thead>
+          <tbody className="num text-ink/85 text-center">
+            {rows.map((p) => (
+              <tr key={p.frac} className="border-b border-line last:border-b-0">
+                <td className="py-2.5 px-4">{Math.round(p.frac * 100)}%</td>
+                <td className="py-2.5 px-4">{p.n_flagged.toLocaleString("en-US")}</td>
+                <td className="py-2.5 px-4">{Math.round(p.precision * 100)}%</td>
+                <td className="py-2.5 px-4">{Math.round(p.recall * 100)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The "reading the two tightest slices" callout (top 5% + top 10%), shared so
+ * every city explains its operating points the same way. `unit` is the city's
+ * establishment noun; the event wording stays neutral ("had an event") so it
+ * reads correctly for both the Chicago fail/priority label and the NYC/LA B/C
+ * grade label.
+ */
+export function TightestSlices({
+  top5,
+  top10,
+  unit,
+}: {
+  top5?: OpPoint;
+  top10?: OpPoint;
+  unit: string;
+}) {
+  return (
+    <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
+      <p className="font-medium mb-1.5">Reading the two tightest slices</p>
+      <ul className="space-y-1.5 list-disc pl-5">
+        <li>
+          <span className="font-medium">Top 5%</span>
+          {top5
+            ? ` (~${top5.n_flagged.toLocaleString("en-US")} ${unit}): about ${Math.round(top5.precision * 100)}% of those flagged had an event (${top5.lift.toFixed(1)}× better than picking at random), and that sliver alone covers ${Math.round(top5.recall * 100)}% of all events.`
+            : ": run the metrics pipeline to populate."}
+        </li>
+        <li>
+          <span className="font-medium">Top 10%</span>
+          {top10
+            ? ` (~${top10.n_flagged.toLocaleString("en-US")} ${unit}): roughly ${Math.round(top10.precision * 100)}% flagged had an event (${top10.lift.toFixed(1)}× random), catching about ${Math.round(top10.recall * 100)}% of all events.`
+            : ""}
+        </li>
+      </ul>
+      <p className="mt-2 text-xs text-muted">
+        The tighter the slice, the higher the hit-rate but the fewer events you
+        cover. That&apos;s the precision/recall trade an inspection team tunes to
+        its capacity.
+      </p>
+    </div>
+  );
+}
+
 export function ModelCard({ city, m, number, limitations }: {
   city: City; m: Methodology | null; number: string; limitations?: ReactNode;
 }) {
@@ -107,8 +197,8 @@ export function ModelCard({ city, m, number, limitations }: {
           and{" "}
           <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>
           {" "}above; the intended-use, limits, and retraining points below are what the
-          card adds. It covers <span className="font-medium text-ink/80">two models</span> —
-          the risk score and a separate trend forecast — the same pair as Chicago,
+          card adds. It covers <span className="font-medium text-ink/80">two models</span>{" "}
+          (the risk score and a separate trend forecast), the same pair as Chicago,
           retrained on {c.label} data.
         </p>
 
@@ -117,7 +207,7 @@ export function ModelCard({ city, m, number, limitations }: {
           <div className="rounded-2xl border border-line bg-card p-4">
             <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">Model 1 · Risk score</p>
             <p className="text-sm text-muted leading-relaxed mt-2">
-              The headline percentage — {c.predictionBlurb}. It uses the current
+              The headline percentage: {c.predictionBlurb}. It uses the current
               inspection&apos;s own outcome, the strongest near-term signal. The details
               and evaluation on this card describe this model.
             </p>
@@ -165,7 +255,7 @@ export function ModelCard({ city, m, number, limitations }: {
 
         <h3 className="text-lg font-medium tracking-tight mt-8">Intended users &amp; use</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
-          Built for the people who plan food-safety inspections — the {c.healthDept} or
+          Built for the people who plan food-safety inspections: the {c.healthDept} or
           an inspection team deciding where limited inspector time should go. It is a
           triage signal that ranks {c.nounPlural} by forward risk so a capacity-limited
           team can work the riskiest first; the value is in the ranking, not any single
@@ -175,11 +265,11 @@ export function ModelCard({ city, m, number, limitations }: {
 
         <h3 className="text-lg font-medium tracking-tight mt-6">Out-of-scope uses</h3>
         <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85 max-w-[62ch]">
-          <li><span className="font-medium">Not a verdict.</span> A high score is not a finding that a place is unsafe — most flagged establishments have no event in the window.</li>
+          <li><span className="font-medium">Not a verdict.</span> A high score is not a finding that a place is unsafe. Most flagged establishments have no event in the window.</li>
           <li><span className="font-medium">Not an enforcement or licensing input.</span> It shouldn&apos;t be used on its own to fine, close, or penalise a business without a human inspection.</li>
           <li><span className="font-medium">Not a live diner guarantee.</span> It doesn&apos;t say whether a specific meal is safe right now.</li>
           <li><span className="font-medium">Not another city.</span> Trained only on {c.label} data and not validated elsewhere.</li>
-          <li><span className="font-medium">Preview quality.</span> {c.label} is a research-preview coverage feature with a weaker signal than Chicago — treat its scores as a rougher guide.</li>
+          <li><span className="font-medium">Preview quality.</span> {c.label} is a research-preview coverage feature with a weaker signal than Chicago. Treat its scores as a rougher guide.</li>
         </ul>
 
         <h3 className="text-lg font-medium tracking-tight mt-6">How it&apos;s evaluated</h3>
@@ -201,7 +291,7 @@ export function ModelCard({ city, m, number, limitations }: {
         <h3 className="text-lg font-medium tracking-tight mt-6">Retraining</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           Retrained on demand from the public source, not on a fixed schedule and never
-          live — each run is tied to the exact commit that produced it, and a published
+          live. Each run is tied to the exact commit that produced it, and a published
           score set can always be regenerated from scratch. The model type and the date
           its metrics were generated are shown above.
         </p>
@@ -218,9 +308,9 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
       <article>
         <h2 className="text-2xl font-medium tracking-tight">Where the data comes from and how it&apos;s handled</h2>
         <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
-          Every input is a public record — {m?.data_source ?? c.sources.join(", ")}. The
-          app collects nothing from the people who visit it — no accounts, no login, no
-          personal data — so the questions below are about public business records, not
+          Every input is a public record: {m?.data_source ?? c.sources.join(", ")}. The
+          app collects nothing from the people who visit it (no accounts, no login, no
+          personal data), so the questions below are about public business records, not
           private user data. The full source list is on the{" "}
           <a href="/sources" className="text-teal hover:underline">Sources</a> page.
         </p>
@@ -237,7 +327,7 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           Scores are published as static JSON served through a content-delivery network.
           The website is read-only static pages with no login and no server-side
-          database, and it never runs the model on a page load — it only reads the
+          database, and it never runs the model on a page load: it only reads the
           pre-computed JSON (the batch-score-to-JSON contract). Source and working data
           sit in a private cloud bucket limited to the team&apos;s own credentials.
         </p>
@@ -246,14 +336,14 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           We don&apos;t read the source feed live; we re-pull and re-score in a batch
           job, then publish a fresh JSON. The scores you see are a snapshot as of the
-          last publish — the detail page shows each establishment&apos;s &ldquo;as
-          of&rdquo; date — not a live reading.
+          last publish (the detail page shows each establishment&apos;s &ldquo;as
+          of&rdquo; date), not a live reading.
         </p>
 
         <h3 className="text-lg font-medium tracking-tight mt-6">Location data</h3>
         <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[62ch]">
           The only location data is an establishment&apos;s own address and map
-          coordinates — it locates a business, not a person.{" "}
+          coordinates: it locates a business, not a person.{" "}
           {city === "la"
             ? "The LA feed carries no coordinates, so they're geocoded from the public street address (a few fall back to a ZIP-code centroid)."
             : "They come straight from the public inspection record."}{" "}

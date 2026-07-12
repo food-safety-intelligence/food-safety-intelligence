@@ -1,12 +1,12 @@
 {
-  "generated_at": "2026-07-04T14:55:36.120518+00:00",
-  "model_version": "nyc_logreg_sigmoid",
+  "generated_at": "2026-07-06T03:42:29.776200+00:00",
+  "model_version": "nyc_xgb_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
   "label": "Probability the establishment's NEXT inspection is graded B or C (score \u2265 14)",
   "train_window": "post-COVID, 2022-07-01 onward (inspections halted Mar 2020)",
   "provenance": {
-    "model_version": "nyc_logreg_sigmoid",
+    "model_version": "nyc_xgb_sigmoid",
     "note": "feasibility build, DR 0016"
   },
   "test": {
@@ -16,101 +16,101 @@
     "split_from": "2025-04-01"
   },
   "headline": {
-    "pr_auc": 0.5604,
-    "roc_auc": 0.6658,
-    "top_decile_lift": 1.57
+    "pr_auc": 0.5826,
+    "roc_auc": 0.6744,
+    "top_decile_lift": 1.69
   },
   "caveat": "NYC is a coverage feature with a weaker signal than Chicago (ROC-AUC ~0.66 vs ~0.78); its data window is only ~3 post-COVID years.",
   "risk_tiers": [
     {
       "label": "Low",
       "min": 0.0,
-      "max": 0.2816,
-      "share": 0.4
+      "max": 0.205,
+      "share": 0.2799
     },
     {
       "label": "Moderate",
-      "min": 0.2816,
-      "max": 0.4805,
-      "share": 0.45
+      "min": 0.205,
+      "max": 0.41,
+      "share": 0.4549
     },
     {
       "label": "Elevated",
-      "min": 0.4805,
-      "max": 0.6817,
-      "share": 0.13
+      "min": 0.41,
+      "max": 0.82,
+      "share": 0.265
     },
     {
       "label": "High",
-      "min": 0.6817,
+      "min": 0.82,
       "max": null,
-      "share": 0.02
+      "share": 0.0002
     }
   ],
   "operating_points": [
     {
       "frac": 0.05,
       "n_flagged": 473,
-      "precision": 0.649,
-      "recall": 0.0792,
-      "lift": 1.5843,
-      "events_caught": 307
+      "precision": 0.704,
+      "recall": 0.086,
+      "lift": 1.7184,
+      "events_caught": 333
     },
     {
       "frac": 0.1,
       "n_flagged": 946,
-      "precision": 0.6416,
-      "recall": 0.1567,
-      "lift": 1.5662,
-      "events_caught": 607
+      "precision": 0.6934,
+      "recall": 0.1693,
+      "lift": 1.6926,
+      "events_caught": 656
     },
     {
       "frac": 0.15,
       "n_flagged": 1419,
-      "precision": 0.6237,
-      "recall": 0.2284,
-      "lift": 1.5223,
-      "events_caught": 885
+      "precision": 0.6695,
+      "recall": 0.2452,
+      "lift": 1.6341,
+      "events_caught": 950
     },
     {
       "frac": 0.2,
       "n_flagged": 1892,
-      "precision": 0.6136,
-      "recall": 0.2997,
-      "lift": 1.4978,
-      "events_caught": 1161
+      "precision": 0.6506,
+      "recall": 0.3178,
+      "lift": 1.5881,
+      "events_caught": 1231
     },
     {
       "frac": 0.25,
       "n_flagged": 2364,
-      "precision": 0.61,
-      "recall": 0.3722,
-      "lift": 1.4889,
-      "events_caught": 1442
+      "precision": 0.6189,
+      "recall": 0.3776,
+      "lift": 1.5106,
+      "events_caught": 1463
     },
     {
       "frac": 0.3,
       "n_flagged": 2837,
-      "precision": 0.5904,
-      "recall": 0.4324,
-      "lift": 1.4411,
-      "events_caught": 1675
+      "precision": 0.5953,
+      "recall": 0.436,
+      "lift": 1.4532,
+      "events_caught": 1689
     },
     {
       "frac": 0.4,
       "n_flagged": 3783,
-      "precision": 0.5538,
-      "recall": 0.5408,
-      "lift": 1.3517,
-      "events_caught": 2095
+      "precision": 0.5617,
+      "recall": 0.5485,
+      "lift": 1.3711,
+      "events_caught": 2125
     },
     {
       "frac": 0.5,
       "n_flagged": 4728,
-      "precision": 0.5275,
-      "recall": 0.6438,
-      "lift": 1.2876,
-      "events_caught": 2494
+      "precision": 0.5326,
+      "recall": 0.65,
+      "lift": 1.2999,
+      "events_caught": 2518
     }
   ]
 }

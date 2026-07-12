@@ -52,3 +52,69 @@ fair than the pre-audit version (demographic proxies `static_zip` /
 coverage**; residual caveats — per-ZIP miscalibration only partly removed,
 small/low-prevalence-group noise — carry to the **Phase-2 disparate-impact audit**
 (census join), which is the real fairness gate before any deployment.
+
+---
+
+# Phase-2 — census disparate-impact audit (Chicago / NYC / LA)
+
+Delivered 2026-07-12 via the reusable `foodsafety.audit` framework (decision
+[0018](decisions/0018-census-disparate-impact-fairness-audit.md), **pending Jun's
+sign-off**). Method: each city's deployed model on its chronological **test split**
+(realised labels), joined to ACS tract demographics (audit-only), then three lenses
+per axis — **statistical parity** (four-fifths flag-rate rule), **equalized odds**
+(FPR + FNR gaps), and **calibration** (ECE gap) — each with bootstrap CIs; a gap is
+a finding only when both material and CI-confident. Flagged = deployed **High** tier
+(secondary: Elevated+High). Full per-axis numbers: `reports/fairness/fairness_audit_<city>.json`.
+
+## The headline
+
+**Across all three cities, every demographic finding is on the parity lens only —
+the equalized-odds (FPR/FNR) and calibration lenses stay clean** (one exception:
+NYC cuisine, below). Parity does not condition on the truth, so a flag-rate gap is
+expected wherever true failure rates differ across groups — the model correctly
+flagging higher-risk areas, not biased errors. This is the reassuring pattern: the
+model does not make *more errors* or run *miscalibrated* for any race / income /
+immigrant group.
+
+| City | Test rows | Prevalence | M1 PR-AUC | Parity findings | Equalized-odds / calibration findings |
+|---|---|---|---|---|---|
+| Chicago | 6,222 | 10.5% | 0.382 | neighborhood, race, poverty, foreign-born, limited-English, facility type | **none** |
+| NYC | 9,456 | 41% | 0.583 | neighborhood, income, race, poverty, foreign-born, limited-English, cuisine | **NYC cuisine — ECE (calibration) gap** |
+| LA | 7,197 | 8.7% | 0.187 | neighborhood, income, race, foreign-born, limited-English, tenure | **none** |
+
+## Reading the parity findings
+
+- Where the flag rate **tracks group prevalence**, the parity gap is prevalence-
+  driven, not bias. Chicago neighborhood (corr 0.67) and limited-English (0.85) are
+  clear examples; both persist at the wider operating point.
+- Where the flag rate does **not** clearly track prevalence (Chicago race / poverty,
+  low correlation), the gap mostly does **not** persist at Elevated+High — pointing
+  to thin High-tier counts (Chicago flags only ~125 as High) rather than a stable
+  disparity. The secondary operating point is the honest check here.
+
+## The one signal to watch — NYC cuisine calibration
+
+NYC is the only city with a native cuisine field, and its model shows a
+**calibration (ECE) gap across cuisines in both the risk model and the forecast
+model** — the sole finding on a truth-conditioned lens in the whole audit.
+Follow-up: is it concentrated in a few low-count cuisines, or a genuine
+miscalibration worth a per-segment recalibration? Chicago and LA have
+no cuisine field (OSM-derived cuisine is a deferred, low-confidence refinement).
+
+## Mitigation (analysis only)
+
+`foodsafety.audit.mitigation` prices per-group thresholds that equalize recall.
+On Chicago, equalizing recall across income quartiles costs **~6 extra inspections
+of ~124 flagged** — a ~5% adjustment, consistent with there being no equalized-odds
+gap to fix. The model is not changed; adopting per-group thresholds is a scope call.
+
+## Caveats
+
+- Low-prevalence / small groups are gated out (n ≥ 50 for parity; ≥ 50 positives
+  for FNR/calibration) and every gap carries a bootstrap CI — a single below-floor
+  group is not a finding.
+- LA coordinates are geocoded with a zip-centroid fallback (some points coarse);
+  NYC/LA tenure is a first-seen-inspection proxy (no license history); NYC/LA
+  facility type is a single group (not carried into their feature frames).
+- "Area demographics" is the **residential** population of the establishment's
+  tract — a neighborhood proxy, not its actual patrons.

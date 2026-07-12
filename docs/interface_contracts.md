@@ -320,8 +320,10 @@ model inference happens in the app** — predictions are precomputed and written
 `scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
 `label_window_days`, `totals` (which as of 0.6.0 includes an
 `out_of_business` count, and whose `worsening` / `improving` counts cover
-**active venues only** — a closed business can't be "worsening"), and
-**`calibration`**. `calibration` is the
+**active venues only** — a closed business can't be "worsening"),
+**`risk_tier_thresholds`** (the unified tier cutoffs this run used, `[[cutoff,
+label], …]` with `High` last — decision record 0017; `methodology.json` reads it),
+and **`calibration`**. `calibration` is the
 Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
 uses it to reconstruct each establishment's calibrated-log-odds driver
 *waterfall* from the row's own `risk_score` + `top_drivers` shap values
@@ -329,22 +331,29 @@ uses it to reconstruct each establishment's calibrated-log-odds driver
 full per-profile waterfall costs three floats total. `top_drivers` now ships
 **5** drivers per row (within the documented 3–5).
 
-**Risk-tier thresholds** (recalibrated in Phase 6 against the actual score distribution):
+**Risk-tier thresholds** — one **unified cross-city rule** (decision record
+[0017](decisions/0017-seasonality-asof-scoring-and-low-tier-widening.md)), anchored
+to each city's base rate (label prevalence) because the three models predict
+different events: Low `< 0.5× base`, Moderate `0.5–1× base`, Elevated
+`1× base – High_cut`, High `≥ High_cut` where `High_cut = max(2× base, city p98)`.
+Per-city cutoffs (base rate in parens):
 
-| Score range | Tier | Approx population share |
-|---|---|---|
-| `[0.00, 0.04)` | Low | ~25% |
-| `[0.04, 0.13)` | Moderate | ~62% |
-| `[0.13, 0.30)` | Elevated | ~11% |
-| `[0.30, 1.00]` | High | ~1% |
+| City | Low `<` | Moderate `<` | Elevated `<` | High `≥` |
+|---|---|---|---|---|
+| Chicago (0.108) | 0.054 | 0.108 | 0.216 | 0.216 |
+| NYC (0.41) | 0.205 | 0.41 | 0.82 | 0.82 |
+| LA (0.087) | 0.0435 | 0.087 | 0.306 | 0.306 |
 
-Note: the mock fixture (`tests/fixtures/scores_mock.parquet`) still uses
-the original (0.20 / 0.40 / 0.65) thresholds — those were appropriate for
-uniformly-distributed synthetic scores. Real calibrated probabilities from
-the model are much more concentrated near zero (median ~0.06, p95 ~0.18),
-so the production thresholds were recalibrated to produce a useful UI
-distribution. Single source of truth: ``RISK_TIER_THRESHOLDS`` in
-``src/foodsafety/serve/predict_batch.py``.
+Cutoffs are computed by `assign_risk_tiers` (`src/foodsafety/serve/predict_batch.py`)
+and the exact values a run used are recorded in `scores.json`'s top-level
+**`risk_tier_thresholds`** (`[[cutoff, label], …]`, High last); `methodology.json`
+reads them so the how-it-works bands can't drift. Chicago's shares are also
+**as-of-month dependent** (0017 § A freezes scoring to the current month) — read
+`scoring_month` in the metrics report before treating a share shift as a data change.
+
+Note: the mock fixture (`tests/fixtures/scores_mock.parquet`) still uses the
+original (0.20 / 0.40 / 0.65) thresholds — appropriate for its uniformly-distributed
+synthetic scores.
 
 **Mock fixture**: `tests/fixtures/scores_mock.parquet` conforms to this schema
 and is used by the UI team in Phase 1 (walking skeleton) before the real
@@ -379,6 +388,20 @@ to the committed/locally-generated copies under `app/public/data/`).
   pages. Producer `_shard_of()` and the web app's `commentShardOf()` must use
   the same md5 scheme. Regenerate and upload `inspection_history.json` and the
   shards **together** so the index alignment holds.
+
+  **Per city (NYC, LA).** The same scheme lives under each city prefix —
+  `web-app-data/nyc/comments/<xx>.json` and `web-app-data/la/comments/<xx>.json`,
+  emitted by `build_nyc_scores.py` / `build_la_scores.py` (`write_comment_shards`)
+  in the same aligned pass as that city's `inspection_history.json`. Format
+  differs by source: **LA** lines carry the point deduction (`"<item> (−N pts)"`,
+  LA scores start at 100 and deduct per violation); **NYC** flags critical
+  citations (`"<description> (critical)"`). Neither feed has a per-line inspector
+  note, so the timeline renders a flat list (the nested-note expansion stays
+  Chicago-only). `prebuild-sync-s3.mjs` pulls all three cities' shards and
+  re-shards them per license at build; `package.json`'s NYC/LA `build-detail-data`
+  steps read the synced dirs. Gitignored like Chicago's — S3 is the source of
+  truth; whoever republishes a city's `web-app-data/<city>/` must sync its
+  `comments/` subdir too.
 
 - **`detail/<license_id>.json` + `detail-globals.json`** (build artifacts, #119,
   decision 0013) — since #119 the detail page is **client-rendered**

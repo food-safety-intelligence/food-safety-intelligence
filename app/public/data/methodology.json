@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-06-27T09:29:38+00:00",
+  "generated_at": "2026-07-06T01:48:23+00:00",
   "model_version": "xgb_monotone",
   "provenance": {
-    "run_id": "20260627_ac236faed",
-    "git_commit": "ac236faed73e43df170a246f95d68714e40b176d",
+    "run_id": "20260706_f18a38d81",
+    "git_commit": "f18a38d81a54f2e1b72a7f42babd9b06fb0c4f95",
     "git_dirty": true,
     "feature_set_version": "68fe2ae76184",
     "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3"
@@ -23,26 +23,26 @@
     {
       "label": "Low",
       "min": 0.0,
-      "max": 0.04,
-      "share": 0.4811
+      "max": 0.054,
+      "share": 0.6556
     },
     {
       "label": "Moderate",
-      "min": 0.04,
-      "max": 0.13,
-      "share": 0.4544
+      "min": 0.054,
+      "max": 0.108,
+      "share": 0.2474
     },
     {
       "label": "Elevated",
-      "min": 0.13,
-      "max": 0.3,
-      "share": 0.0552
+      "min": 0.108,
+      "max": 0.216,
+      "share": 0.0782
     },
     {
       "label": "High",
-      "min": 0.3,
+      "min": 0.216,
       "max": null,
-      "share": 0.0093
+      "share": 0.0187
     }
   ],
   "operating_points": [

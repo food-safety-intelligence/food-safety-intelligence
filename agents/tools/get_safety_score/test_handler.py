@@ -25,6 +25,11 @@ import pytest
 _THIS_DIR = os.path.dirname(__file__)
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
+# handler imports the shared matcher (agents/scores_match.py), so the agents/
+# dir must be importable too — same dir the deployed runtime and run_eval add.
+_AGENTS_DIR = os.path.dirname(os.path.dirname(_THIS_DIR))
+if _AGENTS_DIR not in sys.path:
+    sys.path.insert(0, _AGENTS_DIR)
 
 # handler imports sagemaker_stub, which imports boto3. Provide a minimal stub
 # so the module imports without the AWS SDK installed.
@@ -184,6 +189,9 @@ _GEO_SCORES = {
             "trend_slope": 0.0,
             "neighborhood": "Loop",
             "top_drivers": [],
+            # Closed venue (scores schema 0.6.0, decision 0014).
+            "is_out_of_business": True,
+            "closed_since": "2020-06-01",
         },
     ]
 }
@@ -238,6 +246,34 @@ def test_trend_label_maps_slope_including_null():
     # Null slope = <2 scored inspections under scores schema 0.5.0: reported as
     # "we can't say", not a confident flat trend (see decision 0011).
     assert _trend_label(None) == "not enough inspection history"
+
+
+def test_closed_venue_flag_passes_through(_geo_scores):
+    # A closed record (CHINA CAFE) must surface is_out_of_business + closed_since
+    # so the agent can frame its score as historical (decision 0014). An active
+    # venue must report the flag as False, not omit it.
+    closed = _score_one(
+        {"osm_id": "9", "name": "China Cafe", "address": "", "lat": 41.88401, "lon": -87.63099}
+    )
+    assert closed["matched_scores_json"] is True
+    assert closed["is_out_of_business"] is True
+    assert closed["closed_since"] == "2020-06-01"
+
+    active = _score_one(
+        {"osm_id": "10", "name": "Amarit", "address": "", "lat": 41.87450, "lon": -87.62930}
+    )
+    assert active["is_out_of_business"] is False
+    assert active["closed_since"] is None
+
+
+def test_no_record_reports_not_closed(_geo_scores):
+    # An unmatched venue carries the closure keys too (no record either way).
+    out = _score_one(
+        {"osm_id": "11", "name": "Nowhere Diner", "address": "", "lat": 41.95, "lon": -87.70}
+    )
+    assert out["status"] == "no_inspection_record"
+    assert out["is_out_of_business"] is False
+    assert out["closed_since"] is None
 
 
 def test_geo_fallback_token_subset_name(_geo_scores):

@@ -39,6 +39,7 @@ from foodsafety.config import (
     WEB_APP_DATA_DIR,
 )
 from foodsafety.explain.shap_drivers import tree_contributions
+from foodsafety.features.temporal_features import override_scoring_month
 from foodsafety.io import storage
 from foodsafety.models.baseline import (
     ALL_FEATURES,
@@ -115,6 +116,12 @@ def main() -> None:
     features = storage.read_parquet(FEATURES_PATH)
     print(f"  shape: {features.shape}")
 
+    # As-of-common-month scoring anchor (change A): every venue is scored with its
+    # seasonal features frozen to the current calendar month. Captured here so it
+    # lands in the metrics report; the override is applied to the scoring frame
+    # below (never to train/val/test).
+    scoring_month = datetime.now().month
+
     # Drop right-truncated rows from modeling (under-counted labels); keep the
     # full set for scoring the home page — same discipline as the LogReg path.
     if "right_truncated" in features.columns:
@@ -183,6 +190,7 @@ def main() -> None:
         "label_window_days": LABEL_WINDOW_DAYS,
         "random_state": RANDOM_STATE,
         "date_trained": datetime.now().strftime("%Y-%m-%d"),
+        "scoring_month": scoring_month,
         "val": val_metrics,
         "test": test_metrics,
     }
@@ -209,11 +217,19 @@ def main() -> None:
     storage.dump_joblib(forecast, forecast_model_path)
     print(f"Saved forecast model → {forecast_model_path}")
 
+    # As-of-common-month scoring: freeze the seasonal features to the CURRENT
+    # calendar month for every venue before scoring, so the served snapshot shows
+    # a single consistent as-of month rather than each venue's (arbitrary, often
+    # stale) last-inspection month. Train/val/test above ran on real months, so
+    # the eval metrics are untouched; only the served scores are re-anchored.
+    features_scoring = override_scoring_month(features, month=scoring_month)
+    print(f"Scoring frame frozen to month={scoring_month} (as-of-common-month)")
+
     # Score EVERY inspection with Model 2 — these are the trend trajectory points
     # (history is scored, not just the latest anchor). Calibrated to a probability.
-    X_full_f = prepare_xgb_features(features[ALL_FEATURES], categorical_dtypes=cat_dtypes).drop(
-        columns=CURRENT_OUTCOME_FEATURES
-    )
+    X_full_f = prepare_xgb_features(
+        features_scoring[ALL_FEATURES], categorical_dtypes=cat_dtypes
+    ).drop(columns=CURRENT_OUTCOME_FEATURES)
     forecast_scores = expit(coef_f * xgb_fore.predict(X_full_f, output_margin=True) + inter_f)
 
     # Persist the per-inspection forecast scores so export_inspection_history can
@@ -236,7 +252,7 @@ def main() -> None:
     print("Building scores table (latest inspection per license; TreeSHAP drivers)")
     scores = build_scores_table(
         served,
-        features,
+        features_scoring,
         ALL_FEATURES,
         n_drivers=5,
         contributions_fn=lambda X: served.contributions(X)[0],
@@ -249,7 +265,7 @@ def main() -> None:
 
     # Calibration triple: a = -coef, b = -inter (app uses logit = -(a*margin+b)),
     # intercept = the TreeSHAP base margin (so intercept + Σshap == raw margin).
-    _, base_margin = served.contributions(features[ALL_FEATURES].head(1))
+    _, base_margin = served.contributions(features_scoring[ALL_FEATURES].head(1))
     calibration = {"a": -coef, "b": -inter, "intercept": float(base_margin)}
     print(f"Calibration triple: {calibration}")
 
@@ -260,6 +276,8 @@ def main() -> None:
         schema_version="0.6.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
+        # Unified tier cutoffs used this run (DR 0017) — Chicago base rate default.
+        risk_tier_thresholds=scores.attrs.get("risk_tier_thresholds"),
     )
     print(f"Wrote {SCORES_JSON_PATH}")
 

@@ -117,7 +117,7 @@ Three layers, in this order — A and B are required, C is a stretch:
 - Yelp Open Dataset + Yelp fuzzy join
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
-- Real-time ingestion, authentication, multi-city support
+- Real-time ingestion, authentication
 - **A scheduler for periodic ingestion (Airflow, Prefect, cron, Fargate timer)**
   — the incremental ingestion *capability* (`ingest_raw.py --incremental`:
   watermark + lookback + upsert on the natural key) is now in scope for Phase 2.
@@ -151,7 +151,13 @@ when someone asks "what about X?" the answer is "noted, post-demo."
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
 - NOAA weather features, Yelp Open Dataset + fuzzy join
 - Production fairness audit (disparate-impact tests, reweighting)
-- Multi-city support beyond Chicago
+- More cities beyond the three now shipped. Chicago is the primary/production
+  city; **NYC and LA are live as research-preview cities** (one static build +
+  runtime city switch, per-city diffs in `app/src/lib/city.ts`), each served by
+  the same two-model XGBoost + SHAP pipeline as Chicago (Model 1 risk score +
+  Model 2 forecast-only trend). Adding a fourth city is the roadmap item; the
+  runbook is `docs/adding-a-city.md`. The chat agent's restaurant-risk answers
+  stay Chicago-only.
 - Auth on the chat endpoint (the Cognito upgrade path is noted in
   `app/src/lib/agent-api.ts`)
 
@@ -310,6 +316,13 @@ source of truth.
   Tailwind reserves the `base` keyword, so `text-base` has no paired
   line-height and inherits the 1.5 body default — that's expected.)
 - No emoji in committed code or UI unless explicitly asked.
+- No em dashes (—) in user-facing UI copy. This covers JSX text, string props
+  (labels, aria-labels, titles, placeholders), template literals rendered as
+  text, and user-facing data strings (glossary, driver descriptions, city
+  descriptions). Rewrite the sentence instead: a comma, colon, parentheses, or
+  a sentence split, whichever reads best. En dashes (–, e.g. code ranges like
+  `1–29`) and a standalone dash used as a "no value" placeholder are fine. Code
+  comments are exempt.
 - Accessibility is default: keyboard nav, ARIA labels on icon-only buttons,
   ≥44px tap targets, sufficient contrast.
 - **Validate UI changes rigorously — by observing the running app, not
@@ -372,7 +385,8 @@ Process:
 
 - Branch per **owner + workstream**: `<owner>/<workstream>-<short-desc>` — e.g.
   `bella/mle-feature-refresh`, `arun/de-loader-fix`. Workstreams: `de`, `eda`,
-  `mle`, `app`, `pm`. (Applies to new branches; existing ones aren't retroactively renamed.)
+  `mle`, `app`, `agent` (Bedrock/AgentCore agent + its deploy), `pm`. (Applies to
+  new branches; existing ones aren't retroactively renamed.)
 - Squash-merge to `main`. No direct pushes to `main`.
 - One reviewer required; backup owner is the default reviewer.
 - PR review SLA = 24h. If silent past 24h on a clearly-scoped workstream
