@@ -293,7 +293,7 @@ export function InspectorWorklist() {
           />
           <StatCard
             value={index ? worseningCount.toLocaleString() : "—"}
-            label="Worsening trend (90 d)"
+            label="Worsening trend (up to past 5 visits)"
             valueClass="text-coral"
           />
           {/* Deviates from the handoff's "Scored citywide": counts active
@@ -484,8 +484,8 @@ export function InspectorWorklist() {
               <h2 className="text-base font-bold">Rising fast</h2>
             </div>
             <p className="text-xs text-muted mt-1.5 mb-3">
-              Steepest score increase over the last 90 days, worth a look even
-              below the High tier.
+              Steepest score increase over an establishment&apos;s last few
+              visits, worth a look even below the High tier.
             </p>
             <div className="flex flex-col gap-0.5">
               {risingFast.map((r) => (
@@ -502,9 +502,11 @@ export function InspectorWorklist() {
                       {r.address}
                     </span>
                   </span>
-                  <span className="num text-xs font-semibold text-terra shrink-0">
-                    +{((r.trend_slope ?? 0) * 90).toFixed(2)} / 90d
-                  </span>
+                  <TrendIndicator
+                    slope={r.trend_slope}
+                    compact
+                    className="shrink-0"
+                  />
                 </Link>
               ))}
               {index && risingFast.length === 0 && (

@@ -30,7 +30,6 @@ export function HomeLogo() {
         <div className="text-lg font-semibold tracking-tight group-hover:text-teal transition-colors">
           <Wordmark />
         </div>
-        <div className="text-2xs text-muted tracking-wide">Food Safety</div>
       </div>
     </Link>
   );
