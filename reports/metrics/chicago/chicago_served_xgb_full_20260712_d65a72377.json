@@ -1,0 +1,123 @@
+{
+  "model": "chicago_served_xgb_full",
+  "city": "chicago",
+  "variant": "served_xgb_full",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_fail_or_critical_next_180d",
+  "n_features": 36,
+  "data_vintage": "20251212",
+  "run_id": "20260712_d65a72377",
+  "git_commit": "d65a7237793f02e1e6a804a1ed12adf78f7653ee",
+  "git_dirty": true,
+  "feature_set_version": "68fe2ae76184",
+  "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3",
+  "train_window": {
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01"
+  },
+  "split": {
+    "train_n": 79268,
+    "val_n": 16564,
+    "test_n": 7008,
+    "test_prevalence": 0.1079
+  },
+  "test": {
+    "n": 7008,
+    "positive_rate": 0.107877,
+    "pr_auc": 0.382016,
+    "roc_auc": 0.805789,
+    "precision_at_5pct": 0.48433,
+    "precision_at_10pct": 0.415121,
+    "precision_at_20pct": 0.31669,
+    "recall_at_5pct": 0.224868,
+    "recall_at_10pct": 0.384921,
+    "recall_at_20pct": 0.587302,
+    "top_decile_lift": 3.848108,
+    "brier_score": 0.080788,
+    "log_loss": 0.27818
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.583333,
+    "recall": 0.148148,
+    "f1": 0.236287
+  },
+  "feature_importance": [
+    {
+      "feature": "was_fail",
+      "mean_abs_shap": 0.73297,
+      "share": 0.2584
+    },
+    {
+      "feature": "n_priority_this_inspection",
+      "mean_abs_shap": 0.389026,
+      "share": 0.1371
+    },
+    {
+      "feature": "license_age_days",
+      "mean_abs_shap": 0.319938,
+      "share": 0.1128
+    },
+    {
+      "feature": "prior_complaint_inspections",
+      "mean_abs_shap": 0.28201,
+      "share": 0.0994
+    },
+    {
+      "feature": "n_core_this_inspection",
+      "mean_abs_shap": 0.200443,
+      "share": 0.0707
+    },
+    {
+      "feature": "temporal_month",
+      "mean_abs_shap": 0.182959,
+      "share": 0.0645
+    },
+    {
+      "feature": "static_inspection_type",
+      "mean_abs_shap": 0.161253,
+      "share": 0.0568
+    },
+    {
+      "feature": "static_risk_tier",
+      "mean_abs_shap": 0.06403,
+      "share": 0.0226
+    },
+    {
+      "feature": "prior_priority_violations_365d",
+      "mean_abs_shap": 0.055193,
+      "share": 0.0195
+    },
+    {
+      "feature": "days_since_last_fail",
+      "mean_abs_shap": 0.054137,
+      "share": 0.0191
+    },
+    {
+      "feature": "days_since_last_inspection",
+      "mean_abs_shap": 0.045862,
+      "share": 0.0162
+    },
+    {
+      "feature": "prior_core_violations",
+      "mean_abs_shap": 0.038852,
+      "share": 0.0137
+    },
+    {
+      "feature": "flag_kw_pest",
+      "mean_abs_shap": 0.036114,
+      "share": 0.0127
+    },
+    {
+      "feature": "temporal_quarter",
+      "mean_abs_shap": 0.030528,
+      "share": 0.0108
+    },
+    {
+      "feature": "prior_fail_or_priority_events",
+      "mean_abs_shap": 0.029593,
+      "share": 0.0104
+    }
+  ]
+}

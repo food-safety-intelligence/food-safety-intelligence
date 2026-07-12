@@ -1,14 +1,14 @@
 {
-  "model": "la_served_xgb_full",
+  "model": "la_xgb_plus_keywords",
   "city": "la",
-  "variant": "served_xgb_full",
+  "variant": "xgb_plus_keywords",
   "estimator": "xgb",
   "calibration": "sigmoid (platt)",
   "label": "y_next_bad",
-  "n_features": 28,
+  "n_features": 40,
   "data_vintage": "20260331",
-  "run_id": "20260712_80b35ed9e",
-  "git_commit": "80b35ed9e4f0276c86b1aa51a7e097e9e6c0a547",
+  "run_id": "20260712_d65a72377",
+  "git_commit": "d65a7237793f02e1e6a804a1ed12adf78f7653ee",
   "git_dirty": true,
   "feature_set_version": "9084bb75c54a",
   "raw_snapshots": {
@@ -30,16 +30,22 @@
   "test": {
     "n": 7197,
     "positive_rate": 0.086564,
-    "pr_auc": 0.186984,
-    "roc_auc": 0.721147,
-    "precision_at_5pct": 0.244444,
-    "precision_at_10pct": 0.218056,
-    "precision_at_20pct": 0.198611,
-    "recall_at_5pct": 0.141252,
-    "recall_at_10pct": 0.252006,
-    "recall_at_20pct": 0.459069,
-    "top_decile_lift": 2.519014,
-    "brier_score": 0.075352,
-    "log_loss": 0.272468
+    "pr_auc": 0.182644,
+    "roc_auc": 0.722184,
+    "precision_at_5pct": 0.236111,
+    "precision_at_10pct": 0.216667,
+    "precision_at_20pct": 0.197222,
+    "recall_at_5pct": 0.136437,
+    "recall_at_10pct": 0.250401,
+    "recall_at_20pct": 0.455859,
+    "top_decile_lift": 2.50297,
+    "brier_score": 0.075467,
+    "log_loss": 0.271948
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.333333,
+    "recall": 0.001605,
+    "f1": 0.003195
   }
 }

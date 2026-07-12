@@ -50,10 +50,12 @@ from sklearn.compose import ColumnTransformer
 from sklearn.frozen import FrozenEstimator
 from sklearn.impute import SimpleImputer
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
 from foodsafety.config import FEATURES_PATH, RANDOM_STATE
+from foodsafety.explain.shap_drivers import tree_contributions
 from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.io import storage
 from foodsafety.models.baseline import (
@@ -85,6 +87,36 @@ import build_la_scores as la  # noqa: E402
 import build_nyc_scores as nyc  # noqa: E402
 
 HEADLINE = ("pr_auc", "roc_auc", "precision_at_10pct", "top_decile_lift", "brier_score")
+
+
+def threshold_metrics(y, p, thr: float = 0.5) -> dict:
+    """Precision / recall / F1 at a fixed decision threshold on the calibrated
+    probability. Complements the ranking metrics (pr@10, recall@10, lift) in
+    evaluate(): those need no threshold; these are the 0.5-cutoff classification
+    view. Under heavy imbalance (LA base 8.7%) a 0.5 cutoff is stringent, so
+    recall runs low — read it alongside the @10% operating point, not instead.
+    """
+    yhat = (p >= thr).astype(int)
+    return {
+        "threshold": thr,
+        "precision": round(float(precision_score(y, yhat, zero_division=0)), 6),
+        "recall": round(float(recall_score(y, yhat, zero_division=0)), 6),
+        "f1": round(float(f1_score(y, yhat, zero_division=0)), 6),
+    }
+
+
+def global_shap_importance(clf, x_df, feats: list[str], top: int = 15) -> list[dict]:
+    """Global feature importance for a served XGB = mean |TreeSHAP| per feature
+    over the test set (margin space), the same explainability the app's per-row
+    driver waterfalls are built on. Ranked descending; top `top` returned.
+    """
+    contribs, _ = tree_contributions(clf, x_df, feats)
+    imp = contribs.abs().mean().sort_values(ascending=False)
+    total = float(imp.sum()) or 1.0
+    return [
+        {"feature": f, "mean_abs_shap": round(float(v), 6), "share": round(float(v) / total, 4)}
+        for f, v in imp.head(top).items()
+    ]
 
 
 def fit_logreg_sigmoid(
@@ -209,9 +241,13 @@ def run_city(city: str) -> list[dict]:
 
     rows = []
     for name, kind, feats in variants:
+        importance = None
         if kind == "xgb":
             clf, coef, inter = fit_xgb(sp.train, sp.val, feats, label=label)
             p_test = xgb_proba(clf, coef, inter, sp.test[feats])
+            # Global feature importance for the DEPLOYED model (served config).
+            if name == "served_xgb_full":
+                importance = global_shap_importance(clf, sp.test[feats], feats)
         else:
             cal = fit_logreg_sigmoid(sp.train, sp.val, feats, label)
             p_test = cal.predict_proba(sp.test[feats])[:, 1]
@@ -240,7 +276,10 @@ def run_city(city: str) -> list[dict]:
             },
             "base_rate": base_rate,
             "test": metrics,
+            "threshold_0p5": threshold_metrics(y_test, p_test),
         }
+        if importance is not None:
+            report["feature_importance"] = importance
         (out_dir / f"{city}_{name}_{run_id}.json").write_text(json.dumps(report, indent=2))
         rows.append({"variant": name, "n_feat": len(feats), **{k: metrics[k] for k in HEADLINE}})
         print(
@@ -267,7 +306,8 @@ def _fit_chicago_xgb(x_train, x_val, x_test, feats, y_train, y_val):
     margin = est.predict(x_val[feats], output_margin=True)
     platt = LogisticRegression(C=1e10, solver="lbfgs").fit(margin.reshape(-1, 1), y_val)
     coef, inter = float(platt.coef_[0, 0]), float(platt.intercept_[0])
-    return expit(coef * est.predict(x_test[feats], output_margin=True) + inter)
+    p_test = expit(coef * est.predict(x_test[feats], output_margin=True) + inter)
+    return p_test, est
 
 
 def run_chicago() -> list[dict]:
@@ -331,8 +371,12 @@ def run_chicago() -> list[dict]:
 
     rows = []
     for name, kind, feats in variants:
+        importance = None
         if kind == "xgb":
-            p_test = _fit_chicago_xgb(xtr, xval, xtest, feats, y_train, y_val)
+            p_test, est = _fit_chicago_xgb(xtr, xval, xtest, feats, y_train, y_val)
+            # Global feature importance for the DEPLOYED model (served config).
+            if name == "served_xgb_full":
+                importance = global_shap_importance(est, xtest[feats], feats)
         else:
             base = build_baseline_pipeline()
             base.fit(sp.train[feats], y_train)
@@ -359,7 +403,10 @@ def run_chicago() -> list[dict]:
                 "test_prevalence": round(float(y_test.mean()), 4),
             },
             "test": metrics,
+            "threshold_0p5": threshold_metrics(y_test, p_test),
         }
+        if importance is not None:
+            report["feature_importance"] = importance
         (out_dir / f"chicago_{name}_{run_id}.json").write_text(json.dumps(report, indent=2))
         rows.append({"variant": name, "n_feat": len(feats), **{k: metrics[k] for k in HEADLINE}})
         print(
@@ -381,7 +428,9 @@ def main() -> None:
     print("\n===== ABLATION SUMMARY (test set) =====")
     for c, rows in summary.items():
         print(f"\n{c.upper()}")
-        print(pd.DataFrame(rows).to_string(index=False))
+        for r in rows:
+            metrics = "  ".join(f"{k}={r[k]:.4f}" for k in HEADLINE)
+            print(f"  {r['variant']:24s} feats={r['n_feat']:3d}  {metrics}")
 
 
 if __name__ == "__main__":
