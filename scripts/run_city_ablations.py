@@ -43,6 +43,7 @@ import json
 import sys
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from scipy.special import expit
 from sklearn.calibration import CalibratedClassifierCV
@@ -103,6 +104,53 @@ def threshold_metrics(y, p, thr: float = 0.5) -> dict:
         "recall": round(float(recall_score(y, yhat, zero_division=0)), 6),
         "f1": round(float(f1_score(y, yhat, zero_division=0)), 6),
     }
+
+
+def operating_points(y, p, fracs=(0.05, 0.10, 0.20)) -> list[dict]:
+    """Ranking operating points — inspect the top `frac` riskiest and read
+    precision / recall / lift there. This, not a 0.5 cutoff, is how a
+    capacity-limited triage tool is actually used; `frac` = the worklist depth.
+    Lift = precision / base rate (>1 means the top slice concentrates positives).
+    """
+    y = np.asarray(y)
+    n, pos, base = len(y), max(int(y.sum()), 1), (float(y.mean()) or 1.0)
+    order = np.argsort(-p)
+    out = []
+    for f in fracs:
+        k = max(1, int(round(f * n)))
+        top = y[order[:k]]
+        prec = float(top.mean())
+        out.append(
+            {
+                "frac": f,
+                "k": k,
+                "precision": round(prec, 6),
+                "recall": round(float(top.sum()) / pos, 6),
+                "lift": round(prec / base, 4),
+            }
+        )
+    return out
+
+
+def f1_optimal_threshold(y, p) -> dict:
+    """The threshold that maximises F1 — a principled single cutoff for the
+    classification-metric view, vs the arbitrary 0.5. Reported as a diagnostic
+    (best the model can do as a hard classifier), not a served knob: the product
+    uses ranked tiers, not a binary flag. Swept over the distinct rounded scores.
+    """
+    y = np.asarray(y)
+    best = {"threshold": 0.5, "precision": 0.0, "recall": 0.0, "f1": -1.0}
+    for t in np.unique(np.round(p, 3)):
+        yhat = (p >= t).astype(int)
+        f = f1_score(y, yhat, zero_division=0)
+        if f > best["f1"]:
+            best = {
+                "threshold": round(float(t), 4),
+                "precision": round(float(precision_score(y, yhat, zero_division=0)), 6),
+                "recall": round(float(recall_score(y, yhat, zero_division=0)), 6),
+                "f1": round(float(f), 6),
+            }
+    return best
 
 
 def global_shap_importance(clf, x_df, feats: list[str], top: int = 15) -> list[dict]:
@@ -278,7 +326,9 @@ def run_city(city: str) -> list[dict]:
             "test": metrics,
             "threshold_0p5": threshold_metrics(y_test, p_test),
         }
-        if importance is not None:
+        if importance is not None:  # served model → richer operating-point record
+            report["operating_points"] = operating_points(y_test, p_test)
+            report["f1_optimal_threshold"] = f1_optimal_threshold(y_test, p_test)
             report["feature_importance"] = importance
         (out_dir / f"{city}_{name}_{run_id}.json").write_text(json.dumps(report, indent=2))
         rows.append({"variant": name, "n_feat": len(feats), **{k: metrics[k] for k in HEADLINE}})
@@ -405,7 +455,9 @@ def run_chicago() -> list[dict]:
             "test": metrics,
             "threshold_0p5": threshold_metrics(y_test, p_test),
         }
-        if importance is not None:
+        if importance is not None:  # served model → richer operating-point record
+            report["operating_points"] = operating_points(y_test, p_test)
+            report["f1_optimal_threshold"] = f1_optimal_threshold(y_test, p_test)
             report["feature_importance"] = importance
         (out_dir / f"chicago_{name}_{run_id}.json").write_text(json.dumps(report, indent=2))
         rows.append({"variant": name, "n_feat": len(feats), **{k: metrics[k] for k in HEADLINE}})

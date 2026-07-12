@@ -141,7 +141,7 @@ All three cities' served models now sit in one parallel ablation frame, from
 numbers match the served model), holds its served temporal split fixed, and
 evaluates every variant on the **same** held-out test set. Each run is a tracked
 JSON under `reports/metrics/<city>/<city>_<variant>_<run_id>.json` (all from
-run_id `20260712_d65a72377`), carrying the full metric set — pr-auc, roc-auc,
+run_id `20260712_b2dc6102d`), carrying the full metric set — pr-auc, roc-auc,
 precision/recall/f1 at 5/10/20% and at a 0.5 threshold, top-decile lift, Brier,
 log-loss — plus, for each served model, its global feature importance. The runner
 never rewrites committed app JSON.
@@ -170,7 +170,7 @@ years, so CV folds are thin. Read the deltas as directional. As a sanity check,
 Chicago's `served_xgb_full` here (PR-AUC **0.382**) reproduces the served model
 (DR 0009) — the ablation fits match production.
 
-### Chicago — test n=7,008, base rate 10.8% (`chicago_*_20260712_d65a72377.json`)
+### Chicago — test n=7,008, base rate 10.8% (`chicago_*_20260712_b2dc6102d.json`)
 
 Metrics: PR-AUC, ROC-AUC, then precision / recall / f1 at the **0.5 threshold**,
 then precision@10% / recall@10% / lift@10%.
@@ -183,7 +183,7 @@ then precision@10% / recall@10% / lift@10%.
 | xgb_no_keywords (drop 12 `flag_kw_*`) | 24 | 0.371 | 0.803 | 0.551 | 0.130 | 0.210 | 0.412 | 0.382 | 3.82 |
 | logreg_full | 36 | 0.372 | 0.800 | 0.553 | 0.152 | 0.239 | 0.415 | 0.385 | 3.85 |
 
-### NYC — test n=9,456, base rate 41.0% (`nyc_*_20260712_d65a72377.json`)
+### NYC — test n=9,456, base rate 41.0% (`nyc_*_20260712_b2dc6102d.json`)
 
 | Variant | n | PR-AUC | ROC-AUC | P(.5) | R(.5) | F1(.5) | P@10 | R@10 | lift@10 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -194,7 +194,7 @@ then precision@10% / recall@10% / lift@10%.
 | xgb_plus_keywords (+12 keyword flags) | 41 | 0.580 | 0.674 | 0.606 | 0.403 | 0.484 | 0.683 | 0.167 | 1.67 |
 | logreg_full | 29 | 0.561 | 0.666 | 0.600 | 0.401 | 0.481 | 0.641 | 0.156 | 1.56 |
 
-### LA — test n=7,197, base rate 8.7% (`la_*_20260712_d65a72377.json`)
+### LA — test n=7,197, base rate 8.7% (`la_*_20260712_b2dc6102d.json`)
 
 | Variant | n | PR-AUC | ROC-AUC | P(.5) | R(.5) | F1(.5) | P@10 | R@10 | lift@10 |
 |---|---|---|---|---|---|---|---|---|---|
@@ -210,6 +210,38 @@ and ROC (0.72). The **0.5-threshold P/R/F1 are near-degenerate** here (the
 calibrated XGB rarely scores an LA event above 0.5, so most variants predict no
 positives → 0/0); this is the imbalance caveat above in action, not a bug —
 LA's meaningful operating point is the top-10% (P@10 / R@10 / lift).
+
+## Served-model operating points
+
+The 0.5-threshold P/R/F1 above are the textbook default, but not what the product
+uses (and for LA, barely usable). The product ranks establishments and works the
+top slice, so the meaningful cutoffs are **worklist depth** (top-K) and, if a
+single hard threshold is ever needed, the **F1-optimal** one. Both are recorded
+in each `*_served_xgb_full_*.json` (`operating_points`, `f1_optimal_threshold`).
+
+Served model — precision / recall / lift at each worklist depth:
+
+| City (base rate) | top 5% | top 10% | top 20% |
+|---|---|---|---|
+| Chicago (10.8%) | 0.486 / 0.23 / 4.50× | 0.415 / 0.39 / 3.85× | 0.317 / 0.59 / 2.94× |
+| NYC (41.0%) | 0.704 / 0.09 / 1.72× | 0.693 / 0.17 / 1.69× | 0.651 / 0.32 / 1.59× |
+| LA (8.7%) | 0.244 / 0.14 / 2.82× | 0.218 / 0.25 / 2.52× | 0.199 / 0.46 / 2.30× |
+
+Served model — F1-optimal single threshold (vs the arbitrary 0.5):
+
+| City | best threshold | P | R | F1 | (F1 at 0.5) |
+|---|---|---|---|---|---|
+| Chicago | 0.225 | 0.357 | 0.508 | **0.419** | 0.236 |
+| NYC | 0.316 | 0.484 | 0.819 | **0.609** | 0.487 |
+| LA | 0.122 | 0.199 | 0.467 | **0.279** | 0.006 |
+
+Takeaways: (1) **0.5 is the wrong cutoff** — moving to the F1-optimal threshold
+roughly doubles Chicago's F1 (0.236 → 0.419) and rescues LA's from ~0 (0.006 →
+0.279), because the calibrated scores for a rare event sit well below 0.5. (2)
+**Lift falls with depth** (Chicago 4.5× at 5% → 2.9× at 20%): going deeper catches
+more (recall up) at lower precision — a **capacity decision**, not a model change.
+(3) This is a *diagnostic*. The served product uses base-rate-anchored **tiers**
+(DR 0017), not a binary threshold, so there is no served cutoff to tune.
 
 ## Deployed-model feature importance
 

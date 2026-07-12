@@ -7,8 +7,8 @@
   "label": "y_next_bad",
   "n_features": 28,
   "data_vintage": "20260331",
-  "run_id": "20260712_d65a72377",
-  "git_commit": "d65a7237793f02e1e6a804a1ed12adf78f7653ee",
+  "run_id": "20260712_b2dc6102d",
+  "git_commit": "b2dc6102d2cb7617fc4921c9722c382220ca99c2",
   "git_dirty": true,
   "feature_set_version": "9084bb75c54a",
   "raw_snapshots": {
@@ -47,6 +47,35 @@
     "precision": 0.666667,
     "recall": 0.00321,
     "f1": 0.00639
+  },
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "k": 360,
+      "precision": 0.244444,
+      "recall": 0.141252,
+      "lift": 2.8239
+    },
+    {
+      "frac": 0.1,
+      "k": 720,
+      "precision": 0.218056,
+      "recall": 0.252006,
+      "lift": 2.519
+    },
+    {
+      "frac": 0.2,
+      "k": 1439,
+      "precision": 0.198749,
+      "recall": 0.459069,
+      "lift": 2.296
+    }
+  ],
+  "f1_optimal_threshold": {
+    "threshold": 0.122,
+    "precision": 0.199042,
+    "recall": 0.467095,
+    "f1": 0.279137
   },
   "feature_importance": [
     {
