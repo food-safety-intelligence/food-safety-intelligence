@@ -687,12 +687,16 @@ export function ChatInterface({
                       ? "Ask about a place, or food safety for someone vulnerable…"
                       : "Ask about a neighborhood, cuisine, or risk level…"
               }
-              disabled={loading}
+              // Stays editable while a response is in flight so the user can
+              // type their next question during the wait. Submitting is still
+              // gated on `loading` (the send button below and the Enter handler
+              // both no-op until the response returns), so this only frees up
+              // typing, never an early send.
               aria-label="Chat input"
               // When scoped, the context tag is prepended to the wire query;
               // cap the user's text so tag + text stay within the proxy's limit.
               maxLength={scoped ? scopedInputBudget(scoped) : undefined}
-              className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto disabled:opacity-50"
+              className="flex-1 resize-none bg-transparent text-base placeholder:text-muted/60 outline-none leading-relaxed py-1 max-h-32 overflow-y-auto"
               style={{ fieldSizing: "content" } as React.CSSProperties}
             />
             <div className="flex items-center gap-1 flex-shrink-0 pb-0.5">
