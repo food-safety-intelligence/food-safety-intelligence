@@ -220,6 +220,22 @@ export const TIER_HEX: Record<RiskTier, string> = {
 };
 
 /**
+ * Tier foreground colours (the darker pill-text palette) as CSS-var references,
+ * for use as a raw colour value in contexts Tailwind classes can't reach — e.g.
+ * an SVG `fill`. This is the pill's `text-tier-*-fg` colour, not the lighter
+ * TIER_HEX arc-fill palette: TIER_HEX is tuned as a large fill and fails text
+ * contrast for Moderate/Elevated, whereas the `-fg` palette is tuned as text.
+ * Referenced as vars (not hard-coded hex) so globals.css stays the single
+ * source of truth and these can't drift from the pill.
+ */
+export const TIER_FG_VAR: Record<RiskTier, string> = {
+  Low: "var(--color-tier-low-fg)",
+  Moderate: "var(--color-tier-mod-fg)",
+  Elevated: "var(--color-tier-elev-fg)",
+  High: "var(--color-tier-high-fg)",
+};
+
+/**
  * Pin/dot colour for out-of-business venues — a neutral warm grey so closed
  * pins recede behind the tier palette. Colour is never the only cue: the pin
  * swaps its centre dot for an "×" glyph and the accessible name says "out of
