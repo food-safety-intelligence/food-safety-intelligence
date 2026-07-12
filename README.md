@@ -20,6 +20,12 @@
 | agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
 | agents/tools/look\_up\_establishment/handler.py          |       86 |       10 |       24 |        4 |     87% |51, 53, 59, 61, 71-72, 81-82, 262-263 |
 | src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/audit/\_\_init\_\_.py                     |        1 |        0 |        0 |        0 |    100% |           |
+| src/foodsafety/audit/config.py                           |       36 |        2 |        0 |        0 |     94% |  196, 200 |
+| src/foodsafety/audit/fairness.py                         |      173 |        4 |       48 |        6 |     95% |39, 78, 82-\>84, 254, 304-\>302, 343 |
+| src/foodsafety/audit/frame.py                            |       38 |        1 |       10 |        2 |     94% |89, 92-\>94 |
+| src/foodsafety/audit/mitigation.py                       |       32 |        2 |        6 |        2 |     89% |    46, 58 |
+| src/foodsafety/audit/report.py                           |       73 |       14 |       28 |        6 |     76% |54, 58, 66, 77, 81, 86-101 |
 | src/foodsafety/config.py                                 |       43 |        4 |        4 |        1 |     85% |     34-37 |
 | src/foodsafety/data/\_\_init\_\_.py                      |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/data/labels.py                            |       65 |        0 |       16 |        1 |     99% | 199-\>201 |
@@ -52,7 +58,7 @@
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **2117** |  **209** |  **590** |   **81** | **88%** |           |
+| **TOTAL**                                                | **2470** |  **232** |  **682** |   **97** | **88%** |           |
 
 
 ## Setup coverage badge
