@@ -356,7 +356,27 @@ cross-city / out-of-scope location, a general food-safety question (must answer
 WITH a cited source), a personal medical question (must steer to a professional),
 per-city grade framing, and a tool outage — and checks the response follows the
 rules (no yes/no verdict, no invented score, scope refusal, cited general facts,
-graceful failure). It also runs deterministic gates with no Bedrock:
+graceful failure).
+
+**Tone & appropriateness.** The suite also checks *how* the agent answers, not
+just *what* it answers. There is **one tone baseline for every user** — general
+diner, caregiver, restaurant owner alike — and it is a universal guarantee, not a
+per-persona rule: calm and non-alarmist, empathetic to a sick or vulnerable user,
+and never shaming or accusatory about a venue or its owner. What varies by persona
+is *content* (a vulnerable diner gets lower-risk options and hazard drivers first),
+never the register. On top of tone it covers **fairness** (no cuisine / ethnicity
+/ neighbourhood stereotype — risk is per establishment, matching the model side
+where cuisine was rejected as a feature on fairness grounds), **no personal legal
+ruling** (decline "can I sue them?", point to reporting channels, never call a
+venue negligent), and **false-premise resistance** (it will not confirm a verdict
+it never gave). Each case carries both a cheap heuristic net (`require_any` /
+`forbid`) and an LLM-judge `rule`; the judge (`--judge`) is the robust grader.
+Note the tone cases respect the output guardrail's contract: for a personal health
+situation the agent gives general facts and declines the personal ruling, so these
+cases do **not** require a "see your care team" steer (that phrasing is blocked and
+truncates the reply — see `system_prompt.txt`).
+
+It also runs deterministic gates with no Bedrock:
 - **faithfulness** (`--faithfulness`) — `get_safety_score` relays `scores.json`
   exactly (same score / tier / license_id / trend, no recompute);
 - **authoritative-address relay** (`--identity`) — a matched venue returns the
@@ -373,9 +393,13 @@ graceful failure). It also runs deterministic gates with no Bedrock:
 runs the no-Bedrock, no-network parts on every PR — each tool's pytest suite (as
 separate invocations, since the tool dirs share a `handler` module name and
 collide in one run) plus `run_eval.py --self-test`, `--faithfulness` (vs the
-committed `scores.json`), `--identity`, `--lookup`, and `--citations`. The Bedrock-graded `--judge`
-guardrail suite and the network `--links` check stay **manual** (paid; run from
-the SageMaker execution role via the `eval-agent` skill).
+committed `scores.json`), `--identity`, `--lookup`, and `--citations`. `--self-test`
+validates the checker for every guardrail case, including the tone / fairness /
+legal / robustness ones, against canned pass/fail responses — so their
+*deterministic* coverage is gated on every PR for free. The Bedrock-graded
+`--judge` guardrail suite (the robust grader for tone, which needs the live model)
+and the network `--links` check stay **manual** (paid; run from the SageMaker
+execution role via the `eval-agent` skill).
 
 ### Note on the SageMaker stub
 
