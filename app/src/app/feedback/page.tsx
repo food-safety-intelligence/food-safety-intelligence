@@ -16,7 +16,8 @@ export const metadata = {
 export default function FeedbackPage() {
   return (
     <>
-      <SiteHeader activeNav="feedback" />
+      {/* No city data on the feedback form, so the "Data as of …" chip is off here. */}
+      <SiteHeader activeNav="feedback" showAsOf={false} />
       <main className="w-full max-w-full lg:max-w-[720px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
         <BackToSearch className="inline-flex items-center gap-2 text-xs text-teal hover:underline" />
 

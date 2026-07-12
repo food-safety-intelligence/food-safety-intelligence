@@ -1,12 +1,15 @@
 # Model Experiments Log
 
-- **Owner**: Bella · **Last updated**: 2026-06-21
+- **Owner**: Bella · **Last updated**: 2026-07-12
 - One row per modeling experiment: the change + hypothesis, the measured result, and the
   verdict (kept / reverted). **Negative results are logged too** — knowing what *didn't*
   move the needle is the point.
 - Conventions: commit code before a tracked run (provenance), machine metrics land in
   `reports/metrics/<run>.json`, decisions in `docs/decisions/`, and feature-contract
   version bumps in [`interface_contracts.md`](interface_contracts.md#feature-contract-changelog).
+- The Chicago experiment **log** is below; a **cross-city ablation** section (Chicago, NYC,
+  and LA in one parallel frame) is at the end. Ablation runs land in
+  `reports/metrics/{chicago,nyc,la}/`.
 - **Metric basis matters.** "served" = baseline LogReg + sigmoid, review-time-filtered
   test (n≈7,008); "honest test" = unfiltered test (n≈13,812). The two bases are not
   directly comparable; each row says which it used.
@@ -128,3 +131,178 @@ remaining DL families are **NO-GO at this scale** (documented, not spiked):
 
 **Net:** no untried DL lever has positive expected value at this scale; the next
 gains are product/operating-point, not model capacity.
+
+---
+
+# Cross-city ablations (Chicago, NYC, LA)
+
+All three cities' served models now sit in one parallel ablation frame, from
+`scripts/run_city_ablations.py`. Each city reuses its **own** production code (so
+numbers match the served model), holds its served temporal split fixed, and
+evaluates every variant on the **same** held-out test set. Each run is a tracked
+JSON under `reports/metrics/<city>/<city>_<variant>_<run_id>.json` (all from
+run_id `20260712_b2dc6102d`), carrying the full metric set — pr-auc, roc-auc,
+precision/recall/f1 at 5/10/20% and at a 0.5 threshold, top-decile lift, Brier,
+log-loss — plus, for each served model, its global feature importance. The runner
+never rewrites committed app JSON.
+
+The tables below show the headline set; **precision / recall / f1 are at a 0.5
+decision threshold**, which is stringent under class imbalance — for LA (base
+8.7%) the calibrated scores rarely exceed 0.5, so recall there is near-zero and
+the ranking metrics (P@10, R@10, lift) are the meaningful operating point.
+
+**The frames are parallel by analogy, not identical numbers** — the cities differ
+in pipeline, label, and feature taxonomy, so compare the *shape* across cities,
+never the absolute values:
+
+| | Chicago | NYC / LA |
+|---|---|---|
+| Source | `features.parquet` pipeline | inline `build_events` from a raw SODA/ArcGIS snapshot |
+| Label | fail-or-critical within 180d | next inspection graded B/C |
+| Served fit | depth-3 monotone XGB + Platt | XGB + Platt |
+| "prior-only" variant | `xgb_forecast_only` (drop current-outcome) | `xgb_prior_only` |
+| "current-only" variant | `xgb_current_outcome_only` (3 cols) | `xgb_current_only` |
+| "drop text layer" | `xgb_no_keywords` (the 12 `flag_kw_*`) | `xgb_no_theme_sev` (crosswalk theme/severity) |
+
+**Caveat:** these are a **single split**, not expanding-window CV. Chicago's
+richer CV-gated verdicts are in the log above; NYC/LA have only ~3 post-COVID
+years, so CV folds are thin. Read the deltas as directional. As a sanity check,
+Chicago's `served_xgb_full` here (PR-AUC **0.382**) reproduces the served model
+(DR 0009) — the ablation fits match production.
+
+### Chicago — test n=7,008, base rate 10.8% (`chicago_*_20260712_b2dc6102d.json`)
+
+Metrics: PR-AUC, ROC-AUC, then precision / recall / f1 at the **0.5 threshold**,
+then precision@10% / recall@10% / lift@10%.
+
+| Variant | n | PR-AUC | ROC-AUC | P(.5) | R(.5) | F1(.5) | P@10 | R@10 | lift@10 |
+|---|---|---|---|---|---|---|---|---|---|
+| **served_xgb_full** | 36 | **0.382** | **0.806** | 0.583 | 0.148 | 0.236 | **0.415** | **0.385** | **3.85** |
+| xgb_forecast_only (drop current-outcome) | 33 | 0.336 | 0.775 | 0.610 | 0.066 | 0.119 | 0.359 | 0.333 | 3.33 |
+| xgb_current_outcome_only (3 cols) | 3 | 0.324 | 0.752 | 0.528 | 0.099 | 0.167 | 0.377 | 0.349 | 3.49 |
+| xgb_no_keywords (drop 12 `flag_kw_*`) | 24 | 0.371 | 0.803 | 0.551 | 0.130 | 0.210 | 0.412 | 0.382 | 3.82 |
+| logreg_full | 36 | 0.372 | 0.800 | 0.553 | 0.152 | 0.239 | 0.415 | 0.385 | 3.85 |
+
+### NYC — test n=9,456, base rate 41.0% (`nyc_*_20260712_b2dc6102d.json`)
+
+| Variant | n | PR-AUC | ROC-AUC | P(.5) | R(.5) | F1(.5) | P@10 | R@10 | lift@10 |
+|---|---|---|---|---|---|---|---|---|---|
+| **served_xgb_full** | 29 | **0.583** | **0.674** | 0.607 | 0.407 | 0.487 | **0.693** | **0.169** | **1.69** |
+| xgb_prior_only | 11 | 0.540 | 0.651 | 0.591 | 0.317 | 0.413 | 0.627 | 0.153 | 1.53 |
+| xgb_current_only | 18 | 0.489 | 0.579 | 0.559 | 0.195 | 0.290 | 0.569 | 0.139 | 1.39 |
+| xgb_no_theme_sev (drop theme+severity) | 12 | 0.575 | 0.669 | 0.605 | 0.397 | 0.479 | 0.669 | 0.163 | 1.63 |
+| xgb_plus_keywords (+12 keyword flags) | 41 | 0.580 | 0.674 | 0.606 | 0.403 | 0.484 | 0.683 | 0.167 | 1.67 |
+| logreg_full | 29 | 0.561 | 0.666 | 0.600 | 0.401 | 0.481 | 0.641 | 0.156 | 1.56 |
+
+### LA — test n=7,197, base rate 8.7% (`la_*_20260712_b2dc6102d.json`)
+
+| Variant | n | PR-AUC | ROC-AUC | P(.5) | R(.5) | F1(.5) | P@10 | R@10 | lift@10 |
+|---|---|---|---|---|---|---|---|---|---|
+| **served_xgb_full** | 28 | **0.187** | **0.721** | 0.667 | 0.003 | 0.006 | **0.218** | **0.252** | **2.52** |
+| xgb_prior_only | 11 | 0.161 | 0.667 | 0.000 | 0.000 | 0.000 | 0.206 | 0.238 | 2.37 |
+| xgb_current_only | 17 | 0.152 | 0.695 | 0.000 | 0.000 | 0.000 | 0.161 | 0.186 | 1.86 |
+| xgb_no_theme_sev (drop theme+severity) | 12 | 0.184 | 0.713 | 0.000 | 0.000 | 0.000 | 0.208 | 0.241 | 2.41 |
+| xgb_plus_keywords (+12 keyword flags) | 40 | 0.183 | 0.722 | 0.333 | 0.002 | 0.003 | 0.217 | 0.250 | 2.50 |
+| logreg_full | 28 | 0.166 | 0.721 | 0.192 | 0.071 | 0.103 | 0.183 | 0.212 | 2.12 |
+
+LA's low PR-AUC is the 8.7% base rate — read the base-rate-invariant lift (2.52×)
+and ROC (0.72). The **0.5-threshold P/R/F1 are near-degenerate** here (the
+calibrated XGB rarely scores an LA event above 0.5, so most variants predict no
+positives → 0/0); this is the imbalance caveat above in action, not a bug —
+LA's meaningful operating point is the top-10% (P@10 / R@10 / lift).
+
+## Served-model operating points
+
+The 0.5-threshold P/R/F1 above are the textbook default, but not what the product
+uses (and for LA, barely usable). The product ranks establishments and works the
+top slice, so the meaningful cutoffs are **worklist depth** (top-K) and, if a
+single hard threshold is ever needed, the **F1-optimal** one. Both are recorded
+in each `*_served_xgb_full_*.json` (`operating_points`, `f1_optimal_threshold`).
+
+Served model — precision / recall / lift at each worklist depth:
+
+| City (base rate) | top 5% | top 10% | top 20% |
+|---|---|---|---|
+| Chicago (10.8%) | 0.486 / 0.23 / 4.50× | 0.415 / 0.39 / 3.85× | 0.317 / 0.59 / 2.94× |
+| NYC (41.0%) | 0.704 / 0.09 / 1.72× | 0.693 / 0.17 / 1.69× | 0.651 / 0.32 / 1.59× |
+| LA (8.7%) | 0.244 / 0.14 / 2.82× | 0.218 / 0.25 / 2.52× | 0.199 / 0.46 / 2.30× |
+
+Served model — F1-optimal single threshold (vs the arbitrary 0.5):
+
+| City | best threshold | P | R | F1 | (F1 at 0.5) |
+|---|---|---|---|---|---|
+| Chicago | 0.225 | 0.357 | 0.508 | **0.419** | 0.236 |
+| NYC | 0.316 | 0.484 | 0.819 | **0.609** | 0.487 |
+| LA | 0.122 | 0.199 | 0.467 | **0.279** | 0.006 |
+
+Takeaways: (1) **0.5 is the wrong cutoff** — moving to the F1-optimal threshold
+roughly doubles Chicago's F1 (0.236 → 0.419) and rescues LA's from ~0 (0.006 →
+0.279), because the calibrated scores for a rare event sit well below 0.5. (2)
+**Lift falls with depth** (Chicago 4.5× at 5% → 2.9× at 20%): going deeper catches
+more (recall up) at lower precision — a **capacity decision**, not a model change.
+(3) This is a *diagnostic*. The served product uses base-rate-anchored **tiers**
+(DR 0017), not a binary threshold, so there is no served cutoff to tune.
+
+## Deployed-model feature importance
+
+Global importance for each city's **served** XGB = mean |TreeSHAP| per feature over
+the test set (margin space) — the same explainability the app's per-row driver
+waterfalls are built on. Full ranked lists live in each `*_served_xgb_full_*.json`
+under `feature_importance` (with each feature's share of total); top 8 shown here.
+The rankings **corroborate the ablations**: Chicago is carried by the current
+inspection, NYC by prior history, LA by a mix.
+
+| Rank | Chicago (share) | NYC (share) | LA (share) |
+|---|---|---|---|
+| 1 | was_fail (0.26) | prior_inspections (0.17) | cur_score (0.22) |
+| 2 | n_priority_this_inspection (0.14) | days_since_last_inspection (0.11) | prior_inspections (0.18) |
+| 3 | license_age_days (0.11) | prior_n_critical (0.11) | days_since_last_inspection (0.14) |
+| 4 | prior_complaint_inspections (0.10) | cur_score (0.09) | prior_mean_score (0.10) |
+| 5 | n_core_this_inspection (0.07) | prior_bad_rate (0.09) | prev_score (0.05) |
+| 6 | temporal_month (0.06) | prior_mean_score (0.07) | cur_n_viol (0.05) |
+| 7 | static_inspection_type (0.06) | cur_n_viol (0.05) | cur_sev_T3 (0.03) |
+| 8 | static_risk_tier (0.02) | cur_theme_temperature_control (0.04) | cur_theme_pest_vermin (0.03) |
+
+Chicago's top two are the current inspection's own outcome (`was_fail` +
+`n_priority_this_inspection`, 40% of total SHAP combined) — the same two the
+leave-one-out ablation flagged as carrying the model (log, 2026-06-21). NYC's top
+three are all prior-history features; LA leads with the current score but leans on
+prior history right behind it. The theme/severity and keyword-analog features sit
+low in every ranking, consistent with the "text layer is marginal" ablation
+result.
+
+## Reading the pattern (cross-city)
+
+- **The full feature set wins in all three cities** — no single family matches it,
+  so history and the current inspection are **complementary**, not substitutes.
+- **The dominant family flips across cities.** In **Chicago** the current
+  inspection's own outcome is the biggest lever: dropping it
+  (`xgb_forecast_only`) is the largest single cut (0.382 → **0.336**, −0.046), and
+  just the 3 current-outcome columns alone (`xgb_current_outcome_only`) already
+  reach **0.324** PR-AUC (85% of the full model). In **NYC and LA it's the
+  reverse** — `xgb_prior_only` (0.540 / 0.161) beats `xgb_current_only` (0.489 /
+  0.152). The likely cause: NYC/LA inspect **roughly annually**, so the "current"
+  snapshot is staler and the prior track record carries relatively more.
+- **Keyword flags help a little in Chicago, not at all when transferred.** Now
+  measured in one frame: dropping Chicago's 12 `flag_kw_*` (`xgb_no_keywords`)
+  costs **+0.011 PR-AUC** (0.382 → 0.371) — small but positive, which is why
+  Chicago ships them. Bolting that *same* Chicago-tuned regex set onto NYC/LA
+  (`xgb_plus_keywords`) is instead flat-to-slightly-negative — NYC 0.583 →
+  **0.580**, LA 0.187 → **0.183**. The transfer fails because NYC/LA already
+  encode those hazards via their crosswalk theme/severity features, and the
+  regexes are tuned to Chicago's phrasing (see the caveat in `keyword_flags.py`).
+  So **Chicago keeps its keyword layer; NYC/LA don't need one.**
+- **NYC/LA's crosswalk theme + severity layer is also marginal** — dropping it
+  (`xgb_no_theme_sev`) costs only +0.008 (NYC) / +0.003 (LA) PR-AUC; 12 features
+  recover ~99% of the model. It's the code→category analog of Chicago's structured
+  codes (from `reference/violation_crosswalk.csv`), not free-text NLP. Worth
+  keeping for the driver labels, but not where the signal lives.
+- **XGBoost beats LogReg in all three cities** (Chicago +0.010: 0.382 vs 0.372;
+  NYC +0.022; LA +0.021 PR-AUC), consistent with Chicago's 2026-06-27 XGB
+  promotion (DR 0009). XGB is the right served estimator everywhere.
+
+**Net:** the served config (full XGB + Platt) is the right call for every city;
+the signal is carried by inspection history + current outcome together, with the
+text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
+NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
+windows before treating those deltas as gate-passing verdicts.

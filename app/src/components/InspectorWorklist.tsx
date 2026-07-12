@@ -16,6 +16,7 @@ import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
@@ -111,20 +112,17 @@ export function InspectorWorklist() {
   }
 
   useEffect(() => {
-    let alive = true;
-    fetch(dataUrl(city, "search-index.json"))
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      )
-      .then((d: SearchIndex) => {
-        if (alive) setIndex(d);
-      })
+    const controller = new AbortController();
+    fetchJson<SearchIndex>(dataUrl(city, "search-index.json"), {
+      signal: controller.signal,
+    })
+      .then((d) => setIndex(d))
       .catch(() => {
-        if (alive) setFailed(true);
+        // A transient blip on the multi-MB index is retried inside fetchJson;
+        // only a genuine, retries-exhausted failure marks the worklist failed.
+        if (!controller.signal.aborted) setFailed(true);
       });
-    return () => {
-      alive = false;
-    };
+    return () => controller.abort();
   }, [city]);
 
   // Backtest metrics for the "Why trust this ranking" card, read from the same
@@ -236,10 +234,6 @@ export function InspectorWorklist() {
     return counts;
   }, [index, activeRows]);
 
-  const asOfLabel = index?.as_of_date
-    ? formatInspectionDate(index.as_of_date)
-    : null;
-
   // "Why trust this ranking" numbers, straight from the active city's
   // methodology.json. The top-decile operating point gives the model-ranked
   // hit rate + its lift over random; test.prevalence is the base rate a random
@@ -274,7 +268,7 @@ export function InspectorWorklist() {
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="max-w-[640px]">
           <p className="text-2xs tracking-[0.2em] uppercase text-muted">
-            Inspector worklist{asOfLabel ? ` · as of ${asOfLabel}` : ""}
+            Inspector worklist
           </p>
           <h1 className="serif text-5xl mt-2.5 mb-3.5">
             Inspect where it matters&nbsp;most.
@@ -299,7 +293,7 @@ export function InspectorWorklist() {
           />
           <StatCard
             value={index ? worseningCount.toLocaleString() : "—"}
-            label="Worsening trend (90 d)"
+            label="Worsening trend (up to past 5 visits)"
             valueClass="text-coral"
           />
           {/* Deviates from the handoff's "Scored citywide": counts active
@@ -490,8 +484,8 @@ export function InspectorWorklist() {
               <h2 className="text-base font-bold">Rising fast</h2>
             </div>
             <p className="text-xs text-muted mt-1.5 mb-3">
-              Steepest score increase over the last 90 days, worth a look even
-              below the High tier.
+              Steepest score increase over an establishment&apos;s last few
+              visits, worth a look even below the High tier.
             </p>
             <div className="flex flex-col gap-0.5">
               {risingFast.map((r) => (
@@ -508,9 +502,11 @@ export function InspectorWorklist() {
                       {r.address}
                     </span>
                   </span>
-                  <span className="num text-xs font-semibold text-terra shrink-0">
-                    +{((r.trend_slope ?? 0) * 90).toFixed(2)} / 90d
-                  </span>
+                  <TrendIndicator
+                    slope={r.trend_slope}
+                    compact
+                    className="shrink-0"
+                  />
                 </Link>
               ))}
               {index && risingFast.length === 0 && (

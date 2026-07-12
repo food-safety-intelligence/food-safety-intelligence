@@ -66,3 +66,35 @@ def provenance(features_path: Path, all_features: list[str], repo_root: Path) ->
         "feature_set_version": feature_set_version(all_features),
         "features_sha256": sha256_file(features_path),
     }
+
+
+def snapshot_provenance(
+    raw_paths: list[Path | str], all_features: list[str], repo_root: Path
+) -> dict:
+    """Tier-0 provenance for city builds that train from a raw SODA snapshot.
+
+    NYC / LA build their features inline from a cached raw pull rather than a
+    ``features.parquet``, so the dataset identity is the content hash of each raw
+    snapshot — the reproducibility anchor, since the live SODA feed drifts over
+    time. Same shape as ``provenance`` (``run_id`` / git / ``feature_set_version``)
+    but keyed by ``raw_snapshots`` instead of a single ``features_sha256``. A
+    missing snapshot hashes to ``None`` (the build pulls it fresh on first run).
+    """
+    git = git_info(repo_root)
+
+    def _key(p: Path | str) -> str:
+        # Repo-relative so the committed record is stable across clones/worktrees.
+        try:
+            return str(Path(p).resolve().relative_to(repo_root.resolve()))
+        except ValueError:
+            return str(p)
+
+    return {
+        "run_id": f"{date.today().strftime('%Y%m%d')}_{git['short']}",
+        "git_commit": git["commit"],
+        "git_dirty": git["dirty"],
+        "feature_set_version": feature_set_version(all_features),
+        "raw_snapshots": {
+            _key(p): (sha256_file(p) if Path(p).exists() else None) for p in raw_paths
+        },
+    }

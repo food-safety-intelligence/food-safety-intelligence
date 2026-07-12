@@ -62,6 +62,20 @@ async function main() {
   await writeFile(dest, JSON.stringify(out), "utf-8");
   const mb = ((await readFile(dest)).length / 1024 / 1024).toFixed(1);
   console.log(`[search-index] ${rows.length} rows → ${dest} (${mb} MB) from ${src}`);
+
+  // Tiny sibling the header's "Data as of …" chip fetches on every page. The
+  // search index is multi-MB, so it can't be pulled just to read the snapshot
+  // date on the static pages — this projects the payload-level fields into a
+  // ~100-byte file that loads instantly city-by-city.
+  const metaDest = dest.replace(/[^/]*$/, "data-meta.json");
+  const meta = {
+    schema_version: "1",
+    as_of_date: payload.as_of_date ?? null,
+    generated_at: payload.generated_at ?? null,
+    total: out.total,
+  };
+  await writeFile(metaDest, JSON.stringify(meta), "utf-8");
+  console.log(`[search-index] meta → ${metaDest} (as_of ${meta.as_of_date ?? "n/a"})`);
 }
 
 main().catch((err) => {

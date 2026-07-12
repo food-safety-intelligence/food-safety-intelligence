@@ -1,0 +1,46 @@
+{
+  "model": "chicago_xgb_current_outcome_only",
+  "city": "chicago",
+  "variant": "xgb_current_outcome_only",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_fail_or_critical_next_180d",
+  "n_features": 3,
+  "data_vintage": "20251212",
+  "run_id": "20260712_b2dc6102d",
+  "git_commit": "b2dc6102d2cb7617fc4921c9722c382220ca99c2",
+  "git_dirty": true,
+  "feature_set_version": "68fe2ae76184",
+  "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3",
+  "train_window": {
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01"
+  },
+  "split": {
+    "train_n": 79268,
+    "val_n": 16564,
+    "test_n": 7008,
+    "test_prevalence": 0.1079
+  },
+  "test": {
+    "n": 7008,
+    "positive_rate": 0.107877,
+    "pr_auc": 0.323805,
+    "roc_auc": 0.752005,
+    "precision_at_5pct": 0.433048,
+    "precision_at_10pct": 0.376605,
+    "precision_at_20pct": 0.288873,
+    "recall_at_5pct": 0.201058,
+    "recall_at_10pct": 0.349206,
+    "recall_at_20pct": 0.535714,
+    "top_decile_lift": 3.491067,
+    "brier_score": 0.084606,
+    "log_loss": 0.295618
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.528169,
+    "recall": 0.099206,
+    "f1": 0.167038
+  }
+}
