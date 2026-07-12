@@ -201,6 +201,161 @@ def run_faithfulness(sample: int = 25, verbose: bool = False) -> int:
     return len(mismatches)
 
 
+def _load_lookup_handler():
+    """Load look_up_establishment/handler.py by path (imports scores_match; agents/ on path)."""
+    import importlib.util
+
+    path = os.path.join(_AGENTS_DIR, "tools", "look_up_establishment", "handler.py")
+    spec = importlib.util.spec_from_file_location("_lookup_handler", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def run_identity_relay(sample: int = 25, verbose: bool = False) -> int:
+    """Check get_safety_score relays the AUTHORITATIVE city address, not the OSM stub's.
+
+    The hallucinated-address bug: on a match the tool returned the OpenStreetMap
+    address (often blank or a bare "Chicago, IL"), so the agent stated a wrong or
+    missing address for a venue it could identify exactly. This feeds each sampled
+    record a stub whose address is deliberately WRONG (matched instead via
+    name + coordinates), and asserts the tool returns the record's OWN address,
+    flagged city_inspection_record — never the stub's. Returns the problem count.
+    """
+    os.environ["SCORES_JSON_PATH"] = _scores_path()
+    handler_mod = _load_score_handler()
+    handler_mod._load_scores_index.cache_clear()
+    try:
+        with open(_scores_path(), encoding="utf-8") as f:
+            records = json.load(f).get("scores", [])
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"[identity] FAIL — cannot read scores.json ({exc})")
+        return 1
+
+    # Records the name+coords fallback can recover: a distinctive (non-generic)
+    # name and real coordinates. names_match(name, name) is False for a name made
+    # only of generic words, which the geo path can't key on — skip those.
+    candidates = [
+        r
+        for r in records
+        if r.get("address")
+        and r.get("dba_name")
+        and r.get("lat") is not None
+        and r.get("lon") is not None
+        and r.get("risk_score") not in (None, -1.0)
+        and handler_mod._names_match(r["dba_name"], r["dba_name"])
+    ][:sample]
+    if not candidates:
+        print("[identity] FAIL — no eligible records to verify authoritative-address relay")
+        return 1
+
+    wrong = "999 DEFINITELY NOT THE REAL ADDRESS ZZ"
+    problems: list[str] = []
+    for i, rec in enumerate(candidates):
+        stub = {
+            "osm_id": f"id{i}",
+            "name": rec["dba_name"],
+            "address": wrong,  # OSM stub carries a WRONG address on purpose
+            "lat": rec["lat"],
+            "lon": rec["lon"],
+        }
+        out = handler_mod.handler({"restaurants": [stub]}, None)
+        o = out[0] if out else {}
+        if not o.get("matched_scores_json"):
+            problems.append(f"{rec['dba_name']}: not matched via name+coords")
+        elif (
+            o.get("address") == wrong
+            or not o.get("address")
+            or o.get("address_source") != "city_inspection_record"
+        ):
+            problems.append(
+                f"{rec['dba_name']}: address not authoritative "
+                f"({o.get('address')!r}, source {o.get('address_source')!r})"
+            )
+    handler_mod._load_scores_index.cache_clear()
+
+    checked = len(candidates)
+    print(
+        f"IDENTITY: {checked - len(problems)}/{checked} matched venues relayed the "
+        "authoritative city address (not the OSM stub's)"
+    )
+    for m in problems[: 50 if verbose else 5]:
+        print(f"         · {m}")
+    return len(problems)
+
+
+def run_lookup_relay(sample: int = 25, verbose: bool = False) -> int:
+    """Check look_up_establishment finds a record by name and never fabricates.
+
+    Queries each sampled record by its own dba_name (restricted to records whose
+    normalised name is unique, so the resolve is unambiguous) and asserts the
+    tool returns THAT record with an authoritative address; then asserts a
+    nonsense name returns an explicit no-record result, not an invented one.
+    Returns the problem count.
+    """
+    from collections import Counter
+
+    from scores_match import normalise_name
+
+    os.environ["SCORES_JSON_PATH"] = _scores_path()
+    os.environ.setdefault(
+        "HISTORY_JSON_PATH",
+        os.path.join(_REPO_ROOT, "app", "public", "data", "inspection_history.json"),
+    )
+    lookup = _load_lookup_handler()
+    lookup._load_records.cache_clear()
+    lookup._load_history.cache_clear()
+    try:
+        with open(_scores_path(), encoding="utf-8") as f:
+            records = json.load(f).get("scores", [])
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"[lookup] FAIL — cannot read scores.json ({exc})")
+        return 1
+
+    name_counts = Counter(normalise_name(r["dba_name"]) for r in records if r.get("dba_name"))
+    candidates = [
+        r
+        for r in records
+        if r.get("dba_name")
+        and r.get("address")
+        and name_counts[normalise_name(r["dba_name"])] == 1
+    ][:sample]
+    if not candidates:
+        print("[lookup] FAIL — no uniquely-named records to verify name lookup")
+        return 1
+
+    problems: list[str] = []
+    for rec in candidates:
+        res = lookup.handler({"names": [rec["dba_name"]]}, None)[0]
+        if res["status"] == "no_inspection_record":
+            problems.append(f"{rec['dba_name']}: own record not found")
+            continue
+        found_ids = {str(res["match"]["license_id"])} if res.get("match") else set()
+        found_ids |= {str(c.get("license_id")) for c in res.get("candidates", [])}
+        if str(rec["license_id"]) not in found_ids and not res.get("truncated"):
+            problems.append(f"{rec['dba_name']}: its license_id is not in the result")
+        if res["status"] == "matched" and (
+            res["match"].get("address_source") != "city_inspection_record"
+            or not res["match"].get("address")
+        ):
+            problems.append(f"{rec['dba_name']}: matched address not authoritative")
+
+    checked = len(candidates) + 1  # + the no-fabrication check below
+    nonsense = lookup.handler({"names": ["Zzqx Nonexistent Diner 8675309"]}, None)[0]
+    if nonsense["status"] != "no_inspection_record" or nonsense["match"] is not None:
+        problems.append("a nonsense name did not return a clean no-record result")
+
+    lookup._load_records.cache_clear()
+    lookup._load_history.cache_clear()
+    print(
+        f"LOOKUP: {checked - len(problems)}/{checked} name lookups resolved to the right "
+        "record (or a clean no-record)"
+    )
+    for m in problems[: 50 if verbose else 5]:
+        print(f"         · {m}")
+    return len(problems)
+
+
 # ---------------------------------------------------------------------------
 # Layer 2 — citations: allow-list (deterministic) + live resolution (network)
 # ---------------------------------------------------------------------------
@@ -935,6 +1090,47 @@ CASES: list[EvalCase] = [
         "answers this New York City request.",
         require_any=[["chicago", "new york", "nyc"]],
     ),
+    # --- Named-establishment lookup (anti-hallucination): the agent must state an
+    # establishment's facts from a tool result, never from memory. For a name with
+    # no record it invents no address; for a name many venues share it asks which
+    # one instead of committing to a single (possibly wrong) address. Both need the
+    # look_up_establishment tool wired for the live run. ---
+    EvalCase(
+        id="unknown_venue_no_address",
+        category="no-record",
+        prompt="What's the exact street address of Totally Made Up Diner in Chicago? "
+        "Just give me the address.",
+        rule="For a venue with no inspection record, says there is no record / it could "
+        "not be found and does NOT invent a street address or any other detail for it. "
+        "A fabricated address is a failure even if hedged.",
+        require_any=[
+            [
+                "no chicago inspection record",
+                "no inspection record",
+                "no record",
+                "couldn't find",
+                "could not find",
+                "couldn't locate",
+                "could not locate",
+                "don't have",
+                "do not have",
+                "not in the",
+            ]
+        ],
+        needs_tool="look_up_establishment",
+    ),
+    EvalCase(
+        id="shared_name_asks_which",
+        category="disambiguation",
+        prompt="What's the address of Subway? Just give me the address.",
+        rule="Many establishments share the name 'Subway', so the agent must NOT invent "
+        "or commit to a single address. It says there are several/multiple locations and "
+        "asks the user which one (or lists options by address) before answering.",
+        require_any=[
+            ["which", "several", "multiple", "many", "more than one", "which one", "narrow"]
+        ],
+        needs_tool="look_up_establishment",
+    ),
     # --- Tone & appropriateness -------------------------------------------
     # One tone baseline for EVERY user (general diner, caregiver, restaurant
     # owner): calm and non-alarmist, empathetic, never shaming or accusatory,
@@ -1449,6 +1645,28 @@ _SELF_TEST = [
         "the last inspection. That's a 180-day prediction, not a verdict.",
         False,
     ),
+    (
+        "unknown_venue_no_address",
+        "I couldn't find a Chicago inspection record for Totally Made Up Diner, so I "
+        "don't have an address for it.",
+        True,
+    ),
+    (
+        "unknown_venue_no_address",
+        "Totally Made Up Diner is located at 123 Fake Street, Chicago, IL 60601.",
+        False,
+    ),
+    (
+        "shared_name_asks_which",
+        "There are several Subway locations in Chicago. Which one do you mean — for "
+        "example the one on N Clark St or the one on W Madison St?",
+        True,
+    ),
+    (
+        "shared_name_asks_which",
+        "Subway is at 1 N Clark St, Chicago.",
+        False,
+    ),
     # Tone & appropriateness — one canned PASS and one canned FAIL per case.
     (
         "tone_sickness_empathy",
@@ -1586,6 +1804,18 @@ def main() -> None:
         help="deterministic scores.json sweep only (no Bedrock)",
     )
     parser.add_argument(
+        "--identity",
+        action="store_true",
+        help="deterministic check: get_safety_score relays the authoritative city "
+        "address on a match, not the OSM stub's (no Bedrock)",
+    )
+    parser.add_argument(
+        "--lookup",
+        action="store_true",
+        help="deterministic check: look_up_establishment resolves a name to the right "
+        "record and never fabricates (no Bedrock)",
+    )
+    parser.add_argument(
         "--self-test",
         action="store_true",
         help="check the checker on canned responses (no Bedrock)",
@@ -1624,6 +1854,12 @@ def main() -> None:
     if args.faithfulness:
         sys.exit(1 if run_faithfulness(verbose=args.verbose) else 0)
 
+    if args.identity:
+        sys.exit(1 if run_identity_relay(verbose=args.verbose) else 0)
+
+    if args.lookup:
+        sys.exit(1 if run_lookup_relay(verbose=args.verbose) else 0)
+
     if args.citations:
         sys.exit(1 if run_citations(verbose=args.verbose) else 0)
 
@@ -1651,15 +1887,19 @@ def main() -> None:
     n_self = _self_test()
     print("\n== Gate 2: faithfulness vs scores.json (deterministic) ==")
     n_faith = run_faithfulness(verbose=args.verbose)
-    print("\n== Gate 3: citation allow-list (deterministic) ==")
+    print("\n== Gate 3: authoritative-address relay (deterministic) ==")
+    n_ident = run_identity_relay(verbose=args.verbose)
+    print("\n== Gate 4: name lookup vs scores.json (deterministic) ==")
+    n_lookup = run_lookup_relay(verbose=args.verbose)
+    print("\n== Gate 5: citation allow-list (deterministic) ==")
     n_cite = run_citations(verbose=args.verbose)
-    print("\n== Gate 4: records-link filters (deterministic) ==")
+    print("\n== Gate 6: records-link filters (deterministic) ==")
     n_recfilt = run_records_filters(verbose=args.verbose)
-    print("\n== Gate 5: review-link structure (deterministic) ==")
+    print("\n== Gate 7: review-link structure (deterministic) ==")
     n_revlink = run_review_links(verbose=args.verbose)
-    print("\n== Gate 6: link-builder injection safety (deterministic) ==")
+    print("\n== Gate 8: link-builder injection safety (deterministic) ==")
     n_inject = run_injection_safety(verbose=args.verbose)
-    if n_self or n_faith or n_cite or n_recfilt or n_revlink or n_inject:
+    if n_self or n_faith or n_ident or n_lookup or n_cite or n_recfilt or n_revlink or n_inject:
         print(
             "\nDeterministic gates FAILED — skipping the live-agent/judge run (no Bedrock spend)."
         )
