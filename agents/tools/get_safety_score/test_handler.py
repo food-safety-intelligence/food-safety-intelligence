@@ -25,6 +25,11 @@ import pytest
 _THIS_DIR = os.path.dirname(__file__)
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
+# handler imports the shared matcher (agents/scores_match.py), so the agents/
+# dir must be importable too — same dir the deployed runtime and run_eval add.
+_AGENTS_DIR = os.path.dirname(os.path.dirname(_THIS_DIR))
+if _AGENTS_DIR not in sys.path:
+    sys.path.insert(0, _AGENTS_DIR)
 
 # handler imports sagemaker_stub, which imports boto3. Provide a minimal stub
 # so the module imports without the AWS SDK installed.

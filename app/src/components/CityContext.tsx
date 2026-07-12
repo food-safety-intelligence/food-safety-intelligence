@@ -49,6 +49,26 @@ export function CityProvider({ children }: { children: React.ReactNode }) {
     /* eslint-enable react-hooks/set-state-in-effect */
   }, []);
 
+  // Browser back/forward changes the URL but not React state, and the provider
+  // lives in the root layout so it never remounts to re-run the effect above.
+  // The URL `?city=` is the source of truth (precedence note at top), so on a
+  // history navigation re-read it and follow an explicit choice — otherwise the
+  // data, map, and copy would keep showing the city from before the back/forward
+  // while the URL says otherwise (and a refresh would then flip it). A URL with
+  // no `?city=` (a param-less page) leaves the current city as-is: localStorage
+  // is the tiebreaker there, matching what a refresh of that URL would resolve.
+  useEffect(() => {
+    const onPopState = () => {
+      const url = new URLSearchParams(window.location.search).get("city");
+      if (isCity(url)) {
+        setCityState(url);
+        setNeedsPick(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
   const setCity = useCallback((c: City) => {
     setCityState(c);
     setNeedsPick(false);
