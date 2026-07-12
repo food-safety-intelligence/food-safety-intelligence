@@ -33,6 +33,15 @@ dev = [
     "jupyterlab>=4.0",
     "ipykernel>=6.29",
 ]
+# Audit-only tooling (foodsafety.audit): the census/TIGER spatial join for the
+# fairness disparate-impact audit. Deliberately NOT in the core deps — census is
+# never a model feature, a serving dependency, or something the app or CI needs.
+# Install only when running the audit: `uv sync --extra audit`.
+audit = [
+    "geopandas>=1.0",
+    "shapely>=2.0",
+    "pyogrio>=0.7",
+]
 
 [build-system]
 requires = ["hatchling"]
