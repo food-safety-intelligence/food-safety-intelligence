@@ -24,7 +24,13 @@ import urllib.error
 import urllib.parse
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_TOOLS_DIR = os.path.join(_REPO_ROOT, "agents", "tools")
+_AGENTS_DIR = os.path.join(_REPO_ROOT, "agents")
+_TOOLS_DIR = os.path.join(_AGENTS_DIR, "tools")
+
+# A handler may import a shared module from agents/ (e.g. scores_match), so keep
+# the agents dir importable — the same way run_local.py / entrypoint.py do.
+if _AGENTS_DIR not in sys.path:
+    sys.path.insert(0, _AGENTS_DIR)
 
 
 def _load_handler(tool_name: str):

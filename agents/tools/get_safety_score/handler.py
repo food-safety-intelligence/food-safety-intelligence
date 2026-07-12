@@ -21,65 +21,26 @@ Score source:
 
 from __future__ import annotations
 
-import difflib
 import functools
 import json
 import os
-import re
 from typing import Any
+
+# The name/address normalisation and fuzzy-match rules live in scores_match so
+# this handler (batch, OSM-driven) and look_up_establishment (name lookup)
+# resolve a venue identically. This handler keeps only its own cached loader and
+# the OSM-stub -> response glue below. Aliased to the leading-underscore names
+# the rest of the module (and the tests) already use.
+from scores_match import fuzzy_lookup as _fuzzy_lookup
+from scores_match import geo_lookup as _geo_lookup
+from scores_match import names_match as _names_match  # noqa: F401 — re-exported for tests
+from scores_match import normalise_address as _normalise_address
+from scores_match import normalise_name as _normalise_name  # noqa: F401 — re-exported for tests
+from scores_match import trend_label as _trend_label
 
 # ---------------------------------------------------------------------------
 # Scores.json loader
 # ---------------------------------------------------------------------------
-
-
-# Address must be a close match AND the best name in that address bucket must
-# clear its own bar before we attach a score. Name is the disambiguator at
-# shared addresses, so it gets the stricter, independently-tuned cutoff.
-_ADDRESS_CUTOFF = 0.72
-_NAME_CUTOFF = 0.6
-
-# Name + geographic-proximity fallback, used only when the address match fails.
-# OSM very often carries no clean street address (just "Chicago, IL" or nothing),
-# so address-only matching reports a venue that IS in the batch run as having no
-# record (e.g. "Amarit" -> the real "AMARIT RESTAURANT"). lat/lon + name recovers
-# it: OSM and the city geocode the same building to slightly different points, so
-# any record within ~0.0025° (≈250 m) is a candidate, then the name must agree.
-# Proximity alone is not enough — a dense block holds many venues — so the name
-# is what identifies the establishment (ethics decision record 0005, principle 1:
-# a confident wrong score is worse than a miss).
-_GEO_RADIUS_DEG = 0.0025
-# SequenceMatcher ratio bar for the near-identical / typo case; the token-subset
-# rule below handles the common "Amarit" vs "AMARIT RESTAURANT" length mismatch
-# that ratio alone scores too low (~0.55) to accept.
-_GEO_NAME_RATIO_CUTOFF = 0.87
-
-# Generic establishment words carry no identifying signal, so a name made only of
-# them (e.g. a bare "Restaurant" OSM node) must never match by the token-subset
-# rule — that would attach a neighbour's score on proximity alone.
-_GENERIC_NAME_TOKENS = frozenset(
-    {
-        "RESTAURANT",
-        "CAFE",
-        "GRILL",
-        "BAR",
-        "KITCHEN",
-        "INC",
-        "LLC",
-        "LTD",
-        "CO",
-        "CORP",
-        "THE",
-        "AND",
-        "OF",
-        "CHICAGO",
-        "FOOD",
-        "FOODS",
-        "CUISINE",
-        "EATERY",
-        "DINER",
-    }
-)
 
 
 # Per-city scores.json path (multi-city, DR 0016). The entrypoint warms each
@@ -124,154 +85,6 @@ def _load_scores_records(city: str = "chicago") -> list[dict]:
     return [r for bucket in _load_scores_index(city).values() for r in bucket]
 
 
-def _normalise_address(addr: str) -> str:
-    """Uppercase, expand common abbreviations, collapse whitespace."""
-    addr = addr.upper()
-    replacements = {
-        "STREET": "ST",
-        "AVENUE": "AVE",
-        "BOULEVARD": "BLVD",
-        "DRIVE": "DR",
-        "COURT": "CT",
-        "PLACE": "PL",
-        "ROAD": "RD",
-        "NORTH": "N",
-        "SOUTH": "S",
-        "EAST": "E",
-        "WEST": "W",
-    }
-    for long, short in replacements.items():
-        addr = re.sub(rf"\b{long}\b", short, addr)
-    return re.sub(r"\s+", " ", addr).strip()
-
-
-def _normalise_name(name: str) -> str:
-    """Uppercase, drop store numbers, strip punctuation, collapse whitespace.
-
-    OSM `name` and city `dba_name` are formatted very differently
-    ("Dunkin'" vs "DUNKIN #305"), so fold both hard before comparing: remove
-    "#1234"-style store numbers, turn any run of non-alphanumerics into a
-    single space, and trim.
-    """
-    # A scores.json record may carry an explicit null name; coerce so .upper()
-    # never crashes on None.
-    name = (name or "").upper()
-    name = re.sub(r"#\s*\d+", " ", name)  # store / franchise numbers
-    name = name.replace("'", "").replace("’", "")  # join contractions ("McDonald's")
-    name = re.sub(r"[^A-Z0-9]+", " ", name)  # remaining punctuation -> space
-    return re.sub(r"\s+", " ", name).strip()
-
-
-def _fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict | None:
-    """Return the best score record for this (address, name), or None.
-
-    Resolve the address to a bucket of records (exact key, then fuzzy over the
-    keys), then pick the record in that bucket whose `dba_name` best matches
-    `name`. BOTH the address and the best name must clear their cutoffs.
-
-    A shared address (food court, airport terminal) holds many establishments,
-    so address alone can attach the wrong business's score — a consumer-facing
-    wrong-signal harm (ethics decision record 0005, principle 1). A missed
-    match (None) is safer than a confident wrong one.
-    """
-    key = _normalise_address(address)
-    bucket = index.get(key)
-    if bucket is None:
-        matches = difflib.get_close_matches(key, index.keys(), n=1, cutoff=_ADDRESS_CUTOFF)
-        if not matches:
-            return None
-        bucket = index[matches[0]]
-
-    # A single-occupancy address already uniquely identifies the establishment,
-    # so skip the name gate here — applying it would regress recall when OSM
-    # `name` and city `dba_name` disagree. Name disambiguation is only needed
-    # when 2+ records share the address.
-    if len(bucket) == 1:
-        return bucket[0]
-
-    target = _normalise_name(name)
-    if not target:
-        return None
-
-    best: dict | None = None
-    best_ratio = 0.0
-    for record in bucket:
-        ratio = difflib.SequenceMatcher(
-            None, target, _normalise_name(record.get("dba_name", ""))
-        ).ratio()
-        # Strict `>` keeps the first record on an exact tie, so a tie resolves to
-        # scores.json order. This only bites when two venues share both an
-        # address and an identical name (near-indistinguishable), and we have no
-        # better signal (no license_id) to break it — so first-in-order is fine.
-        if ratio > best_ratio:
-            best_ratio = ratio
-            best = record
-
-    return best if best_ratio >= _NAME_CUTOFF else None
-
-
-def _names_match(osm_name: str, dba_name: str) -> bool:
-    """True if an OSM name and a city dba_name plausibly name the same venue.
-
-    Two complementary rules, because OSM and the city write names very
-    differently:
-
-    * Token-subset: every word of the shorter name appears in the longer one,
-      and the shorter name has at least one distinctive (non-generic) word.
-      This accepts "Amarit" vs "AMARIT RESTAURANT" (a pure length mismatch that
-      SequenceMatcher scores far too low) while rejecting "China Cafe" vs
-      "China Grill" (neither is a subset of the other).
-    * High SequenceMatcher ratio: catches near-identical spellings / word order
-      that the subset rule misses.
-    """
-    a = _normalise_name(osm_name).split()
-    b = _normalise_name(dba_name).split()
-    if not a or not b:
-        return False
-
-    short, long = (a, b) if len(a) <= len(b) else (b, a)
-    short_set, long_set = set(short), set(long)
-    if short_set <= long_set and any(t not in _GENERIC_NAME_TOKENS for t in short_set):
-        return True
-
-    ratio = difflib.SequenceMatcher(None, " ".join(sorted(a)), " ".join(sorted(b))).ratio()
-    return ratio >= _GEO_NAME_RATIO_CUTOFF
-
-
-def _geo_lookup(
-    name: str, lat: float | None, lon: float | None, records: list[dict]
-) -> dict | None:
-    """Find a score record by name within ~250 m of (lat, lon), or None.
-
-    The address-first path misses any venue whose OSM record lacks a clean
-    street address; this recovers it from coordinates + name. Among all records
-    inside the proximity box whose name matches, return the one with the highest
-    name-similarity ratio (ties resolve to scores.json order).
-    """
-    if lat is None or lon is None or not _normalise_name(name):
-        return None
-
-    target = " ".join(sorted(_normalise_name(name).split()))
-    best: dict | None = None
-    best_ratio = -1.0
-    for record in records:
-        rlat, rlon = record.get("lat"), record.get("lon")
-        if rlat is None or rlon is None:
-            continue
-        # Cheap bounding-box reject before the (relatively costly) name compare.
-        if abs(rlat - lat) > _GEO_RADIUS_DEG or abs(rlon - lon) > _GEO_RADIUS_DEG:
-            continue
-        if not _names_match(name, record.get("dba_name", "")):
-            continue
-        ratio = difflib.SequenceMatcher(
-            None, target, " ".join(sorted(_normalise_name(record.get("dba_name", "")).split()))
-        ).ratio()
-        if ratio > best_ratio:
-            best_ratio = ratio
-            best = record
-    return best
-
-
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -301,8 +114,12 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]]:
     [
         {
             "osm_id":       str,
-            "name":         str,
-            "address":      str,
+            "name":         str,           # OSM display name (friendlier casing)
+            "dba_name":     str,           # official city-registered name ("" if no record)
+            "address":      str,           # authoritative city address on a match, else OSM's
+            "address_source": str,         # "city_inspection_record" | "openstreetmap"
+            "zip":          str,           # city record ZIP ("" if no record)
+            "facility_type": str,          # city record facility type ("" if no record)
             "license_id":   str | null,
             "risk_score":   float | null,  # calibrated probability 0–1, or null
             "risk_tier":    str | null,    # "Low" | "Moderate" | "Elevated" | "High"
@@ -375,11 +192,27 @@ def _output_from_scores(restaurant: dict[str, Any], record: dict[str, Any]) -> d
     tier = record.get("risk_tier")
     if score is None or tier is None:
         return _output_no_record(restaurant)
+    # Once a venue is matched to a city inspection record, that record — not the
+    # OpenStreetMap stub — is the source of truth for the establishment's own
+    # facts. OSM addresses are frequently blank or partial (the directory even
+    # defaults to a bare "Chicago, IL"), so relaying the OSM address let the
+    # agent state a wrong or missing address for a venue we can identify exactly.
+    # Relay the record's authoritative address, and flag which source it came
+    # from so the agent can label an OSM-only address as unverified. The OSM name
+    # stays as the friendlier display `name`; the official `dba_name` rides
+    # alongside for when the user asks for the registered name.
+    record_address = record.get("address") or ""
+    address = record_address or restaurant.get("address", "")
+    address_source = "city_inspection_record" if record_address else "openstreetmap"
     return {
         # Identity
         "osm_id": restaurant["osm_id"],
         "name": restaurant["name"],
-        "address": restaurant.get("address", ""),
+        "dba_name": record.get("dba_name", ""),
+        "address": address,
+        "address_source": address_source,
+        "zip": record.get("zip", ""),
+        "facility_type": record.get("facility_type", ""),
         "lat": restaurant.get("lat"),
         "lon": restaurant.get("lon"),
         "cuisine": restaurant.get("cuisine", ""),
@@ -416,10 +249,16 @@ def _output_no_record(restaurant: dict[str, Any]) -> dict[str, Any]:
     vector at request time (see the module docstring).
     """
     return {
-        # Identity
+        # Identity. There is no matched city record, so any address here is the
+        # OpenStreetMap directory's, not the authoritative city one — flag it so
+        # the agent presents it as an unverified location, never as the city record.
         "osm_id": restaurant["osm_id"],
         "name": restaurant["name"],
+        "dba_name": "",
         "address": restaurant.get("address", ""),
+        "address_source": "openstreetmap",
+        "zip": "",
+        "facility_type": "",
         "lat": restaurant.get("lat"),
         "lon": restaurant.get("lon"),
         "cuisine": restaurant.get("cuisine", ""),
@@ -460,18 +299,3 @@ def _drivers_from_top_drivers(top_drivers: list[dict[str, Any]]) -> list[dict[st
             }
         )
     return drivers
-
-
-def _trend_label(slope: float | None) -> str:
-    # Under scores schema 0.5.0 a null trend_slope means the venue has fewer
-    # than 2 scored inspections, so no forward slope can be fit — that is "we
-    # can't say", not a flat trend. Reporting it as "stable" is what let the
-    # trend_slope_90d->trend_slope rename miss (decision 0011) go silent in the
-    # deployed agent, so say so explicitly instead.
-    if slope is None:
-        return "not enough inspection history"
-    if slope > 0.001:
-        return "worsening"
-    if slope < -0.001:
-        return "improving"
-    return "stable"
