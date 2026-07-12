@@ -11,6 +11,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { BackToSearch } from "@/components/BackToSearch";
 import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
@@ -268,6 +269,7 @@ export function InspectorWorklist() {
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
+      <BackToSearch className="inline-flex items-center gap-2 text-sm text-teal hover:underline mb-6" />
       {/* ---- Page intro + stat cards ---- */}
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="max-w-[640px]">
