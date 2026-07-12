@@ -103,6 +103,13 @@ omit = [
     # CI (to exercise the handlers), but its own lines aren't scored; half of
     # them are the Bedrock-judge / live-link paths CI can't reach anyway.
     "agents/eval/*",
+    # Untestable in CI: the census join needs geopandas (the `audit` extra),
+    # network access to Census/TIGER, and a CENSUS_API_KEY; the city adapters need
+    # the S3 model/features data and each city's live build pipeline. CI can't
+    # exercise a line. The scored audit logic (fairness/frame/report/mitigation) IS
+    # unit-tested; excluded so the floor reflects that.
+    "src/foodsafety/audit/census.py",
+    "src/foodsafety/audit/adapters/*",
 ]
 
 [tool.coverage.report]

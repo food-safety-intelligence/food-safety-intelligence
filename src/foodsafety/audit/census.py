@@ -123,7 +123,8 @@ def fetch_acs_tracts(state_fips: str) -> pd.DataFrame:
         out["area_pct_limited_english"] = _safe_ratio(limited, raw["C16002_001E"])
         out["area_population"] = raw["B01003_001E"]
         out["area_dominant_group"] = _dominant_group(raw)
-        return out
+        # One row per tract keeps the downstream left-merge strictly 1:1.
+        return out.drop_duplicates("tract_geoid").reset_index(drop=True)
 
     return cache.load_or_fetch(
         f"acs_{state_fips}_{ACS_YEAR}", _fetch, cache_dir=storage.join(str(RAW_DIR), "census")
@@ -206,6 +207,9 @@ def attach_area_demographics(df: pd.DataFrame, *, city: str) -> pd.DataFrame:
     if state_fips is None:
         raise ValueError(f"No state FIPS mapping for city {city!r}; add it to CITY_STATE_FIPS")
 
+    # Normalise the index so the point-join and the acs left-merge stay row-aligned
+    # regardless of what index the caller passed.
+    df = df.reset_index(drop=True)
     tract = _points_to_tract(df, state_fips)
     acs = fetch_acs_tracts(state_fips)
     merged = tract.join(df).merge(acs, on="tract_geoid", how="left")
