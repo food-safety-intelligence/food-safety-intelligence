@@ -351,7 +351,7 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
         "prior_inspections": "{value} prior inspections on record",
         "prior_bad": "{value} prior inspections graded B/C",
         "prior_n_critical": "{value} critical violations in prior inspections",
-        "prior_mean_score": "Average past inspection score: {value}",
+        "prior_mean_score": "Average past inspection score: {value:.1f}",
         "prior_bad_rate": "Past B/C rate: {value}",
         "prev_score": "Previous inspection score: {value}",
         "prev_is_bad": {True: "Previous inspection was B/C", False: "Previous inspection was A"},
