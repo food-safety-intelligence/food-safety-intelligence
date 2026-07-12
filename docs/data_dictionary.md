@@ -117,10 +117,17 @@ refrigeration and drive pest activity), but `temporal_month` / `temporal_quarter
 already capture coarse seasonality, so it would need to show *incremental* signal
 over those. Untried.
 
-### Census (tract demographics)
-**Audit-only.** Reserved for the Phase-2 disparate-impact fairness audit
-(`docs/fairness_audit.md`) — never a model feature (it's a direct
-geographic/demographic proxy).
+### Census / ACS (tract demographics) — audit-only
+**Audit-only, never a model feature** (it's a direct geographic/demographic
+proxy — decisions 0004 / 0005). Now implemented for the disparate-impact fairness
+audit (`src/foodsafety/audit/census.py`, decision record 0018): each
+establishment's `lat/lon` is point-in-polygon joined to its **census tract**
+(TIGER/Line shapefiles) and then to **ACS 5-year** tract attributes (median income,
+race/ethnicity, poverty, foreign-born, limited-English, and secondary context).
+Used only to *measure* disparate impact — no column reaches `ALL_FEATURES`, the
+served parquet, the app, or CI. Needs a free `CENSUS_API_KEY` (the data API now
+requires one) and the `audit` optional dependency extra (geopandas). Results:
+`docs/fairness_audit.md`, `reports/fairness/fairness_audit_<city>.json`.
 
 ### Cuisine / menu type
 Not pursued: predictive but ≈ ethnicity (a fairness trap). Related:
