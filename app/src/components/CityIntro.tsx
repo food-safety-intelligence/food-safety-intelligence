@@ -7,6 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { CITY_CONFIG, dataUrl, DEFAULT_CITY } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { useCity } from "@/components/CityContext";
 
 interface Totals {
@@ -23,19 +24,18 @@ export function CityIntro({ initialTotals }: { initialTotals: Totals }) {
 
   useEffect(() => {
     if (city === DEFAULT_CITY) return;
-    let alive = true;
-    fetch(dataUrl(city, "search-index.json"))
-      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d: { total: number; tier_counts: { High: number } }) => {
-        if (alive)
-          setFetched({ city, totals: { establishments: d.total, high: d.tier_counts.High } });
-      })
+    const controller = new AbortController();
+    fetchJson<{ total: number; tier_counts: { High: number } }>(
+      dataUrl(city, "search-index.json"),
+      { signal: controller.signal },
+    )
+      .then((d) =>
+        setFetched({ city, totals: { establishments: d.total, high: d.tier_counts.High } }),
+      )
       .catch(() => {
-        /* keep whatever we have */
+        /* keep whatever we have if the index can't load after retries */
       });
-    return () => {
-      alive = false;
-    };
+    return () => controller.abort();
   }, [city]);
 
   const totals: Totals =

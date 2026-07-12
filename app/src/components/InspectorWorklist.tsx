@@ -16,6 +16,7 @@ import { useCity } from "@/components/CityContext";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
@@ -111,20 +112,17 @@ export function InspectorWorklist() {
   }
 
   useEffect(() => {
-    let alive = true;
-    fetch(dataUrl(city, "search-index.json"))
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      )
-      .then((d: SearchIndex) => {
-        if (alive) setIndex(d);
-      })
+    const controller = new AbortController();
+    fetchJson<SearchIndex>(dataUrl(city, "search-index.json"), {
+      signal: controller.signal,
+    })
+      .then((d) => setIndex(d))
       .catch(() => {
-        if (alive) setFailed(true);
+        // A transient blip on the multi-MB index is retried inside fetchJson;
+        // only a genuine, retries-exhausted failure marks the worklist failed.
+        if (!controller.signal.aborted) setFailed(true);
       });
-    return () => {
-      alive = false;
-    };
+    return () => controller.abort();
   }, [city]);
 
   // Backtest metrics for the "Why trust this ranking" card, read from the same
