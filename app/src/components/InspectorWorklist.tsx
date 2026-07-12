@@ -236,10 +236,6 @@ export function InspectorWorklist() {
     return counts;
   }, [index, activeRows]);
 
-  const asOfLabel = index?.as_of_date
-    ? formatInspectionDate(index.as_of_date)
-    : null;
-
   // "Why trust this ranking" numbers, straight from the active city's
   // methodology.json. The top-decile operating point gives the model-ranked
   // hit rate + its lift over random; test.prevalence is the base rate a random
@@ -274,7 +270,7 @@ export function InspectorWorklist() {
       <div className="flex flex-wrap items-end justify-between gap-5">
         <div className="max-w-[640px]">
           <p className="text-2xs tracking-[0.2em] uppercase text-muted">
-            Inspector worklist{asOfLabel ? ` · as of ${asOfLabel}` : ""}
+            Inspector worklist
           </p>
           <h1 className="serif text-5xl mt-2.5 mb-3.5">
             Inspect where it matters&nbsp;most.
