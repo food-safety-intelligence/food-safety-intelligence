@@ -489,6 +489,14 @@ export interface SearchIndexRow {
    * venue must never appear on an inspection list.
    */
   is_out_of_business?: boolean;
+  /**
+   * Bitmask of violation categories observed at the latest scored inspection
+   * (bit i = VIOLATION_CATEGORIES[i] in lib/violations.ts). Omitted when the
+   * inspection was clean or the index was built without violation tagging —
+   * an index with NO vc on any row predates the feature, and the worklist
+   * hides the violation filter entirely.
+   */
+  vc?: number;
 }
 
 /** The whole `search-index.json` file the client fetches once. */
