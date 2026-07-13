@@ -26,6 +26,12 @@ import type {
 } from "@/lib/scores";
 import { ALL_TIERS, isAllTiers, parseTiers, TIER_HEX } from "@/lib/scores";
 import { cn, formatInspectionDate } from "@/lib/utils";
+import {
+  bitsForSlugs,
+  matchesViolations,
+  parseViol,
+  VIOLATION_CATEGORIES,
+} from "@/lib/violations";
 
 /**
  * "For inspectors" — a model-ranked inspection worklist (design handoff:
@@ -86,6 +92,12 @@ export function InspectorWorklist() {
   const activeTiers = useMemo(() => parseTiers(tierParam), [tierParam]);
   const sort = parseInspectorSort(searchParams.get("sort"));
 
+  // Violation-category filter, URL-driven like tier/sort. Memoized on the raw
+  // param (same React Compiler pattern as activeTiers). bits=0 → no filter.
+  const violParam = searchParams.get("viol") ?? undefined;
+  const activeViol = useMemo(() => parseViol(violParam), [violParam]);
+  const violBits = bitsForSlugs(activeViol);
+
   // City-scoped data — the header's CityToggle switches it. Expanded rows and
   // the route reset with the city (license ids are per-city).
   const { city } = useCity();
@@ -145,7 +157,11 @@ export function InspectorWorklist() {
   // "now" is fixed per mount so day-counts don't drift between renders.
   const [now] = useState(() => Date.now());
 
-  const setParams = (next: { tiers?: RiskTier[]; sort?: InspectorSort }) => {
+  const setParams = (next: {
+    tiers?: RiskTier[];
+    sort?: InspectorSort;
+    viol?: string[];
+  }) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next.tiers) {
       if (isAllTiers(next.tiers)) params.delete("tier");
@@ -154,6 +170,13 @@ export function InspectorWorklist() {
     if (next.sort) {
       if (next.sort === "risk") params.delete("sort");
       else params.set("sort", next.sort);
+    }
+    if (next.viol) {
+      // Unlike tiers, all-six-selected is NOT a no-op (it still excludes
+      // establishments whose latest inspection was clean), so the param
+      // only clears when the selection is empty.
+      if (next.viol.length === 0) params.delete("viol");
+      else params.set("viol", next.viol.join(","));
     }
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -167,6 +190,18 @@ export function InspectorWorklist() {
     // resetting to all tiers, matching parseTiers's all-invalid fallback.
     const next = ALL_TIERS.filter((t) => set.has(t));
     setParams({ tiers: next.length > 0 ? next : [...ALL_TIERS] });
+    setVisibleCount(QUEUE_PAGE);
+  };
+
+  const toggleViol = (slug: string) => {
+    const set = new Set(activeViol);
+    if (set.has(slug)) set.delete(slug);
+    else set.add(slug);
+    setParams({
+      viol: VIOLATION_CATEGORIES.filter((c) => set.has(c.slug)).map(
+        (c) => c.slug,
+      ),
+    });
     setVisibleCount(QUEUE_PAGE);
   };
 
@@ -184,7 +219,9 @@ export function InspectorWorklist() {
     const tierSet = new Set(activeTiers);
     const tierActive = !isAllTiers(activeTiers);
     const matched = activeRows.filter(
-      (r) => !tierActive || tierSet.has(r.risk_tier),
+      (r) =>
+        (!tierActive || tierSet.has(r.risk_tier)) &&
+        matchesViolations(r.vc, violBits),
     );
     const days = (r: SearchIndexRow) => daysSince(r.as_of_date, now) ?? -1;
     return matched.slice().sort((a, b) => {
@@ -193,7 +230,7 @@ export function InspectorWorklist() {
         return (b.trend_slope ?? -9) - (a.trend_slope ?? -9);
       return b.risk_score - a.risk_score;
     });
-  }, [activeRows, activeTiers, sort, now]);
+  }, [activeRows, activeTiers, violBits, sort, now]);
 
   // "Worsening" uses the same source-of-truth band as the per-row trend pill
   // (CITY_CONFIG.trendStableBand) and the producer's payload totals
@@ -233,6 +270,26 @@ export function InspectorWorklist() {
     for (const r of activeRows) counts[r.risk_tier] += 1;
     return counts;
   }, [index, activeRows]);
+
+  // An index built before violation tagging has no vc on ANY row — hide the
+  // violation chips rather than render controls that can never match.
+  const indexHasVc = useMemo(
+    () => activeRows.some((r) => r.vc !== undefined),
+    [activeRows],
+  );
+
+  // Chip counts over ACTIVE venues, like tierCounts (population-level; they
+  // don't shrink when other filters are applied).
+  const violCounts = useMemo(() => {
+    const counts = VIOLATION_CATEGORIES.map(() => 0);
+    for (const r of activeRows) {
+      const vc = r.vc ?? 0;
+      for (const c of VIOLATION_CATEGORIES) {
+        if (vc & (1 << c.id)) counts[c.id] += 1;
+      }
+    }
+    return counts;
+  }, [activeRows]);
 
   // "Why trust this ranking" numbers, straight from the active city's
   // methodology.json. The top-decile operating point gives the model-ranked
@@ -363,6 +420,43 @@ export function InspectorWorklist() {
         </div>
       </div>
 
+      {/* ---- Violation filter ---- */}
+      {indexHasVc && (
+        <div
+          role="group"
+          aria-label="Filter by violations at last inspection"
+          className="mt-3 flex flex-wrap items-center gap-1.5"
+        >
+          <span className="text-2xs tracking-[0.14em] uppercase text-muted mr-1.5">
+            Violations at last inspection
+          </span>
+          {VIOLATION_CATEGORIES.map((c) => {
+            const on = activeViol.includes(c.slug);
+            return (
+              <button
+                key={c.slug}
+                type="button"
+                onClick={() => toggleViol(c.slug)}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                  on
+                    ? "bg-ink text-cream border border-ink"
+                    : "bg-transparent text-ink border border-line hover:bg-tint",
+                )}
+              >
+                {c.label}
+                <span
+                  className={cn("num ml-1.5", on ? "text-cream/70" : "text-muted")}
+                >
+                  {violCounts[c.id].toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ---- Main grid: queue + sidebar ---- */}
       <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
         {/* ===== Priority queue ===== */}
@@ -387,6 +481,11 @@ export function InspectorWorklist() {
           {!failed && !index && (
             <p className="px-6 py-10 text-sm text-muted text-center">
               Loading the worklist…
+            </p>
+          )}
+          {index && !failed && rows.length === 0 && (
+            <p className="px-6 py-10 text-sm text-muted text-center">
+              No establishments match these filters.
             </p>
           )}
 
