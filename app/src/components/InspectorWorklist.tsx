@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BackToSearch } from "@/components/BackToSearch";
 import { useCity } from "@/components/CityContext";
+import { MapView } from "@/components/MapView";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
@@ -20,11 +21,18 @@ import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
+  PinSummary,
   RiskTier,
   SearchIndex,
   SearchIndexRow,
 } from "@/lib/scores";
-import { ALL_TIERS, isAllTiers, parseTiers, TIER_HEX } from "@/lib/scores";
+import {
+  ALL_TIERS,
+  hasCoords,
+  isAllTiers,
+  parseTiers,
+  TIER_HEX,
+} from "@/lib/scores";
 import { cn, formatInspectionDate } from "@/lib/utils";
 import {
   bitsForSlugs,
@@ -49,6 +57,12 @@ type InspectorSort = "risk" | "overdue" | "trend";
 
 function parseInspectorSort(raw: string | null): InspectorSort {
   return raw === "overdue" ? "overdue" : raw === "trend" ? "trend" : "risk";
+}
+
+type WorklistView = "list" | "map";
+
+function parseWorklistView(raw: string | null): WorklistView {
+  return raw === "map" ? "map" : "list";
 }
 
 const SORTS: { key: InspectorSort; label: string }[] = [
@@ -97,6 +111,8 @@ export function InspectorWorklist() {
   const violParam = searchParams.get("viol") ?? undefined;
   const activeViol = useMemo(() => parseViol(violParam), [violParam]);
   const violBits = bitsForSlugs(activeViol);
+
+  const view = parseWorklistView(searchParams.get("view"));
 
   // City-scoped data — the header's CityToggle switches it. Expanded rows and
   // the route reset with the city (license ids are per-city).
@@ -161,6 +177,7 @@ export function InspectorWorklist() {
     tiers?: RiskTier[];
     sort?: InspectorSort;
     viol?: string[];
+    view?: WorklistView;
   }) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next.tiers) {
@@ -177,6 +194,10 @@ export function InspectorWorklist() {
       // only clears when the selection is empty.
       if (next.viol.length === 0) params.delete("viol");
       else params.set("viol", next.viol.join(","));
+    }
+    if (next.view) {
+      if (next.view === "list") params.delete("view");
+      else params.set("view", next.view);
     }
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -317,6 +338,27 @@ export function InspectorWorklist() {
   }, [meth]);
 
   const visible = rows.slice(0, visibleCount);
+
+  // Pins in active-sort order: MapView's zoom-density cap draws the FIRST N
+  // pins, so the map surfaces the same establishments as the top of the list
+  // (e.g. "Worsening fastest" puts trending pins on first). activeRows already
+  // excludes closed venues, so no is_out_of_business handling here.
+  const mapPins = useMemo<PinSummary[]>(
+    () =>
+      view === "map"
+        ? rows.filter(hasCoords).map((r) => ({
+            license_id: r.license_id,
+            dba_name: r.dba_name,
+            address: r.address,
+            lat: r.lat as number,
+            lon: r.lon as number,
+            risk_score: r.risk_score,
+            risk_tier: r.risk_tier,
+            top_driver: r.top_driver ?? undefined,
+          }))
+        : [],
+    [rows, view],
+  );
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
@@ -464,12 +506,39 @@ export function InspectorWorklist() {
           aria-label="Priority queue"
           className="bg-card border border-line rounded-3xl overflow-hidden soft-shadow-lg"
         >
-          <div className="flex items-baseline justify-between px-6 pt-5 pb-3.5 border-b border-line">
-            <h2 className="text-md font-bold">Priority queue</h2>
-            <p className="text-xs text-muted">
-              <span className="num">{rows.length.toLocaleString()}</span>{" "}
-              establishments · highest expected yield first
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-5 pb-3.5 border-b border-line">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <h2 className="text-md font-bold">Priority queue</h2>
+              <p className="text-xs text-muted">
+                <span className="num">{rows.length.toLocaleString()}</span>{" "}
+                establishments · highest expected yield first
+              </p>
+            </div>
+            {/* List | Map toggle — same segmented pattern as the home page's
+                mobile Map/List switch. URL-driven (?view=map). */}
+            <div
+              role="group"
+              aria-label="Queue view"
+              className="inline-flex rounded-lg border border-line overflow-hidden text-xs"
+            >
+              {(["list", "map"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setParams({ view: v })}
+                  aria-pressed={view === v}
+                  className={cn(
+                    "px-3 py-1 capitalize transition-colors cursor-pointer",
+                    v === "map" && "border-l border-line",
+                    view === v
+                      ? "bg-ink text-cream"
+                      : "text-muted hover:bg-cream/60",
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
 
           {failed && (
@@ -483,44 +552,61 @@ export function InspectorWorklist() {
               Loading the worklist…
             </p>
           )}
-          {index && !failed && rows.length === 0 && (
-            <p className="px-6 py-10 text-sm text-muted text-center">
-              No establishments match these filters.
-            </p>
+
+          {index && !failed && view === "map" && (
+            <div className="relative h-[70vh] min-h-[480px]">
+              <MapView
+                pins={mapPins}
+                className="absolute inset-0"
+                center={{
+                  lat: CITY_CONFIG[city].center.lat,
+                  lon: CITY_CONFIG[city].center.lon,
+                  zoom: CITY_CONFIG[city].zoom,
+                }}
+              />
+            </div>
           )}
 
-          {visible.map((r, i) => (
-            <QueueRow
-              key={r.license_id}
-              row={r}
-              city={city}
-              rank={i + 1}
-              days={daysSince(r.as_of_date, now)}
-              expanded={!!expanded[r.license_id]}
-              onToggle={() =>
-                setExpanded((e) => ({
-                  ...e,
-                  [r.license_id]: !e[r.license_id],
-                }))
-              }
-              onAddToRoute={() =>
-                setRoute((ids) =>
-                  ids.includes(r.license_id) ? ids : [...ids, r.license_id],
-                )
-              }
-            />
-          ))}
-
-          {rows.length > visibleCount && (
-            <div className="p-3">
-              <button
-                type="button"
-                onClick={() => setVisibleCount((c) => c + QUEUE_PAGE)}
-                className="w-full rounded-xl border border-line py-2 text-sm text-teal hover:bg-cream/50 transition-colors cursor-pointer"
-              >
-                Show {Math.min(QUEUE_PAGE, rows.length - visibleCount)} more
-              </button>
-            </div>
+          {index && !failed && view === "list" && (
+            <>
+              {rows.length === 0 && (
+                <p className="px-6 py-10 text-sm text-muted text-center">
+                  No establishments match these filters.
+                </p>
+              )}
+              {visible.map((r, i) => (
+                <QueueRow
+                  key={r.license_id}
+                  row={r}
+                  city={city}
+                  rank={i + 1}
+                  days={daysSince(r.as_of_date, now)}
+                  expanded={!!expanded[r.license_id]}
+                  onToggle={() =>
+                    setExpanded((e) => ({
+                      ...e,
+                      [r.license_id]: !e[r.license_id],
+                    }))
+                  }
+                  onAddToRoute={() =>
+                    setRoute((ids) =>
+                      ids.includes(r.license_id) ? ids : [...ids, r.license_id],
+                    )
+                  }
+                />
+              ))}
+              {rows.length > visibleCount && (
+                <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + QUEUE_PAGE)}
+                    className="w-full rounded-xl border border-line py-2 text-sm text-teal hover:bg-cream/50 transition-colors cursor-pointer"
+                  >
+                    Show {Math.min(QUEUE_PAGE, rows.length - visibleCount)} more
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
 

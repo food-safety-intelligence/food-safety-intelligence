@@ -510,7 +510,8 @@ export interface SearchIndex {
   rows: SearchIndexRow[];
 }
 
-function hasCoords(r: SearchIndexRow): boolean {
+/** Row has renderable map coordinates. Shared by the home + inspector maps. */
+export function hasCoords(r: SearchIndexRow): boolean {
   return (
     r.lat != null &&
     r.lon != null &&
