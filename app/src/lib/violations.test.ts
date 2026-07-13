@@ -13,6 +13,19 @@ describe("VIOLATION_CATEGORIES", () => {
     expect(new Set(slugs).size).toBe(6);
     VIOLATION_CATEGORIES.forEach((c, i) => expect(c.id).toBe(i));
   });
+
+  it("keeps the published slug order (vc bit positions are a wire contract)", () => {
+    // Reordering categories silently changes what already-deployed vc
+    // bitmasks mean — treat any diff here as a breaking change.
+    expect(VIOLATION_CATEGORIES.map((c) => c.slug)).toEqual([
+      "pests",
+      "temp",
+      "contamination",
+      "hygiene",
+      "sanitizing",
+      "facility",
+    ]);
+  });
 });
 
 describe("parseViol", () => {

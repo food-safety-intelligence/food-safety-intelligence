@@ -236,13 +236,25 @@ export function InspectorWorklist() {
     [index],
   );
 
+  // An index built before violation tagging has no vc on ANY row — hide the
+  // violation chips rather than render controls that can never match.
+  const indexHasVc = useMemo(
+    () => activeRows.some((r) => r.vc !== undefined),
+    [activeRows],
+  );
+
+  // A ?viol= URL against an index built before violation tagging must not
+  // become an invisible, unclearable filter (the chip row is hidden then) —
+  // treat the mask as inactive when no row carries vc.
+  const effectiveViolBits = indexHasVc ? violBits : 0;
+
   const rows = useMemo(() => {
     const tierSet = new Set(activeTiers);
     const tierActive = !isAllTiers(activeTiers);
     const matched = activeRows.filter(
       (r) =>
         (!tierActive || tierSet.has(r.risk_tier)) &&
-        matchesViolations(r.vc, violBits),
+        matchesViolations(r.vc, effectiveViolBits),
     );
     const days = (r: SearchIndexRow) => daysSince(r.as_of_date, now) ?? -1;
     return matched.slice().sort((a, b) => {
@@ -251,7 +263,7 @@ export function InspectorWorklist() {
         return (b.trend_slope ?? -9) - (a.trend_slope ?? -9);
       return b.risk_score - a.risk_score;
     });
-  }, [activeRows, activeTiers, violBits, sort, now]);
+  }, [activeRows, activeTiers, effectiveViolBits, sort, now]);
 
   // "Worsening" uses the same source-of-truth band as the per-row trend pill
   // (CITY_CONFIG.trendStableBand) and the producer's payload totals
@@ -291,13 +303,6 @@ export function InspectorWorklist() {
     for (const r of activeRows) counts[r.risk_tier] += 1;
     return counts;
   }, [index, activeRows]);
-
-  // An index built before violation tagging has no vc on ANY row — hide the
-  // violation chips rather than render controls that can never match.
-  const indexHasVc = useMemo(
-    () => activeRows.some((r) => r.vc !== undefined),
-    [activeRows],
-  );
 
   // Chip counts over ACTIVE venues, like tierCounts (population-level; they
   // don't shrink when other filters are applied).
@@ -350,8 +355,8 @@ export function InspectorWorklist() {
             license_id: r.license_id,
             dba_name: r.dba_name,
             address: r.address,
-            lat: r.lat as number,
-            lon: r.lon as number,
+            lat: r.lat,
+            lon: r.lon,
             risk_score: r.risk_score,
             risk_tier: r.risk_tier,
             top_driver: r.top_driver ?? undefined,

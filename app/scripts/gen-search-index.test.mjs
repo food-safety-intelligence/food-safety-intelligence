@@ -56,6 +56,11 @@ function writeFixtures(withComments) {
         "38. INSECTS, RODENTS, & ANIMALS NOT PRESENT - Comments: rat droppings | 21. COLD HOLDING temperature above 41F",
       ]),
     );
+    // "222" has a synced comments file too, but its single history event (index
+    // 0) is an explicit "" entry — a clean inspection, distinct from "no synced
+    // comments at all". Proves the deploy-mode "present but empty = clean, vc
+    // omitted" branch, not just the "no comments file" fallback.
+    writeFileSync(path.join(cdir, "222.json"), JSON.stringify([""]));
   }
   return dir;
 }
@@ -81,6 +86,8 @@ describe("gen-search-index violation tagging", () => {
       path.join(dir, "comments-by-license"),
     ]);
     expect(rows[0].vc).toBe(0b11); // pests + temperature from the full text
+    // "222"'s comments file has an explicit "" entry (present but empty) —
+    // comments present but empty string = clean, vc omitted.
     expect(rows[1].vc).toBeUndefined();
   });
 

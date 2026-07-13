@@ -129,6 +129,8 @@ async function main() {
         ? `full text (${taggedFromComments.toLocaleString()} licenses with comments)`
         : "headlines only (first violation per inspection; dev fallback)";
     console.log(`[search-index] violation tagging: ${mode}`);
+    // Counts include out-of-business rows, so they read slightly higher than
+    // the UI's chip counts (which only tally active venues).
     console.log(
       "[search-index] category counts: " +
         CATEGORY_SLUGS.map((s, i) => `${s}=${categoryCounts[i]}`).join(" "),
