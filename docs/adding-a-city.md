@@ -121,7 +121,13 @@ detail-page trend chart, DR 0011) and the `result` string the app expects
   script and appended NYC to `predev` / `prebuild` (gen-search-index) and
   `postbuild` (build-detail-data into `out/data/<city>` + drop the large source
   JSONs). Generalising to an N-city loop is a welcome cleanup; otherwise copy the
-  NYC lines for `<city>`.
+  NYC lines for `<city>`. `gen-search-index.mjs` now takes a 4th arg:
+  `node scripts/gen-search-index.mjs <scores.json> <search-index.json>
+  <inspection_history.json> [<comments-by-license-dir>]` — the history arg
+  enables violation-category tagging (omit it and the city ships without the
+  violation filter, chips hidden in the UI); `prebuild` should also pass the
+  new city's comments-by-license dir from `/tmp/fsi-build-cache` (mirror the
+  Chicago/NYC/LA `prebuild` lines).
 - **Deploy** (`.github/workflows/deploy-web.yml`): exclude `data/<city>/detail/*`
   from the plain `aws s3 sync` and add a per-city `sync-detail-s3.mjs` pass. The
   added city's data comes from the **committed `public/data/<city>/*.json`**

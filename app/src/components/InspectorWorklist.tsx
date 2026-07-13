@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BackToSearch } from "@/components/BackToSearch";
 import { useCity } from "@/components/CityContext";
+import { MapView } from "@/components/MapView";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
@@ -20,12 +21,25 @@ import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
   DetailBundle,
+  PinSummary,
   RiskTier,
   SearchIndex,
   SearchIndexRow,
 } from "@/lib/scores";
-import { ALL_TIERS, isAllTiers, parseTiers, TIER_HEX } from "@/lib/scores";
+import {
+  ALL_TIERS,
+  hasCoords,
+  isAllTiers,
+  parseTiers,
+  TIER_HEX,
+} from "@/lib/scores";
 import { cn, formatInspectionDate } from "@/lib/utils";
+import {
+  bitsForSlugs,
+  matchesViolations,
+  parseViol,
+  VIOLATION_CATEGORIES,
+} from "@/lib/violations";
 
 /**
  * "For inspectors" — a model-ranked inspection worklist (design handoff:
@@ -43,6 +57,12 @@ type InspectorSort = "risk" | "overdue" | "trend";
 
 function parseInspectorSort(raw: string | null): InspectorSort {
   return raw === "overdue" ? "overdue" : raw === "trend" ? "trend" : "risk";
+}
+
+type WorklistView = "list" | "map";
+
+function parseWorklistView(raw: string | null): WorklistView {
+  return raw === "map" ? "map" : "list";
 }
 
 const SORTS: { key: InspectorSort; label: string }[] = [
@@ -85,6 +105,14 @@ export function InspectorWorklist() {
   const tierParam = searchParams.get("tier") ?? undefined;
   const activeTiers = useMemo(() => parseTiers(tierParam), [tierParam]);
   const sort = parseInspectorSort(searchParams.get("sort"));
+
+  // Violation-category filter, URL-driven like tier/sort. Memoized on the raw
+  // param (same React Compiler pattern as activeTiers). bits=0 → no filter.
+  const violParam = searchParams.get("viol") ?? undefined;
+  const activeViol = useMemo(() => parseViol(violParam), [violParam]);
+  const violBits = bitsForSlugs(activeViol);
+
+  const view = parseWorklistView(searchParams.get("view"));
 
   // City-scoped data — the header's CityToggle switches it. Expanded rows and
   // the route reset with the city (license ids are per-city).
@@ -145,7 +173,12 @@ export function InspectorWorklist() {
   // "now" is fixed per mount so day-counts don't drift between renders.
   const [now] = useState(() => Date.now());
 
-  const setParams = (next: { tiers?: RiskTier[]; sort?: InspectorSort }) => {
+  const setParams = (next: {
+    tiers?: RiskTier[];
+    sort?: InspectorSort;
+    viol?: string[];
+    view?: WorklistView;
+  }) => {
     const params = new URLSearchParams(searchParams.toString());
     if (next.tiers) {
       if (isAllTiers(next.tiers)) params.delete("tier");
@@ -154,6 +187,17 @@ export function InspectorWorklist() {
     if (next.sort) {
       if (next.sort === "risk") params.delete("sort");
       else params.set("sort", next.sort);
+    }
+    if (next.viol) {
+      // Unlike tiers, all-six-selected is NOT a no-op (it still excludes
+      // establishments whose latest inspection was clean), so the param
+      // only clears when the selection is empty.
+      if (next.viol.length === 0) params.delete("viol");
+      else params.set("viol", next.viol.join(","));
+    }
+    if (next.view) {
+      if (next.view === "list") params.delete("view");
+      else params.set("view", next.view);
     }
     const qs = params.toString();
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
@@ -170,6 +214,18 @@ export function InspectorWorklist() {
     setVisibleCount(QUEUE_PAGE);
   };
 
+  const toggleViol = (slug: string) => {
+    const set = new Set(activeViol);
+    if (set.has(slug)) set.delete(slug);
+    else set.add(slug);
+    setParams({
+      viol: VIOLATION_CATEGORIES.filter((c) => set.has(c.slug)).map(
+        (c) => c.slug,
+      ),
+    });
+    setVisibleCount(QUEUE_PAGE);
+  };
+
   // An inspection worklist must never contain a closed venue (DR 0014) — every
   // derived view on this page (queue, stats, Rising fast, tier counts) starts
   // from activeRows, so a flagged establishment can't appear anywhere here.
@@ -180,11 +236,25 @@ export function InspectorWorklist() {
     [index],
   );
 
+  // An index built before violation tagging has no vc on ANY row — hide the
+  // violation chips rather than render controls that can never match.
+  const indexHasVc = useMemo(
+    () => activeRows.some((r) => r.vc !== undefined),
+    [activeRows],
+  );
+
+  // A ?viol= URL against an index built before violation tagging must not
+  // become an invisible, unclearable filter (the chip row is hidden then) —
+  // treat the mask as inactive when no row carries vc.
+  const effectiveViolBits = indexHasVc ? violBits : 0;
+
   const rows = useMemo(() => {
     const tierSet = new Set(activeTiers);
     const tierActive = !isAllTiers(activeTiers);
     const matched = activeRows.filter(
-      (r) => !tierActive || tierSet.has(r.risk_tier),
+      (r) =>
+        (!tierActive || tierSet.has(r.risk_tier)) &&
+        matchesViolations(r.vc, effectiveViolBits),
     );
     const days = (r: SearchIndexRow) => daysSince(r.as_of_date, now) ?? -1;
     return matched.slice().sort((a, b) => {
@@ -193,7 +263,7 @@ export function InspectorWorklist() {
         return (b.trend_slope ?? -9) - (a.trend_slope ?? -9);
       return b.risk_score - a.risk_score;
     });
-  }, [activeRows, activeTiers, sort, now]);
+  }, [activeRows, activeTiers, effectiveViolBits, sort, now]);
 
   // "Worsening" uses the same source-of-truth band as the per-row trend pill
   // (CITY_CONFIG.trendStableBand) and the producer's payload totals
@@ -234,6 +304,19 @@ export function InspectorWorklist() {
     return counts;
   }, [index, activeRows]);
 
+  // Chip counts over ACTIVE venues, like tierCounts (population-level; they
+  // don't shrink when other filters are applied).
+  const violCounts = useMemo(() => {
+    const counts = VIOLATION_CATEGORIES.map(() => 0);
+    for (const r of activeRows) {
+      const vc = r.vc ?? 0;
+      for (const c of VIOLATION_CATEGORIES) {
+        if (vc & (1 << c.id)) counts[c.id] += 1;
+      }
+    }
+    return counts;
+  }, [activeRows]);
+
   // "Why trust this ranking" numbers, straight from the active city's
   // methodology.json. The top-decile operating point gives the model-ranked
   // hit rate + its lift over random; test.prevalence is the base rate a random
@@ -260,6 +343,27 @@ export function InspectorWorklist() {
   }, [meth]);
 
   const visible = rows.slice(0, visibleCount);
+
+  // Pins in active-sort order: MapView's zoom-density cap draws the FIRST N
+  // pins, so the map surfaces the same establishments as the top of the list
+  // (e.g. "Worsening fastest" puts trending pins on first). activeRows already
+  // excludes closed venues, so no is_out_of_business handling here.
+  const mapPins = useMemo<PinSummary[]>(
+    () =>
+      view === "map"
+        ? rows.filter(hasCoords).map((r) => ({
+            license_id: r.license_id,
+            dba_name: r.dba_name,
+            address: r.address,
+            lat: r.lat,
+            lon: r.lon,
+            risk_score: r.risk_score,
+            risk_tier: r.risk_tier,
+            top_driver: r.top_driver ?? undefined,
+          }))
+        : [],
+    [rows, view],
+  );
 
   return (
     <main className="flex-1 w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-4 sm:px-8 pt-10 pb-18">
@@ -363,6 +467,43 @@ export function InspectorWorklist() {
         </div>
       </div>
 
+      {/* ---- Violation filter ---- */}
+      {indexHasVc && (
+        <div
+          role="group"
+          aria-label="Filter by violations at last inspection"
+          className="mt-3 flex flex-wrap items-center gap-1.5"
+        >
+          <span className="text-2xs tracking-[0.14em] uppercase text-muted mr-1.5">
+            Violations at last inspection
+          </span>
+          {VIOLATION_CATEGORIES.map((c) => {
+            const on = activeViol.includes(c.slug);
+            return (
+              <button
+                key={c.slug}
+                type="button"
+                onClick={() => toggleViol(c.slug)}
+                aria-pressed={on}
+                className={cn(
+                  "rounded-full px-3.5 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                  on
+                    ? "bg-ink text-cream border border-ink"
+                    : "bg-transparent text-ink border border-line hover:bg-tint",
+                )}
+              >
+                {c.label}
+                <span
+                  className={cn("num ml-1.5", on ? "text-cream/70" : "text-muted")}
+                >
+                  {violCounts[c.id].toLocaleString()}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {/* ---- Main grid: queue + sidebar ---- */}
       <div className="mt-5 grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-6 items-start">
         {/* ===== Priority queue ===== */}
@@ -370,12 +511,39 @@ export function InspectorWorklist() {
           aria-label="Priority queue"
           className="bg-card border border-line rounded-3xl overflow-hidden soft-shadow-lg"
         >
-          <div className="flex items-baseline justify-between px-6 pt-5 pb-3.5 border-b border-line">
-            <h2 className="text-md font-bold">Priority queue</h2>
-            <p className="text-xs text-muted">
-              <span className="num">{rows.length.toLocaleString()}</span>{" "}
-              establishments · highest expected yield first
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-2 px-6 pt-5 pb-3.5 border-b border-line">
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
+              <h2 className="text-md font-bold">Priority queue</h2>
+              <p className="text-xs text-muted">
+                <span className="num">{rows.length.toLocaleString()}</span>{" "}
+                establishments · highest expected yield first
+              </p>
+            </div>
+            {/* List | Map toggle — same segmented pattern as the home page's
+                mobile Map/List switch. URL-driven (?view=map). */}
+            <div
+              role="group"
+              aria-label="Queue view"
+              className="inline-flex rounded-lg border border-line overflow-hidden text-xs"
+            >
+              {(["list", "map"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setParams({ view: v })}
+                  aria-pressed={view === v}
+                  className={cn(
+                    "px-3 py-1 capitalize transition-colors cursor-pointer",
+                    v === "map" && "border-l border-line",
+                    view === v
+                      ? "bg-ink text-cream"
+                      : "text-muted hover:bg-cream/60",
+                  )}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
           </div>
 
           {failed && (
@@ -390,38 +558,60 @@ export function InspectorWorklist() {
             </p>
           )}
 
-          {visible.map((r, i) => (
-            <QueueRow
-              key={r.license_id}
-              row={r}
-              city={city}
-              rank={i + 1}
-              days={daysSince(r.as_of_date, now)}
-              expanded={!!expanded[r.license_id]}
-              onToggle={() =>
-                setExpanded((e) => ({
-                  ...e,
-                  [r.license_id]: !e[r.license_id],
-                }))
-              }
-              onAddToRoute={() =>
-                setRoute((ids) =>
-                  ids.includes(r.license_id) ? ids : [...ids, r.license_id],
-                )
-              }
-            />
-          ))}
-
-          {rows.length > visibleCount && (
-            <div className="p-3">
-              <button
-                type="button"
-                onClick={() => setVisibleCount((c) => c + QUEUE_PAGE)}
-                className="w-full rounded-xl border border-line py-2 text-sm text-teal hover:bg-cream/50 transition-colors cursor-pointer"
-              >
-                Show {Math.min(QUEUE_PAGE, rows.length - visibleCount)} more
-              </button>
+          {index && !failed && view === "map" && (
+            <div className="relative h-[70vh] min-h-[480px]">
+              <MapView
+                pins={mapPins}
+                className="absolute inset-0"
+                center={{
+                  lat: CITY_CONFIG[city].center.lat,
+                  lon: CITY_CONFIG[city].center.lon,
+                  zoom: CITY_CONFIG[city].zoom,
+                }}
+              />
             </div>
+          )}
+
+          {index && !failed && view === "list" && (
+            <>
+              {rows.length === 0 && (
+                <p className="px-6 py-10 text-sm text-muted text-center">
+                  No establishments match these filters.
+                </p>
+              )}
+              {visible.map((r, i) => (
+                <QueueRow
+                  key={r.license_id}
+                  row={r}
+                  city={city}
+                  rank={i + 1}
+                  days={daysSince(r.as_of_date, now)}
+                  expanded={!!expanded[r.license_id]}
+                  onToggle={() =>
+                    setExpanded((e) => ({
+                      ...e,
+                      [r.license_id]: !e[r.license_id],
+                    }))
+                  }
+                  onAddToRoute={() =>
+                    setRoute((ids) =>
+                      ids.includes(r.license_id) ? ids : [...ids, r.license_id],
+                    )
+                  }
+                />
+              ))}
+              {rows.length > visibleCount && (
+                <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleCount((c) => c + QUEUE_PAGE)}
+                    className="w-full rounded-xl border border-line py-2 text-sm text-teal hover:bg-cream/50 transition-colors cursor-pointer"
+                  >
+                    Show {Math.min(QUEUE_PAGE, rows.length - visibleCount)} more
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </section>
 
