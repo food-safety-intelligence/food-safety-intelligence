@@ -19,6 +19,8 @@ export default defineConfig({
     // the .ts-only glob silently skipped them. (A test that renders a component
     // into the DOM would also need environment: "jsdom"; the node env here still
     // runs .tsx files that only exercise pure logic.)
-    include: ["src/**/*.test.{ts,tsx}"],
+    // scripts/ are plain-Node build helpers (.mjs) — their pure logic
+    // (violation tagging, index generation) is tested here too.
+    include: ["src/**/*.test.{ts,tsx}", "scripts/**/*.test.mjs"],
   },
 });
