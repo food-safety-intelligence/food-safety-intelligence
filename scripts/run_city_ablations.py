@@ -60,6 +60,7 @@ from foodsafety.explain.shap_drivers import tree_contributions
 from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.io import storage
 from foodsafety.models.baseline import (
+    ALCOHOL_TOBACCO_FEATURES,
     ALL_FEATURES,
     CURRENT_OUTCOME_FEATURES,
     FORECAST_FEATURES,
@@ -227,6 +228,162 @@ def event_keyword_flags(raw: pd.DataFrame, keys: list[str]) -> pd.DataFrame:
     return ev_flags.reset_index()
 
 
+_STREET_WORD_SUB = {
+    "STREET": "ST",
+    "AVENUE": "AVE",
+    "BOULEVARD": "BLVD",
+    "PLACE": "PL",
+    "ROAD": "RD",
+    "DRIVE": "DR",
+    "LANE": "LN",
+    "PARKWAY": "PKWY",
+    "HIGHWAY": "HWY",
+    "TERRACE": "TER",
+    "COURT": "CT",
+    "CIRCLE": "CIR",
+    "WEST": "W",
+    "EAST": "E",
+    "NORTH": "N",
+    "SOUTH": "S",
+}
+
+
+def _norm_addr(addr: pd.Series) -> pd.Series:
+    """Normalize a free-text street address for exact-match joining across
+    independently-sourced datasets (NYC/LA restaurant feeds vs external
+    alcohol/tobacco license lists — no shared ID, address is the only key).
+
+    Uppercases, drops punctuation, collapses whitespace, strips ordinal
+    suffixes ("5TH" -> "5", so "5 AVENUE" and "5TH AVENUE" both normalize to
+    "5 AVE"), and maps common street-type/directional words to their USPS
+    abbreviation. This is a best-effort exact match, not a fuzzy/geocoded
+    join — coverage is reported at join time, not assumed.
+    """
+    s = addr.astype("string").fillna("").str.upper()
+    s = s.str.replace(r"[.,'`]", "", regex=True)
+    s = s.str.replace(r"(\d+)(ST|ND|RD|TH)\b", r"\1", regex=True)
+    s = s.str.replace(r"\s+", " ", regex=True).str.strip()
+    for word, abbr in _STREET_WORD_SUB.items():
+        s = s.str.replace(rf"\b{word}\b", abbr, regex=True)
+    return s.str.replace(r"\s+", " ", regex=True).str.strip()
+
+
+def _zip5(z: pd.Series) -> pd.Series:
+    return z.astype("string").str.extract(r"(\d{5})", expand=False)
+
+
+def _first_marker_by_address(
+    df: pd.DataFrame, addr_col: str, zip_col: str, date_col: str | None
+) -> pd.DataFrame:
+    """Collapse a license source table to one row per (zip5, norm_addr) with
+    the earliest issue date at that address — the address-keyed analog of
+    Chicago's per-license first-marker-date (license_history_features.py).
+    ``date_col=None`` (LA tobacco/alcohn — see fetch_alcohol_tobacco_licenses.py
+    docstring for why) degrades to a current-status-only flag: every anchor at
+    a matched address is treated as True, not just those after some date.
+    """
+    out = pd.DataFrame({"zip5": _zip5(df[zip_col]), "norm_addr": _norm_addr(df[addr_col])})
+    if date_col is not None:
+        out["first_date"] = pd.to_datetime(df[date_col], errors="coerce")
+    else:
+        out["first_date"] = pd.Timestamp.min
+    out = out.dropna(subset=["zip5", "norm_addr"])
+    return out.groupby(["zip5", "norm_addr"], as_index=False)["first_date"].min()
+
+
+def alcohol_tobacco_flags_nyc(ev: pd.DataFrame) -> pd.DataFrame:
+    """has_alcohol_license / has_tobacco_license for NYC events, joined by
+    address to the NYS Liquor Authority + NYC DCWP tobacco license lists
+    (scripts/fetch_alcohol_tobacco_licenses.py). Both sources carry the
+    license's issuance date, so this is date-gated the same way as Chicago's
+    version — EXCEPT both sources are "currently active" snapshots, so a
+    business that let its license lapse before now won't show True for any
+    past inspection even if it truly held the license then (survivorship
+    bias inherent to the source data, not this join).
+    """
+    import fetch_alcohol_tobacco_licenses as fetch
+
+    alcohol = fetch.fetch_nyc_alcohol()
+    tobacco = fetch.fetch_nyc_tobacco()
+    alc_by_addr = _first_marker_by_address(
+        alcohol, "actualaddressofpremises", "zipcode", "originalissuedate"
+    )
+    tob_by_addr = _first_marker_by_address(
+        tobacco.assign(
+            addr=tobacco["address_building"].astype("string").fillna("")
+            + " "
+            + tobacco["address_street_name"].astype("string").fillna("")
+        ),
+        "addr",
+        "address_zip",
+        "license_creation_date",
+    )
+
+    per_camis = ev.groupby("camis", sort=False)[["building", "street", "zip"]].first().reset_index()
+    per_camis["zip5"] = _zip5(per_camis["zip"])
+    per_camis["norm_addr"] = _norm_addr(
+        per_camis["building"].astype("string").fillna("")
+        + " "
+        + per_camis["street"].astype("string").fillna("")
+    )
+    per_camis = per_camis.merge(
+        alc_by_addr.rename(columns={"first_date": "first_alcohol"}),
+        on=["zip5", "norm_addr"],
+        how="left",
+    ).merge(
+        tob_by_addr.rename(columns={"first_date": "first_tobacco"}),
+        on=["zip5", "norm_addr"],
+        how="left",
+    )
+
+    n = len(per_camis)
+    print(
+        f"  [nyc alcohol/tobacco join] matched alcohol={per_camis['first_alcohol'].notna().sum()}/{n}  "
+        f"tobacco={per_camis['first_tobacco'].notna().sum()}/{n} facilities (by address)"
+    )
+    return per_camis[["camis", "first_alcohol", "first_tobacco"]]
+
+
+def alcohol_tobacco_flags_la(ev: pd.DataFrame) -> pd.DataFrame:
+    """has_alcohol_license / has_tobacco_license for LA events, joined by
+    address to LA County's own alcohol-license layer + CDTFA's statewide
+    tobacco retailer list (scripts/fetch_alcohol_tobacco_licenses.py). Neither
+    source has a usable issuance date (LA County's is sparsely populated;
+    CDTFA's is a current snapshot only, by law), so BOTH flags are
+    current-status-only: every anchor at a matched address is True, not just
+    those after some date. This is the weaker of the two cities' leak-safety
+    stories — mitigated somewhat by LA's short ~2023-2026 modeling window
+    (build_la_scores.LA_TRAIN_START), where "current" drifts less from "as of
+    the anchor date" than it would over a longer span.
+    """
+    import fetch_alcohol_tobacco_licenses as fetch
+
+    alcohol = fetch.fetch_la_alcohol()
+    tobacco = fetch.fetch_la_tobacco()
+    alc_by_addr = _first_marker_by_address(alcohol, "Premise_Street_Address_1", "Premise_Zip", None)
+    tob_by_addr = _first_marker_by_address(tobacco, "address", "zip", None)
+
+    per_fac = ev.groupby("facility_id", sort=False)[["address", "zip"]].first().reset_index()
+    per_fac["zip5"] = _zip5(per_fac["zip"])
+    per_fac["norm_addr"] = _norm_addr(per_fac["address"])
+    per_fac = per_fac.merge(
+        alc_by_addr.rename(columns={"first_date": "first_alcohol"}),
+        on=["zip5", "norm_addr"],
+        how="left",
+    ).merge(
+        tob_by_addr.rename(columns={"first_date": "first_tobacco"}),
+        on=["zip5", "norm_addr"],
+        how="left",
+    )
+
+    n = len(per_fac)
+    print(
+        f"  [la alcohol/tobacco join] matched alcohol={per_fac['first_alcohol'].notna().sum()}/{n}  "
+        f"tobacco={per_fac['first_tobacco'].notna().sum()}/{n} facilities (by address)"
+    )
+    return per_fac[["facility_id", "first_alcohol", "first_tobacco"]]
+
+
 def run_city(city: str) -> list[dict]:
     """Build events once, then fit + evaluate every variant on the fixed split."""
     if city == "nyc":
@@ -262,6 +419,17 @@ def run_city(city: str) -> list[dict]:
     ev = ev.merge(kw, on=kw_keys, how="left")
     ev[kw_cols] = ev[kw_cols].fillna(0).astype("int8")
 
+    # CDPH-prompted alcohol/tobacco license flags, joined by address (no shared
+    # ID with these external sources — see fetch_alcohol_tobacco_licenses.py +
+    # the join functions' docstrings for each city's leak-safety caveat).
+    id_col = "camis" if city == "nyc" else "facility_id"
+    lookup = alcohol_tobacco_flags_nyc(ev) if city == "nyc" else alcohol_tobacco_flags_la(ev)
+    ev = ev.merge(lookup, on=id_col, how="left")
+    ev["has_alcohol_license"] = (ev["inspection_date"] > ev["first_alcohol"]).fillna(False)
+    ev["has_tobacco_license"] = (ev["inspection_date"] > ev["first_tobacco"]).fillna(False)
+    ev = ev.drop(columns=["first_alcohol", "first_tobacco"])
+    alc_tob_cols = ["has_alcohol_license", "has_tobacco_license"]
+
     # Same anchoring + temporal split as the served build, so every variant is
     # scored on an identical held-out test set (comparability is the point).
     anch = ev[ev["next_score"].notna() & (ev["inspection_date"] >= train_start)].copy()
@@ -279,6 +447,7 @@ def run_city(city: str) -> list[dict]:
         ("xgb_no_theme_sev", "xgb", feats_no_theme_sev),
         ("xgb_plus_keywords", "xgb", feats_full + kw_cols),
         ("logreg_full", "logreg", feats_full),
+        ("xgb_plus_alcohol_tobacco", "xgb", feats_full + alc_tob_cols),
     ]
 
     prov = snapshot_provenance(raw_paths, feats_full, REPO)
@@ -398,6 +567,7 @@ def run_chicago() -> list[dict]:
     )
 
     no_kw = [f for f in ALL_FEATURES if not f.startswith("flag_kw_")]
+    has_alc_tob = all(c in modelable.columns for c in ALCOHOL_TOBACCO_FEATURES)
     variants = [
         ("served_xgb_full", "xgb", list(ALL_FEATURES)),
         ("xgb_forecast_only", "xgb", list(FORECAST_FEATURES)),
@@ -405,6 +575,13 @@ def run_chicago() -> list[dict]:
         ("xgb_no_keywords", "xgb", no_kw),
         ("logreg_full", "logreg", list(ALL_FEATURES)),
     ]
+    if has_alc_tob:
+        # Tests the CDPH-prompted has_alcohol_license / has_tobacco_license flags
+        # (license_history_features.py) on top of the production set — see
+        # docs/model-experiments.md for the result.
+        variants.append(
+            ("xgb_plus_alcohol_tobacco", "xgb", list(ALL_FEATURES) + ALCOHOL_TOBACCO_FEATURES)
+        )
 
     prov = provenance(FEATURES_PATH, list(ALL_FEATURES), REPO)
     run_id = prov["run_id"]
@@ -418,6 +595,14 @@ def run_chicago() -> list[dict]:
     cat = extract_categorical_dtypes(xtr)
     xval = prepare_xgb_features(sp.val[ALL_FEATURES], categorical_dtypes=cat)
     xtest = prepare_xgb_features(sp.test[ALL_FEATURES], categorical_dtypes=cat)
+
+    # prepare_xgb_features only ever selects ALL_FEATURES, so the experimental
+    # alcohol/tobacco columns (not in ALL_FEATURES) have to be appended
+    # separately — same int8 cast as the other pass-through BOOLEAN_FEATURES.
+    if has_alc_tob:
+        for xframe, split_frame in ((xtr, sp.train), (xval, sp.val), (xtest, sp.test)):
+            for c in ALCOHOL_TOBACCO_FEATURES:
+                xframe[c] = split_frame[c].astype("int8")
 
     rows = []
     for name, kind, feats in variants:

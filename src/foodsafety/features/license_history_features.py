@@ -14,6 +14,16 @@ Two features land here in Phase 5 (more possible later):
     status-change activity to date". A facility with one row has never
     renewed; one with twenty has gone through many cycles.
 
+Experimental (not in ``ALL_FEATURES`` — see ``models.baseline.
+ALCOHOL_TOBACCO_FEATURES``): ``has_alcohol_license`` / ``has_tobacco_license``,
+prompted by CDPH's own model reportedly weighting these two license types
+above the environmental features this project already rejected (see
+docs/model-experiments.md). Both are "ever held this license type by the
+anchor date" booleans, matched on ``license_description`` (Chicago's alcohol
+licenses aren't one code: ``Tavern``, ``Consumption on Premises - Incidental
+Activity``, ``Package Goods``, and the caterer's-liquor / special-event-liquor
+variants all count).
+
 **Leak guard**: we filter the historical table to ``date_issued <
 inspection_date`` before aggregating. Renewals filed after the inspection
 can't be visible to the model at inspection time.
@@ -27,6 +37,32 @@ and easier to validate.
 from __future__ import annotations
 
 import pandas as pd
+
+# license_description substrings (case-insensitive) that denote an alcohol or
+# tobacco license. Chicago splits alcohol across several license types rather
+# than one code — confirmed against the unfiltered licenses_current.parquet,
+# since licenses_historical.parquet's own server-side pull filter (see
+# foodsafety.config._FOOD_LICENSE_WHERE) has to list the same substrings to
+# even fetch these rows.
+_ALCOHOL_DESC_MARKERS: tuple[str, ...] = (
+    "TAVERN",
+    "LIQUOR",
+    "CONSUMPTION ON PREMISES",
+    "PACKAGE GOODS",
+)
+_TOBACCO_DESC_MARKERS: tuple[str, ...] = ("TOBACCO",)
+
+
+def _first_marker_date(hist: pd.DataFrame, license_col: str, markers: tuple[str, ...]) -> pd.Series:
+    """Earliest ``date_issued`` per license among rows whose ``license_description``
+    contains any of ``markers`` (case-insensitive). Missing from the result for a
+    license that never held a matching license type.
+    """
+    upper_desc = hist["license_description"].astype("string").str.upper()
+    mask = pd.Series(False, index=hist.index)
+    for m in markers:
+        mask |= upper_desc.str.contains(m, na=False)
+    return hist.loc[mask].groupby(license_col)["date_issued"].min()
 
 
 def add_license_history_features(
@@ -50,6 +86,8 @@ def add_license_history_features(
         license_age_days        : Float32 (NaN if license never seen in history)
         license_n_history_rows  : Int32 (count up to and including anchor date;
                                           0 if no history at or before anchor)
+        has_alcohol_license     : bool (experimental — see module docstring)
+        has_tobacco_license     : bool (experimental — see module docstring)
     """
     out = inspections.copy()
     out[date_col] = pd.to_datetime(out[date_col])
@@ -79,6 +117,34 @@ def add_license_history_features(
         "Float32"
     )
 
+    # has_alcohol_license / has_tobacco_license: "ever held this license type
+    # strictly before the anchor date" — same leak guard as license_age_days,
+    # just gated on a matching license_description rather than any row.
+    # licenses_historical always carries license_description (it's the column
+    # the ingest WHERE filter itself matches on); a caller passing a minimal
+    # frame without it (e.g. a unit-test fixture) degrades to all-False rather
+    # than raising, matching license_age_days' NaN-degrade-on-missing pattern.
+    if "license_description" in hist.columns:
+        first_alcohol = _first_marker_date(hist, license_col_historical, _ALCOHOL_DESC_MARKERS)
+        first_tobacco = _first_marker_date(hist, license_col_historical, _TOBACCO_DESC_MARKERS)
+    else:
+        first_alcohol = pd.Series(dtype="datetime64[ns]")
+        first_tobacco = pd.Series(dtype="datetime64[ns]")
+
+    out = out.merge(
+        first_alcohol.rename("_first_alcohol"),
+        left_on="_license_for_join",
+        right_index=True,
+        how="left",
+    ).merge(
+        first_tobacco.rename("_first_tobacco"),
+        left_on="_license_for_join",
+        right_index=True,
+        how="left",
+    )
+    out["has_alcohol_license"] = (out["_first_alcohol"] < out["_inspection_date"]).fillna(False)
+    out["has_tobacco_license"] = (out["_first_tobacco"] < out["_inspection_date"]).fillna(False)
+
     # Per-license sorted issuance dates → vectorised searchsorted.
     sorted_issuances = (
         hist.sort_values([license_col_historical, "date_issued"])
@@ -106,4 +172,12 @@ def add_license_history_features(
     ]
     out["license_n_history_rows"] = out["license_n_history_rows"].astype("Int32")
 
-    return out.drop(columns=["_inspection_date", "_license_for_join", "_first_issued"])
+    return out.drop(
+        columns=[
+            "_inspection_date",
+            "_license_for_join",
+            "_first_issued",
+            "_first_alcohol",
+            "_first_tobacco",
+        ]
+    )

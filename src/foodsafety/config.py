@@ -148,12 +148,23 @@ LOOKBACK_DAYS: int = 730
 # server-side filter (keeps the historical-licenses pull tractable: ~80k of
 # several hundred thousand rows). Must stay in sync with
 # _fetch_licenses_historical in scripts/ingest_raw.py.
+#
+# TOBACCO / CONSUMPTION ON PREMISES / PACKAGE GOODS were added alongside FOOD/
+# RESTAURANT/TAVERN/LIQUOR/KITCHEN to support the has_alcohol_license /
+# has_tobacco_license features: "Consumption on Premises - Incidental
+# Activity" (the common license letting a restaurant serve beer/wine) and
+# "Package Goods" (liquor store) don't contain "LIQUOR", so they were silently
+# excluded before this widening — confirmed against licenses_current.parquet
+# (which has no server-side filter) that these are real, populated categories.
 _FOOD_LICENSE_WHERE: str = (
     "(upper(license_description) like '%FOOD%'"
     " OR upper(license_description) like '%RESTAURANT%'"
     " OR upper(license_description) like '%TAVERN%'"
     " OR upper(license_description) like '%LIQUOR%'"
-    " OR upper(license_description) like '%KITCHEN%')"
+    " OR upper(license_description) like '%KITCHEN%'"
+    " OR upper(license_description) like '%TOBACCO%'"
+    " OR upper(license_description) like '%CONSUMPTION ON PREMISES%'"
+    " OR upper(license_description) like '%PACKAGE GOODS%')"
 )
 
 _SR_TYPES_SOQL: str = "sr_type in (" + ", ".join(f"'{t}'" for t in RELEVANT_SR_TYPES) + ")"

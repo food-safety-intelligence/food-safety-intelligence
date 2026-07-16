@@ -161,6 +161,17 @@ BUILDING_FEATURES: list[str] = [
     "days_since_last_food_safety_bldg_violation",
 ]
 
+# Alcohol / tobacco license flags (computed by license_history_features.py but
+# NOT in ALL_FEATURES) — prompted by CDPH's own model reportedly weighting
+# these two license types above the environmental features this project
+# already rejected. Kept as a named list, same pattern as BUILDING_FEATURES,
+# so scripts/run_city_ablations.py can test ALL_FEATURES + this set without
+# hardcoding column names. See docs/model-experiments.md for the result.
+ALCOHOL_TOBACCO_FEATURES: list[str] = [
+    "has_alcohol_license",
+    "has_tobacco_license",
+]
+
 # The current inspection's OWN outcome — the features that make a model a
 # "current-state" risk score rather than a forecast. The forecast-only model
 # (used to compute the forward-looking trend slope; see DR 0011) drops these so

@@ -61,12 +61,16 @@ def _fetch_licenses_current():
 
 def _fetch_licenses_historical():
     # Food-related licenses only — server-side filter keeps the pull tractable.
+    # Must stay in sync with foodsafety.config._FOOD_LICENSE_WHERE.
     where = (
         "(upper(license_description) like '%FOOD%'"
         " OR upper(license_description) like '%RESTAURANT%'"
         " OR upper(license_description) like '%TAVERN%'"
         " OR upper(license_description) like '%LIQUOR%'"
-        " OR upper(license_description) like '%KITCHEN%')"
+        " OR upper(license_description) like '%KITCHEN%'"
+        " OR upper(license_description) like '%TOBACCO%'"
+        " OR upper(license_description) like '%CONSUMPTION ON PREMISES%'"
+        " OR upper(license_description) like '%PACKAGE GOODS%')"
     )
     return fetch_soda(
         DATASETS["licenses_historical"],

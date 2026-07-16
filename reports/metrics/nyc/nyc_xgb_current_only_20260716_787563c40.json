@@ -1,0 +1,50 @@
+{
+  "model": "nyc_xgb_current_only",
+  "city": "nyc",
+  "variant": "xgb_current_only",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_next_bc",
+  "n_features": 18,
+  "data_vintage": "20260714",
+  "run_id": "20260716_787563c40",
+  "git_commit": "787563c40b1ac86e216c0994cc40b8f9644adabd",
+  "git_dirty": true,
+  "feature_set_version": "80db8fd80368",
+  "raw_snapshots": {
+    "data/raw/nyc_inspections.parquet": "bbf9550b93e085d198cc3bef792eda1519b9e06b3c1ce851ecaaf07f204f727c"
+  },
+  "train_window": {
+    "train_start": "2022-07-01",
+    "train_end": "2024-10-01",
+    "val_end": "2025-04-01"
+  },
+  "split": {
+    "train_n": 34683,
+    "val_n": 8966,
+    "test_n": 9821,
+    "test_prevalence": 0.4088
+  },
+  "base_rate": 0.41,
+  "test": {
+    "n": 9821,
+    "positive_rate": 0.408818,
+    "pr_auc": 0.48577,
+    "roc_auc": 0.577772,
+    "precision_at_5pct": 0.579268,
+    "precision_at_10pct": 0.561546,
+    "precision_at_20pct": 0.537913,
+    "recall_at_5pct": 0.070984,
+    "recall_at_10pct": 0.137484,
+    "recall_at_20pct": 0.263263,
+    "top_decile_lift": 1.373586,
+    "brier_score": 0.23794,
+    "log_loss": 0.669164
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.553041,
+    "recall": 0.19477,
+    "f1": 0.288083
+  }
+}

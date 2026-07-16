@@ -1,0 +1,46 @@
+{
+  "model": "chicago_xgb_plus_alcohol_tobacco",
+  "city": "chicago",
+  "variant": "xgb_plus_alcohol_tobacco",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_fail_or_critical_next_180d",
+  "n_features": 38,
+  "data_vintage": "20251205",
+  "run_id": "20260716_787563c40",
+  "git_commit": "787563c40b1ac86e216c0994cc40b8f9644adabd",
+  "git_dirty": true,
+  "feature_set_version": "68fe2ae76184",
+  "features_sha256": "d7a1b47a86c87212b5409725e67717d79a6802633760ef0e04af1fef0666224d",
+  "train_window": {
+    "train_end": "2024-07-01",
+    "val_end": "2025-07-01"
+  },
+  "split": {
+    "train_n": 79268,
+    "val_n": 16564,
+    "test_n": 6702,
+    "test_prevalence": 0.1053
+  },
+  "test": {
+    "n": 6702,
+    "positive_rate": 0.105342,
+    "pr_auc": 0.376172,
+    "roc_auc": 0.805394,
+    "precision_at_5pct": 0.47619,
+    "precision_at_10pct": 0.408346,
+    "precision_at_20pct": 0.308725,
+    "recall_at_5pct": 0.226629,
+    "recall_at_10pct": 0.388102,
+    "recall_at_20pct": 0.586402,
+    "top_decile_lift": 3.876393,
+    "brier_score": 0.079418,
+    "log_loss": 0.274515
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.554348,
+    "recall": 0.144476,
+    "f1": 0.229213
+  }
+}

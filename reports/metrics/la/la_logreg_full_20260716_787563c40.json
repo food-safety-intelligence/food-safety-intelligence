@@ -1,0 +1,51 @@
+{
+  "model": "la_logreg_full",
+  "city": "la",
+  "variant": "logreg_full",
+  "estimator": "logreg",
+  "calibration": "sigmoid (platt)",
+  "label": "y_next_bad",
+  "n_features": 28,
+  "data_vintage": "20260630",
+  "run_id": "20260716_787563c40",
+  "git_commit": "787563c40b1ac86e216c0994cc40b8f9644adabd",
+  "git_dirty": true,
+  "feature_set_version": "9084bb75c54a",
+  "raw_snapshots": {
+    "data/raw/la_inspections.parquet": "91c5feb6ec0fae48b1d030d406d60e16ff787f8f2bdadc4528ec918a3b4e4939",
+    "data/raw/la_violations.parquet": "cc85cc5c388b6252b67814e557097371e98257b9f26539bf3c289636c1cdb873"
+  },
+  "train_window": {
+    "train_start": "2023-04-01",
+    "train_end": "2024-07-01",
+    "val_end": "2025-01-01"
+  },
+  "split": {
+    "train_n": 30185,
+    "val_n": 8844,
+    "test_n": 10045,
+    "test_prevalence": 0.093
+  },
+  "base_rate": 0.087,
+  "test": {
+    "n": 10045,
+    "positive_rate": 0.092982,
+    "pr_auc": 0.169437,
+    "roc_auc": 0.702114,
+    "precision_at_5pct": 0.208748,
+    "precision_at_10pct": 0.18209,
+    "precision_at_20pct": 0.181682,
+    "recall_at_5pct": 0.11242,
+    "recall_at_10pct": 0.195931,
+    "recall_at_20pct": 0.390792,
+    "top_decile_lift": 1.95834,
+    "brier_score": 0.087289,
+    "log_loss": 0.304143
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.213043,
+    "recall": 0.052463,
+    "f1": 0.084192
+  }
+}

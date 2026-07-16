@@ -1,0 +1,157 @@
+{
+  "model": "la_served_xgb_full",
+  "city": "la",
+  "variant": "served_xgb_full",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_next_bad",
+  "n_features": 28,
+  "data_vintage": "20260630",
+  "run_id": "20260716_787563c40",
+  "git_commit": "787563c40b1ac86e216c0994cc40b8f9644adabd",
+  "git_dirty": true,
+  "feature_set_version": "9084bb75c54a",
+  "raw_snapshots": {
+    "data/raw/la_inspections.parquet": "91c5feb6ec0fae48b1d030d406d60e16ff787f8f2bdadc4528ec918a3b4e4939",
+    "data/raw/la_violations.parquet": "cc85cc5c388b6252b67814e557097371e98257b9f26539bf3c289636c1cdb873"
+  },
+  "train_window": {
+    "train_start": "2023-04-01",
+    "train_end": "2024-07-01",
+    "val_end": "2025-01-01"
+  },
+  "split": {
+    "train_n": 30185,
+    "val_n": 8844,
+    "test_n": 10045,
+    "test_prevalence": 0.093
+  },
+  "base_rate": 0.087,
+  "test": {
+    "n": 10045,
+    "positive_rate": 0.092982,
+    "pr_auc": 0.182988,
+    "roc_auc": 0.706653,
+    "precision_at_5pct": 0.212724,
+    "precision_at_10pct": 0.204975,
+    "precision_at_20pct": 0.19562,
+    "recall_at_5pct": 0.114561,
+    "recall_at_10pct": 0.220557,
+    "recall_at_20pct": 0.420771,
+    "top_decile_lift": 2.20447,
+    "brier_score": 0.0808,
+    "log_loss": 0.288024
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0
+  },
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "k": 502,
+      "precision": 0.213147,
+      "recall": 0.114561,
+      "lift": 2.2924
+    },
+    {
+      "frac": 0.1,
+      "k": 1004,
+      "precision": 0.205179,
+      "recall": 0.220557,
+      "lift": 2.2067
+    },
+    {
+      "frac": 0.2,
+      "k": 2009,
+      "precision": 0.19562,
+      "recall": 0.420771,
+      "lift": 2.1039
+    }
+  ],
+  "f1_optimal_threshold": {
+    "threshold": 0.121,
+    "precision": 0.182979,
+    "recall": 0.552463,
+    "f1": 0.274907
+  },
+  "feature_importance": [
+    {
+      "feature": "cur_score",
+      "mean_abs_shap": 0.62301,
+      "share": 0.1929
+    },
+    {
+      "feature": "prev_score",
+      "mean_abs_shap": 0.45329,
+      "share": 0.1403
+    },
+    {
+      "feature": "prior_mean_score",
+      "mean_abs_shap": 0.346334,
+      "share": 0.1072
+    },
+    {
+      "feature": "days_since_last_inspection",
+      "mean_abs_shap": 0.319968,
+      "share": 0.0991
+    },
+    {
+      "feature": "cur_n_viol",
+      "mean_abs_shap": 0.183024,
+      "share": 0.0567
+    },
+    {
+      "feature": "prior_cur_sev_T3",
+      "mean_abs_shap": 0.173034,
+      "share": 0.0536
+    },
+    {
+      "feature": "prior_inspections",
+      "mean_abs_shap": 0.167499,
+      "share": 0.0519
+    },
+    {
+      "feature": "cur_sev_T3",
+      "mean_abs_shap": 0.139307,
+      "share": 0.0431
+    },
+    {
+      "feature": "cur_theme_pest_vermin",
+      "mean_abs_shap": 0.11407,
+      "share": 0.0353
+    },
+    {
+      "feature": "cur_theme_temperature_control",
+      "mean_abs_shap": 0.113526,
+      "share": 0.0351
+    },
+    {
+      "feature": "cur_theme_equipment_nonfood_surface",
+      "mean_abs_shap": 0.075561,
+      "share": 0.0234
+    },
+    {
+      "feature": "prior_n_critical",
+      "mean_abs_shap": 0.049963,
+      "share": 0.0155
+    },
+    {
+      "feature": "cur_n_critical",
+      "mean_abs_shap": 0.043602,
+      "share": 0.0135
+    },
+    {
+      "feature": "cur_theme_food_contact_surface",
+      "mean_abs_shap": 0.043241,
+      "share": 0.0134
+    },
+    {
+      "feature": "cur_is_bad",
+      "mean_abs_shap": 0.042861,
+      "share": 0.0133
+    }
+  ]
+}

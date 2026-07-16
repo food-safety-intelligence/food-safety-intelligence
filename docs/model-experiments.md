@@ -306,3 +306,62 @@ the signal is carried by inspection history + current outcome together, with the
 text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
 NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
 windows before treating those deltas as gate-passing verdicts.
+
+## Alcohol / tobacco license flags (CDPH-prompted, all three cities)
+
+Prompted by a report that CDPH's own model gives `has_alcohol_license` /
+`has_tobacco_license` more weight than the environmental features this project
+already rejected (weather, Yelp — see the OUT-of-scope list in CLAUDE.md), and
+that we don't carry either flag today. Tested as `xgb_plus_alcohol_tobacco` in
+the same `scripts/run_city_ablations.py` frame as the ablations above (branch
+`deepak/mle-alcohol-tobacco-license-flags`, run_id `20260716_787563c40`), one
+single held-out split per city (not expanding-window CV — same caveat as the
+cross-city ablations above).
+
+**The three cities are NOT on equal footing here** — Chicago computes the flag
+from its own leak-clean licensing history; NYC/LA have no such dataset in their
+pipeline, so the flag comes from an external license list joined by
+normalized-address string match (`scripts/fetch_alcohol_tobacco_licenses.py`):
+
+| | Chicago | NYC | LA |
+|---|---|---|---|
+| Source | `licenses_historical.parquet` (own data, widened ingest filter to catch `TOBACCO` / `CONSUMPTION ON PREMISES` / `PACKAGE GOODS` — see `config._FOOD_LICENSE_WHERE`) | NY State Liquor Authority (`data.ny.gov` 9s3h-dpkz) + NYC DCWP tobacco dealer licenses (adw8-wvxb) | LA County's own alcohol-license ArcGIS layer + CDTFA statewide tobacco retailer list (.xlsx) |
+| Join key | `license_id` = `license_number` (exact, same as `license_age_days`) | normalized `(zip5, address)` string match, no shared ID | normalized `(zip5, address)` string match, no shared ID |
+| Leak guard | strict: first alcohol/tobacco `date_issued` < anchor date | partial: both sources carry an issuance date, BUT are "currently active" snapshots only — a lapsed license shows False for every past inspection even if it was true then | none: LA County's issue-date field is sparsely populated and CDTFA's list has no date at all (by law); both flags are current-status-only, applied blanket regardless of anchor date |
+| Coverage | 375 / 109,353 rows have `has_alcohol_license=True` (0.34%), 67 (0.06%) tobacco — rare because most Chicago food licenses never add either type | 11,121 / 27,674 facilities matched alcohol (40.2%), 3,157 (11.4%) tobacco | 11,383 / 43,205 facilities matched alcohol (26.3%), 4,461 (10.3%) tobacco |
+
+### Results (test set, `served_xgb_full` → `xgb_plus_alcohol_tobacco`)
+
+| City | PR-AUC | ROC-AUC | P@10 | lift@10 | Brier | Both-metrics gate |
+|---|---|---|---|---|---|---|
+| Chicago | 0.3748 → 0.3762 (+0.0014) | 0.8059 → 0.8054 (−0.0005) | 0.4113 → 0.4083 (**−0.0030**) | 3.905 → 3.876 (−0.029) | 0.0794 → 0.0794 | **FAIL** (P@10 regresses) |
+| NYC | 0.5734 → 0.5772 (+0.0038) | 0.6690 → 0.6714 (+0.0024) | 0.6796 → 0.6836 (+0.0040) | 1.662 → 1.672 (+0.010) | 0.2215 → 0.2209 | pass (small, single split) |
+| LA | 0.1830 → 0.1854 (+0.0024) | 0.7067 → 0.7105 (+0.0038) | 0.2050 → 0.2109 (+0.0059) | 2.205 → 2.269 (+0.064) | 0.0808 → 0.0805 | pass (small, single split) |
+
+**Reading it:** the pattern is the opposite of what a naive read of "CDPH weighs
+this feature highly" would predict. Chicago — the one city where the flag is
+computed correctly and leak-free — shows no real lift (fails the project's
+both-metrics gate: PR-AUC nudges up, P@10 nudges down) because so few Chicago
+food-inspection rows are alcohol/tobacco licensed (0.34% / 0.06%) that the flag
+has almost no room to move an aggregate metric. NYC and LA show small,
+consistent, all-metrics-positive deltas, but on a materially higher-prevalence,
+lower-rigor version of the same flag (external address join, current-status
+snapshots, real survivorship bias in NYC and no date gate at all in LA) — so
+part or all of that "win" could be the join acting as a weak proxy for
+something else correlated with matched addresses (e.g. commercial-corridor
+density) rather than alcohol/tobacco licensing itself.
+
+**Verdict: do not promote to production in any city yet.**
+- Chicago fails the both-metrics gate outright.
+- NYC/LA's gains are directionally positive but small, single-split, and rest
+  on a join whose leak-safety is weaker than every other feature in this
+  project's pipeline — exactly the kind of result CLAUDE.md's temporal-split /
+  leakage discipline exists to catch before it ships.
+
+**If revisited:** expanding-window CV to confirm NYC/LA's deltas aren't split
+noise; a real historical (not current-snapshot) alcohol/tobacco source for
+LA/NYC would remove the biggest caveat. Feature code stays in-tree, unwired
+(`license_history_features.py` has `has_alcohol_license`/`has_tobacco_license`
+behind `models.baseline.ALCOHOL_TOBACCO_FEATURES`, not in `ALL_FEATURES`; NYC/LA
+join helpers live in `run_city_ablations.py` + `fetch_alcohol_tobacco_licenses.py`,
+not in the served `build_nyc_scores.py` / `build_la_scores.py`).

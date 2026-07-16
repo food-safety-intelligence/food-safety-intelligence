@@ -30,6 +30,27 @@ def _fixtures():
     return inspections, historical
 
 
+def _fixtures_with_alcohol_tobacco():
+    inspections = pd.DataFrame(
+        {
+            "license_id": ["100", "100", "200"],
+            "inspection_date": pd.to_datetime(["2023-01-01", "2023-06-01", "2023-01-01"]),
+        }
+    )
+    historical = pd.DataFrame(
+        {
+            "license_number": ["100", "100", "200"],
+            "date_issued": pd.to_datetime(["2020-01-01", "2023-03-01", "2019-01-01"]),
+            "license_description": [
+                "Retail Food Establishment",
+                "Consumption on Premises - Incidental Activity",
+                "Tobacco",
+            ],
+        }
+    )
+    return inspections, historical
+
+
 def test_history_count_respects_leak_guard():
     inspections, historical = _fixtures()
     out = add_license_history_features(inspections, historical)
@@ -70,3 +91,48 @@ def test_no_helper_columns_leak_into_output():
     # The internal join scratch columns must be dropped.
     assert not any(c.startswith("_") for c in out.columns)
     assert {"license_age_days", "license_n_history_rows"} <= set(out.columns)
+
+
+def test_missing_license_description_degrades_to_all_false():
+    # A caller passing a minimal historical frame (no license_description) gets
+    # False rather than a KeyError — same degrade-gracefully contract as the
+    # NaN age / zero count for an unseen license.
+    inspections, historical = _fixtures()
+    out = add_license_history_features(inspections, historical)
+    assert not out["has_alcohol_license"].any()
+    assert not out["has_tobacco_license"].any()
+
+
+def test_alcohol_and_tobacco_flags_respect_leak_guard():
+    inspections, historical = _fixtures_with_alcohol_tobacco()
+    out = add_license_history_features(inspections, historical)
+    by_anchor = out.set_index(["license_id", "inspection_date"])
+
+    # License 100's "Consumption on Premises" row is issued 2023-03-01 — AFTER
+    # the 2023-01-01 anchor (must not leak) but BEFORE the 2023-06-01 anchor.
+    assert not by_anchor.loc[("100", pd.Timestamp("2023-01-01")), "has_alcohol_license"]
+    assert by_anchor.loc[("100", pd.Timestamp("2023-06-01")), "has_alcohol_license"]
+    assert not by_anchor.loc[("100", pd.Timestamp("2023-01-01")), "has_tobacco_license"]
+
+    # License 200's Tobacco license (2019-01-01) precedes its 2023-01-01 anchor.
+    row_200 = by_anchor.loc[("200", pd.Timestamp("2023-01-01"))]
+    assert row_200["has_tobacco_license"]
+    assert not row_200["has_alcohol_license"]
+
+
+def test_liquor_synonyms_all_match_alcohol_marker():
+    # Chicago spreads alcohol across several license_description strings —
+    # Tavern, Package Goods, and the caterer's/special-event liquor variants —
+    # not one code. Each must independently flip the flag.
+    inspections = pd.DataFrame(
+        {"license_id": ["1", "2", "3"], "inspection_date": pd.to_datetime(["2023-01-01"] * 3)}
+    )
+    historical = pd.DataFrame(
+        {
+            "license_number": ["1", "2", "3"],
+            "date_issued": pd.to_datetime(["2020-01-01"] * 3),
+            "license_description": ["Tavern", "Package Goods", "Caterer's Liquor License"],
+        }
+    )
+    out = add_license_history_features(inspections, historical)
+    assert out["has_alcohol_license"].all()
