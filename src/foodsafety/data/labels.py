@@ -99,15 +99,19 @@ def add_violation_features(df: pd.DataFrame) -> pd.DataFrame:
     return out
 
 
-def _compute_forward_labels(
+def compute_forward_window_label(
     df: pd.DataFrame,
     window_days: int,
+    *,
+    flag_col: str = "is_fail_or_priority",
 ) -> np.ndarray:
-    """Per-license forward-window labels. Pure helper, see `build_labels`.
+    """Per-license forward-window label. Generic: reused by NYC/LA experiments
+    (see ``scripts/experiment_label_window_nyc_la.py``) via ``flag_col``, not
+    just Chicago's ``build_labels``.
 
     For every row i, look at rows at the same license_id with
     ``inspection_date in (date_i, date_i + window_days]``. Label is 1 if any
-    of those rows has ``is_fail_or_priority == True``, else 0.
+    of those rows has ``df[flag_col] == True``, else 0.
 
     Returns a numpy int8 array of length len(df), aligned to df's existing
     integer position (0..N-1). Callers should ensure df is positionally
@@ -116,7 +120,7 @@ def _compute_forward_labels(
     n = len(df)
     out = np.zeros(n, dtype=np.int8)
     dates = df["inspection_date"].to_numpy()
-    flags = df["is_fail_or_priority"].to_numpy()
+    flags = df[flag_col].to_numpy()
     window = np.timedelta64(window_days, "D")
 
     # Group by license_id and process each group. `.indices` returns a dict
@@ -224,11 +228,11 @@ def build_labels(
     ) > dataset_max
 
     # Compute labels with positional indexing. We reset_index here so the
-    # numpy positions returned by `_compute_forward_labels` align with the
+    # numpy positions returned by `compute_forward_window_label` align with the
     # row order; we restore the original index at the end.
     original_index = df.index
     df = df.reset_index(drop=True)
-    labels = _compute_forward_labels(df, label_window_days)
+    labels = compute_forward_window_label(df, label_window_days)
     df["y_fail_or_critical_next_180d"] = pd.array(labels, dtype="Int8")
 
     # Mask the label to NA where we couldn't / shouldn't compute it:
