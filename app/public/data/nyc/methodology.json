@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T03:42:29.776200+00:00",
+  "generated_at": "2026-07-18T23:23:02.061273+00:00",
   "model_version": "nyc_xgb_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
@@ -16,9 +16,9 @@
     "split_from": "2025-04-01"
   },
   "headline": {
-    "pr_auc": 0.5826,
-    "roc_auc": 0.6744,
-    "top_decile_lift": 1.69
+    "pr_auc": 0.6024,
+    "roc_auc": 0.6874,
+    "top_decile_lift": 1.77
   },
   "caveat": "NYC is a coverage feature with a weaker signal than Chicago (ROC-AUC ~0.66 vs ~0.78); its data window is only ~3 post-COVID years.",
   "risk_tiers": [
@@ -26,91 +26,91 @@
       "label": "Low",
       "min": 0.0,
       "max": 0.205,
-      "share": 0.2799
+      "share": 0.488
     },
     {
       "label": "Moderate",
       "min": 0.205,
       "max": 0.41,
-      "share": 0.4549
+      "share": 0.3322
     },
     {
       "label": "Elevated",
       "min": 0.41,
       "max": 0.82,
-      "share": 0.265
+      "share": 0.1794
     },
     {
       "label": "High",
       "min": 0.82,
       "max": null,
-      "share": 0.0002
+      "share": 0.0005
     }
   ],
   "operating_points": [
     {
       "frac": 0.05,
       "n_flagged": 473,
-      "precision": 0.704,
-      "recall": 0.086,
-      "lift": 1.7184,
-      "events_caught": 333
+      "precision": 0.7717,
+      "recall": 0.0942,
+      "lift": 1.8836,
+      "events_caught": 365
     },
     {
       "frac": 0.1,
       "n_flagged": 946,
-      "precision": 0.6934,
-      "recall": 0.1693,
-      "lift": 1.6926,
-      "events_caught": 656
+      "precision": 0.7262,
+      "recall": 0.1773,
+      "lift": 1.7726,
+      "events_caught": 687
     },
     {
       "frac": 0.15,
       "n_flagged": 1419,
-      "precision": 0.6695,
-      "recall": 0.2452,
-      "lift": 1.6341,
-      "events_caught": 950
+      "precision": 0.6949,
+      "recall": 0.2545,
+      "lift": 1.6961,
+      "events_caught": 986
     },
     {
       "frac": 0.2,
       "n_flagged": 1892,
-      "precision": 0.6506,
-      "recall": 0.3178,
-      "lift": 1.5881,
-      "events_caught": 1231
+      "precision": 0.6591,
+      "recall": 0.3219,
+      "lift": 1.6088,
+      "events_caught": 1247
     },
     {
       "frac": 0.25,
       "n_flagged": 2364,
-      "precision": 0.6189,
-      "recall": 0.3776,
-      "lift": 1.5106,
-      "events_caught": 1463
+      "precision": 0.6358,
+      "recall": 0.388,
+      "lift": 1.5519,
+      "events_caught": 1503
     },
     {
       "frac": 0.3,
       "n_flagged": 2837,
-      "precision": 0.5953,
-      "recall": 0.436,
-      "lift": 1.4532,
-      "events_caught": 1689
+      "precision": 0.6123,
+      "recall": 0.4484,
+      "lift": 1.4945,
+      "events_caught": 1737
     },
     {
       "frac": 0.4,
       "n_flagged": 3783,
-      "precision": 0.5617,
-      "recall": 0.5485,
-      "lift": 1.3711,
-      "events_caught": 2125
+      "precision": 0.5712,
+      "recall": 0.5578,
+      "lift": 1.3943,
+      "events_caught": 2161
     },
     {
       "frac": 0.5,
       "n_flagged": 4728,
-      "precision": 0.5326,
-      "recall": 0.65,
-      "lift": 1.2999,
-      "events_caught": 2518
+      "precision": 0.5387,
+      "recall": 0.6575,
+      "lift": 1.3149,
+      "events_caught": 2547
     }
   ]
 }

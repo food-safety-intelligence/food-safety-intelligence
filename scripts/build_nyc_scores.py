@@ -278,6 +278,7 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
             zip=("zipcode", first),
             lat=("latitude", first),
             lon=("longitude", first),
+            action=("action", first),
         )
         .reset_index()
     )
@@ -287,12 +288,26 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
     ev = ev[ev["cur_score"].notna()].copy()
     ev = ev.sort_values(["camis", "inspection_date"], kind="mergesort").reset_index(drop=True)
     ev["cur_is_bad"] = (ev["cur_score"] >= BC_THRESHOLD).astype("int8")
+    # DOHMH enforcement action at this inspection: closed / re-closed by the dept
+    # (the "action" field). A strong own-outcome signal beyond the numeric score —
+    # gate-validated to add both PR-AUC and precision@10% (see model-experiments).
+    # Observed at as-of (the current visit's outcome), like cur_is_bad.
+    ev["cur_closed"] = (
+        ev["action"].astype("string").str.contains("closed", case=False, na=False).astype("int8")
+    )
 
     theme_cols = [c for c in ev.columns if c.startswith("cur_theme_")]
     sev_cols = [c for c in ev.columns if c.startswith("cur_sev_")]
 
     g = ev.groupby("camis", sort=False)
     ev["prior_inspections"] = g.cumcount().astype("int32")
+    # Prior closures (cumsum-minus-self, leak-free) + establishment tenure (days
+    # since first inspection on record). Tenure is forecast-safe, so both go in the
+    # PRIOR set; cur_closed is the current outcome and stays in CURRENT.
+    ev["prior_closures"] = (g["cur_closed"].cumsum() - ev["cur_closed"]).astype("int32")
+    ev["tenure_days"] = (
+        ev["inspection_date"] - g["inspection_date"].transform("min")
+    ).dt.days.astype("float32")
     ev["prior_bad"] = (g["cur_is_bad"].cumsum() - ev["cur_is_bad"]).astype("int32")
     ev["prior_n_critical"] = (g["cur_n_critical"].cumsum() - ev["cur_n_critical"]).astype("int32")
     _cum = g["cur_score"].cumsum() - ev["cur_score"]
@@ -333,8 +348,14 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
         "prev_score",
         "prev_is_bad",
         "days_since_last_inspection",
+        "tenure_days",
+        "prior_closures",
     ] + prior_sev
-    CURRENT = ["cur_score", "cur_n_viol", "cur_n_critical", "cur_is_bad"] + sev_cols + theme_cols
+    CURRENT = (
+        ["cur_score", "cur_n_viol", "cur_n_critical", "cur_is_bad", "cur_closed"]
+        + sev_cols
+        + theme_cols
+    )
     return ev, PRIOR, CURRENT, theme_cols, sev_cols, raw
 
 
@@ -357,6 +378,12 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
         "prev_score": "Previous inspection score: {value}",
         "prev_is_bad": {True: "Previous inspection was B/C", False: "Previous inspection was A"},
         "days_since_last_inspection": "{value} days since the last inspection",
+        "cur_closed": {
+            True: "Closed by the health department at this inspection",
+            False: "Not closed at this inspection",
+        },
+        "prior_closures": "{value} prior health-department closures",
+        "tenure_days": "{value:.0f} days of inspection history on record",
     }
     for c in sev_cols:
         t = c.replace("cur_sev_", "")
