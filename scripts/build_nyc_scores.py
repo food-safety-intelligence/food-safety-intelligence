@@ -431,14 +431,18 @@ def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False):
             **common,
         )
     else:
+        # depth-2 + min_child_weight=20: the closure/tenure features (2026-07-18)
+        # made the older depth-3 config slightly over-fit; regularizing harder is
+        # a seed-robust HPO win (+0.011 PR-AUC / +0.006 P@10, 7/8 seeds) on top of
+        # the feature gain. See docs/model-experiments.md.
         clf = XGBClassifier(
             n_estimators=400,
-            max_depth=3,
+            max_depth=2,
             learning_rate=0.05,
             subsample=0.8,
             colsample_bytree=0.8,
             reg_lambda=1.0,
-            min_child_weight=5,
+            min_child_weight=20,
             **common,
         )
     clf.fit(train[feats], y)
