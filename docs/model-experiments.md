@@ -307,3 +307,27 @@ the signal is carried by inspection history + current outcome together, with the
 text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
 NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
 windows before treating those deltas as gate-passing verdicts.
+
+## Closing the Chicago feature gap (NYC / LA feature additions, 2026-07-18)
+
+NYC/LA shipped a leaner feature set than Chicago: they lacked the time-windowed
+(recent) priors, calendar/seasonality, recency-to-last-bad, trend, tenure, and
+visit-type families. Added each MISSING family **leak-free** and A/B'd it under
+**expanding-window CV** + a **seed-robustness** confirm on the held-out test (8
+seeds), per city, via `scripts/run_city_feature_experiments.py`. A family is kept
+only if it clears the both-metrics gate AND holds up across seeds. Deliberately
+NOT tried: Chicago's keyword text flags (the ablation above already showed them
+flat-to-negative when transferred) and inspector id / facility-type / geography
+(fairness/legal).
+
+| City | Change + hypothesis | Result | Verdict |
+|---|---|---|---|
+| **NYC** | **Add DOHMH enforcement (`cur_closed` / `prior_closures`) + establishment `tenure_days`.** *Does the closure/enforcement action carry signal beyond the numeric score, and does tenure help?* | **Yes, both.** CV both-gate pass; holdout seed-check (8 seeds): **+0.024 PR-AUC / +0.043 P@10, both up 8/8**. Served rebuild: PR-AUC **0.583 → 0.602**, ROC 0.674 → 0.687, lift 1.69 → 1.77 (same test n=9,456). `cur_closed` is the current visit's own outcome (→ CURRENT); `prior_closures` + `tenure_days` are forecast-safe (→ PRIOR). `recent365`, `recency_bad`, `trend`, `calendar` all failed the gate for NYC. | **Kept** — wired into `build_nyc_scores.py` + driver labels; NYC scores/methodology regenerated + republished. |
+| **LA** | Same candidate families (tenure, calendar, visit-type = ROUTINE vs OWNER-INITIATED, recent priors, trend). | **Null.** LA's CV region is a single fold (short post-COVID window). On the holdout across 8 seeds every family is flat-to-negative: tenure **−0.0055 PR-AUC** (both-gate 1/8), visit-type −0.008, calendar −. LA sits at its information ceiling (base 8.7%, ~98% A-grades). | **Reverted (no change).** Kept the incumbent; negative result logged (`reports/metrics/la/la_feature_experiments.json`). |
+
+**Standardization note:** the *methodology* (leak-free guards, expanding-window
+CV, both-metrics + seed gate, Platt-on-margin, TreeSHAP drivers) and the *feature
+concepts* are shared across cities; the *label* and *raw encoding* are not (data-
+dictated). The same families produced different winners per city — NYC gains from
+the closure signal it uniquely has, LA has no equivalent — which is why the code
+is standardized but the served features differ.
