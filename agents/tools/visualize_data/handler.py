@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import uuid
 from typing import Any
 from urllib.parse import quote
@@ -140,7 +141,10 @@ def _stub_run(code: str, city: str) -> dict[str, Any]:
         "ok": True,
         "image_kind": "svg",
         "image": svg,
-        "stdout": f"(stub) would run the script against the {city} scores and print a summary here",
+        "stdout": (
+            "Chart generation is not fully enabled in this environment yet, so this is a "
+            f"placeholder preview rather than a real chart of the {city} data."
+        ),
     }
 
 
@@ -274,6 +278,32 @@ def build_chart_block(
         payload["img"] = _inline_image(run)
         payload["scriptText"] = code
     return "```eatelligence-chart\n" + json.dumps(payload) + "\n```"
+
+
+# Markdown image the model sometimes fabricates from a chart's img URL — the chat
+# renders `[label](url)` links but NOT `![alt](url)` images (and never a data: URL),
+# so this never renders; strip it when we have the authoritative block to append.
+_MD_IMAGE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
+
+
+def merge_chart_blocks(text: str, blocks: list[str]) -> str:
+    """Guarantee each generated chart block appears in the reply exactly once.
+
+    The block must reach the web app inside the reply text (the wire contract is a
+    single string), but the model (Nova 2 Lite) sometimes drops the block or
+    reformats the chart as a markdown ``![alt](data:...)`` image the chat cannot
+    render. Whenever a chart was generated this strips any markdown image the model
+    fabricated and appends every block not already present — so the chart renders
+    regardless of the model's compliance. A no-op when no chart was generated.
+    """
+    if not blocks:
+        return text
+    merged = _MD_IMAGE.sub("", text or "").rstrip()
+    for block in blocks:
+        b = (block or "").strip()
+        if b and b not in merged:
+            merged = (merged + "\n\n" + b).strip() if merged else b
+    return merged
 
 
 # ---------------------------------------------------------------------------

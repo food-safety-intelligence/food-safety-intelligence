@@ -66,6 +66,12 @@ import city_context  # noqa: E402 — shared per-city framing (see run_local.py 
 
 _ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
 
+# Chart blocks generated during ONE request. The visualize_data wrapper appends
+# each block here; invoke() guarantees they land in the reply text even if the
+# model omitted them (see merge_chart_blocks). Per-request via contextvar so
+# concurrent invocations stay isolated; invoke() sets a fresh list each request.
+_PENDING_CHARTS: contextvars.ContextVar = contextvars.ContextVar("pending_charts", default=None)
+
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
 # ---------------------------------------------------------------------------
@@ -332,7 +338,14 @@ def visualize_data(code: str, title: str) -> dict:
         code: pandas + matplotlib code that builds `df`-based figure into chart.png
         title: a short plain-English chart title (also used for the download name)
     """
-    return _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY.get()}, None)
+    result = _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY.get()}, None)
+    # Stash the block so invoke() can guarantee it reaches the reply even if the
+    # model drops it or reformats it (see _PENDING_CHARTS / merge_chart_blocks).
+    if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
+        pending = _PENDING_CHARTS.get()
+        if pending is not None:
+            pending.append(result["chart_block"])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -523,6 +536,7 @@ def invoke(payload: dict) -> dict:
     # The marker is stripped before the model sees the query.
     query, city = _extract_city(query, payload.get("city"))
     _ACTIVE_CITY.set(city)
+    _PENDING_CHARTS.set([])  # fresh per-request collector for generated chart blocks
 
     # Persona (For Inspectors / For Caregivers chat entry points): same
     # precedence and marker mechanism as city, extracted from what's left of the
@@ -534,7 +548,11 @@ def invoke(payload: dict) -> dict:
     # follow-up questions have context. History is client-supplied and validated.
     agent = _build_agent(_coerce_history(payload.get("history")), persona)
     result = agent(query)
-    return {"result": str(result)}
+    # Guarantee any generated chart block reaches the reply even if the model
+    # dropped or reformatted it (Nova sometimes emits a markdown image instead of
+    # the block the chat renders).
+    text = _viz_handler.merge_chart_blocks(str(result), _PENDING_CHARTS.get() or [])
+    return {"result": text}
 
 
 _CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc|la)\]\]\s*")

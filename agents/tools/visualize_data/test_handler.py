@@ -21,6 +21,7 @@ from handler import (  # noqa: E402
     MAX_CODE_CHARS,
     build_chart_block,
     handler,
+    merge_chart_blocks,
 )
 
 CODE = "import matplotlib.pyplot as plt\nplt.plot([1,2,3]); plt.savefig('chart.png')\nprint('n=3')"
@@ -94,3 +95,29 @@ def test_block_uses_presigned_urls_when_provided():
     assert obj["img"] == urls["img"]
     assert obj["script"] == urls["script"]
     assert "scriptText" not in obj  # the long script travels as a URL, not inline
+
+
+# merge_chart_blocks — the server-side guarantee that a generated chart renders
+# even when the model drops or reformats the block (the prod bug it fixes).
+
+_BLOCK = build_chart_block("chart-1", "T", None, {"image_kind": "svg", "image": "<svg/>"}, CODE)
+
+
+def test_merge_appends_dropped_block_and_strips_fabricated_markdown_image():
+    # Model dropped the block and fabricated a markdown image instead (the live bug).
+    text = "Here is your chart.\n![T](data:image/svg+xml;utf8,%3Csvg/%3E)\nHope it helps."
+    out = merge_chart_blocks(text, [_BLOCK])
+    assert "![" not in out  # fabricated markdown image stripped
+    assert _BLOCK in out  # authoritative block appended
+    assert out.count("eatelligence-chart") == 1
+
+
+def test_merge_does_not_double_when_block_already_present():
+    text = "Here is your chart.\n" + _BLOCK
+    out = merge_chart_blocks(text, [_BLOCK])
+    assert out.count("eatelligence-chart") == 1
+
+
+def test_merge_is_noop_without_generated_charts():
+    text = "no charts here, just a link [CDC](https://cdc.gov)"
+    assert merge_chart_blocks(text, []) == text
