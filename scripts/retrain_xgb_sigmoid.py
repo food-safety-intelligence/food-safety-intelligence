@@ -183,7 +183,7 @@ def main() -> None:
         "git_commit": prov["git_commit"],
         "git_dirty": prov["git_dirty"],
         "calibration": "platt_on_margin",
-        "config": "depth-3, monotone risk constraints, n_estimators=300, lr=0.05",
+        "config": "depth-3, monotone risk constraints, n_estimators=300, lr=0.05, colsample_bytree=0.70",
         "right_truncation_filtered": int(n_dropped),
         "feature_set_version": prov["feature_set_version"],
         "features_sha256": prov["features_sha256"],
