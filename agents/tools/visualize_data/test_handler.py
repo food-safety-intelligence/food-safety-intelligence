@@ -9,6 +9,7 @@ untrusted code. The live sandbox path is validated on deploy, not here.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -19,6 +20,9 @@ if _THIS_DIR not in sys.path:
 
 from handler import (  # noqa: E402
     MAX_CODE_CHARS,
+    SLIM_COLUMNS,
+    _slim_payload,
+    _slim_record,
     build_chart_block,
     handler,
     merge_chart_blocks,
@@ -121,3 +125,125 @@ def test_merge_does_not_double_when_block_already_present():
 def test_merge_is_noop_without_generated_charts():
     text = "no charts here, just a link [CDC](https://cdc.gov)"
     assert merge_chart_blocks(text, []) == text
+
+
+# _slim_record — the runtime-side projection that keeps the sandbox payload small
+# (shipping the full 20-40MB scores.json blew the 60s request timeout).
+
+
+def test_slim_record_drops_heavy_fields_and_rolls_up_driver_topics():
+    s = _slim_record(
+        {
+            "license_id": "1",
+            "dba_name": "X",
+            "address": "123 Main",
+            "lat": 1.0,
+            "lon": 2.0,
+            "as_of_date": "2026-01-01",
+            "risk_score": 0.5,
+            "risk_tier": "Low",
+            "trend_slope": 0.01,
+            "neighborhood": "N",
+            "zip": "60622",
+            "facility_type": "Restaurant",
+            "trend_ci_low": 0,
+            "trend_ci_high": 1,
+            "top_drivers": [
+                {"feature": "flag_kw_rodent_x", "shap": 0.9},
+                {"feature": "n_priority_this_inspection", "shap": 0.2},
+            ],
+        }
+    )
+    # heavy / unused fields dropped
+    for dropped in ("address", "lat", "lon", "trend_ci_low", "top_drivers"):
+        assert dropped not in s
+    # driver topic precomputed in the runtime, not the sandbox
+    assert s["top_driver"] == "flag_kw_rodent_x"
+    assert s["top_driver_topic"] == "pest"
+    assert s["top_driver_shap"] == 0.9
+    # charting columns kept
+    assert s["risk_tier"] == "Low"
+    assert s["neighborhood"] == "N"
+
+
+def test_slim_record_handles_a_record_with_no_drivers():
+    s = _slim_record({"license_id": "2"})
+    assert s["top_driver"] is None
+    assert s["top_driver_topic"] == "other"
+
+
+def test_timeout_is_capped_and_marked_non_retryable(monkeypatch):
+    """A timed-out run must be terminal for the turn: the model retrying would stack
+    a second cap onto the request budget and hit the gateway's 504 (the prod bug)."""
+    import time as _time
+
+    import handler as h
+
+    monkeypatch.setenv("FSI_SANDBOX_USE_STUB", "false")
+    monkeypatch.setenv("FSI_CHART_BUCKET", "some-bucket")
+    monkeypatch.setattr(h, "_sandbox_run", lambda code, city: _time.sleep(30))
+    out = h.handler({"code": CODE, "title": "t", "city": "chicago", "timeout_s": 5}, None)
+    assert out["status"] == "error"
+    assert out["retryable"] is False
+    assert "timed out" in out["error"]
+
+
+# A minimal whole PNG: magic header + body + the closing IEND chunk.
+_PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"payload" + b"IEND\xaeB`\x82"
+_PNG_B64 = base64.b64encode(_PNG_BYTES).decode()
+
+
+def test_split_chart_b64_extracts_png_and_strips_it_from_the_summary():
+    """The PNG rides back on stdout (readFiles response shapes proved unreliable),
+    but the base64 must never reach the model as part of the caption summary."""
+    from handler import CHART_B64_MARKER, _split_chart_b64
+
+    text = "pest    10\ntemperature 4\n" + CHART_B64_MARKER + _PNG_B64 + "\ntrailing note"
+    b64, rest = _split_chart_b64(text)
+    assert b64 == _PNG_B64
+    assert CHART_B64_MARKER not in rest
+    assert _PNG_B64 not in rest
+    assert "pest    10" in rest and "trailing note" in rest
+
+
+def test_split_chart_b64_is_noop_without_the_marker():
+    from handler import _split_chart_b64
+
+    assert _split_chart_b64("just some printed output") == ("", "just some printed output")
+
+
+def test_split_chart_b64_rejects_a_truncated_or_non_png_payload():
+    """Truncated stdout would otherwise hand the app a corrupt image that renders as a
+    silently broken chart. Returning no PNG lets the readFiles fallback try instead."""
+    from handler import CHART_B64_MARKER, _split_chart_b64
+
+    truncated = base64.b64encode(_PNG_BYTES[:-6]).decode()  # header intact, IEND lost
+    for bad in (base64.b64encode(b"not a png").decode(), truncated, "!!!not base64!!!"):
+        b64, rest = _split_chart_b64("counts\n" + CHART_B64_MARKER + bad + "\ntail")
+        assert b64 == ""
+        assert "counts" in rest and "tail" in rest
+
+
+def test_slim_payload_is_columnar(tmp_path):
+    """Columnar ({col: [values]}) — a records payload repeats every key name on
+    every row, which is megabytes at 20-40k rows."""
+    p = tmp_path / "scores.json"
+    p.write_text(
+        json.dumps(
+            {
+                "scores": [
+                    {
+                        "license_id": "1",
+                        "risk_tier": "Low",
+                        "top_drivers": [{"feature": "flag_kw_pest_x", "shap": 0.4}],
+                    },
+                    {"license_id": "2", "risk_tier": "High", "top_drivers": []},
+                ]
+            }
+        )
+    )
+    d = json.loads(_slim_payload(str(p)))
+    assert set(d["cols"]) == set(SLIM_COLUMNS)  # one list per column, no per-row keys
+    assert d["cols"]["license_id"] == ["1", "2"]
+    assert d["cols"]["risk_tier"] == ["Low", "High"]
+    assert d["cols"]["top_driver_topic"] == ["pest", "other"]

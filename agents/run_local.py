@@ -310,17 +310,23 @@ def visualize_data(code: str, title: str) -> dict:
     way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
     subjects as usual. Do NOT paste code into your chat reply; pass it here.
 
-    A DataFrame `df` is already loaded (one row per establishment) with columns:
-      license_id, dba_name, address, neighborhood, zip, facility_type, lat, lon,
-      as_of_date, risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
+    A DataFrame `df` is already loaded (one row per establishment) with EXACTLY
+    these columns — use ONLY these, anything else raises KeyError:
+      license_id, dba_name, as_of_date, neighborhood, zip, facility_type,
+      risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
       trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
-      trend_ci_low, trend_ci_high, top_drivers (list of {feature, shap, label}),
-      and helper columns: driver_features (list of feature names), top_driver
-      (the dominant one), top_driver_topic (its plain hazard family, e.g.
-      "temperature", "pest", "handwashing", for "common drivers" questions).
+      top_driver (dominant SHAP feature name), top_driver_shap (its contribution),
+      top_driver_topic (its plain hazard family, e.g. "temperature", "pest",
+      "handwashing", "priority_violations", "inspection_outcome"). Use
+      top_driver_topic for "common drivers" / "violation category" questions —
+      it is the category each establishment's STRONGEST driver falls into, so
+      value_counts() gives the number of establishments per category.
 
     Your `code` MUST:
-      - use `df`; build a matplotlib figure and save it with fig.savefig("chart.png").
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
       - print() the aggregated numbers you plotted (counts / means) — you then base
         the caption ONLY on that printed summary, which this tool returns.
       - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
