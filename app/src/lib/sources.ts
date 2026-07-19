@@ -53,7 +53,30 @@ export const SOURCES_BY_CITY: Record<City, Source[]> = {
   ],
 };
 
-/** Just the dataset names for a city (footer, prose fallbacks). */
+/**
+ * Datasets used ONLY to audit fairness, never to compute a score.
+ *
+ * Deliberately kept out of SOURCES_BY_CITY (and out of the footer): those are the
+ * inputs a score is computed from, and listing census data beside them would imply
+ * demographics feed the model. They don't. The join happens after the model runs,
+ * purely to measure whether predictions land unevenly across groups.
+ */
+export const AUDIT_ONLY_SOURCES: Source[] = [
+  {
+    name: "US Census Bureau, American Community Survey (5-year)",
+    href: "https://www.census.gov/programs-surveys/acs",
+    summary:
+      "Neighborhood-level demographics (income, race and ethnicity, poverty, country of birth, language). Matched to an establishment's location only after the model has produced a score, to check whether the model's flags and errors fall unevenly across groups. No demographic value is ever a model input.",
+  },
+  {
+    name: "US Census Bureau, TIGER/Line census tracts",
+    href: "https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.html",
+    summary:
+      "The tract boundaries used to match an establishment's coordinates to its census tract for that audit.",
+  },
+];
+
+/** Just the dataset names for a city (footer, prose fallbacks). Scoring sources only. */
 export function sourceNames(city: City): string[] {
   return SOURCES_BY_CITY[city].map((s) => s.name);
 }
