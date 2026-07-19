@@ -143,6 +143,50 @@ improves" is blocked (LA is a preview feature). The clean fix, if pursued, is to
 audit LA at a coarser, well-defined geography (e.g. council district) rather than raw
 ZIP — follow-up work, not a blocker.
 
+## Why the proxy features stay out (zip, facility type, cuisine)
+
+None of the three cities feeds **zip, facility type, or cuisine** to its model. Chicago
+dropped `static_zip` and `static_facility_type` explicitly (decision
+[0004](decisions/0004-fairness-audit-and-proxy-feature-removal.md)); NYC and LA never
+included them — their inputs are inspection history, the current inspection's outcome,
+and violation theme/severity rollups. Cuisine is an **audit axis only**, which is why the
+NYC calibration gap cannot be "fixed" by dropping it: the model never sees it. The gap
+comes from how the *kept* features generalize across cuisine groups.
+
+To check that the exclusion is the right call and not merely the cautious one, we ran the
+ablation in reverse — **adding** the proxies back as features (train-only smoothed
+mean-target encoding, the most favorable encoding, same fit recipe and chronological
+split) and measuring accuracy and the bias lenses on the held-out test set.
+
+| City | Metric | Without (served) | With proxies | Effect |
+|---|---|---|---|---|
+| NYC | PR-AUC | 0.5712 | 0.5825 | +0.011 |
+| NYC | precision@10% | 0.680 | 0.687 | +0.007 |
+| NYC | **ZIP false-positive-rate gap** | **0.015** | **0.039** | **~2.5× worse** |
+| NYC | Cuisine calibration (ECE) gap | 0.203 | 0.167 | better (−0.035) |
+| LA | PR-AUC | 0.1844 | 0.1881 | +0.004 |
+| LA | precision@10% | 0.209 | 0.226 | +0.017 |
+| LA | **ZIP false-positive-rate gap** | **0.136** | **0.254** | **~1.9× worse** |
+
+Chicago's own ablation (accuracy only, on its then-current feature set) points the same
+way: dropping `static_zip` *improved* PR-AUC 0.3147 → 0.3188, and dropping
+`static_facility_type` was ~free (0.3147 → 0.3139).
+
+**Zip stays out.** Including it buys a small accuracy gain but roughly **doubles the
+geographic false-alarm gap** in both cities — the model starts using neighborhood to
+predict, which concentrates unearned High-risk flags unevenly by area. That is exactly
+the harm the LA neighborhood finding describes.
+
+**Cuisine stays out — even though the metric improves.** Adding cuisine slightly improves
+both accuracy and the cuisine calibration gap, because the model can then calibrate per
+cuisine. But the mechanism is the model **explicitly pricing risk by an ethnicity proxy**,
+which decisions 0004 / 0005 rule out for a public-facing score. This is the one place
+where a fairness metric argues one way and the charter the other: the charter wins, and
+the number is recorded here so the trade is explicit rather than assumed.
+
+*Caveat:* in this harness the parity (four-fifths) ratios came out degenerate (0.0 — at
+least one group has a zero flag rate), so the FPR / ECE gaps are the usable signal.
+
 ## Mitigation (analysis only)
 
 `foodsafety.audit.mitigation` prices per-group thresholds that equalize recall.

@@ -109,6 +109,16 @@ Both truth-conditioned findings were diagnosed further; neither changes the mode
   geocoding, which inflates a max-minus-min statistic. No action now; the clean fix
   (if pursued) is to audit LA at a coarser, well-defined geography (e.g. council
   district), and the geocoding re-check stays blocked while LA is a preview feature.
+- **Proxy-feature ablation — the exclusions are load-bearing, not just cautious.** None
+  of the three cities feeds zip, facility type, or cuisine to its model, so we tested the
+  ablation in reverse: adding them back (train-only target encoding, same recipe/split).
+  Adding **zip** buys +0.004–0.011 PR-AUC but roughly **doubles the ZIP false-positive-rate
+  gap** (NYC 0.015 → 0.039; LA 0.136 → 0.254) — the exact harm the LA finding describes.
+  Adding **NYC cuisine** improves both accuracy and the cuisine calibration gap
+  (0.203 → 0.167), but only by pricing risk on an ethnicity proxy, which 0004 / 0005
+  forbid — so it stays out and the trade is now recorded rather than assumed. This also
+  confirms the NYC calibration gap is **not** fixable by dropping cuisine: the model never
+  saw it. Table + method in `docs/fairness_audit.md`.
 
 ## Consequences
 
