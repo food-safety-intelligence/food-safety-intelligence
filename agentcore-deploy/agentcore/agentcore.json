@@ -40,6 +40,22 @@
         {
           "name": "FSI_BEDROCK_GUARDRAIL_VERSION",
           "value": "9"
+        },
+        {
+          "name": "FSI_SANDBOX_USE_STUB",
+          "value": "false"
+        },
+        {
+          "name": "FSI_CHART_REGION",
+          "value": "us-west-2"
+        },
+        {
+          "name": "FSI_CHART_BUCKET",
+          "value": "fsi-agent-charts-991500268971"
+        },
+        {
+          "name": "FSI_CODE_INTERPRETER_ID",
+          "value": "fsi_agent_chart_sandbox-MPH274mfxb"
         }
       ]
     }

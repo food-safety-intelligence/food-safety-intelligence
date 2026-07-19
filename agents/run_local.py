@@ -75,6 +75,19 @@ from strands.models.bedrock import BedrockModel  # noqa: E402
 # The CLI stays Chicago; the eval calls set_active_city() to exercise NYC / LA.
 _ACTIVE_CITY = "chicago"
 
+# Chart blocks generated during one query (mirrors entrypoint._PENDING_CHARTS).
+# The visualize_data wrapper appends; finalize() merges them into the reply and
+# clears the list, so local runs and the eval match the deployed invoke().
+_PENDING_CHARTS: list = []
+
+
+def finalize(text: str) -> str:
+    """Apply the deployed chart-block guarantee to a raw agent reply, then clear
+    the per-query collector. Call on every reply so local == production."""
+    merged = _viz_handler.merge_chart_blocks(text, list(_PENDING_CHARTS))
+    _PENDING_CHARTS.clear()
+    return merged
+
 
 def set_active_city(city: str) -> None:
     """Set the city all tool wrappers + the prompt prefix use for this run."""
@@ -323,7 +336,10 @@ def visualize_data(code: str, title: str) -> dict:
         code: pandas + matplotlib code that builds a `df`-based figure into chart.png
         title: a short plain-English chart title (also used for the download name)
     """
-    return _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY}, None)
+    result = _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY}, None)
+    if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
+        _PENDING_CHARTS.append(result["chart_block"])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -429,7 +445,7 @@ def main():
         _banner()
         print(f"Query: {query}\n")
         agent = build_agent()
-        response = agent(query)
+        response = finalize(str(agent(query)))
         print(f"\n{response}")
         return
 
@@ -450,7 +466,7 @@ def main():
             break
 
         try:
-            response = agent(query)
+            response = finalize(str(agent(query)))
             print(f"\nAgent: {response}\n")
         except Exception as exc:
             print(f"\n[Error] {exc}\n")
