@@ -1531,7 +1531,9 @@ def run_guardrails(verbose: bool, use_judge: bool = False, only: str | None = No
 
             find_handler._fetch_overpass = _boom
         try:
-            response = str(agent(case.prompt))
+            # finalize() applies the deployed invoke()'s chart-block guarantee, so
+            # the eval judges the same reply text production would send.
+            response = run_local.finalize(str(agent(case.prompt)))
         except Exception as exc:  # noqa: BLE001 — a crash is itself a failed case
             response = f"<agent raised: {exc}>"
         finally:

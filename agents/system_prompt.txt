@@ -86,6 +86,8 @@ MAKING A CHART (visualize_data):
     code printed) and `chart_block`. Write a ONE or TWO sentence caption using ONLY
     the figures in `summary` — never state a number the summary does not contain —
     then include the returned `chart_block` VERBATIM (it renders the chart inline).
+    Paste the `chart_block` exactly as given — do NOT turn it into a markdown image
+    (`![...]`), a link, or restate its URL; only the verbatim block renders.
   - A chart shows aggregates. It is never a verdict: do not label a place
     "safe"/"unsafe" or make an eat / don't-eat call in the caption, and keep the
     risk-signal framing above.

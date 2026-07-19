@@ -23,7 +23,7 @@ What it creates:
 # --- confirm these three before running anything ---
 export REGION="us-west-2"                       # the region the AgentCore runtime lives in
 export CHART_BUCKET="fsi-agent-charts-991500268971"   # new private bucket name (globally unique)
-export EXEC_ROLE_NAME=""                         # the runtime's execution role NAME (discover below)
+export EXEC_ROLE_NAME="AgentCore-foodsafety-defa-ApplicationAgentFoodsafet-wMqqRqVPcPK3"                         # the runtime's execution role NAME (discover below)
 
 export ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
 echo "acct=$ACCOUNT region=$REGION bucket=$CHART_BUCKET"   # acct should be 991500268971
@@ -38,7 +38,7 @@ aws bedrock-agentcore-control list-agent-runtimes --region "$REGION" \
 
 # Then (fill in the id):
 aws bedrock-agentcore-control get-agent-runtime --region "$REGION" \
-  --agent-runtime-id "<RUNTIME_ID>" --query 'roleArn' --output text
+  --agent-runtime-id "foodsafety_foodsafetyagent-4UtF42EBno" --query 'roleArn' --output text
 # -> arn:aws:iam::991500268971:role/<THIS_IS_EXEC_ROLE_NAME>
 ```
 Set `EXEC_ROLE_NAME` to the role name (the part after `role/`).
@@ -88,8 +88,11 @@ for name, shape in op.input_shape.members.items():
 PY
 ```
 
-Then create it (adjust key names to match what the helper printed — `networkConfiguration`
-/ `networkMode: "SANDBOX"` is the no-egress mode):
+Then create it. `networkMode` is an enum — valid values are **`SANDBOX`** (managed,
+no outbound network — use this), `ISOLATED` (also no network, stricter), `VPC` (runs
+in your VPC, needs a `vpcConfig` — gives it network access, NOT what we want), and
+`PUBLIC` (full egress). Do NOT pass `vpcConfig` as the mode; that's a field name, not
+a value. `executionRoleArn` is optional and can be omitted for SANDBOX.
 
 ```bash
 python3 - <<PY
@@ -150,22 +153,29 @@ aws iam put-role-policy \
 
 ---
 
-## 4. Hand these values to the runtime (done in the deploy, not here)
+## 4. Hand these values to the runtime — NOT a CloudShell step
 
-The agent tool reads these env vars. They get wired into the runtime by `deploy-agent.yml`
-/ the CDK stack (feature-branch work) — record the values now:
+These are runtime **environment variables**, not shell commands (don't paste them
+into a terminal). Add them to the runtime's env config in
+**`agentcore-deploy/agentcore/agentcore.json`** → `runtimes[0].envVars` (alongside
+`DATA_BUCKET`, the guardrail vars, etc.); the CDK deploy (`deploy-agent.yml` on
+merge to `main`) applies them on the next deploy:
 
+```jsonc
+{ "name": "FSI_SANDBOX_USE_STUB",    "value": "false" }              // REQUIRED: real execution (default true = stub)
+{ "name": "FSI_CHART_REGION",        "value": "us-west-2" }          // region of the Code Interpreter + charts bucket
+{ "name": "FSI_CHART_BUCKET",        "value": "<CHART_BUCKET>" }
+{ "name": "FSI_CODE_INTERPRETER_ID", "value": "<CODE_INTERPRETER_ID>" }
+// optional: FSI_CHART_URL_TTL_SECONDS = 3600 (presigned URL lifetime; default 1h,
+//           and a presigned URL can't outlive the runtime role's ~1h STS session)
 ```
-FSI_SANDBOX_USE_STUB    = false   # REQUIRED: real execution (default true = stub placeholder)
-FSI_CHART_BUCKET        = <CHART_BUCKET>
-FSI_CODE_INTERPRETER_ID = <CODE_INTERPRETER_ID>
-# optional: FSI_CHART_URL_TTL_SECONDS = 3600   (presigned URL lifetime; default 1h —
-#           a presigned URL can't outlive the runtime role's ~1h STS session anyway)
-```
 
-Without `FSI_SANDBOX_USE_STUB=false` the tool stays in stub mode and returns a
-placeholder chart (it never runs the model's code) — setting it is what switches
-the deployed agent to real charts.
+`FSI_CHART_REGION` matters because the runtime's `AWS_REGION` is **us-east-1** (the
+Bedrock model + the data bucket), but the sandbox and charts bucket live in the
+runtime's own region (**us-west-2**) — without it the tool would look in the wrong
+region and fail. Without `FSI_SANDBOX_USE_STUB=false` the tool stays in stub mode
+and returns a placeholder chart; setting it (with the bucket + interpreter
+provisioned above) is what switches the deployed agent to real charts.
 
 ---
 
