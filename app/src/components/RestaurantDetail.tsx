@@ -14,7 +14,7 @@ import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
 import type { DetailBundle, DetailGlobals } from "@/lib/scores";
 import { useCity } from "@/components/CityContext";
-import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
+import { CITY_CONFIG, dataUrl, formatLocationLine, type City } from "@/lib/city";
 import { formatInspectionDate } from "@/lib/utils";
 
 type LoadState =
@@ -81,14 +81,8 @@ function DetailLoader({ id, city }: { id: string; city: City }) {
 
   // Location line — join only the parts we have so a missing neighborhood/zip
   // doesn't leave orphaned "·" separators.
-  const cityLine = `${CITY_CONFIG[city].cityState}${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
-  const locationLine = [
-    restaurant.address.trim(),
-    restaurant.neighborhood.trim(),
-    cityLine,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // Placement of the area part is per-city — see formatLocationLine.
+  const locationLine = formatLocationLine(restaurant, city);
 
   const facilityType = restaurant.facility_type.trim();
 
