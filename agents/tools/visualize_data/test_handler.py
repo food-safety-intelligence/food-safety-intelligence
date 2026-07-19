@@ -9,6 +9,7 @@ untrusted code. The live sandbox path is validated on deploy, not here.
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
@@ -185,6 +186,42 @@ def test_timeout_is_capped_and_marked_non_retryable(monkeypatch):
     assert out["status"] == "error"
     assert out["retryable"] is False
     assert "timed out" in out["error"]
+
+
+# A minimal whole PNG: magic header + body + the closing IEND chunk.
+_PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"payload" + b"IEND\xaeB`\x82"
+_PNG_B64 = base64.b64encode(_PNG_BYTES).decode()
+
+
+def test_split_chart_b64_extracts_png_and_strips_it_from_the_summary():
+    """The PNG rides back on stdout (readFiles response shapes proved unreliable),
+    but the base64 must never reach the model as part of the caption summary."""
+    from handler import CHART_B64_MARKER, _split_chart_b64
+
+    text = "pest    10\ntemperature 4\n" + CHART_B64_MARKER + _PNG_B64 + "\ntrailing note"
+    b64, rest = _split_chart_b64(text)
+    assert b64 == _PNG_B64
+    assert CHART_B64_MARKER not in rest
+    assert _PNG_B64 not in rest
+    assert "pest    10" in rest and "trailing note" in rest
+
+
+def test_split_chart_b64_is_noop_without_the_marker():
+    from handler import _split_chart_b64
+
+    assert _split_chart_b64("just some printed output") == ("", "just some printed output")
+
+
+def test_split_chart_b64_rejects_a_truncated_or_non_png_payload():
+    """Truncated stdout would otherwise hand the app a corrupt image that renders as a
+    silently broken chart. Returning no PNG lets the readFiles fallback try instead."""
+    from handler import CHART_B64_MARKER, _split_chart_b64
+
+    truncated = base64.b64encode(_PNG_BYTES[:-6]).decode()  # header intact, IEND lost
+    for bad in (base64.b64encode(b"not a png").decode(), truncated, "!!!not base64!!!"):
+        b64, rest = _split_chart_b64("counts\n" + CHART_B64_MARKER + bad + "\ntail")
+        assert b64 == ""
+        assert "counts" in rest and "tail" in rest
 
 
 def test_slim_payload_is_columnar(tmp_path):

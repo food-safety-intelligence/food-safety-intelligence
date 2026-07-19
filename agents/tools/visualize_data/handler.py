@@ -29,6 +29,8 @@ untrusted code off the sandbox.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import concurrent.futures
 import json
 import os
@@ -42,6 +44,11 @@ from urllib.parse import quote
 # ---------------------------------------------------------------------------
 
 CHART_FILENAME = "chart.png"  # the path the model's code must savefig() to
+# The sandbox prints the rendered PNG as base64 behind this marker. Reading the
+# image back out of stdout avoids depending on the readFiles response shape (which
+# varies by SDK version and silently yielded "no chart produced" in production even
+# when the code had rendered fine). readFiles stays as a fallback.
+CHART_B64_MARKER = "__FSI_CHART_B64__"
 DATA_FILENAME = "scores.json"  # the data file the sandbox loads into `df`
 MAX_CODE_CHARS = 8000  # a chart script is short; cap keeps a runaway arg out
 
@@ -187,6 +194,42 @@ df = pd.DataFrame(json.load(open({DATA_FILENAME!r}, encoding="utf-8"))["cols"])
 """
 
 
+# Appended AFTER the model's snippet: emit the rendered PNG on stdout so the handler
+# never has to parse a readFiles response. Only runs if the snippet actually saved a
+# figure, so a snippet that raised still surfaces its traceback instead.
+EPILOGUE_CODE = f"""
+import base64 as _fsi_b64, os as _fsi_os
+if _fsi_os.path.exists({CHART_FILENAME!r}):
+    print("{CHART_B64_MARKER}" + _fsi_b64.b64encode(open({CHART_FILENAME!r}, "rb").read()).decode())
+"""
+
+
+def _split_chart_b64(text: str) -> tuple[str, str]:
+    """Pull the marker-tagged base64 PNG out of the cell's stdout.
+
+    Returns (png_base64, remaining_text). The base64 must never reach the model — it
+    would be hundreds of KB of noise in the tool result — so it is stripped from the
+    text that becomes the caption `summary`.
+    """
+    if not text or CHART_B64_MARKER not in text:
+        return "", text or ""
+    before, _, rest = text.partition(CHART_B64_MARKER)
+    b64, _, after = rest.partition("\n")
+    b64 = b64.strip()
+    remainder = (before + after).strip()
+    # A PNG is ~100KB of base64; if the sandbox truncated stdout we'd hand the app a
+    # corrupt image, which renders as a silently broken chart. Check BOTH ends: the
+    # magic-byte header alone still passes on a truncated file, so require the closing
+    # IEND chunk too. Anything short of a whole PNG falls through to readFiles.
+    try:
+        png = base64.b64decode(b64, validate=True)
+    except (binascii.Error, ValueError):
+        return "", remainder
+    if not (png.startswith(b"\x89PNG\r\n\x1a\n") and png.endswith(b"IEND\xaeB`\x82")):
+        return "", remainder
+    return b64, remainder
+
+
 # ---------------------------------------------------------------------------
 # Sandbox execution
 # ---------------------------------------------------------------------------
@@ -241,14 +284,23 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
             # Setup + the model's snippet run as ONE cell, so `df` is guaranteed to
             # exist in the same execution rather than relying on variables surviving
             # across separate executeCode invocations.
-            cell = SETUP_CODE + "\n" + code
+            cell = SETUP_CODE + "\n" + code + "\n" + EPILOGUE_CODE
             run = _drain(client.invoke("executeCode", {"language": "python", "code": cell}))
-            output = (run.get("text") or "").strip()
-            if run.get("isError"):
+            png_b64, output = _split_chart_b64(run.get("text") or "")
+            output = output.strip()
+            if not png_b64 and run.get("isError"):
                 return {"ok": False, "error": f"your chart code raised an error:\n{output[:800]}"}
-            files = _drain(client.invoke("readFiles", {"paths": [CHART_FILENAME]}))
-            png_b64 = _extract_file_b64(files, CHART_FILENAME)
+            files: dict[str, Any] = {}
             if not png_b64:
+                # Fallback for SDK versions that don't stream stdout the same way.
+                files = _drain(client.invoke("readFiles", {"paths": [CHART_FILENAME]}))
+                png_b64 = _extract_file_b64(files, CHART_FILENAME)
+            if not png_b64:
+                # Diagnostic into CloudWatch: the response shapes we failed to parse.
+                print(
+                    f"[visualize_data] no PNG — exec_keys={sorted(run)[:8]} "
+                    f"readFiles_keys={sorted(files)[:8]} out={output[:200]!r}"
+                )
                 # Say WHY and include whatever the cell printed/raised. Without this
                 # the model can't tell what went wrong and just retries the same
                 # broken snippet until the request times out.
