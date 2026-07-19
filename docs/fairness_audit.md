@@ -242,6 +242,15 @@ gap to fix. The model is not changed; adopting per-group thresholds is a scope c
 - Low-prevalence / small groups are gated out (n ≥ 50 for parity; ≥ 50 positives
   for FNR/calibration) and every gap carries a bootstrap CI — a single below-floor
   group is not a finding.
+- **A four-fifths ratio of exactly 0.00 is degenerate, not an extreme.** The High
+  tier is thin and many audited groups are small, so a group with *zero* High flags
+  is common (20 of 46 Chicago neighborhoods, 21 of 33 NYC cuisines, 33 of 71 LA ZIPs).
+  One such group pins the min/max ratio to 0 no matter how the remaining groups
+  compare, so the ratio stops carrying information. Where the parity cell reads
+  `0.00`, read that axis from the truth-conditioned lenses (false-alarm, missed-risk,
+  calibration) and from the wider Elevated+High operating point instead. The
+  scorecard figure marks these cells `0.00*` and shades them neutral rather than
+  max-severity.
 - LA coordinates are geocoded with a zip-centroid fallback (some points coarse);
   NYC/LA tenure is a first-seen-inspection proxy (no license history); NYC/LA
   facility type is a single group (not carried into their feature frames).
