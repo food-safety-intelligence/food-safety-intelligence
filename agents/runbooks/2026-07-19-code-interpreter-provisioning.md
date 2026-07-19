@@ -237,6 +237,69 @@ aws elbv2 modify-load-balancer-attributes --region "$REGION" \
 
 ---
 
+## 7. Troubleshooting: read the runtime logs
+
+The agent runtime and its logs live in **Deepak's account (991500268971)**, so these
+must run as Deepak (CloudShell). Bella's IAM user gets `AccessDenied` on
+`logs:DescribeLogGroups` — she cannot pull these.
+
+```bash
+# 1) find the runtime's log group
+aws logs describe-log-groups --region "$REGION" \
+  --query "logGroups[?contains(logGroupName,'agentcore') || contains(logGroupName,'foodsafety') || contains(logGroupName,'bedrock')].logGroupName" \
+  --output table
+
+export LG="<log group from above>"
+
+# 2) reproduce the failing request in the app, then read the last few minutes
+aws logs tail "$LG" --region "$REGION" --since 15m --format short
+
+# 3) only the chart-relevant lines
+aws logs tail "$LG" --region "$REGION" --since 15m --format short \
+  | grep -iE "chart|sandbox|interpreter|timed out|Traceback|Error|Denied"
+
+# or follow live while you click in the app
+aws logs tail "$LG" --region "$REGION" --follow --format short
+```
+
+The ALB→runtime proxy logs separately (useful for 502/504 attribution):
+
+```bash
+aws logs tail /aws/lambda/food-safety-agent-proxy --region "$REGION" --since 15m --format short
+```
+
+What the log tells you when a chart request fails:
+
+| Symptom in the log | Means |
+|---|---|
+| no `visualize_data` call at all | the model never called the tool — prompt/scope issue, not infra |
+| `AccessDenied` on a `*CodeInterpreterSession` action | the runtime role is missing an action — see step 3 (add `CreateCodeInterpreterSession` if the SDK uses it rather than `Start`) |
+| `chart generation timed out after Ns` | the run exceeded `FSI_CHART_TIMEOUT_SECONDS`. Check whether the model then **retried** — two attempts blow the ~60s gateway budget even though each one was capped |
+| a long gap around session start | Code Interpreter **cold-start** dominates → the fix is a warm/persistent session, not a smaller payload |
+| `Traceback` from the executed snippet | the model's generated chart code is wrong (it is allowed one self-correction) |
+
+### Which hop is cutting the request off at 60s?
+
+A gateway 504 can come from the **ALB idle timeout** or **CloudFront's origin
+response timeout** (max 60s without a Service Quotas increase), and the fix differs.
+Test the ALB directly, bypassing CloudFront:
+
+```bash
+aws elbv2 describe-load-balancers --region "$REGION" \
+  --query 'LoadBalancers[].{name:LoadBalancerName,dns:DNSName}' --output table
+
+# same query straight at the ALB, timed
+time curl -s -o /dev/null -w '%{http_code}\n' -X POST "http://<ALB DNS>/" \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"[[city:la]] chart risk tiers","session_id":"00000000-0000-4000-8000-000000000000"}'
+```
+
+If the ALB call survives past 60s but the CloudFront one does not, CloudFront is the
+limiter — raise its origin response timeout (and request a quota increase to exceed
+60s). If BOTH cut at 60s, raise the ALB idle timeout too (section 6).
+
+---
+
 ## Teardown (if abandoning the feature)
 
 ```bash
