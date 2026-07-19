@@ -29,6 +29,7 @@ untrusted code off the sandbox.
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
 import os
 import re
@@ -67,25 +68,12 @@ def _chart_region() -> str:
     return os.environ.get("FSI_CHART_REGION", "us-west-2")
 
 
-# Setup cell run in the sandbox BEFORE the model's code: loads the city's data
-# into `df` and adds the driver-topic columns the "common drivers" charts use.
-# The hazard families mirror the keyword flags in interface_contracts.md and the
-# frontend's driver-icons taxonomy, so "common drivers" means the same thing
-# across the product. Kept as source the sandbox executes; documented to the model
-# via the tool docstring below.
-SETUP_CODE = f"""
-import json
-import matplotlib
-matplotlib.use("Agg")  # headless: render to a file, no display
-import pandas as pd
-
-_raw = json.load(open({DATA_FILENAME!r}, encoding="utf-8"))
-df = pd.DataFrame(_raw["scores"] if isinstance(_raw, dict) else _raw)
-
-# Driver-topic families for "common drivers" questions.
-# Prefix -> family. More specific prefixes are matched in order, so distinct
-# families like license_age vs license_n_history don't shadow each other.
-_TOPICS = {{
+# Driver-topic families for "common drivers" questions. Prefix -> family, matched
+# in order so distinct families (license_age vs license_n_history) don't shadow each
+# other. Mirrors the keyword flags in interface_contracts.md and the frontend's
+# driver-icons taxonomy, so "common drivers" means the same thing across the product.
+# Applied in the RUNTIME (not the sandbox) — see _slim_record.
+_TOPIC_PREFIXES = {
     "was_fail": "inspection_outcome",
     "n_priority": "priority_violations",
     "n_core": "core_violations",
@@ -101,31 +89,101 @@ _TOPICS = {{
     "temporal": "seasonality",
     "static_inspection": "inspection_type",
     "static_risk": "assigned_risk",
-    "flag_kw_temp": "temperature", "flag_kw_cool": "temperature",
-    "flag_kw_raw": "raw_food", "flag_kw_cross": "cross_contamination",
-    "flag_kw_expired": "expired", "flag_kw_rodent": "pest", "flag_kw_pest": "pest",
-    "flag_kw_no_soap": "handwashing", "flag_kw_handwash": "handwashing",
-    "flag_kw_no_paper": "handwashing", "flag_kw_sewage": "sewage",
+    "flag_kw_temp": "temperature",
+    "flag_kw_cool": "temperature",
+    "flag_kw_raw": "raw_food",
+    "flag_kw_cross": "cross_contamination",
+    "flag_kw_expired": "expired",
+    "flag_kw_rodent": "pest",
+    "flag_kw_pest": "pest",
+    "flag_kw_no_soap": "handwashing",
+    "flag_kw_handwash": "handwashing",
+    "flag_kw_no_paper": "handwashing",
+    "flag_kw_sewage": "sewage",
     "flag_kw_certified": "certified_manager",
-}}
+}
 
 
-def driver_topic(feature):
-    \"\"\"Map a SHAP feature name to its plain hazard/topic family.\"\"\"
+def _driver_topic(feature: Any) -> str:
+    """Map a SHAP feature name to its plain hazard/topic family."""
     if not feature:
         return "other"
-    for prefix, topic in _TOPICS.items():
+    for prefix, topic in _TOPIC_PREFIXES.items():
         if str(feature).startswith(prefix):
             return topic
     return "other"
 
 
-# Per-row driver helpers: the ordered feature list, the dominant driver, and its topic.
-df["driver_features"] = df["top_drivers"].apply(
-    lambda ds: [d.get("feature") for d in (ds or [])]
+def _slim_record(r: dict) -> dict:
+    """Project one score record to the columns a chart actually needs."""
+    drivers = [d for d in (r.get("top_drivers") or []) if isinstance(d, dict)]
+    top = drivers[0].get("feature") if drivers else None
+    return {
+        "license_id": r.get("license_id"),
+        "dba_name": r.get("dba_name"),
+        "as_of_date": r.get("as_of_date"),
+        "risk_score": r.get("risk_score"),
+        "risk_tier": r.get("risk_tier"),
+        "trend_slope": r.get("trend_slope"),
+        "neighborhood": r.get("neighborhood"),
+        "zip": r.get("zip"),
+        "facility_type": r.get("facility_type"),
+        "top_driver": top,
+        "top_driver_shap": drivers[0].get("shap") if drivers else None,
+        "top_driver_topic": _driver_topic(top),
+    }
+
+
+SLIM_COLUMNS = (
+    "license_id",
+    "dba_name",
+    "as_of_date",
+    "risk_score",
+    "risk_tier",
+    "trend_slope",
+    "neighborhood",
+    "zip",
+    "facility_type",
+    "top_driver",
+    "top_driver_shap",
+    "top_driver_topic",
 )
-df["top_driver"] = df["driver_features"].apply(lambda xs: xs[0] if xs else None)
-df["top_driver_topic"] = df["top_driver"].apply(driver_topic)
+
+
+def _slim_payload(path: str) -> str:
+    """A city's scores.json projected to the slim chart frame, as COLUMNAR JSON.
+
+    The published scores.json is 20-40MB per city, dominated by fields a chart never
+    needs (address, lat/lon, five nested top_drivers structs per row) — shipping all
+    of it into the sandbox AND parsing it there blew the 60s request timeout.
+
+    Two size levers, both material at ~42k rows:
+      * project to chart columns and precompute the driver topic in the RUNTIME, so
+        the sandbox never does a per-row rollup;
+      * emit COLUMNAR ({col: [values]}) rather than a list of records — a records
+        payload repeats all twelve key names on every row, which alone is megabytes.
+    `pd.DataFrame(dict_of_lists)` consumes this directly.
+    """
+    with open(path, encoding="utf-8") as f:
+        raw = json.load(f)
+    records = raw.get("scores", raw) if isinstance(raw, dict) else raw
+    cols: dict[str, list] = {c: [] for c in SLIM_COLUMNS}
+    for r in records:
+        slim = _slim_record(r)
+        for c in SLIM_COLUMNS:
+            cols[c].append(slim[c])
+    return json.dumps({"cols": cols})
+
+
+# Setup cell run in the sandbox BEFORE the model's code. The frame is already slim
+# and the driver topics are precomputed in the runtime, so this is just a load.
+SETUP_CODE = f"""
+import json
+import matplotlib
+matplotlib.use("Agg")  # headless: render to a file, no display
+import pandas as pd
+
+df = pd.DataFrame(json.load(open({DATA_FILENAME!r}, encoding="utf-8"))["cols"])
 """
 
 
@@ -164,10 +222,11 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
     """
     scores_path = _scores_path(city)
     try:
-        with open(scores_path, encoding="utf-8") as f:
-            scores_text = f.read()
+        scores_text = _slim_payload(scores_path)
     except FileNotFoundError:
         return {"ok": False, "error": f"no data file for {city}"}
+    except (json.JSONDecodeError, TypeError, AttributeError) as exc:
+        return {"ok": False, "error": f"could not read {city} chart data: {exc}"}
 
     try:
         # Lazy import: only the deployed runtime has (and needs) this SDK.
@@ -198,6 +257,32 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
         }
     except Exception as exc:  # noqa: BLE001 — surface any sandbox/SDK error as a clean tool error
         return {"ok": False, "error": f"sandbox error: {exc}"}
+
+
+_SANDBOX_TIMEOUT_S = int(os.environ.get("FSI_CHART_TIMEOUT_SECONDS", "40"))
+
+
+def _run_sandbox_guarded(code: str, city: str) -> dict[str, Any]:
+    """Run the sandbox under a hard wall-clock cap.
+
+    A chart is generated inside a synchronous chat request whose gateway budget is
+    ~60s (ALB idle / CloudFront origin timeout), so a slow or hung sandbox run
+    surfaces as an opaque 504 the user can't act on. Capping it here returns a clean
+    tool error the agent can relay instead.
+    """
+    ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        return ex.submit(_sandbox_run, code, city).result(timeout=_SANDBOX_TIMEOUT_S)
+    except concurrent.futures.TimeoutError:
+        return {
+            "ok": False,
+            "error": (
+                f"chart generation timed out after {_SANDBOX_TIMEOUT_S}s — "
+                "try a simpler chart or a narrower filter"
+            ),
+        }
+    finally:
+        ex.shutdown(wait=False)  # never block the request on an orphaned run
 
 
 def _drain(stream: Any) -> dict[str, Any]:
@@ -350,7 +435,7 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
     if not _use_stub() and not os.environ.get("FSI_CHART_BUCKET"):
         return {"status": "error", "error": "chart storage is not configured (FSI_CHART_BUCKET)"}
 
-    run = _stub_run(code, city) if _use_stub() else _sandbox_run(code, city)
+    run = _stub_run(code, city) if _use_stub() else _run_sandbox_guarded(code, city)
     if not run.get("ok"):
         return {"status": "error", "error": run.get("error", "chart generation failed")}
 
