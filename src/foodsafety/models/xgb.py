@@ -181,6 +181,16 @@ def build_production_xgb(
         n_estimators=300,
         max_depth=3,
         learning_rate=0.05,
+        # colsample_bytree=0.70 (below the 0.85 default): a broad HPO sweep found
+        # this is the one hyperparameter that robustly improves both PR-AUC and
+        # precision@10% over the depth-3 default. Two features dominate the model
+        # (was_fail, n_priority_this_inspection); sampling fewer columns per tree
+        # decorrelates the ensemble away from them and sharpens the top-decile
+        # ranking. Seed-mean over 16 seeds: PR-AUC 0.3813->0.3824, P@10 0.4147->
+        # 0.4153, at lower variance. Every other knob (depth, lr, n_estimators,
+        # min_child_weight, reg_*, gamma, scale_pos_weight, monotone off) was null
+        # or worse under expanding-window CV. See docs/model-experiments.md.
+        colsample_bytree=0.70,
         scale_pos_weight=scale_pos_weight,
         early_stopping_rounds=None,
         monotone_constraints=monotone_constraints_for(feats),

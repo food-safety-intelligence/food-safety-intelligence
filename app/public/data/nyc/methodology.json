@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-19T08:31:42.818494+00:00",
+  "generated_at": "2026-07-19T09:54:05.666823+00:00",
   "model_version": "nyc_xgb_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
@@ -10,32 +10,32 @@
     "note": "feasibility build, DR 0016"
   },
   "test": {
-    "n": 9951,
-    "prevalence": 0.4088,
-    "events": 4068,
+    "n": 9456,
+    "prevalence": 0.4097,
+    "events": 3874,
     "split_from": "2025-04-01"
   },
   "windows": {
     "train": {
       "start": "2022-07-01",
       "end": "2024-09-30",
-      "n": 34544
+      "n": 35190
     },
     "val": {
       "start": "2024-10-01",
       "end": "2025-03-31",
-      "n": 9035
+      "n": 8773
     },
     "test": {
       "start": "2025-04-01",
-      "end": "2026-07-13",
-      "n": 9951
+      "end": "2026-06-29",
+      "n": 9456
     }
   },
   "headline": {
-    "pr_auc": 0.5718,
-    "roc_auc": 0.6674,
-    "top_decile_lift": 1.66
+    "pr_auc": 0.6148,
+    "roc_auc": 0.6981,
+    "top_decile_lift": 1.8
   },
   "caveat": "NYC is a coverage feature with a weaker signal than Chicago (ROC-AUC ~0.66 vs ~0.78); its data window is only ~3 post-COVID years.",
   "risk_tiers": [
@@ -43,91 +43,91 @@
       "label": "Low",
       "min": 0.0,
       "max": 0.205,
-      "share": 0.2724
+      "share": 0.4647
     },
     {
       "label": "Moderate",
       "min": 0.205,
       "max": 0.41,
-      "share": 0.4669
+      "share": 0.3528
     },
     {
       "label": "Elevated",
       "min": 0.41,
       "max": 0.82,
-      "share": 0.2598
+      "share": 0.1821
     },
     {
       "label": "High",
       "min": 0.82,
       "max": null,
-      "share": 0.0008
+      "share": 0.0004
     }
   ],
   "operating_points": [
     {
       "frac": 0.05,
-      "n_flagged": 498,
-      "precision": 0.6948,
-      "recall": 0.0851,
-      "lift": 1.6995,
-      "events_caught": 346
+      "n_flagged": 473,
+      "precision": 0.7865,
+      "recall": 0.096,
+      "lift": 1.9197,
+      "events_caught": 372
     },
     {
       "frac": 0.1,
-      "n_flagged": 996,
-      "precision": 0.6767,
-      "recall": 0.1657,
-      "lift": 1.6553,
-      "events_caught": 674
+      "n_flagged": 946,
+      "precision": 0.7389,
+      "recall": 0.1804,
+      "lift": 1.8036,
+      "events_caught": 699
     },
     {
       "frac": 0.15,
-      "n_flagged": 1493,
-      "precision": 0.6618,
-      "recall": 0.2429,
-      "lift": 1.6188,
-      "events_caught": 988
+      "n_flagged": 1419,
+      "precision": 0.7047,
+      "recall": 0.2581,
+      "lift": 1.7201,
+      "events_caught": 1000
     },
     {
       "frac": 0.2,
-      "n_flagged": 1991,
-      "precision": 0.6354,
-      "recall": 0.311,
-      "lift": 1.5542,
-      "events_caught": 1265
+      "n_flagged": 1892,
+      "precision": 0.6702,
+      "recall": 0.3273,
+      "lift": 1.6359,
+      "events_caught": 1268
     },
     {
       "frac": 0.25,
-      "n_flagged": 2488,
-      "precision": 0.6049,
-      "recall": 0.37,
-      "lift": 1.4797,
-      "events_caught": 1505
+      "n_flagged": 2364,
+      "precision": 0.6472,
+      "recall": 0.3949,
+      "lift": 1.5798,
+      "events_caught": 1530
     },
     {
       "frac": 0.3,
-      "n_flagged": 2986,
-      "precision": 0.5901,
-      "recall": 0.4331,
-      "lift": 1.4435,
-      "events_caught": 1762
+      "n_flagged": 2837,
+      "precision": 0.6207,
+      "recall": 0.4546,
+      "lift": 1.5151,
+      "events_caught": 1761
     },
     {
       "frac": 0.4,
-      "n_flagged": 3981,
-      "precision": 0.5561,
-      "recall": 0.5442,
-      "lift": 1.3604,
-      "events_caught": 2214
+      "n_flagged": 3783,
+      "precision": 0.5823,
+      "recall": 0.5687,
+      "lift": 1.4214,
+      "events_caught": 2203
     },
     {
       "frac": 0.5,
-      "n_flagged": 4976,
-      "precision": 0.5245,
-      "recall": 0.6416,
-      "lift": 1.2831,
-      "events_caught": 2610
+      "n_flagged": 4728,
+      "precision": 0.5499,
+      "recall": 0.6711,
+      "lift": 1.3423,
+      "events_caught": 2600
     }
   ]
 }

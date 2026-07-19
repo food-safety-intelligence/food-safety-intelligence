@@ -1,17 +1,17 @@
 {
-  "generated_at": "2026-07-19T08:25:49+00:00",
+  "generated_at": "2026-07-19T09:47:25+00:00",
   "model_version": "xgb_monotone",
   "provenance": {
-    "run_id": "20260719_787563c40",
-    "git_commit": "787563c40b1ac86e216c0994cc40b8f9644adabd",
+    "run_id": "20260719_52d9277c0",
+    "git_commit": "52d9277c05d2e4fa9b4b141e944f816817d5075c",
     "git_dirty": true,
     "feature_set_version": "68fe2ae76184",
-    "features_sha256": "b37cb2dbda742bd35b537de62c4918ceeb1883bebb16a76b07ddad9a01f8a817"
+    "features_sha256": "2bf527ac434e1d58337d8eeb829ae5877eccf23ca51b3c527e1be4028619a3a3"
   },
   "test": {
-    "n": 6222,
-    "prevalence": 0.1053,
-    "events": 655,
+    "n": 7008,
+    "prevalence": 0.1079,
+    "events": 756,
     "split_from": "2025-07-01"
   },
   "windows": {
@@ -27,171 +27,171 @@
     },
     "test": {
       "start": "2025-07-01",
-      "end": "2025-11-21",
-      "n": 6222
+      "end": "2025-12-12",
+      "n": 7008
     }
   },
   "headline": {
-    "pr_auc": 0.3824,
-    "roc_auc": 0.8088,
-    "top_decile_lift": 3.92
+    "pr_auc": 0.382,
+    "roc_auc": 0.8062,
+    "top_decile_lift": 3.9
   },
   "risk_tiers": [
     {
       "label": "Low",
       "min": 0.0,
       "max": 0.054,
-      "share": 0.6556
+      "share": 0.6551
     },
     {
       "label": "Moderate",
       "min": 0.054,
       "max": 0.108,
-      "share": 0.2474
+      "share": 0.2481
     },
     {
       "label": "Elevated",
       "min": 0.108,
       "max": 0.216,
-      "share": 0.0782
+      "share": 0.0777
     },
     {
       "label": "High",
       "min": 0.216,
       "max": null,
-      "share": 0.0187
+      "share": 0.019
     }
   ],
   "operating_points": [
     {
       "frac": 0.05,
-      "n_flagged": 312,
-      "precision": 0.4872,
-      "recall": 0.2321,
-      "lift": 4.6278,
-      "events_caught": 152
+      "n_flagged": 351,
+      "precision": 0.49,
+      "recall": 0.2275,
+      "lift": 4.5425,
+      "events_caught": 172
     },
     {
       "frac": 0.1,
-      "n_flagged": 623,
-      "precision": 0.4125,
-      "recall": 0.3924,
-      "lift": 3.9186,
-      "events_caught": 257
+      "n_flagged": 701,
+      "precision": 0.4208,
+      "recall": 0.3902,
+      "lift": 3.901,
+      "events_caught": 295
     },
     {
       "frac": 0.2,
-      "n_flagged": 1245,
-      "precision": 0.3116,
-      "recall": 0.5924,
-      "lift": 2.9604,
-      "events_caught": 388
+      "n_flagged": 1402,
+      "precision": 0.3188,
+      "recall": 0.5913,
+      "lift": 2.9555,
+      "events_caught": 447
     },
     {
       "frac": 0.3,
-      "n_flagged": 1867,
-      "precision": 0.2528,
-      "recall": 0.7206,
-      "lift": 2.4015,
-      "events_caught": 472
+      "n_flagged": 2103,
+      "precision": 0.2615,
+      "recall": 0.7275,
+      "lift": 2.4244,
+      "events_caught": 550
     },
     {
       "frac": 0.5,
-      "n_flagged": 3111,
-      "precision": 0.1842,
-      "recall": 0.8748,
-      "lift": 1.7496,
-      "events_caught": 573
+      "n_flagged": 3504,
+      "precision": 0.1864,
+      "recall": 0.8638,
+      "lift": 1.7275,
+      "events_caught": 653
     }
   ],
   "global_importance": [
     {
       "feature": "was_fail",
       "label": "Outcome of the current inspection",
-      "mean_abs_logodds": 0.7392
+      "mean_abs_logodds": 0.7192
     },
     {
       "feature": "n_priority_this_inspection",
       "label": "Priority violations at this inspection",
-      "mean_abs_logodds": 0.383
+      "mean_abs_logodds": 0.3781
     },
     {
       "feature": "license_age_days",
       "label": "License age",
-      "mean_abs_logodds": 0.3032
+      "mean_abs_logodds": 0.3079
     },
     {
       "feature": "prior_complaint_inspections",
       "label": "Prior complaint-driven inspections",
-      "mean_abs_logodds": 0.2844
+      "mean_abs_logodds": 0.2849
     },
     {
       "feature": "n_core_this_inspection",
       "label": "Core violations at this inspection",
-      "mean_abs_logodds": 0.2159
-    },
-    {
-      "feature": "static_inspection_type",
-      "label": "Inspection type",
-      "mean_abs_logodds": 0.1597
+      "mean_abs_logodds": 0.1976
     },
     {
       "feature": "temporal_month",
       "label": "Month of inspection",
-      "mean_abs_logodds": 0.1472
+      "mean_abs_logodds": 0.1574
+    },
+    {
+      "feature": "static_inspection_type",
+      "label": "Inspection type",
+      "mean_abs_logodds": 0.1545
     },
     {
       "feature": "static_risk_tier",
       "label": "Chicago risk tier",
-      "mean_abs_logodds": 0.0635
-    },
-    {
-      "feature": "prior_priority_violations_365d",
-      "label": "Priority violations in the last year",
-      "mean_abs_logodds": 0.0605
-    },
-    {
-      "feature": "days_since_last_fail",
-      "label": "Days since last failure",
-      "mean_abs_logodds": 0.0548
-    },
-    {
-      "feature": "days_since_last_inspection",
-      "label": "Days since last inspection",
-      "mean_abs_logodds": 0.0416
+      "mean_abs_logodds": 0.0648
     },
     {
       "feature": "temporal_quarter",
       "label": "Quarter of inspection",
-      "mean_abs_logodds": 0.0406
+      "mean_abs_logodds": 0.0564
+    },
+    {
+      "feature": "prior_priority_violations_365d",
+      "label": "Priority violations in the last year",
+      "mean_abs_logodds": 0.0543
+    },
+    {
+      "feature": "days_since_last_fail",
+      "label": "Days since last failure",
+      "mean_abs_logodds": 0.0526
+    },
+    {
+      "feature": "license_n_history_rows",
+      "label": "License history entries",
+      "mean_abs_logodds": 0.0475
     }
   ],
   "waterfall": {
-    "base": -1.8346,
+    "base": -1.845,
     "drivers": [
       {
         "feature": "was_fail",
         "label": "Failed the current inspection",
-        "contribution": 1.0869
+        "contribution": 0.8103
+      },
+      {
+        "feature": "prior_complaint_inspections",
+        "label": "23 prior complaint-driven inspections",
+        "contribution": 0.7221
       },
       {
         "feature": "n_priority_this_inspection",
-        "label": "9 priority violations at this inspection",
-        "contribution": 0.9727
-      },
-      {
-        "feature": "n_core_this_inspection",
-        "label": "19 core violations at this inspection",
-        "contribution": 0.4582
+        "label": "5 priority violations at this inspection",
+        "contribution": 0.7143
       },
       {
         "feature": "license_age_days",
-        "label": "License is 4536 days old",
-        "contribution": -0.3765
+        "label": "License is 4923 days old",
+        "contribution": -0.3672
       }
     ],
-    "other": 0.5408,
-    "total_logit": 0.8475,
-    "probability": 0.7
+    "other": 0.8645,
+    "total_logit": 0.899,
+    "probability": 0.7107
   }
 }
