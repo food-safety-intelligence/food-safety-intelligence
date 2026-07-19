@@ -910,13 +910,17 @@ export default async function HowItWorksPage() {
               alarms and missed risks differ, and whether its risk scores are equally
               accurate. Almost every difference shows up only on the first check,
               which is what you expect wherever groups genuinely fail inspections at
-              different rates. Two results are being followed up: risk scores are
-              less accurate for a small number of New York cuisines, and the
-              false-alarm rate varies by area in Los Angeles (treated as provisional,
-              because LA locations are approximate). Residual risks (a detection
-              feedback loop in the prior-history and current-outcome signals,
-              geographic miscalibration where history is sparse, and unstable metrics
-              for very small groups) stay documented.
+              different rates. Two results did not, and both were then tested rather
+              than assumed. In New York, several cuisines get risk scores that are
+              measurably off, and most of those are{" "}
+              <span className="font-medium text-ink/80">under</span>-scored, meaning
+              they read safer than they turn out to be. In Los Angeles, the rate of
+              false alarms (flagged as high risk but no problem found) varies by area
+              by more than chance would produce. Both are open, and we are treating
+              them as real rather than as measurement quirks. Residual risks (a
+              detection feedback loop in the prior-history and current-outcome
+              signals, geographic miscalibration where history is sparse, and unstable
+              metrics for very small groups) stay documented.
             </p>
 
             <h3
