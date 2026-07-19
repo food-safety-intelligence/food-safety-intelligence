@@ -36,6 +36,7 @@ import json
 import os
 import re
 import uuid
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import quote
 
@@ -157,8 +158,15 @@ SLIM_COLUMNS = (
 )
 
 
-def _slim_payload(path: str) -> str:
+# Columns that must survive even if empty — the frame's identity and measures. Only
+# the descriptive/filter columns are subject to the empty-column guard below.
+_REQUIRED_COLUMNS = ("license_id", "dba_name", "as_of_date", "risk_score", "risk_tier")
+
+
+def _slim_payload(path: str) -> tuple[str, tuple[str, ...]]:
     """A city's scores.json projected to the slim chart frame, as COLUMNAR JSON.
+
+    Returns (columnar_json, live_columns).
 
     The published scores.json is 20-40MB per city, dominated by fields a chart never
     needs (address, lat/lon, five nested top_drivers structs per row) — shipping all
@@ -170,6 +178,14 @@ def _slim_payload(path: str) -> str:
       * emit COLUMNAR ({col: [values]}) rather than a list of records — a records
         payload repeats all twelve key names on every row, which alone is megabytes.
     `pd.DataFrame(dict_of_lists)` consumes this directly.
+
+    Empty-column guard: a descriptive column that is empty in EVERY row is dropped
+    rather than shipped. Shipping it produced the worst possible failure — the
+    model's filter matched nothing, so it got a valid empty frame back, no error,
+    and concluded the city had no such places. Dropping it turns that silent wrong
+    answer into a loud KeyError the handler converts into a retry naming the live
+    columns. Geography legitimately varies by city (Chicago publishes no
+    neighborhood, only zip), so this is a permanent condition, not a transient one.
     """
     with open(path, encoding="utf-8") as f:
         raw = json.load(f)
@@ -179,18 +195,27 @@ def _slim_payload(path: str) -> str:
         slim = _slim_record(r)
         for c in SLIM_COLUMNS:
             cols[c].append(slim[c])
-    return json.dumps({"cols": cols})
+    live = tuple(
+        c
+        for c in SLIM_COLUMNS
+        if c in _REQUIRED_COLUMNS or any(v not in (None, "") for v in cols[c])
+    )
+    return json.dumps({"cols": {c: cols[c] for c in live}}), live
 
 
-# Setup cell run in the sandbox BEFORE the model's code. The frame is already slim
-# and the driver topics are precomputed in the runtime, so this is just a load.
-SETUP_CODE = f"""
+def _setup_code(live_columns: Sequence[str]) -> str:
+    """Setup cell run in the sandbox BEFORE the model's code. The frame is already
+    slim and the driver topics are precomputed in the runtime, so this is just a
+    load. The live column list is asserted here so a stale expectation fails loudly
+    inside the cell rather than silently yielding an empty filter."""
+    return f"""
 import json
 import matplotlib
 matplotlib.use("Agg")  # headless: render to a file, no display
 import pandas as pd
 
 df = pd.DataFrame(json.load(open({DATA_FILENAME!r}, encoding="utf-8"))["cols"])
+# Columns available for THIS city: {", ".join(live_columns)}
 """
 
 
@@ -235,6 +260,18 @@ def _split_chart_b64(text: str) -> tuple[str, str]:
 # ---------------------------------------------------------------------------
 
 
+def _missing_column(traceback_text: str, live_columns: Sequence[str]) -> str:
+    """The column name from a pandas KeyError, when it's one the chart frame knows
+    about but this city doesn't publish. Returns "" for any other error, so a genuine
+    bug in the model's code still surfaces its real traceback."""
+    if "KeyError" not in traceback_text:
+        return ""
+    for name in re.findall(r"KeyError: ['\"]([^'\"]+)['\"]", traceback_text):
+        if name in SLIM_COLUMNS and name not in live_columns:
+            return name
+    return ""
+
+
 def _stub_run(code: str, city: str) -> dict[str, Any]:
     """Do NOT execute the code. Return a placeholder image + the code echoed, so
     the flow works end-to-end without a sandbox or executing untrusted code."""
@@ -265,7 +302,7 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
     """
     scores_path = _scores_path(city)
     try:
-        scores_text = _slim_payload(scores_path)
+        scores_text, live_columns = _slim_payload(scores_path)
     except FileNotFoundError:
         return {"ok": False, "error": f"no data file for {city}"}
     except (json.JSONDecodeError, TypeError, AttributeError) as exc:
@@ -284,11 +321,26 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
             # Setup + the model's snippet run as ONE cell, so `df` is guaranteed to
             # exist in the same execution rather than relying on variables surviving
             # across separate executeCode invocations.
-            cell = SETUP_CODE + "\n" + code + "\n" + EPILOGUE_CODE
+            cell = _setup_code(live_columns) + "\n" + code + "\n" + EPILOGUE_CODE
             run = _drain(client.invoke("executeCode", {"language": "python", "code": cell}))
             png_b64, output = _split_chart_b64(run.get("text") or "")
             output = output.strip()
             if not png_b64 and run.get("isError"):
+                # A KeyError names a column this city doesn't publish (see the
+                # empty-column guard in _slim_payload). Say which columns DO exist so
+                # the retry can succeed instead of guessing the same name again.
+                dead = _missing_column(output, live_columns)
+                if dead:
+                    return {
+                        "ok": False,
+                        "error": (
+                            f"this city's data has no {dead!r} column, so that filter or "
+                            f"grouping cannot work here. Available columns: "
+                            f"{', '.join(live_columns)}. Rewrite the code using only "
+                            f"those, or tell the user that breakdown isn't available "
+                            f"for this city."
+                        ),
+                    }
                 return {"ok": False, "error": f"your chart code raised an error:\n{output[:800]}"}
             files: dict[str, Any] = {}
             if not png_b64:

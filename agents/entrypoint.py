@@ -324,9 +324,11 @@ def visualize_data(code: str, title: str) -> dict:
     way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
     subjects as usual. Do NOT paste code into your chat reply; pass it here.
 
-    A DataFrame `df` is already loaded (one row per establishment) with EXACTLY
-    these columns — use ONLY these, anything else raises KeyError:
-      license_id, dba_name, as_of_date, neighborhood, zip, facility_type,
+    A DataFrame `df` is already loaded (one row per establishment). Use ONLY the
+    columns below, and NEVER invent one — anything else raises KeyError.
+
+    Always present:
+      license_id, dba_name, as_of_date, zip,
       risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
       trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
       top_driver (dominant SHAP feature name), top_driver_shap (its contribution),
@@ -335,6 +337,19 @@ def visualize_data(code: str, title: str) -> dict:
       top_driver_topic for "common drivers" / "violation category" questions —
       it is the category each establishment's STRONGEST driver falls into, so
       value_counts() gives the number of establishments per category.
+
+    Varies by city — do NOT assume either exists:
+      neighborhood — the area the city publishes: NYC boroughs, or LA cities like
+        Santa Monica and West Hollywood. ABSENT for Chicago.
+      facility_type — the kind of establishment (Restaurant, Grocery Store,
+        School, Daycare, Bakery, Long Term Care, …). Chicago ONLY. Descriptive
+        breakdowns only; it is never part of the risk model. It has a LONG TAIL
+        of ~190 rare one-off values, so ALWAYS take the top N (about 10, which
+        covers ~96% of establishments) rather than plotting every category.
+    For a geographic breakdown prefer zip, which every city has. If you use a
+    column this city doesn't publish, the tool returns an error listing the ones
+    that do exist — rewrite using those, or tell the user that breakdown isn't
+    available for this city. Never say the city has no such places.
 
     Your `code` MUST:
       - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no

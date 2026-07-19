@@ -25,6 +25,24 @@ export interface CityConfig {
   sourceBlurb: string;
   /** Detail-page copy that names the label / place / source. */
   cityState: string; // "Chicago, IL"
+  /**
+   * What a record's `neighborhood` value means here, which decides how the detail
+   * page writes its location line.
+   *
+   * "within"   the area sits inside cityState, so show both: a NYC record reads
+   *            "1307 Avenue Z, Brooklyn, New York, NY 11235".
+   * "locality" the value IS the city, so it REPLACES cityState. LA County's feed
+   *            names separate incorporated cities (West Hollywood, Santa Monica)
+   *            and postal cities (Van Nuys). Appending those to a fixed
+   *            "Los Angeles, CA" read as "West Hollywood, Los Angeles, CA"
+   *            (wrong, it is not in Los Angeles) and "Los Angeles, Los Angeles,
+   *            CA" (duplicated).
+   *
+   * Omit when the city publishes no neighborhood at all, as Chicago does.
+   */
+  neighborhoodKind?: "within" | "locality";
+  /** Two-letter state, used for the location line when neighborhoodKind is "locality". */
+  stateAbbrev: string; // "IL"
   healthDept: string;
   riskLabel: string; // "Predicted 180-day risk"
   typicalNoun: string; // "Chicago food establishment"
@@ -73,6 +91,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     sourceBlurb:
       "Chicago publishes every food establishment inspection it conducts. We pair that record with its license history to estimate the chance a place will see a failed inspection or priority violation in the next six months, and show you exactly why.",
     cityState: "Chicago, IL",
+    // Chicago's feed has no area column worth publishing, so no neighborhoodKind.
+    stateAbbrev: "IL",
     healthDept: "Chicago Department of Public Health",
     riskLabel: "Predicted 180-day risk",
     typicalNoun: "Chicago food establishment",
@@ -104,6 +124,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     sourceBlurb:
       "New York City publishes every restaurant inspection its Health Department conducts, each carrying a letter grade (A / B / C). We use inspection history since the post-COVID restart to estimate the chance a place's next inspection is graded B or C, and show you exactly why. NYC is a research-preview second city with a weaker signal than Chicago.",
     cityState: "New York, NY",
+    neighborhoodKind: "within", // borough, genuinely inside New York, NY
+    stateAbbrev: "NY",
     healthDept: "New York City Department of Health and Mental Hygiene",
     riskLabel: "Predicted next-inspection risk",
     typicalNoun: "New York food service establishment",
@@ -146,6 +168,8 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     sourceBlurb:
       "Los Angeles County publishes every restaurant and market inspection its Environmental Health division conducts, each carrying a letter grade (A / B / C) on a 0-100 scale where higher is cleaner. We use inspection history since 2023 to estimate the chance a place's next inspection drops to a B or C, and show you exactly why. LA is a research-preview third city with a weaker signal than Chicago.",
     cityState: "Los Angeles, CA",
+    neighborhoodKind: "locality", // separate incorporated / postal cities
+    stateAbbrev: "CA",
     healthDept: "Los Angeles County Department of Public Health",
     riskLabel: "Predicted next-inspection risk",
     typicalNoun: "Los Angeles County food establishment",
@@ -191,4 +215,33 @@ export function isCity(v: unknown): v is City {
 export function dataUrl(city: City, file: string): string {
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   return `${base}/data/${CITY_CONFIG[city].dataPrefix}${file}`;
+}
+
+/**
+ * The detail page's location line: "address · area · City, ST ZIP".
+ *
+ * Only the parts that exist are joined, so a city that publishes no
+ * neighborhood (Chicago) leaves no orphaned "·" separator.
+ *
+ * The area is placed by the city's `neighborhoodKind`:
+ *   "within"   shown beside the city, because a NYC borough is inside New York.
+ *   "locality" shown INSTEAD of the city, because LA County's feed names
+ *              separate incorporated cities. Appending them to a fixed
+ *              "Los Angeles, CA" read as "West Hollywood · Los Angeles, CA"
+ *              (not where the venue is) and "Los Angeles · Los Angeles, CA".
+ */
+export function formatLocationLine(
+  parts: { address: string; neighborhood: string; zip: string },
+  city: City,
+): string {
+  const cfg = CITY_CONFIG[city];
+  const address = parts.address.trim();
+  const neighborhood = parts.neighborhood.trim();
+  const zip = parts.zip.trim();
+
+  const isLocality = cfg.neighborhoodKind === "locality" && neighborhood !== "";
+  const place = isLocality ? `${neighborhood}, ${cfg.stateAbbrev}` : cfg.cityState;
+  const cityLine = `${place}${zip ? ` ${zip}` : ""}`;
+
+  return [address, isLocality ? "" : neighborhood, cityLine].filter(Boolean).join(" · ");
 }

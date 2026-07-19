@@ -31,6 +31,7 @@ from foodsafety.explain.shap_drivers import (
     linear_contributions,
     top_drivers_for_row,
 )
+from foodsafety.features.license_features import normalize_facility_type
 
 # --- Unified cross-city risk-tier rule (DR 0017) ------------------------------
 # Every city's model emits a CALIBRATED probability, but the three cities predict
@@ -165,6 +166,105 @@ def _establishment_key(df: pd.DataFrame) -> pd.Series:
     return key.mask(blank, "license:" + df["license_id"].astype(str))
 
 
+# Source columns for the display area, in preference order. NYC's feed carries
+# `boro`; LA's `city` names the separate incorporated cities (Beverly Hills, West
+# Hollywood) and postal cities (Van Nuys) that a user actually means when they say
+# where a place is. Chicago's feed has `city` too, but see _area_series.
+_AREA_SOURCE_COLUMNS = ("boro", "city")
+
+# Feed placeholders that mean "no value" and must not reach the UI as a label.
+# NYC's boro column uses "0" for unknown.
+_AREA_PLACEHOLDER = r"0|n/?a|none|unknown|not applicable"
+
+# A source column whose single most common value covers at least this share of rows
+# can't distinguish one area from another, so it counts as no signal. See
+# _area_series for the measured per-city shares this sits between.
+_AREA_DOMINANCE_LIMIT = 0.9
+
+
+def _clean_area(values: pd.Series) -> pd.Series:
+    """Normalise a raw feed area value for display."""
+    out = values.fillna("").astype(str).str.strip().str.replace(r"\s+", " ", regex=True)
+    out = out.mask(out.str.fullmatch(_AREA_PLACEHOLDER, case=False), "")
+    # Title-case only the shouted values (LA ships "LOS ANGELES"); leave already
+    # mixed-case ones alone so "Manhattan" and a name like "DeKalb" survive intact.
+    return out.where(~out.str.isupper(), out.str.title())
+
+
+def _area_series(df: pd.DataFrame) -> pd.Series:
+    """Per-establishment display area, or empty when the feed carries no area signal.
+
+    Chicago's feed has a ``city`` column, but 99.6% of rows say CHICAGO — it tells a
+    user nothing, and shipping it would put a dead filter in front of the chart tool
+    and a useless term in the app's search index. A column dominated by one value is
+    therefore treated as no signal and yields empty.
+
+    Dominance, not distinct-count, is the test: Chicago's column has 54 distinct
+    values once typo variants (Cchicago, CHicago, CHICAGOCHICAGO) and a few genuine
+    suburbs are counted, so counting values keeps a column that distinguishes
+    nothing. Measured top-value share is 0.996 for Chicago against 0.30 (LA) and
+    0.38 (NYC), so the threshold sits in a wide empty gap. The rule needs no
+    per-city branch and any future single-city feed drops out the same way.
+    """
+    for col in _AREA_SOURCE_COLUMNS:
+        if col not in df.columns:
+            continue
+        cleaned = _clean_area(df[col])
+        present = cleaned[cleaned != ""]
+        if present.empty:
+            continue
+        # Case-folded so Chicago's typo variants count toward the same dominant
+        # value instead of masquerading as genuine variety.
+        share = present.str.casefold().value_counts(normalize=True).iloc[0]
+        if share < _AREA_DOMINANCE_LIMIT:
+            return cleaned
+    return pd.Series("", index=df.index, dtype="object")
+
+
+def _clean_zip(values: pd.Series) -> pd.Series:
+    """Five-digit ZIP for display. Anything else (ZIP+4, blank, junk) reduces to the
+    leading five digits, or empty when there aren't five."""
+    digits = values.fillna("").astype(str).str.extract(r"^\s*(\d{5})", expand=False)
+    return digits.fillna("")
+
+
+# The display columns every city's scores artifact must carry. Empty string is a
+# legal value: which of these a feed can populate varies by city.
+DISPLAY_GEOGRAPHY_COLUMNS = ("neighborhood", "zip", "facility_type")
+
+
+def add_display_geography(df: pd.DataFrame) -> pd.DataFrame:
+    """Attach the descriptive display columns, derived from the feed's own values.
+
+    Shared by ALL city score builders (Chicago's ``build_scores_table`` and the NYC
+    / LA scripts) on purpose. These columns were empty in every city for months
+    because each writer was expected to populate them independently and none did;
+    a single derivation means a city cannot silently ship blanks again, and the
+    three cities agree on what each column MEANS rather than by coincidence.
+
+    Coverage differs by feed and that is expected, not a defect:
+      * ``zip``           — all three cities.
+      * ``neighborhood``  — NYC (borough) and LA (incorporated / postal city).
+                            Empty for Chicago, whose feed has no area signal.
+      * ``facility_type`` — Chicago only, as a canonical bucket. Descriptive use
+                            only: DR 0004 bars it as a MODEL feature while keeping
+                            facility type as a group-performance dimension.
+
+    Consumers must treat every one of these as optional. The chart tool drops a
+    column that is empty across all rows rather than offering a filter that
+    silently matches nothing.
+    """
+    out = df.copy()
+    out["neighborhood"] = _area_series(out)
+    out["zip"] = _clean_zip(out["zip"]) if "zip" in out.columns else ""
+    out["facility_type"] = (
+        out["facility_type"].map(normalize_facility_type).fillna("")
+        if "facility_type" in out.columns
+        else ""
+    )
+    return out
+
+
 def build_scores_table(
     model,
     features: pd.DataFrame,
@@ -285,8 +385,14 @@ def build_scores_table(
         latest_per_license["is_out_of_business"] = False
         latest_per_license["closed_since"] = pd.NaT
 
+    # Display geography. Kept out of keep_columns so callers passing their own
+    # keep_columns still get them: these are contract fields, not caller-selectable
+    # display extras.
+    latest_per_license = add_display_geography(latest_per_license)
+
     # Output schema per contract.
     output_cols = list(keep_columns) + [
+        *DISPLAY_GEOGRAPHY_COLUMNS,
         "as_of_date",
         "risk_score",
         "risk_tier",
@@ -440,6 +546,11 @@ def write_scores_json(
     storage.write_text(json.dumps(payload, separators=(",", ":")), out_path)
 
 
+def _display_str(value) -> str:
+    """A display string for scores.json: never null, never padded."""
+    return "" if value is None or pd.isna(value) else str(value).strip()
+
+
 def _row_to_json(row) -> dict:
     # Strip surrounding whitespace on the display strings at this JSON boundary:
     # some source dba_name/address values carry leading spaces (e.g.
@@ -447,11 +558,15 @@ def _row_to_json(row) -> dict:
     # list. Normalising here keeps every consumer of scores.json clean.
     return {
         "license_id": str(row.license_id),
-        "dba_name": "" if pd.isna(row.dba_name) else str(row.dba_name).strip(),
-        "address": "" if pd.isna(row.address) else str(row.address).strip(),
-        "neighborhood": "",
-        "zip": "",
-        "facility_type": "",
+        "dba_name": _display_str(row.dba_name),
+        "address": _display_str(row.address),
+        # Derived in build_scores_table from the feed's own area/zip columns.
+        # neighborhood is empty for a single-city feed like Chicago's, which the
+        # chart tool's live-filter guard then drops rather than offering a filter
+        # that matches nothing.
+        "neighborhood": _display_str(getattr(row, "neighborhood", "")),
+        "zip": _display_str(getattr(row, "zip", "")),
+        "facility_type": _display_str(getattr(row, "facility_type", "")),
         "lat": None if pd.isna(row.lat) else float(row.lat),
         "lon": None if pd.isna(row.lon) else float(row.lon),
         "as_of_date": str(row.as_of_date),
