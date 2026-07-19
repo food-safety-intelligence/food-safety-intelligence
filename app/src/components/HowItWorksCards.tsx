@@ -10,6 +10,7 @@
 import type { ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
 import { CITY_CONFIG, type City } from "@/lib/city";
+import { sourceNames } from "@/lib/sources";
 import { EvaluationDetail } from "@/components/EvaluationDetail";
 import type { DateWindow } from "@/lib/methodology-server";
 
@@ -313,7 +314,7 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
       <article>
         <h2 className="text-2xl font-medium tracking-tight">Where the data comes from and how it&apos;s handled</h2>
         <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
-          Every input is a public record: {m?.data_source ?? c.sources.join(", ")}. The
+          Every input is a public record: {m?.data_source ?? sourceNames(city).join(", ")}. The
           app collects nothing from the people who visit it (no accounts, no login, no
           personal data), so the questions below are about public business records, not
           private user data. The full source list is on the{" "}
