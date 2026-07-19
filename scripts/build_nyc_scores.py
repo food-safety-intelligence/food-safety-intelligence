@@ -39,7 +39,12 @@ from xgboost import XGBClassifier
 from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
-from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.serve.predict_batch import (
+    DISPLAY_GEOGRAPHY_COLUMNS,
+    add_display_geography,
+    assign_risk_tiers,
+    write_scores_json,
+)
 from foodsafety.tracking import snapshot_provenance
 from foodsafety.utils.time import split_window, temporal_split
 
@@ -585,12 +590,17 @@ def main():
         )
     print(f"Saved models → {models_dir}/{MODEL_VERSION}_{ver}.joblib (+ forecast)")
 
+    # Same derivation Chicago uses, so all three cities agree on what these
+    # columns mean instead of each writer inventing its own (they were empty in
+    # every city until this was shared).
+    latest = add_display_geography(latest)
     cols = [
         "license_id",
         "dba_name",
         "address",
         "lat",
         "lon",
+        *DISPLAY_GEOGRAPHY_COLUMNS,
         "as_of_date",
         "risk_score",
         "risk_tier",

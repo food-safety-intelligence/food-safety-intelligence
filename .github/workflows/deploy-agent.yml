@@ -237,6 +237,47 @@ jobs:
           fi
           echo "✓ scoring responded after deploy"
 
+      # Post-deploy gate: a chart must actually render. This CANNOT run in PR CI —
+      # the sandbox is stubbed off AWS (FSI_SANDBOX_USE_STUB defaults true) and there
+      # are no creds, so the deployed runtime is the ONLY place the real Code
+      # Interpreter meets the real published scores.json. Every bug this feature has
+      # had (the readFiles response shape, the region mismatch, the 504, the empty
+      # filter columns) was invisible to the stub tests and surfaced only here.
+      #
+      # Two requests, because they fail in different ways:
+      #   1. city-wide   — exercises sandbox + render + block emission;
+      #   2. zip-grouped — exercises a GEOGRAPHIC column actually having values. A
+      #      scores.json published with blank zips still charts fine city-wide, so
+      #      only the grouped probe catches a regression back to empty geography.
+      # Cost is ~2 AgentCore invokes plus a few seconds of Code Interpreter.
+      - name: Smoke-test charting (gate)
+        run: |
+          chart_probe() {
+            desc="$1"; query="$2"; sess="$3"
+            for attempt in 1 2 3; do
+              resp=$(curl -s --max-time 90 -X POST https://d1uefdb2te19wk.cloudfront.net/api/agent \
+                -H 'Content-Type: application/json' \
+                -d "$(QUERY="$query" SESS="$sess" python3 -c 'import json,os;print(json.dumps({"query":os.environ["QUERY"],"session_id":os.environ["SESS"]}))')" || true)
+              echo "  $desc attempt $attempt: $(printf '%s' "$resp" | head -c 400)"
+              # The block is what the web app renders inline; its presence means the
+              # sandbox ran, matplotlib drew, and the PNG made it back out.
+              if printf '%s' "$resp" | grep -q 'eatelligence-chart'; then
+                echo "  ✓ $desc rendered a chart"
+                return 0
+              fi
+              sleep 20
+            done
+            echo "::error::Post-deploy chart smoke test failed — $desc produced no chart block."
+            return 1
+          }
+          chart_probe "city-wide chart" \
+            "Chart the distribution of risk tiers across Chicago." \
+            "sess-ci-chart-0001-0001-0001-000000000001"
+          chart_probe "zip-grouped chart" \
+            "Chart the ten Chicago zip codes with the most food establishments." \
+            "sess-ci-chart-0002-0002-0002-000000000002"
+          echo "✓ charting responded after deploy"
+
       # Agent behavior probes (gate): a few of the eval's behavioral rules checked
       # against the live endpoint with substring heuristics — no LLM judge, to keep
       # the deploy fast and deterministic. Strict only on UNAMBIGUOUS failures so

@@ -21,6 +21,8 @@ if _THIS_DIR not in sys.path:
 from handler import (  # noqa: E402
     MAX_CODE_CHARS,
     SLIM_COLUMNS,
+    _missing_column,
+    _setup_code,
     _slim_payload,
     _slim_record,
     build_chart_block,
@@ -242,8 +244,86 @@ def test_slim_payload_is_columnar(tmp_path):
             }
         )
     )
-    d = json.loads(_slim_payload(str(p)))
-    assert set(d["cols"]) == set(SLIM_COLUMNS)  # one list per column, no per-row keys
+    payload, live = _slim_payload(str(p))
+    d = json.loads(payload)
+    # Columns empty in every row are dropped (see the empty-column guard); the
+    # fixture populates only some, so compare against what came back as live.
+    assert set(d["cols"]) == set(live)
+    assert set(live) <= set(SLIM_COLUMNS)  # never invents a column
     assert d["cols"]["license_id"] == ["1", "2"]
     assert d["cols"]["risk_tier"] == ["Low", "High"]
     assert d["cols"]["top_driver_topic"] == ["pest", "other"]
+
+
+# ---------------------------------------------------------------------------
+# Empty-column guard
+#
+# The bug these exist for: neighborhood / zip / facility_type were shipped as
+# advertised chart filters while being EMPTY in every row of every city. The
+# model's filter then matched nothing and got back a valid empty frame with no
+# error, so it concluded the city had no such places and apologised. A dead
+# filter is worse than a missing one, because nothing anywhere raises.
+# ---------------------------------------------------------------------------
+
+
+def _payload_with(records: list[dict], tmp_path):
+    p = tmp_path / "scores.json"
+    p.write_text(json.dumps({"scores": records}))
+    text, live = _slim_payload(str(p))
+    return json.loads(text), live
+
+
+def test_column_empty_in_every_row_is_dropped(tmp_path):
+    # Chicago's real shape: zip populated, neighborhood empty on every row.
+    records = [
+        {"license_id": "1", "risk_tier": "Low", "zip": "60614", "neighborhood": ""},
+        {"license_id": "2", "risk_tier": "High", "zip": "60618", "neighborhood": ""},
+    ]
+    d, live = _payload_with(records, tmp_path)
+
+    assert "neighborhood" not in live
+    assert "neighborhood" not in d["cols"]
+    assert "zip" in live and d["cols"]["zip"] == ["60614", "60618"]
+
+
+def test_column_populated_in_only_some_rows_is_kept(tmp_path):
+    # Partial coverage is real data (NYC zip is 98.9%), not a dead column.
+    records = [
+        {"license_id": "1", "risk_tier": "Low", "neighborhood": "Manhattan"},
+        {"license_id": "2", "risk_tier": "High", "neighborhood": ""},
+    ]
+    _, live = _payload_with(records, tmp_path)
+    assert "neighborhood" in live
+
+
+def test_identity_columns_survive_even_when_empty(tmp_path):
+    # Dropping dba_name would break every chart that labels a bar, so the frame's
+    # identity/measure columns are exempt from the guard.
+    records = [{"license_id": "1", "dba_name": "", "risk_tier": "Low"}]
+    _, live = _payload_with(records, tmp_path)
+    assert {"license_id", "dba_name", "risk_tier"} <= set(live)
+
+
+def test_setup_code_names_the_live_columns():
+    code = _setup_code(("license_id", "zip"))
+    assert "license_id, zip" in code
+    assert "pd.DataFrame" in code
+
+
+def test_missing_column_identifies_a_dropped_filter():
+    tb = "Traceback (most recent call last):\n  ...\nKeyError: 'neighborhood'"
+    assert _missing_column(tb, ("license_id", "zip")) == "neighborhood"
+
+
+def test_missing_column_ignores_a_genuine_code_bug():
+    # A KeyError on something that was never a chart column is the model's own bug;
+    # it must keep its real traceback rather than be reported as a city data gap.
+    tb = "KeyError: 'not_a_real_column'"
+    assert _missing_column(tb, ("license_id", "zip")) == ""
+    # And a non-KeyError error is never reinterpreted.
+    assert _missing_column("ValueError: bad shape", ("license_id",)) == ""
+
+
+def test_missing_column_ignores_a_column_that_is_live():
+    tb = "KeyError: 'zip'"
+    assert _missing_column(tb, ("license_id", "zip")) == ""

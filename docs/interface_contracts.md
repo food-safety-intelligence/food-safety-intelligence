@@ -306,6 +306,9 @@ model inference happens in the app** — predictions are precomputed and written
 | `license_id` | `string` | no | The restaurant's license number. |
 | `dba_name` | `string` | no | For display + search. |
 | `address` | `string` | yes | For display. |
+| `neighborhood` | `string` | no | Display area, derived from the city feed's own area column: NYC's `boro` (5 boroughs), LA's `city` (separate incorporated cities like West Hollywood, and postal cities like Van Nuys). **Empty string for Chicago**, whose feed has only a `city` column reading `CHICAGO` on 99.6% of rows. Never null — empty means "this city publishes no area". Consumers must treat it as optional: the app omits it from the detail-page location line, and the chart tool drops it from the available filters rather than offering one that matches nothing. |
+| `zip` | `string` | no | 5-digit ZIP, from the feed. Populated in all three cities (Chicago 100%, LA 100%, NYC 98.9%). Empty string when the feed has no parseable 5-digit value. This is the geographic column that works everywhere. |
+| `facility_type` | `string` | no | Canonical facility bucket (Restaurant, Grocery Store, Daycare, School, Long Term Care, …) via `license_features.normalize_facility_type` — never the raw feed value, which is operator-entered free text with ~500 spellings. Empty string when missing. **Descriptive only.** [Decision 0004](decisions/0004-fairness-audit-and-proxy-feature-removal.md) dropped `static_facility_type` as a *model feature* (it is "only partly a proxy") while keeping facility type as a group-performance dimension; this column is that dimension, and the same distinction applies to `zip` / `static_zip`. Grouping by it is in scope precisely because vulnerable-population facilities (daycare, school, hospital, long-term care) are. It must never become a model input. |
 | `lat` | `float64` | yes | For the map. Null if no geocode. |
 | `lon` | `float64` | yes | For the map. Null if no geocode. |
 | `as_of_date` | `datetime64[ns]` | no | Date the prediction is anchored to. |
@@ -330,6 +333,7 @@ uses it to reconstruct each establishment's calibrated-log-odds driver
 (`calibrated_logit = −(a·L + b)`, `L = intercept + Σ contributions`), so the
 full per-profile waterfall costs three floats total. `top_drivers` now ships
 **5** drivers per row (within the documented 3–5).
+
 
 **Risk-tier thresholds** — one **unified cross-city rule** (decision record
 [0017](decisions/0017-seasonality-asof-scoring-and-low-tier-widening.md)), anchored
