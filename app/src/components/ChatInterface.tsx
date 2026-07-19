@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowUp,
   RotateCcw,
@@ -18,6 +18,13 @@ import { CITY_CONFIG, type City } from "@/lib/city";
 import { useCity } from "@/components/CityContext";
 import { Tooltip } from "@/components/Tooltip";
 import { Wordmark } from "@/components/Wordmark";
+import { ChartCard } from "@/components/ChartCard";
+import { ChartAttachmentsPanel, type ChartItem } from "@/components/ChartAttachmentsPanel";
+import {
+  parseChartAttachments,
+  mockChartMessageContent,
+  type ChartAttachment,
+} from "@/lib/chart-attachments";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -361,7 +368,21 @@ function UserBubble({ content }: { content: string }) {
   );
 }
 
-function AgentBubble({ content, error }: { content: string; error?: boolean }) {
+function AgentBubble({
+  content,
+  error,
+  compact,
+}: {
+  content: string;
+  error?: boolean;
+  compact?: boolean;
+}) {
+  // Charts are parsed out of the message text and rendered as cards beneath the
+  // prose. Error bubbles are plain client-side strings, never chart carriers, so
+  // they skip parsing.
+  const { text, attachments } = error
+    ? { text: content, attachments: [] as ChartAttachment[] }
+    : parseChartAttachments(content);
   return (
     <div className="flex gap-3 items-start">
       {/* Avatar */}
@@ -372,14 +393,21 @@ function AgentBubble({ content, error }: { content: string; error?: boolean }) {
           <MapPin className="w-3.5 h-3.5 text-sage" strokeWidth={2} />
         )}
       </span>
-      <div
-        className={`max-w-[85%] px-4 py-3 rounded-2xl rounded-tl-sm text-base leading-relaxed soft-shadow border ${
-          error
-            ? "bg-card border-terra/20 text-terra"
-            : "bg-card border-line text-ink"
-        }`}
-      >
-        {renderContent(content)}
+      <div className="flex flex-col gap-3 max-w-[85%] min-w-0">
+        {text && (
+          <div
+            className={`px-4 py-3 rounded-2xl rounded-tl-sm text-base leading-relaxed soft-shadow border ${
+              error
+                ? "bg-card border-terra/20 text-terra"
+                : "bg-card border-line text-ink"
+            }`}
+          >
+            {renderContent(text)}
+          </div>
+        )}
+        {attachments.map((a) => (
+          <ChartCard key={a.id} attachment={a} compact={compact} />
+        ))}
       </div>
     </div>
   );
@@ -470,11 +498,26 @@ export function ChatInterface({
       sessionIdRef.current = getOrCreateSessionId();
     }
     const saved = loadMessages();
+    // Dev-only: `?demo=chart` seeds a mock chart message (with no saved transcript)
+    // so the chart-attachment UI can be exercised and screenshotted with no
+    // backend. The branch is dropped from production builds, so it can never seed
+    // on a live page.
+    const demoChart =
+      process.env.NODE_ENV !== "production" &&
+      !saved.length &&
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("demo") === "chart";
+    const initial: Message[] = demoChart
+      ? [
+          { role: "user", content: "Show Chicago establishments by risk tier as a chart" },
+          { role: "agent", content: mockChartMessageContent() },
+        ]
+      : saved;
     // Starter chips are set by the city effect below, which also runs on mount —
     // setting them here too would only duplicate that and pull `city` into this
     // mount-only effect (a stale-closure trap the exhaustive-deps rule flags).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (saved.length) setMessages(saved);
+    if (initial.length) setMessages(initial);
   }, []);
 
   // Re-pick the starter chips when the city or persona changes — the "find"
@@ -561,8 +604,33 @@ export function ChatInterface({
 
   const isEmpty = messages.length === 0;
 
+  // Every chart generated in the conversation, newest first, for the /chat-page
+  // attachments rail. Derived from the message text (attachments aren't stored
+  // separately), keyed by message index + attachment id so ids can't collide
+  // across turns.
+  const chartItems: ChartItem[] = useMemo(
+    () =>
+      messages
+        .flatMap((m, i) =>
+          m.role === "agent" && !m.error
+            ? parseChartAttachments(m.content).attachments.map((attachment) => ({
+                key: `${i}-${attachment.id}`,
+                attachment,
+              }))
+            : [],
+        )
+        .reverse(),
+    [messages],
+  );
+
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-1 min-h-0">
+      {/* Attachments rail — /chat page only (not the compact floating widget). */}
+      {!compact && chartItems.length > 0 && <ChartAttachmentsPanel items={chartItems} />}
+      {/* min-w-0 lets this column shrink below its content width (a flex item
+          defaults to min-width:auto), so a wide chip row / code block scrolls
+          inside its own box instead of forcing page-level horizontal overflow. */}
+      <div className="flex flex-col flex-1 min-w-0 min-h-0">
       {/* ── Persona notice ───────────────────────────────────────────────────────
           Shown while the chat was opened from the For Inspectors or For
           Caregivers page (see RegisterChatPersona). Purely informational — the
@@ -683,7 +751,7 @@ export function ChatInterface({
             m.role === "user" ? (
               <UserBubble key={i} content={m.content} />
             ) : (
-              <AgentBubble key={i} content={m.content} error={m.error} />
+              <AgentBubble key={i} content={m.content} error={m.error} compact={compact} />
             ),
           )}
 
@@ -760,6 +828,7 @@ export function ChatInterface({
             ) · any diner reviews shown are unverified
           </p>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -82,7 +82,7 @@ a request-time-inference one.
 | Deployed | `agents/entrypoint.py` + AgentCore | warms `scores.json` / `inspection_history.json` from S3 on cold start |
 | Web app | `/chat` (`app/src/components/ChatInterface.tsx` → `/api/agent`) | the user-facing surface |
 
-All three run the **same** seven `handler.py` files (and share `city_context.py`
+All three run the **same** eight `handler.py` files (and share `city_context.py`
 plus the `scores_match.py` matcher).
 
 ### Tools
@@ -107,6 +107,12 @@ user arrived and what identity you already hold:
   `find_inspection_records` (a link to the city's own records), and
   `food_safety_info` (a general food-safety question — does NOT run the
   restaurant sequence).
+- **Charting the data** — `visualize_data` (when the user asks to plot / graph /
+  visualize the active city's data). The model writes pandas + matplotlib code
+  that a **network-isolated sandbox** runs against the precomputed `scores.json`;
+  the tool returns a rendered image + the exact script as an `eatelligence-chart`
+  block the web app renders inline. A chart is an aggregate of the batch scores,
+  never a new prediction (decision record 0019). See [0019](../docs/decisions/0019-agent-data-visualization.md).
 
 **Availability & plurality** — which tools apply in each mode, and whether one
 call handles several establishments or the agent calls the tool once per venue:
@@ -120,6 +126,7 @@ call handles several establishments or the agent calls the tool once per venue:
 | `find_inspection_records` | ✓ | ✓ | ✓ | **a set** of `license_id`s / an area |
 | `find_reviews` | on ask | on ask | on ask | one venue (per place) |
 | `food_safety_info` | ✓ | ✓ | ✓ | one general question |
+| `visualize_data` | on ask | on ask | on ask | one chart of the city's data |
 
 The batch tools (`get_safety_score`, `look_up_establishment`,
 `find_inspection_records`) take a list, so a "compare A and B" request resolves
@@ -299,10 +306,16 @@ Independent layers keep the agent on-task and prevent fabrication:
    medical/legal advice; and a prediction-vs-verdict caveat on every response.
    The model runs at `temperature=0.2`.
 2. **Bedrock Guardrail** (#55) — a platform-level guardrail attached to the
-   model: denied topics (genuinely off-topic requests + *personalised* medical /
-   legal advice — general food-safety education is deliberately allowed) plus a
-   contextual-grounding check that scores each response against the tool outputs
-   and blocks low-grounding answers. Enforced by Bedrock, not by model compliance.
+   model: two denied topics only — *personalised* medical advice and legal advice
+   (general food-safety education is deliberately allowed) — plus a prompt-attack
+   filter. There is deliberately NO catch-all "off-topic" topic: a
+   negatively-defined one over-matches and blocks core risk lookups, so off-topic
+   requests are declined by the system prompt instead. A contextual-grounding +
+   relevance policy is configured but is NOT active as wired (Strands'
+   `BedrockModel` does not tag tool outputs as grounding sources), so it does not
+   block low-grounding answers — anti-fabrication rests on the system prompt and
+   tool-level grounding. The denied-topic and prompt-attack filters are enforced
+   by Bedrock, not by model compliance.
 3. **Tool-level grounding** (#56, #58) — the tools never hand the model a value
    it shouldn't have: unmatched venues return no score (#58), tool failures return
    an explicit error object the prompt knows how to relay (#56), and
