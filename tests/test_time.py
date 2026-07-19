@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 
 from foodsafety.utils.time import (
+    expanding_cv_pr_auc,
     expanding_year_folds,
     summarize,
     temporal_split,
@@ -165,6 +166,55 @@ def test_expanding_year_folds_train_expands_and_never_overlaps_val():
 
 def test_expanding_year_folds_empty_input():
     assert expanding_year_folds(_df([])) == []
+
+
+# ---------------------------------------------------------------------------
+# expanding_cv_pr_auc() — dev-set cross-validated PR-AUC
+# ---------------------------------------------------------------------------
+
+
+def _cv_frame() -> pd.DataFrame:
+    # Three calendar years; alternating labels so every slice has both classes.
+    dates = (
+        [f"2020-06-{d:02d}" for d in range(1, 21)]
+        + [f"2021-06-{d:02d}" for d in range(1, 21)]
+        + [f"2022-06-{d:02d}" for d in range(1, 21)]
+    )
+    return _df(dates, y_fail=[i % 2 for i in range(len(dates))])
+
+
+def _perfect_fit_score(train, val):
+    # Return the val labels as both truth and score → PR-AUC 1.0 every fold.
+    yv = val["y_fail"].to_numpy()
+    return yv, yv.astype(float)
+
+
+def test_expanding_cv_pr_auc_summary_and_folds():
+    out = expanding_cv_pr_auc(_cv_frame(), _perfect_fit_score, embargo_days=0)
+    # 2021 and 2022 validate (2020 is the earliest year, no prior history).
+    assert out["n_folds"] == len(out["folds"]) == 2
+    assert [f["val_year"] for f in out["folds"]] == [2021, 2022]
+    assert out["pr_auc_mean"] == 1.0
+    assert out["pr_auc_std"] == 0.0
+    for f in out["folds"]:
+        assert f["pr_auc"] == 1.0
+        assert f["val_from"].startswith(str(f["val_year"]))
+        assert f["val_to"].startswith(str(f["val_year"]))
+        assert f["train_n"] > 0 and f["val_n"] > 0
+
+
+def test_expanding_cv_pr_auc_train_grows_across_folds():
+    out = expanding_cv_pr_auc(_cv_frame(), _perfect_fit_score, embargo_days=0)
+    train_sizes = [f["train_n"] for f in out["folds"]]
+    assert train_sizes == sorted(train_sizes)  # expanding window
+
+
+def test_expanding_cv_pr_auc_no_folds_is_safe():
+    # A single year yields no validatable fold; summary stays None, not a crash.
+    out = expanding_cv_pr_auc(_df(["2020-06-01", "2020-07-01"], y_fail=[0, 1]), _perfect_fit_score)
+    assert out["n_folds"] == 0
+    assert out["pr_auc_mean"] is None
+    assert out["pr_auc_std"] is None
 
 
 # ---------------------------------------------------------------------------

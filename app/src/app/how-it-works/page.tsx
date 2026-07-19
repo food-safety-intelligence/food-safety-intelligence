@@ -19,6 +19,7 @@ import { CityGate } from "@/components/CityGate";
 import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
 import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
+import { EvaluationDetail } from "@/components/EvaluationDetail";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -591,6 +592,11 @@ export default async function HowItWorksPage() {
             </p>
 
             <TightestSlices top5={top5} top10={top10} unit="food establishments" />
+
+            <EvaluationDetail
+              windows={methodology.windows}
+              cv={methodology.cross_validation}
+            />
           </article>
 
           <article>

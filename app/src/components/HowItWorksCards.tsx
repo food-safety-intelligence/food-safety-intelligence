@@ -10,6 +10,8 @@
 import type { ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
 import { CITY_CONFIG, type City } from "@/lib/city";
+import { EvaluationDetail } from "@/components/EvaluationDetail";
+import type { CrossValidation, DateWindow } from "@/lib/methodology-server";
 
 // "a" vs "an" for a percentage read aloud (e.g. "an 8%", "a 41%"). For whole
 // percents 0–100 the vowel-sound-initial numbers are 8, 11, 18, and the 80s.
@@ -68,6 +70,8 @@ interface Methodology {
   data_source?: string;
   train_window?: string;
   test?: { split_from?: string; n?: number };
+  windows?: { train: DateWindow; val: DateWindow; test: DateWindow };
+  cross_validation?: CrossValidation;
 }
 
 function CardSectionLabel({ id, number, icon: Icon, children }: {
@@ -280,6 +284,8 @@ export function ModelCard({ city, m, number, limitations }: {
           full metrics table + operating points are under{" "}
           <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>.
         </p>
+
+        <EvaluationDetail windows={m?.windows} cv={m?.cross_validation} />
 
         {limitations && (
           <>

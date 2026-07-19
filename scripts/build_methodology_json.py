@@ -38,6 +38,7 @@ from foodsafety.models.xgb import (
     prepare_xgb_features,
 )
 from foodsafety.tracking import provenance
+from foodsafety.utils.time import expanding_cv_pr_auc, split_window
 
 # Tier bands are read from the served scores.json (the unified thresholds this run
 # actually used, DR 0017) — not recomputed here — so the page can't drift from it.
@@ -198,6 +199,22 @@ def risk_tier_bands(shares: dict[str, float] | None, thresholds: list | None) ->
     return bands
 
 
+def _cv_fit_score(train_fold: pd.DataFrame, val_fold: pd.DataFrame):
+    """Fit the production XGB recipe on a CV fold's train slice, score its val slice.
+
+    Returns ``(y_true, raw_margin)`` for the val slice. PR-AUC is rank-based, so the
+    uncalibrated margin ranks identically to the Platt-calibrated probability — no
+    need to refit the calibrator inside each fold.
+    """
+    y_tr = train_fold[LABEL_COL].astype(int).to_numpy()
+    x_tr = prepare_xgb_features(train_fold[ALL_FEATURES])
+    cat_dtypes = extract_categorical_dtypes(x_tr)
+    est = build_production_xgb(scale_pos_weight=compute_scale_pos_weight(y_tr))
+    est.fit(x_tr, y_tr, verbose=False)
+    x_va = prepare_xgb_features(val_fold[ALL_FEATURES], categorical_dtypes=cat_dtypes)
+    return val_fold[LABEL_COL].astype(int).to_numpy(), est.predict(x_va, output_margin=True)
+
+
 def main() -> None:
     if not storage.exists(FEATURES_PATH):
         raise SystemExit(
@@ -222,6 +239,11 @@ def main() -> None:
     report = evaluate(y, scores)
     table = operating_point_table(y, scores, k_fracs=K_FRACS)
 
+    # Cross-validated PR-AUC on the development set (train+val, pre-test) via
+    # expanding-window-by-year folds with a 180-day embargo — reports how the
+    # recipe generalizes across years without touching the held-out test set.
+    cv = expanding_cv_pr_auc(df[df["inspection_date"] < TEST_START], _cv_fit_score)
+
     payload = {
         "generated_at": datetime.now(UTC).isoformat(timespec="seconds"),
         # Production XGBoost (depth-3 + monotone). Operating points + PR/ROC-AUC
@@ -234,6 +256,14 @@ def main() -> None:
             "events": int(y.sum()),
             "split_from": TEST_START.date().isoformat(),
         },
+        # Train / validation / test date ranges (the chronological split).
+        "windows": {
+            "train": split_window(train),
+            "val": split_window(val),
+            "test": split_window(test),
+        },
+        # Cross-validated PR-AUC on the development set (see _cv_fit_score).
+        "cross_validation": cv,
         "headline": {
             "pr_auc": round(float(report.pr_auc), 4),
             "roc_auc": round(float(report.roc_auc), 4),
