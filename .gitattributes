@@ -1,0 +1,12 @@
+# Append-only experiment logs: every branch adds a row at the bottom of the same
+# table, so parallel writeup branches conflict on each other even though the rows
+# never overlap. The union merge driver keeps both sides' added lines instead of
+# raising a conflict.
+#
+# Trade-off: union also keeps both versions when two branches genuinely edit the
+# SAME row, which shows up as a duplicated row rather than a conflict. Rows are
+# historical entries and are not normally revised, so that case is rare; when it
+# happens, delete the stale copy. Row order follows merge order, not date order,
+# so re-sort by date if a batch of branches lands out of order.
+docs/model-experiments.md merge=union
+docs/agent-experiments.md merge=union
