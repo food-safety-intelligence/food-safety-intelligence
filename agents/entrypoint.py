@@ -22,6 +22,7 @@ import importlib.util
 import os
 import re
 import sys
+import time
 
 # ---------------------------------------------------------------------------
 # Path setup — add tool dirs so handler.py files import their siblings.
@@ -71,6 +72,17 @@ _ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city"
 # model omitted them (see merge_chart_blocks). Per-request via contextvar so
 # concurrent invocations stay isolated; invoke() sets a fresh list each request.
 _PENDING_CHARTS: contextvars.ContextVar = contextvars.ContextVar("pending_charts", default=None)
+
+# Wall-clock budget for ALL chart generation in ONE request. The whole reply must
+# land inside the gateway's ~60s ceiling (ALB idle / CloudFront origin timeout), and
+# the model may call visualize_data more than once (it is told it may retry a broken
+# snippet). Capping each call individually is not enough — two capped calls still
+# overrun — so invoke() sets a deadline and the wrapper spends against it.
+_CHART_BUDGET_S = float(os.environ.get("FSI_CHART_REQUEST_BUDGET_SECONDS", "35"))
+# Below this much remaining, a fresh sandbox run can't finish; refuse instead of
+# starting one we know will time out.
+_CHART_MIN_RUN_S = 8.0
+_CHART_DEADLINE: contextvars.ContextVar = contextvars.ContextVar("chart_deadline", default=None)
 
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
@@ -325,7 +337,10 @@ def visualize_data(code: str, title: str) -> dict:
       value_counts() gives the number of establishments per category.
 
     Your `code` MUST:
-      - use `df`; build a matplotlib figure and save it with fig.savefig("chart.png").
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
       - print() the aggregated numbers you plotted (counts / means) — you then base
         the caption ONLY on that printed summary, which this tool returns.
       - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
@@ -341,7 +356,28 @@ def visualize_data(code: str, title: str) -> dict:
         code: pandas + matplotlib code that builds `df`-based figure into chart.png
         title: a short plain-English chart title (also used for the download name)
     """
-    result = _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY.get()}, None)
+    # Spend against this request's chart budget, so a retry after a timeout can't
+    # push the whole reply past the gateway ceiling (that produced a 504).
+    deadline = _CHART_DEADLINE.get()
+    remaining = (deadline - time.monotonic()) if deadline else None
+    if remaining is not None and remaining < _CHART_MIN_RUN_S:
+        return {
+            "status": "error",
+            "retryable": False,
+            "error": (
+                "no time left to build a chart in this reply — tell the user the chart "
+                "took too long and to ask again, and do NOT call this tool again now"
+            ),
+        }
+    result = _viz_handler.handler(
+        {
+            "code": code,
+            "title": title,
+            "city": _ACTIVE_CITY.get(),
+            "timeout_s": remaining,
+        },
+        None,
+    )
     # Stash the block so invoke() can guarantee it reaches the reply even if the
     # model drops it or reformats it (see _PENDING_CHARTS / merge_chart_blocks).
     if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
@@ -540,6 +576,7 @@ def invoke(payload: dict) -> dict:
     query, city = _extract_city(query, payload.get("city"))
     _ACTIVE_CITY.set(city)
     _PENDING_CHARTS.set([])  # fresh per-request collector for generated chart blocks
+    _CHART_DEADLINE.set(time.monotonic() + _CHART_BUDGET_S)  # bound ALL chart work
 
     # Persona (For Inspectors / For Caregivers chat entry points): same
     # precedence and marker mechanism as city, extracted from what's left of the

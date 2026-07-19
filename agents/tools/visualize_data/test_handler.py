@@ -171,6 +171,22 @@ def test_slim_record_handles_a_record_with_no_drivers():
     assert s["top_driver_topic"] == "other"
 
 
+def test_timeout_is_capped_and_marked_non_retryable(monkeypatch):
+    """A timed-out run must be terminal for the turn: the model retrying would stack
+    a second cap onto the request budget and hit the gateway's 504 (the prod bug)."""
+    import time as _time
+
+    import handler as h
+
+    monkeypatch.setenv("FSI_SANDBOX_USE_STUB", "false")
+    monkeypatch.setenv("FSI_CHART_BUCKET", "some-bucket")
+    monkeypatch.setattr(h, "_sandbox_run", lambda code, city: _time.sleep(30))
+    out = h.handler({"code": CODE, "title": "t", "city": "chicago", "timeout_s": 5}, None)
+    assert out["status"] == "error"
+    assert out["retryable"] is False
+    assert "timed out" in out["error"]
+
+
 def test_slim_payload_is_columnar(tmp_path):
     """Columnar ({col: [values]}) — a records payload repeats every key name on
     every row, which is megabytes at 20-40k rows."""
