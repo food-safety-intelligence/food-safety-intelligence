@@ -1,0 +1,114 @@
+{
+  "date": "2026-07-18",
+  "cv_region": "inspection_date < 2025-07-01",
+  "fold_val_years": [
+    2020,
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "device": "cuda",
+  "config": {
+    "epochs": 60,
+    "patience": 8,
+    "batch": 512,
+    "lr": 0.001,
+    "wd": 1e-05
+  },
+  "reference": {
+    "xgb_served": {
+      "pr_auc": 0.382,
+      "p10": 0.421
+    },
+    "mlp_incumbent": {
+      "pr_auc": 0.333,
+      "p10": 0.402
+    },
+    "logreg": {
+      "pr_auc": 0.372,
+      "p10": null
+    }
+  },
+  "results": {
+    "ft": {
+      "cv": {
+        "pr_auc_mean": 0.41719000771932374,
+        "p10_mean": 0.4852825730309857,
+        "pr_auc_folds": [
+          0.5531,
+          0.4779,
+          0.3868,
+          0.3733,
+          0.3654,
+          0.3466
+        ],
+        "p10_folds": [
+          0.6307,
+          0.564,
+          0.4477,
+          0.4509,
+          0.4219,
+          0.3965
+        ]
+      },
+      "test": {
+        "n": 7008,
+        "positive_rate": 0.107877,
+        "pr_auc": 0.369963,
+        "roc_auc": 0.806744,
+        "precision_at_5pct": 0.487179,
+        "precision_at_10pct": 0.419401,
+        "precision_at_20pct": 0.318117,
+        "recall_at_5pct": 0.22619,
+        "recall_at_10pct": 0.388889,
+        "recall_at_20pct": 0.589947,
+        "top_decile_lift": 3.887779,
+        "brier_score": 0.169762,
+        "log_loss": 0.513353
+      },
+      "beats_xgb": false,
+      "beats_mlp": true
+    },
+    "resnet": {
+      "cv": {
+        "pr_auc_mean": 0.4177612717356712,
+        "p10_mean": 0.47672959893220085,
+        "pr_auc_folds": [
+          0.5416,
+          0.4719,
+          0.3907,
+          0.3873,
+          0.3707,
+          0.3444
+        ],
+        "p10_folds": [
+          0.6132,
+          0.529,
+          0.4477,
+          0.4541,
+          0.4176,
+          0.3988
+        ]
+      },
+      "test": {
+        "n": 7008,
+        "positive_rate": 0.107877,
+        "pr_auc": 0.366205,
+        "roc_auc": 0.804978,
+        "precision_at_5pct": 0.487179,
+        "precision_at_10pct": 0.413695,
+        "precision_at_20pct": 0.314551,
+        "recall_at_5pct": 0.22619,
+        "recall_at_10pct": 0.383598,
+        "recall_at_20pct": 0.583333,
+        "top_decile_lift": 3.834884,
+        "brier_score": 0.163906,
+        "log_loss": 0.50133
+      },
+      "beats_xgb": false,
+      "beats_mlp": true
+    }
+  }
+}

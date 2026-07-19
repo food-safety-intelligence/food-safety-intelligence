@@ -1,0 +1,135 @@
+{
+  "city": "la",
+  "baseline": {
+    "n_feat": 28,
+    "cv_pr": 0.1549,
+    "cv_p10": 0.18758,
+    "pr_folds": [
+      0.1549
+    ],
+    "p10_folds": [
+      0.1876
+    ]
+  },
+  "families": [
+    {
+      "family": "recent365",
+      "cols": [
+        "prior_insp_365d",
+        "prior_bad_365d",
+        "prior_bad_rate_365d"
+      ],
+      "d_pr": -0.00306,
+      "d_p10": -0.00425,
+      "cv_pr": 0.15184,
+      "cv_p10": 0.18333,
+      "both_gate": false,
+      "pr_folds": [
+        0.1518
+      ],
+      "p10_folds": [
+        0.1833
+      ]
+    },
+    {
+      "family": "recency_bad",
+      "cols": [
+        "days_since_last_bad"
+      ],
+      "d_pr": -0.00074,
+      "d_p10": -0.00128,
+      "cv_pr": 0.15416,
+      "cv_p10": 0.1863,
+      "both_gate": false,
+      "pr_folds": [
+        0.1542
+      ],
+      "p10_folds": [
+        0.1863
+      ]
+    },
+    {
+      "family": "trend",
+      "cols": [
+        "bad_rate_recent3",
+        "bad_rate_trend"
+      ],
+      "d_pr": -0.00168,
+      "d_p10": -0.00128,
+      "cv_pr": 0.15322,
+      "cv_p10": 0.1863,
+      "both_gate": false,
+      "pr_folds": [
+        0.1532
+      ],
+      "p10_folds": [
+        0.1863
+      ]
+    },
+    {
+      "family": "calendar",
+      "cols": [
+        "insp_month",
+        "insp_quarter"
+      ],
+      "d_pr": 0.00057,
+      "d_p10": -0.00468,
+      "cv_pr": 0.15547,
+      "cv_p10": 0.1829,
+      "both_gate": false,
+      "pr_folds": [
+        0.1555
+      ],
+      "p10_folds": [
+        0.1829
+      ]
+    },
+    {
+      "family": "tenure",
+      "cols": [
+        "tenure_days"
+      ],
+      "d_pr": 0.00096,
+      "d_p10": 0.0017,
+      "cv_pr": 0.15586,
+      "cv_p10": 0.18928,
+      "both_gate": true,
+      "pr_folds": [
+        0.1559
+      ],
+      "p10_folds": [
+        0.1893
+      ]
+    },
+    {
+      "family": "visit_type",
+      "cols": [
+        "cur_owner_initiated",
+        "prior_owner_initiated"
+      ],
+      "d_pr": -0.00819,
+      "d_p10": -0.00638,
+      "cv_pr": 0.14671,
+      "cv_p10": 0.1812,
+      "both_gate": false,
+      "pr_folds": [
+        0.1467
+      ],
+      "p10_folds": [
+        0.1812
+      ]
+    }
+  ],
+  "combined": {
+    "cols": [
+      "tenure_days"
+    ],
+    "cv_pr": 0.15586,
+    "cv_p10": 0.18928,
+    "d_pr": 0.00096,
+    "d_p10": 0.0017
+  },
+  "fold_val_years": [
+    2024
+  ]
+}

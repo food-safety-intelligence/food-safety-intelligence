@@ -1,6 +1,6 @@
 # Model Experiments Log
 
-- **Owner**: Bella · **Last updated**: 2026-07-12
+- **Owner**: Bella · **Last updated**: 2026-07-19
 - One row per modeling experiment: the change + hypothesis, the measured result, and the
   verdict (kept / reverted). **Negative results are logged too** — knowing what *didn't*
   move the needle is the point.
@@ -43,6 +43,9 @@
 | 2026-06-27 | **Building-violation features — re-evaluation + revert (corrects PR #44)** — PR #44 re-added 9 block-face building-violation features (aggregate counts/recency + a 5-bureau split: conservation/refrigeration/plumbing/ventilation/electrical) to `ALL_FEATURES`, reporting XGB **+0.0198 PR-AUC / +0.0231 P@10**. That delta compared a freshly-trained candidate (correct RT-dropped test, n≈6,702, base 10.5%) against a **stale stored control on a different test set** (`xgb_20260621_bef769ef8.json`, RT-kept n=13,812, base 8.85%) — a base-rate artifact, not signal (ROC-AUC and top-decile lift, which are base-rate-invariant, both went *down* −0.021 / −0.458). *Re-run honestly: same rows both arms, all three model families.* | **Null — fails the gate on every model.** Same-split A/B on the correct test (n=7,008, base 10.8%): the control's PR-AUC rises 0.3381→0.3597 once moved onto the correct rows — that +0.0216 IS the fake "gain"; the feature's real contribution is **+0.0015 PR-AUC** (noise). Expanding-window CV (6 folds, 180d embargo): **XGB** mean ΔPR-AUC −0.0055, both-gate 2/6; **LogReg** ΔPR-AUC +0.0005, 2/6; **MLP (nb07)** ΔPR-AUC −0.0045, 1/5. Add-one ablation: all 9 columns negative on both metrics. Even under the relaxed one-model gate (DR 0002 amendment), no model clears it. Reproduces the original 2026-06-21 building-permits-and-violations null (row above). | **Reverted** — 9 features removed from `ALL_FEATURES` + driver labels; `features/building_features.py` (incl. the bureau split) kept in-tree, **unwired**. Also corrected **nb07 (MLP)**: it was evaluating on the wrong RT-kept test set (deflated, base 8.8%) — now drops burn-in + right-truncated before splitting, matching the production scorer. | this PR |
 | 2026-06-28 | **Forward-looking trend — last-K-visits slope on a forecast-only model** — the served `trend_slope_90d` (90-day OLS of the *production* score, `predict_batch._compute_trend_slopes`) is null for ~70% of licenses (needs 2 inspections within 90 days) and, when present, tracks the mandated fail→re-inspection swing. Two independent knobs: **window** 90-day→**last-K visits** (coverage) and **score** production→**forecast-only Model 2** (drops `was_fail`/`n_priority_this_inspection`/`n_core_this_inspection`; makes the trend forward-looking). Reconstructs the 2026-06-22 `/tmp` prototype on real data + sweeps K∈{3,4,5,6,8}. Basis: anchors = each license's latest **non-right-truncated** test inspection (n=5,226, base 4.4%, 97.5% clean). XGB both models. | **Coverage 0.29→0.87** (K-independent — only needs 2 of the last K). **Partly forward-looking**: corr(slope, `last_was_fail`) −0.31→−0.19 (residual is legitimate prior-history signal, not the re-inspection bounce). **Clean early-warning** (was_fail==0, base 4.4%): strict top-decile rising slope **2.26× @K=5** (2.1–2.3× for K3–5, decays to 1.74× @K8), strict top-20% ~1.65×, **loose slope>0 ~1.16× (uninformative)**. Reproduces + exceeds the prototype's 1.46×. | **Ship as an additive descriptive trend + early-warning watch-list (DR 0011).** A coverage + honesty win, **not** a predictive improving/worsening/stable label (the loose signal is flat). Replaces `trend_slope_90d` → `trend_slope` (last-K=5 forecast); adds per-inspection forecast scores for a real detail-page chart. | DR 0011, this PR |
 | 2026-07-01 | **Hyperparameter sweep — regularisation knobs (min_child_weight, reg_lambda, subsample, colsample_bytree)** — the DR 0009 production config (depth-3, lr=0.05, n_estimators=300, monotone risk constraints) locked those four axis by convention, never by search. *Do the existing defaults happen to be near-optimal, or is there a better combination?* 81-combo grid (3 values × 4 knobs), screened on the single train→val split then top-5 validated on the 3 most-recent expanding-window CV folds of the train set. Same-run A/B: production config as the control, best HP as the candidate, evaluated on the correct RT-dropped test (n=6,702, base 10.8%). Script: `scripts/xgb_hyperparam_sweep.py`. | **Flat — fails the both-metrics gate.** Best combo (`min_child_weight=10, reg_lambda=5.0, subsample=0.75, colsample_bytree=0.75`) vs same-run control on test: PR-AUC −0.0002 / P@10 +0.0015. CV PR-AUC spread across all top-5 candidates: 0.3848–0.3862 (range 0.0014 — noise floor). Stored production baseline (n=7,008 from a different features snapshot) is not apples-to-apples; same-run control is the honest gate. | **Reverted — not worth retaining.** The existing defaults (min_child_weight=10, reg_lambda=1.0, subsample=0.85, colsample_bytree=0.85) are already near-optimal for depth-3 + monotone at this scale. Sweep script + metrics retained in `reports/metrics/experiments/xgb_hyperparam_sweep_20260701_134745.json` on branch `deepak/mle-hyperparam-sweep`. | — |
+| 2026-07-18 | **XGBoost hyperparameter sweep (feature set frozen)** — the served depth-3 monotone config was hand-picked, never swept. 112 configs (one-factor-at-a-time + 80-draw randomized search) scored on 6-fold expanding-window CV over the train+val region (test held out), then seed-robustness-checked. Knobs: `max_depth`, `learning_rate`, `n_estimators`, `min_child_weight`, `reg_lambda`, `reg_alpha`, `gamma`, `subsample`, `colsample_bytree`, `max_delta_step`, `scale_pos_weight` scaling, monotone on/off. *Is the served config at its HPO optimum, or is there headroom?* | **Near-optimal — one small robust lever.** Every knob except one is null-or-worse (deeper trees, higher lr, more estimators, `monotone=False` all regress — re-confirming the DR 0002/0009 choices). The lone sweep "winner" that beat the incumbent on the single test split was a **lucky seed** (across 8 seeds its PR-AUC delta is +0.0000, higher variance) — correctly rejected. The one robust improvement is **`colsample_bytree` 0.85→0.70**: two features dominate (`was_fail`, `n_priority_this_inspection`), so sampling fewer columns per tree decorrelates the ensemble and sharpens the top-decile ranking. Smooth monotone basin (0.6–0.8 all beat 0.85; 1.0 worse), seed-mean over 16 seeds **PR-AUC 0.3813→0.3824, P@10 0.4147→0.4153 at lower variance**. Served seed-42 retrain: **P@10 0.4151→0.4208, P@5 0.484→0.490, top-decile lift 3.85→3.90, Brier better**; PR-AUC a tie (0.38202→0.38199, within noise; +0.0011 in expectation). | **Kept — promoted `colsample_bytree=0.70` in `build_production_xgb`.** A top-decile-precision + calibration win (the worklist operating point) at tie PR-AUC; the seed-averaged evidence has PR-AUC up too. No feature change; serving contract unchanged. Served-JSON republish is the deploy step. | this PR |
+| 2026-07-19 | **Deep tabular models — fair-shot HPO + TabM + XGB ensemble** — put **FT-Transformer** + **ResNet-MLP** (Gorishniy 2021) + **TabM** (Gorishniy 2024, parameter-efficient deep ensemble) against the served XGB, each given the **same tuning budget XGB got** (16-trial random search over expanding-window CV; winner scored once on the 2025-07-01+ test, seed-avg ×3); then blend XGB+DL (weight picked on val). Frozen v36 features; isolated `.venv-torch` (torch not in the lockfile). *Does modern tabular DL — tuned, or ensembled with XGB — beat the tree on 36 features with 2 dominant signals?* | **No — statistical tie; XGB ahead in point estimate.** Tuned DL PR-AUC: FT 0.369 / ResNet 0.368 / TabM 0.372, all < XGB **0.381** (P@10 0.409–0.419 vs 0.415); **HPO moved nothing** vs the untuned benchmark (0.366–0.370). Best ensemble XGB+TabM rank-avg 0.382/0.415 (≈XGB). **Paired bootstrap (2000 resamples, n=7,008): every delta-vs-XGB CI crosses 0** — DL-alone PR-AUC ~−0.011 [P(DL>XGB) 0.07–0.12]; ensembles +0.000–0.001 [P≈0.5–0.6]; a tentative DL-consensus top-decile P@10 edge (+0.006) is **not** significant (P=0.73, CI [−0.014,+0.026]). | **XGB stays served.** Empirically closes the earlier predicted tabular-DL NO-GO: nets reach parity, win nothing distinguishable, and no ensemble justifies serving a torch model. Harnesses + result JSONs kept (`scripts/run_torch_*`, `reports/metrics/mlp/torch_*`). | this PR |
+| 2026-07-19 | **sklearn MLP — broad hyperparameter sweep (feature set frozen)** — 58 configs (one-factor-at-a-time + 40-draw random search) over architecture / L2 / learning-rate / batch / activation / class-weighting, scored on 6-fold expanding-window CV (train+val region only), top passers confirmed on the 2025-07-01+ test seed-averaged ×3. *Is the incumbent MLP (0.333 single-seed) just under-tuned?* | **No — null once the comparison is fair.** Best CV gain +0.003 PR-AUC (thousandths). The sweep's apparent test "winners" were a seed-averaging artifact: the incumbent baseline was scored single-seed (0.333) but candidates were seed-averaged (~0.36); re-scored against a seed-averaged incumbent (0.364 / 0.402), only one config marginally clears both metrics (+0.003 PR-AUC / tied P@10, within seed noise). Same story as the tabular-DL row above and the XGBoost tuning round (2026-07-18): an information ceiling, not under-tuning. | **Incumbent MLP config retained** — no promotion; the MLP stays a benchmark, XGB stays served. Harness + sweep log kept (`scripts/run_mlp_hpo.py`, `reports/metrics/mlp/mlp_hpo_sweep_*.json`). | this PR |
 
 ## Model comparison: LogReg vs XGBoost
 
@@ -122,9 +125,9 @@ remaining DL families are **NO-GO at this scale** (documented, not spiked):
 - **Sequence model** (RNN / temporal-Transformer over each license's ordered
   inspections) — `prior_*` already encodes recency / trend / 365-day / last-outcome;
   ~80k short sequences would relearn those aggregates with more variance. Default NO-GO.
-- **Tabular DL** (FT-Transformer / TabNet) — wrong tool at ~80k rows with heavy
-  structural NaNs; GBMs win this regime and XGBoost already pulled even with LogReg
-  on v36. Expected lift ≈ 0.
+- **Tabular DL** (FT-Transformer / ResNet-MLP / TabM) — **now spiked (2026-07-19),
+  prediction confirmed** (see "Tabular DL spike" below): GBMs win this regime, and even
+  tuned modern nets reach only parity — the "expected lift ≈ 0" held on the test set.
 - **Graph** (operator / inspector / address networks) — the cross-license
   **operator-prior already came up flat** (2026-06-14), and an inspector-linked
   graph would re-create the geographic/demographic proxy we dropped `static_zip`
@@ -133,9 +136,60 @@ remaining DL families are **NO-GO at this scale** (documented, not spiked):
 **Net:** no untried DL lever has positive expected value at this scale; the next
 gains are product/operating-point, not model capacity.
 
+### Tabular DL spike — parity, no win (2026-07-19)
+
+The tabular-DL NO-GO above was the one prediction still unspiked, so it got a full
+fair-shot test: three modern architectures — **FT-Transformer** and **ResNet-MLP**
+(Gorishniy 2021), and **TabM** (Gorishniy 2024, a parameter-efficient deep ensemble of
+BatchEnsemble members) — each given the **same tuning budget XGB got** (16-trial random
+search over the same expanding-window CV; the winner scored **once** on the 2025-07-01+
+test, seed-averaged ×3), then blended with the served XGB (blend weight chosen on
+validation, never on test). Frozen v36 features; run JSONs under
+`reports/metrics/mlp/torch_*`; torch lives in an isolated `.venv-torch` (deliberately
+**not** in the lockfile — this is a benchmark, not a serving dependency).
+
+Test set n=7,008, base 10.8%; served XGB on this split = **PR-AUC 0.381 / P@10 0.415**:
+
+| Model (tuned, seed-avg ×3) | PR-AUC | P@10 | vs XGB |
+|---|---|---|---|
+| FT-Transformer | 0.369 | 0.419 | behind on PR-AUC |
+| ResNet-MLP | 0.368 | 0.409 | behind |
+| TabM (best DL) | 0.372 | 0.414 | behind |
+| XGB + TabM (rank-avg) | 0.382 | 0.415 | tie |
+| XGB + all-3-DL consensus (rank) | 0.381 | 0.417 | tie |
+
+**HPO changed nothing.** Tuned PR-AUC (0.368–0.372) is indistinguishable from the untuned
+fixed-config benchmark (0.366–0.370), so the gap is the information ceiling, not
+under-tuning. TabM is the strongest net, as the literature predicts for this regime, and
+still lands short.
+
+**A paired bootstrap (2,000 resamples of the test rows, `torch_bootstrap_ci_*`) settles
+significance: every delta-vs-XGB confidence interval crosses zero.** DL alone runs ~0.011
+PR-AUC behind XGB with P(DL > XGB) ≈ 0.07–0.12 (very likely behind, though not at the 95%
+bar); the XGB+DL ensembles land +0.000–0.001 PR-AUC at P ≈ 0.5–0.6 (a coin-flip tie). A
+tentative top-decile edge from the DL consensus (point P@10 0.424, +0.006 over XGB) does
+**not** survive — P = 0.73, CI [−0.014, +0.026]. Two method notes: the val-chosen blend
+weights kept collapsing toward the DL side (a sign val-weight selection overfits — the
+fixed 50/50 rank-average was more robust), and the test set is peeked at once per model,
+so a sub-0.01 "win" is read as a tie by design.
+
+**Verdict: XGB stays served.** On 36 features with two dominant signals (`was_fail`,
+`n_priority_this_inspection`), modern tabular DL reaches parity but wins nothing
+distinguishable, and no ensemble justifies serving a torch model beside the joblib XGB.
+The tree-vs-DL prediction held; this is the empirical close-out of the tabular-DL bet.
+
 ---
 
 # Cross-city ablations (Chicago, NYC, LA)
+
+> **Refreshed 2026-07-19** on the current shipped models (run_id `20260719_c186cf99a`).
+> The only material change from the 2026-07-12 baseline below is **NYC**, after the
+> closure/tenure feature additions: NYC full PR-AUC **0.583 → 0.615** (prior-only
+> 0.540→0.536, current-only 0.488→0.524, LogReg 0.561→**0.615** — the linear model now
+> ties XGBoost on NYC). The family-contribution *structure* is unchanged: neither
+> family alone matches the full model, and prior history alone gets closest in every
+> city. See figures 12–13 in `notebooks/09_cross_city_eda.ipynb`. The detailed table
+> below is the 2026-07-12 baseline run.
 
 All three cities' served models now sit in one parallel ablation frame, from
 `scripts/run_city_ablations.py`. Each city reuses its **own** production code (so
@@ -307,3 +361,87 @@ the signal is carried by inspection history + current outcome together, with the
 text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
 NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
 windows before treating those deltas as gate-passing verdicts.
+
+## Closing the Chicago feature gap (NYC / LA feature additions, 2026-07-18)
+
+NYC/LA shipped a leaner feature set than Chicago: they lacked the time-windowed
+(recent) priors, calendar/seasonality, recency-to-last-bad, trend, tenure, and
+visit-type families. Added each MISSING family **leak-free** and A/B'd it under
+**expanding-window CV** + a **seed-robustness** confirm on the held-out test (8
+seeds), per city, via `scripts/run_city_feature_experiments.py`. A family is kept
+only if it clears the both-metrics gate AND holds up across seeds. Deliberately
+NOT tried: Chicago's keyword text flags (the ablation above already showed them
+flat-to-negative when transferred) and inspector id / facility-type / geography
+(fairness/legal).
+
+| City | Change + hypothesis | Result | Verdict |
+|---|---|---|---|
+| **NYC** | **Add DOHMH enforcement (`cur_closed` / `prior_closures`) + establishment `tenure_days`.** *Does the closure/enforcement action carry signal beyond the numeric score, and does tenure help?* | **Yes, both.** CV both-gate pass; holdout seed-check (8 seeds): **+0.024 PR-AUC / +0.043 P@10, both up 8/8**. `cur_closed` is the current visit's own outcome (→ CURRENT); `prior_closures` + `tenure_days` are forecast-safe (→ PRIOR). Interesting: a closure predicts *lower* next-inspection risk (remediate + re-inspect to reopen), so it's a clean separator. `recent365`, `recency_bad`, `trend`, `calendar` all failed the gate for NYC. | **Kept** — wired into `build_nyc_scores.py` + driver labels. |
+| **NYC (HPO)** | **Regularize Model 1 harder** now that it has the new features: `max_depth` 3→2, `min_child_weight` 5→20. *Did the extra features make the old depth-3 config over-fit?* | **Yes.** Seed-check (8 seeds): **+0.011 PR-AUC / +0.006 P@10, both up 7/8** on top of the feature gain. | **Kept.** **Combined served NYC (features + HPO), same test n=9,456: PR-AUC 0.583 → 0.615 (+0.032), ROC 0.674 → 0.698, top-decile lift 1.69 → 1.80.** Regenerated + republished. |
+| **LA** | Same candidate families (tenure, calendar, visit-type = ROUTINE vs OWNER-INITIATED, recent priors, trend). | **Null.** LA's CV region is a single fold (short post-COVID window). On the holdout across 8 seeds every family is flat-to-negative: tenure **−0.0055 PR-AUC** (both-gate 1/8), visit-type −0.008, calendar −. LA sits at its information ceiling (base 8.7%, ~98% A-grades). | **Reverted (no change).** Kept the incumbent; negative result logged (`reports/metrics/la/la_feature_experiments.json`). |
+
+**Standardization note:** the *methodology* (leak-free guards, expanding-window
+CV, both-metrics + seed gate, Platt-on-margin, TreeSHAP drivers) and the *feature
+concepts* are shared across cities; the *label* and *raw encoding* are not (data-
+dictated). The same families produced different winners per city — NYC gains from
+the closure signal it uniquely has, LA has no equivalent — which is why the code
+is standardized but the served features differ.
+
+## Alcohol / tobacco license flags (CDPH-prompted, all three cities)
+
+Prompted by a report that CDPH's own model gives `has_alcohol_license` /
+`has_tobacco_license` more weight than the environmental features this project
+already rejected (weather, Yelp — see the OUT-of-scope list in CLAUDE.md), and
+that we don't carry either flag today. Tested as `xgb_plus_alcohol_tobacco` in
+the same `scripts/run_city_ablations.py` frame as the ablations above (branch
+`deepak/mle-alcohol-tobacco-license-flags`, run_id `20260716_787563c40`), one
+single held-out split per city (not expanding-window CV — same caveat as the
+cross-city ablations above).
+
+**The three cities are NOT on equal footing here** — Chicago computes the flag
+from its own leak-clean licensing history; NYC/LA have no such dataset in their
+pipeline, so the flag comes from an external license list joined by
+normalized-address string match (`scripts/fetch_alcohol_tobacco_licenses.py`):
+
+| | Chicago | NYC | LA |
+|---|---|---|---|
+| Source | `licenses_historical.parquet` (own data, widened ingest filter to catch `TOBACCO` / `CONSUMPTION ON PREMISES` / `PACKAGE GOODS` — see `config._FOOD_LICENSE_WHERE`) | NY State Liquor Authority (`data.ny.gov` 9s3h-dpkz) + NYC DCWP tobacco dealer licenses (adw8-wvxb) | LA County's own alcohol-license ArcGIS layer + CDTFA statewide tobacco retailer list (.xlsx) |
+| Join key | `license_id` = `license_number` (exact, same as `license_age_days`) | normalized `(zip5, address)` string match, no shared ID | normalized `(zip5, address)` string match, no shared ID |
+| Leak guard | strict: first alcohol/tobacco `date_issued` < anchor date | partial: both sources carry an issuance date, BUT are "currently active" snapshots only — a lapsed license shows False for every past inspection even if it was true then | none: LA County's issue-date field is sparsely populated and CDTFA's list has no date at all (by law); both flags are current-status-only, applied blanket regardless of anchor date |
+| Coverage | 375 / 109,353 rows have `has_alcohol_license=True` (0.34%), 67 (0.06%) tobacco — rare because most Chicago food licenses never add either type | 11,121 / 27,674 facilities matched alcohol (40.2%), 3,157 (11.4%) tobacco | 11,383 / 43,205 facilities matched alcohol (26.3%), 4,461 (10.3%) tobacco |
+
+### Results (test set, `served_xgb_full` → `xgb_plus_alcohol_tobacco`)
+
+| City | PR-AUC | ROC-AUC | P@10 | lift@10 | Brier | Both-metrics gate |
+|---|---|---|---|---|---|---|
+| Chicago | 0.3748 → 0.3762 (+0.0014) | 0.8059 → 0.8054 (−0.0005) | 0.4113 → 0.4083 (**−0.0030**) | 3.905 → 3.876 (−0.029) | 0.0794 → 0.0794 | **FAIL** (P@10 regresses) |
+| NYC | 0.5734 → 0.5772 (+0.0038) | 0.6690 → 0.6714 (+0.0024) | 0.6796 → 0.6836 (+0.0040) | 1.662 → 1.672 (+0.010) | 0.2215 → 0.2209 | pass (small, single split) |
+| LA | 0.1830 → 0.1854 (+0.0024) | 0.7067 → 0.7105 (+0.0038) | 0.2050 → 0.2109 (+0.0059) | 2.205 → 2.269 (+0.064) | 0.0808 → 0.0805 | pass (small, single split) |
+
+**Reading it:** the pattern is the opposite of what a naive read of "CDPH weighs
+this feature highly" would predict. Chicago — the one city where the flag is
+computed correctly and leak-free — shows no real lift (fails the project's
+both-metrics gate: PR-AUC nudges up, P@10 nudges down) because so few Chicago
+food-inspection rows are alcohol/tobacco licensed (0.34% / 0.06%) that the flag
+has almost no room to move an aggregate metric. NYC and LA show small,
+consistent, all-metrics-positive deltas, but on a materially higher-prevalence,
+lower-rigor version of the same flag (external address join, current-status
+snapshots, real survivorship bias in NYC and no date gate at all in LA) — so
+part or all of that "win" could be the join acting as a weak proxy for
+something else correlated with matched addresses (e.g. commercial-corridor
+density) rather than alcohol/tobacco licensing itself.
+
+**Verdict: do not promote to production in any city yet.**
+- Chicago fails the both-metrics gate outright.
+- NYC/LA's gains are directionally positive but small, single-split, and rest
+  on a join whose leak-safety is weaker than every other feature in this
+  project's pipeline — exactly the kind of result CLAUDE.md's temporal-split /
+  leakage discipline exists to catch before it ships.
+
+**If revisited:** expanding-window CV to confirm NYC/LA's deltas aren't split
+noise; a real historical (not current-snapshot) alcohol/tobacco source for
+LA/NYC would remove the biggest caveat. Feature code stays in-tree, unwired
+(`license_history_features.py` has `has_alcohol_license`/`has_tobacco_license`
+behind `models.baseline.ALCOHOL_TOBACCO_FEATURES`, not in `ALL_FEATURES`; NYC/LA
+join helpers live in `run_city_ablations.py` + `fetch_alcohol_tobacco_licenses.py`,
+not in the served `build_nyc_scores.py` / `build_la_scores.py`).

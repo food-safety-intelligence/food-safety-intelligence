@@ -1,0 +1,113 @@
+{
+  "model": "nyc_xgb_sigmoid",
+  "city": "nyc",
+  "calibration": "xgboost + platt (sigmoid) on val",
+  "label": "y_next_bc (next inspection graded B/C, score >= 14)",
+  "data_vintage": "20260701",
+  "run_id": "20260718_5c25b8c5e",
+  "git_commit": "5c25b8c5e6cc206ba7803b3dce1de8178d943aee",
+  "git_dirty": true,
+  "feature_set_version": "8109e815ddb4",
+  "raw_snapshots": {
+    "data/raw/nyc_inspections.parquet": "438dc202a2c78215cd62b6ca1e35828d78a6c8c9876f05645e1492c5961061a2"
+  },
+  "train_window": {
+    "train_start": "2022-07-01",
+    "train_end": "2024-10-01",
+    "val_end": "2025-04-01"
+  },
+  "split": {
+    "train_n": 35190,
+    "val_n": 8773,
+    "test_n": 9456,
+    "test_prevalence": 0.4097
+  },
+  "base_rate": 0.41,
+  "tier_thresholds": [
+    0.205,
+    0.41,
+    0.82
+  ],
+  "n_establishments": 27525,
+  "test": {
+    "n": 9456,
+    "positive_rate": 0.409687,
+    "pr_auc": 0.602427,
+    "roc_auc": 0.687448,
+    "precision_at_5pct": 0.77167,
+    "precision_at_10pct": 0.726216,
+    "precision_at_20pct": 0.659091,
+    "recall_at_5pct": 0.094218,
+    "recall_at_10pct": 0.177336,
+    "recall_at_20pct": 0.32189,
+    "top_decile_lift": 1.772611,
+    "brier_score": 0.217917,
+    "log_loss": 0.627523
+  },
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "n_flagged": 473,
+      "precision": 0.7717,
+      "recall": 0.0942,
+      "lift": 1.8836,
+      "events_caught": 365
+    },
+    {
+      "frac": 0.1,
+      "n_flagged": 946,
+      "precision": 0.7262,
+      "recall": 0.1773,
+      "lift": 1.7726,
+      "events_caught": 687
+    },
+    {
+      "frac": 0.15,
+      "n_flagged": 1419,
+      "precision": 0.6949,
+      "recall": 0.2545,
+      "lift": 1.6961,
+      "events_caught": 986
+    },
+    {
+      "frac": 0.2,
+      "n_flagged": 1892,
+      "precision": 0.6591,
+      "recall": 0.3219,
+      "lift": 1.6088,
+      "events_caught": 1247
+    },
+    {
+      "frac": 0.25,
+      "n_flagged": 2364,
+      "precision": 0.6358,
+      "recall": 0.388,
+      "lift": 1.5519,
+      "events_caught": 1503
+    },
+    {
+      "frac": 0.3,
+      "n_flagged": 2837,
+      "precision": 0.6123,
+      "recall": 0.4484,
+      "lift": 1.4945,
+      "events_caught": 1737
+    },
+    {
+      "frac": 0.4,
+      "n_flagged": 3783,
+      "precision": 0.5712,
+      "recall": 0.5578,
+      "lift": 1.3943,
+      "events_caught": 2161
+    },
+    {
+      "frac": 0.5,
+      "n_flagged": 4728,
+      "precision": 0.5387,
+      "recall": 0.6575,
+      "lift": 1.3149,
+      "events_caught": 2547
+    }
+  ]
+}
