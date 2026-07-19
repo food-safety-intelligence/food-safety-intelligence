@@ -71,27 +71,6 @@ export interface DateWindow {
   n: number;
 }
 
-/** One cross-validation fold: the year validated, its date range, and PR-AUC. */
-export interface CvFold {
-  val_year: number;
-  train_n: number;
-  val_n: number;
-  train_through: string;
-  val_from: string;
-  val_to: string;
-  pr_auc: number;
-}
-
-/** Expanding-window cross-validation summary across the development set. */
-export interface CrossValidation {
-  scheme: string;
-  embargo_days: number;
-  n_folds: number;
-  pr_auc_mean: number | null;
-  pr_auc_std: number | null;
-  folds: CvFold[];
-}
-
 export interface Methodology {
   generated_at: string;
   model_version: string;
@@ -105,9 +84,6 @@ export interface Methodology {
     val: DateWindow;
     test: DateWindow;
   };
-  /** Expanding-window cross-validated PR-AUC on the development set (train+val),
-   *  one fold per calendar year with a 180-day embargo. Absent in older JSON. */
-  cross_validation?: CrossValidation;
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   /** Score→tier bands (Low/Moderate/Elevated/High) for the badge legend.
    *  Probability cutoffs (top band's `max` is null) + `share` (fraction of

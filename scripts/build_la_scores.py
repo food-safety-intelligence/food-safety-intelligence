@@ -55,7 +55,7 @@ from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributi
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
 from foodsafety.tracking import snapshot_provenance
-from foodsafety.utils.time import expanding_cv_pr_auc, split_window, temporal_split
+from foodsafety.utils.time import split_window, temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
 CW = REPO / "reference" / "violation_crosswalk.csv"
@@ -597,15 +597,6 @@ def main():
         "Model 1 test:", {k: test_metrics[k] for k in ("pr_auc", "roc_auc", "precision_at_10pct")}
     )
 
-    # Cross-validated PR-AUC on the development set (train+val), expanding-window
-    # by year. Calibrate on the fold's own train (PR-AUC is rank-based) and never
-    # touch the held-out test split.
-    def _cv_fit_score(tr, va):
-        clf, coef, inter = fit_xgb_platt(tr, tr, FEATS_M1)
-        return va["y_next_bad"].astype(int).to_numpy(), xgb_proba(clf, coef, inter, va[FEATS_M1])
-
-    cv = expanding_cv_pr_auc(anch[anch["inspection_date"] < pd.Timestamp(VAL_END)], _cv_fit_score)
-
     # score EVERY facility's latest inspection (serving anchor)
     ev["risk_score"] = xgb_proba(xgb1, coef1, inter1, ev[FEATS_M1])
     ev["forecast_risk"] = xgb_proba(xgb2, coef2, inter2, ev[PRIOR])
@@ -787,7 +778,6 @@ def main():
             "val": split_window(sp.val),
             "test": split_window(sp.test),
         },
-        "cross_validation": cv,
         "headline": {
             "pr_auc": round(test_metrics["pr_auc"], 4),
             "roc_auc": round(test_metrics["roc_auc"], 4),

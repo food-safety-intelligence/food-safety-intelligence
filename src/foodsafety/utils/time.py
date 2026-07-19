@@ -17,7 +17,6 @@ guarantee this module exists to enforce.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 from dataclasses import dataclass
 from typing import NamedTuple
 
@@ -163,58 +162,6 @@ def split_window(df: pd.DataFrame, *, date_col: str = "inspection_date") -> dict
         "start": d.min().date().isoformat(),
         "end": d.max().date().isoformat(),
         "n": int(len(df)),
-    }
-
-
-def expanding_cv_pr_auc(
-    dev: pd.DataFrame,
-    fit_score: Callable[[pd.DataFrame, pd.DataFrame], tuple[np.ndarray, np.ndarray]],
-    *,
-    date_col: str = "inspection_date",
-    embargo_days: int = 180,
-) -> dict:
-    """Expanding-window cross-validated PR-AUC on the development set.
-
-    Runs :func:`expanding_year_folds` over ``dev`` (the pre-test data). For each
-    fold, ``fit_score(train_fold, val_fold)`` fits on the fold's train slice and
-    returns ``(y_true, scores)`` for its validation slice. Reports per-fold PR-AUC
-    with the fold's year, date windows, and row counts, plus the mean and standard
-    deviation across folds. The time-held-out test set is never touched — this
-    measures how the recipe generalizes across years within the development data.
-
-    Returns a JSON-safe dict suitable for the methodology payload.
-    """
-    from sklearn.metrics import average_precision_score
-
-    dev = dev.reset_index(drop=True)
-    dates = pd.to_datetime(dev[date_col])
-    per_fold: list[dict] = []
-    for train_idx, val_idx in expanding_year_folds(
-        dev, date_col=date_col, embargo_days=embargo_days
-    ):
-        y_true, scores = fit_score(dev.iloc[train_idx], dev.iloc[val_idx])
-        va_dates = dates.iloc[val_idx]
-        year = int(va_dates.dt.year.iloc[0])
-        train_through = pd.Timestamp(year=year, month=1, day=1) - pd.Timedelta(days=embargo_days)
-        per_fold.append(
-            {
-                "val_year": year,
-                "train_n": int(len(train_idx)),
-                "val_n": int(len(val_idx)),
-                "train_through": train_through.date().isoformat(),
-                "val_from": va_dates.min().date().isoformat(),
-                "val_to": va_dates.max().date().isoformat(),
-                "pr_auc": round(float(average_precision_score(y_true, scores)), 4),
-            }
-        )
-    aucs = [f["pr_auc"] for f in per_fold]
-    return {
-        "scheme": "expanding-window by calendar year",
-        "embargo_days": embargo_days,
-        "n_folds": len(per_fold),
-        "pr_auc_mean": round(float(np.mean(aucs)), 4) if aucs else None,
-        "pr_auc_std": round(float(np.std(aucs)), 4) if aucs else None,
-        "folds": per_fold,
     }
 
 

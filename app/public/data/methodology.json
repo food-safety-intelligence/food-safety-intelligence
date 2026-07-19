@@ -31,69 +31,6 @@
       "n": 6222
     }
   },
-  "cross_validation": {
-    "scheme": "expanding-window by calendar year",
-    "embargo_days": 180,
-    "n_folds": 6,
-    "pr_auc_mean": 0.4132,
-    "pr_auc_std": 0.0727,
-    "folds": [
-      {
-        "val_year": 2020,
-        "train_n": 8352,
-        "val_n": 12581,
-        "train_through": "2019-07-05",
-        "val_from": "2020-01-02",
-        "val_to": "2020-12-31",
-        "pr_auc": 0.5471
-      },
-      {
-        "val_year": 2021,
-        "train_n": 23242,
-        "val_n": 13118,
-        "train_through": "2020-07-05",
-        "val_from": "2021-01-04",
-        "val_to": "2021-12-30",
-        "pr_auc": 0.4707
-      },
-      {
-        "val_year": 2022,
-        "train_n": 35456,
-        "val_n": 14242,
-        "train_through": "2021-07-05",
-        "val_from": "2022-01-04",
-        "val_to": "2022-12-30",
-        "pr_auc": 0.3871
-      },
-      {
-        "val_year": 2023,
-        "train_n": 48652,
-        "val_n": 15361,
-        "train_through": "2022-07-05",
-        "val_from": "2023-01-03",
-        "val_to": "2023-12-29",
-        "pr_auc": 0.3728
-      },
-      {
-        "val_year": 2024,
-        "train_n": 63644,
-        "val_n": 15948,
-        "train_through": "2023-07-05",
-        "val_from": "2024-01-02",
-        "val_to": "2024-12-31",
-        "pr_auc": 0.3628
-      },
-      {
-        "val_year": 2025,
-        "train_n": 79468,
-        "val_n": 8495,
-        "train_through": "2024-07-05",
-        "val_from": "2025-01-02",
-        "val_to": "2025-06-27",
-        "pr_auc": 0.3384
-      }
-    ]
-  },
   "headline": {
     "pr_auc": 0.3824,
     "roc_auc": 0.8088,

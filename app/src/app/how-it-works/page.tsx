@@ -593,10 +593,7 @@ export default async function HowItWorksPage() {
 
             <TightestSlices top5={top5} top10={top10} unit="food establishments" />
 
-            <EvaluationDetail
-              windows={methodology.windows}
-              cv={methodology.cross_validation}
-            />
+            <EvaluationDetail windows={methodology.windows} />
           </article>
 
           <article>

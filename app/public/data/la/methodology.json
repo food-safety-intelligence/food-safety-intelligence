@@ -32,24 +32,6 @@
       "n": 10045
     }
   },
-  "cross_validation": {
-    "scheme": "expanding-window by calendar year",
-    "embargo_days": 180,
-    "n_folds": 1,
-    "pr_auc_mean": 0.1108,
-    "pr_auc_std": 0.0,
-    "folds": [
-      {
-        "val_year": 2024,
-        "train_n": 34,
-        "val_n": 25538,
-        "train_through": "2023-07-05",
-        "val_from": "2024-01-02",
-        "val_to": "2024-12-31",
-        "pr_auc": 0.1108
-      }
-    ]
-  },
   "headline": {
     "pr_auc": 0.1844,
     "roc_auc": 0.707,

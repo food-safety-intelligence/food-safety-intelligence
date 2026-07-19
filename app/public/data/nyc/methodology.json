@@ -32,42 +32,6 @@
       "n": 9951
     }
   },
-  "cross_validation": {
-    "scheme": "expanding-window by calendar year",
-    "embargo_days": 180,
-    "n_folds": 3,
-    "pr_auc_mean": 0.4822,
-    "pr_auc_std": 0.0903,
-    "folds": [
-      {
-        "val_year": 2023,
-        "train_n": 5,
-        "val_n": 15144,
-        "train_through": "2022-07-05",
-        "val_from": "2023-01-03",
-        "val_to": "2023-12-29",
-        "pr_auc": 0.3754
-      },
-      {
-        "val_year": 2024,
-        "train_n": 11928,
-        "val_n": 21280,
-        "train_through": "2023-07-05",
-        "val_from": "2024-01-02",
-        "val_to": "2024-12-31",
-        "pr_auc": 0.4749
-      },
-      {
-        "val_year": 2025,
-        "train_n": 29636,
-        "val_n": 3548,
-        "train_through": "2024-07-05",
-        "val_from": "2025-01-02",
-        "val_to": "2025-03-31",
-        "pr_auc": 0.5963
-      }
-    ]
-  },
   "headline": {
     "pr_auc": 0.5718,
     "roc_auc": 0.6674,
