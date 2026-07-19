@@ -19,7 +19,7 @@
 | agents/tools/get\_safety\_score/handler.py               |       72 |        2 |       20 |        2 |     96% |  149, 194 |
 | agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
 | agents/tools/look\_up\_establishment/handler.py          |       86 |       10 |       24 |        4 |     87% |51, 53, 59, 61, 71-72, 81-82, 262-263 |
-| agents/tools/visualize\_data/handler.py                  |      112 |       60 |       42 |        3 |     42% |49-53, 154-189, 194-205, 210-215, 229-246, 260, 318 |
+| agents/tools/visualize\_data/handler.py                  |      125 |       61 |       48 |        3 |     48% |50-54, 67, 165-200, 205-216, 221-226, 240-257, 271, 355 |
 | src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/audit/\_\_init\_\_.py                     |        1 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/audit/config.py                           |       36 |        2 |        0 |        0 |     94% |  196, 200 |
@@ -59,7 +59,7 @@
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **2582** |  **292** |  **724** |  **100** | **86%** |           |
+| **TOTAL**                                                | **2595** |  **293** |  **730** |  **100** | **86%** |           |
 
 
 ## Setup coverage badge
