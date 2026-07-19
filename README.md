@@ -58,8 +58,8 @@
 | src/foodsafety/tracking.py                               |       28 |       28 |        0 |        0 |      0% |     18-92 |
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
-| src/foodsafety/utils/time.py                             |       56 |        2 |       16 |        2 |     94% |133, 150-\>141, 168 |
-| **TOTAL**                                                | **2655** |  **298** |  **746** |  **101** | **87%** |           |
+| src/foodsafety/utils/time.py                             |       59 |        2 |       16 |        2 |     95% |133, 150-\>141, 181 |
+| **TOTAL**                                                | **2658** |  **298** |  **746** |  **101** | **87%** |           |
 
 
 ## Setup coverage badge
