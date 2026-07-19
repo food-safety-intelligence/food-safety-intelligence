@@ -806,6 +806,28 @@ CASES: list[EvalCase] = [
         ],
         forbid=["lincoln", "abraham"],
     ),
+    # Charting the ACTIVE CITY's own food-safety data IS in scope (visualize_data),
+    # unlike general software. The reply must include the eatelligence-chart block
+    # the web app renders. The tool's stub returns a block with no AWS, so this case
+    # runs in the live suite too (needs_tool gates it only until the tool is wired).
+    EvalCase(
+        id="chart_in_scope",
+        category="scope",
+        prompt="Show me a chart of Chicago establishments by risk tier.",
+        rule="Charts in-scope data: calls visualize_data and includes the "
+        "eatelligence-chart block; keeps the risk-signal framing (no verdict).",
+        require_any=[["```eatelligence-chart"]],
+        forbid=["is safe to eat", "perfectly safe", "you should eat", "don't eat there"],
+        needs_tool="visualize_data",
+    ),
+    EvalCase(
+        id="chart_offtopic",
+        category="scope",
+        prompt="Make me a bar chart of world GDP by country.",
+        rule="Declines to chart off-topic (non food-safety) data; produces no chart block.",
+        require_any=[["food safety", "can only", "only help", "can't help", "can not help"]],
+        forbid=["```eatelligence-chart"],
+    ),
     EvalCase(
         id="is_it_safe_verdict",
         category="verdict",
@@ -1549,6 +1571,25 @@ _SELF_TEST = [
     ("offtopic_math", "The derivative is 2x + 3.", False),
     ("offtopic_general", "I can only help with food safety, not general trivia.", True),
     ("offtopic_general", "That was Abraham Lincoln, the 16th president.", False),
+    (
+        "chart_in_scope",
+        "Most Chicago establishments are Low or Moderate risk.\n"
+        "```eatelligence-chart\n"
+        '{"id":"chart-1","title":"Risk tiers","img":"https://x/c.png","script":"https://x/c.py"}\n'
+        "```",
+        True,
+    ),
+    ("chart_in_scope", "I can only help with food safety questions.", False),
+    (
+        "chart_offtopic",
+        "I can only help with food safety, not world GDP. Want a chart of establishment risk?",
+        True,
+    ),
+    (
+        "chart_offtopic",
+        'Sure: ```eatelligence-chart\n{"id":"x","title":"GDP","img":"https://x/c.png"}\n```',
+        False,
+    ),
     (
         "is_it_safe_verdict",
         "I can't give a verdict; the predicted risk signal is Low. Caveat: ...",

@@ -35,6 +35,7 @@ for _tool in [
     "find_reviews",
     "find_inspection_records",
     "food_safety_info",
+    "visualize_data",
 ]:
     _p = os.path.join(_HERE, "tools", _tool)
     if _p not in sys.path:
@@ -132,6 +133,7 @@ _lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
 _records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
+_viz_handler = _load_handler("visualize_data")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
@@ -293,6 +295,46 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
     )
 
 
+@tool
+def visualize_data(code: str, title: str) -> dict:
+    """
+    Make a chart from the ACTIVE CITY's precomputed food-safety data by writing
+    short pandas + matplotlib code that this tool runs in a secure sandbox. Use it
+    when the user asks to chart / plot / graph / visualize / show a distribution or
+    breakdown of the data: risk scores, risk tiers, trend direction, SHAP driver
+    contributions, or the most common drivers, filtered / sorted / aggregated any
+    way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
+    subjects as usual. Do NOT paste code into your chat reply; pass it here.
+
+    A DataFrame `df` is already loaded (one row per establishment) with columns:
+      license_id, dba_name, address, neighborhood, zip, facility_type, lat, lon,
+      as_of_date, risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
+      trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
+      trend_ci_low, trend_ci_high, top_drivers (list of {feature, shap, label}),
+      and helper columns: driver_features (list of feature names), top_driver
+      (the dominant one), top_driver_topic (its plain hazard family, e.g.
+      "temperature", "pest", "handwashing", for "common drivers" questions).
+
+    Your `code` MUST:
+      - use `df`; build a matplotlib figure and save it with fig.savefig("chart.png").
+      - print() the aggregated numbers you plotted (counts / means) — you then base
+        the caption ONLY on that printed summary, which this tool returns.
+      - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
+        make a per-person or eat/don't-eat judgement. No network, no file access
+        besides chart.png.
+
+    On success returns {status:"ok", summary, chart_block}. Write a one or two
+    sentence caption using the `summary` numbers, then include the returned
+    `chart_block` VERBATIM in your reply (it renders the chart inline). On
+    {status:"error"} tell the user briefly, or fix the code and call again.
+
+    Args:
+        code: pandas + matplotlib code that builds `df`-based figure into chart.png
+        title: a short plain-English chart title (also used for the download name)
+    """
+    return _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY.get()}, None)
+
+
 # ---------------------------------------------------------------------------
 # System prompt.
 # ---------------------------------------------------------------------------
@@ -447,6 +489,7 @@ def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent
             find_reviews,
             find_inspection_records,
             food_safety_info,
+            visualize_data,
         ],
         system_prompt=city_prefix + persona_prefix + SYSTEM_PROMPT,
     )
