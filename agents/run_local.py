@@ -323,7 +323,10 @@ def visualize_data(code: str, title: str) -> dict:
       value_counts() gives the number of establishments per category.
 
     Your `code` MUST:
-      - use `df`; build a matplotlib figure and save it with fig.savefig("chart.png").
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
       - print() the aggregated numbers you plotted (counts / means) — you then base
         the caption ONLY on that printed summary, which this tool returns.
       - stay a chart of aggregates; never label a place "safe"/"unsafe" and never

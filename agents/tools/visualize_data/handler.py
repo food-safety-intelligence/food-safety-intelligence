@@ -238,22 +238,35 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
 
         with code_session(region, **session_kwargs) as client:
             client.invoke("writeFiles", {"content": [{"path": DATA_FILENAME, "text": scores_text}]})
-            setup = _drain(client.invoke("executeCode", {"language": "python", "code": SETUP_CODE}))
-            if setup.get("isError"):
-                return {"ok": False, "error": f"setup failed: {setup.get('text', '')[:300]}"}
-            run = _drain(client.invoke("executeCode", {"language": "python", "code": code}))
+            # Setup + the model's snippet run as ONE cell, so `df` is guaranteed to
+            # exist in the same execution rather than relying on variables surviving
+            # across separate executeCode invocations.
+            cell = SETUP_CODE + "\n" + code
+            run = _drain(client.invoke("executeCode", {"language": "python", "code": cell}))
+            output = (run.get("text") or "").strip()
             if run.get("isError"):
-                # The model's own code raised — hand the traceback back so it can fix it.
-                return {"ok": False, "error": run.get("text", "chart code raised an error")[:600]}
+                return {"ok": False, "error": f"your chart code raised an error:\n{output[:800]}"}
             files = _drain(client.invoke("readFiles", {"paths": [CHART_FILENAME]}))
             png_b64 = _extract_file_b64(files, CHART_FILENAME)
             if not png_b64:
-                return {"ok": False, "error": "the code did not save a chart to chart.png"}
+                # Say WHY and include whatever the cell printed/raised. Without this
+                # the model can't tell what went wrong and just retries the same
+                # broken snippet until the request times out.
+                detail = f"\nThe code's output was:\n{output[:800]}" if output else ""
+                return {
+                    "ok": False,
+                    "error": (
+                        f"no {CHART_FILENAME} was produced. `df` is ALREADY loaded in the "
+                        "sandbox — do NOT read any file (no pd.read_csv / pd.read_json / "
+                        "open); there is no CSV. Use `df` directly and finish with "
+                        f"fig.savefig('{CHART_FILENAME}')." + detail
+                    ),
+                }
         return {
             "ok": True,
             "image_kind": "png_b64",
             "image": png_b64,
-            "stdout": run.get("text", ""),
+            "stdout": output,
         }
     except Exception as exc:  # noqa: BLE001 — surface any sandbox/SDK error as a clean tool error
         return {"ok": False, "error": f"sandbox error: {exc}"}
