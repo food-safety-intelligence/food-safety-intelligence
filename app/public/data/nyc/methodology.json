@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-18T23:50:01.608907+00:00",
+  "generated_at": "2026-07-19T09:54:05.666823+00:00",
   "model_version": "nyc_xgb_sigmoid",
   "city": "nyc",
   "data_source": "NYC DOHMH Restaurant Inspections (43nn-pn8j)",
@@ -14,6 +14,23 @@
     "prevalence": 0.4097,
     "events": 3874,
     "split_from": "2025-04-01"
+  },
+  "windows": {
+    "train": {
+      "start": "2022-07-01",
+      "end": "2024-09-30",
+      "n": 35190
+    },
+    "val": {
+      "start": "2024-10-01",
+      "end": "2025-03-31",
+      "n": 8773
+    },
+    "test": {
+      "start": "2025-04-01",
+      "end": "2026-06-29",
+      "n": 9456
+    }
   },
   "headline": {
     "pr_auc": 0.6148,

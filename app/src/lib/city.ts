@@ -33,7 +33,6 @@ export interface CityConfig {
   outcomeSentence: string;
   /** Footer. */
   footerBlurb: string;
-  sources: string[];
   /** History section: how inspection outcomes are categorised for this city. */
   historyResults: { key: string; label: string; bg: string; badge: string; match: (result: string) => boolean }[];
   /** Noun for the "N <outcomeNoun>" count in the history headline. */
@@ -82,7 +81,6 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
       "fail an inspection or be cited for a priority violation in the next 180 days",
     footerBlurb:
       "Open-data project pairing Chicago Food Inspections with license records to estimate forward-window food-safety risk. Not affiliated with the City of Chicago.",
-    sources: ["Chicago Food Inspections", "Chicago Business Licenses"],
     historyResults: [
       { key: "Pass", label: "Pass", bg: "bg-sage", badge: "P", match: (r) => r === "Pass" },
       { key: "PassCond", label: "Pass w/ Conditions", bg: "bg-amber", badge: "!", match: (r) => r === "Pass w/ Conditions" },
@@ -113,7 +111,6 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     outcomeSentence: "receive a B or C letter grade at its next inspection",
     footerBlurb:
       "Open-data project using NYC Health Department restaurant inspection records to estimate the risk of a B or C grade at the next inspection. A research preview; not affiliated with the City of New York.",
-    sources: ["NYC DOHMH Restaurant Inspection Results"],
     historyResults: [
       { key: "A", label: "Grade A", bg: "bg-sage", badge: "A", match: (r) => r.startsWith("Grade A") },
       { key: "B", label: "Grade B", bg: "bg-amber", badge: "B", match: (r) => r.startsWith("Grade B") },
@@ -156,7 +153,6 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     outcomeSentence: "be graded B or C at its next inspection (a score below 90)",
     footerBlurb:
       "Open-data project using LA County Environmental Health restaurant and market inspection records to estimate the risk of a B or C grade at the next inspection. A research preview; not affiliated with the County of Los Angeles.",
-    sources: ["LA County Restaurant and Market Inspections"],
     // LA grades run the OPPOSITE way to NYC (A = 90-100, higher is cleaner). Bucket
     // by the parsed SCORE, not the letter: a sub-70 inspection carries no letter
     // grade in the feed (LA has no grade below C) and would otherwise render as a

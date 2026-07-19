@@ -12,6 +12,7 @@ import pytest
 
 from foodsafety.utils.time import (
     expanding_year_folds,
+    split_window,
     summarize,
     temporal_split,
 )
@@ -165,6 +166,16 @@ def test_expanding_year_folds_train_expands_and_never_overlaps_val():
 
 def test_expanding_year_folds_empty_input():
     assert expanding_year_folds(_df([])) == []
+
+
+# ---------------------------------------------------------------------------
+# split_window() — date range + count for the methodology `windows` block
+# ---------------------------------------------------------------------------
+
+
+def test_split_window_reports_range_and_count():
+    w = split_window(_df(["2024-03-15", "2024-01-02", "2024-12-31"]))
+    assert w == {"start": "2024-01-02", "end": "2024-12-31", "n": 3}
 
 
 # ---------------------------------------------------------------------------

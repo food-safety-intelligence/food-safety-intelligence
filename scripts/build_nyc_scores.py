@@ -41,7 +41,7 @@ from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributi
 from foodsafety.models.evaluate import evaluate, operating_point_table
 from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
 from foodsafety.tracking import snapshot_provenance
-from foodsafety.utils.time import temporal_split
+from foodsafety.utils.time import split_window, temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
 CW = REPO / "reference" / "violation_crosswalk.csv"
@@ -677,6 +677,11 @@ def main():
             "prevalence": round(float(y_test.mean()), 4),
             "events": int(y_test.sum()),
             "split_from": VAL_END,
+        },
+        "windows": {
+            "train": split_window(sp.train),
+            "val": split_window(sp.val),
+            "test": split_window(sp.test),
         },
         "headline": {
             "pr_auc": round(test_metrics["pr_auc"], 4),

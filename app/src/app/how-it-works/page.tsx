@@ -19,6 +19,7 @@ import { CityGate } from "@/components/CityGate";
 import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
 import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
+import { EvaluationDetail } from "@/components/EvaluationDetail";
 import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
@@ -591,6 +592,8 @@ export default async function HowItWorksPage() {
             </p>
 
             <TightestSlices top5={top5} top10={top10} unit="food establishments" />
+
+            <EvaluationDetail windows={methodology.windows} />
           </article>
 
           <article>
@@ -895,13 +898,25 @@ export default async function HowItWorksPage() {
               Group performance is checked across facility type and ZIP (precision,
               coverage, and ranking quality per group) and the known proxy features
               were removed: ZIP and facility type were dropped so the model keys on
-              an establishment&apos;s own conduct, not who-lives-where. Any
-              demographic data is used only to audit disparate impact, never as a
-              model input. Known residual risks (a detection feedback loop in the
-              prior-history and current-outcome signals, geographic miscalibration
-              where history is sparse, and unstable metrics for very small groups)
-              are documented, and a fuller demographic disparate-impact audit is
-              planned before any real deployment.
+              an establishment&apos;s own conduct, not who-lives-where. Demographic
+              data is used only to audit disparate impact, never as a model input.
+            </p>
+            <p className="text-sm text-muted leading-relaxed mt-3">
+              The full demographic disparate-impact audit has now been run for all
+              three cities. Neighborhood demographics are matched to each
+              establishment <span className="font-medium text-ink/80">after</span>{" "}
+              the model has scored it, and every group is then checked three ways:
+              whether it gets flagged more often, whether the model&apos;s false
+              alarms and missed risks differ, and whether its risk scores are equally
+              accurate. Almost every difference shows up only on the first check,
+              which is what you expect wherever groups genuinely fail inspections at
+              different rates. Two results are being followed up: risk scores are
+              less accurate for a small number of New York cuisines, and the
+              false-alarm rate varies by area in Los Angeles (treated as provisional,
+              because LA locations are approximate). Residual risks (a detection
+              feedback loop in the prior-history and current-outcome signals,
+              geographic miscalibration where history is sparse, and unstable metrics
+              for very small groups) stay documented.
             </p>
 
             <h3
@@ -929,9 +944,10 @@ export default async function HowItWorksPage() {
                 per-group precision, coverage, and ranking quality. No systematic
                 unfairness shows up on the coverage lens, though a few small,
                 low-event groups dip on the strictest ranking metric (a base-rate
-                artifact, not bias). The fuller demographic disparate-impact audit
-                (joining census data) is deferred to a later phase, so expect
-                uneven calibration where training history is sparse.
+                artifact, not bias). The demographic disparate-impact audit has
+                since been completed for all three cities, with two open follow-ups
+                (see Fairness testing above); calibration can still be uneven where
+                training history is sparse.
               </li>
             </ul>
 

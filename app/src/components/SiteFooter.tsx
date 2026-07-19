@@ -3,11 +3,14 @@
 import { FeedbackFooterLink } from "@/components/FeedbackFooterLink";
 
 import { CITY_CONFIG } from "@/lib/city";
+import { sourceNames } from "@/lib/sources";
 import { useCity } from "@/components/CityContext";
 
 export function SiteFooter() {
   const { city } = useCity();
   const cfg = CITY_CONFIG[city];
+  // Same catalog the /sources page renders, so the two can't drift apart.
+  const sources = sourceNames(city);
   return (
     <footer className="border-t border-line bg-cream/70 mt-auto">
       <div className="max-w-[1240px] mx-auto px-8 py-8 grid grid-cols-12 gap-6 items-start text-sm text-muted">
@@ -23,7 +26,7 @@ export function SiteFooter() {
             Sources
           </div>
           <ul className="space-y-1">
-            {cfg.sources.map((s) => (
+            {sources.map((s) => (
               <li key={s}>{s}</li>
             ))}
           </ul>
