@@ -104,6 +104,13 @@ SPACES = {
 def sample_config(rng: random.Random, kind: str) -> tuple[dict, dict]:
     arch = {k: rng.choice(v) for k, v in SPACES[kind]["arch"].items()}
     opt = {k: rng.choice(v) for k, v in SPACES[kind]["opt"].items()}
+    # FT attention requires d % n_heads == 0. Every d/n_heads pair in SPACES already
+    # satisfies this, so this guard is a no-op today; it keeps a future SPACES edit from
+    # silently sampling an invalid TransformerEncoderLayer. Deterministic (no rng draw),
+    # so it never perturbs the sampling stream.
+    if kind == "ft" and arch["d"] % arch["n_heads"] != 0:
+        valid = [h for h in SPACES["ft"]["arch"]["n_heads"] if arch["d"] % h == 0]
+        arch["n_heads"] = max(valid) if valid else 1
     return arch, opt
 
 

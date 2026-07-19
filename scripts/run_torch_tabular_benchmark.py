@@ -329,7 +329,6 @@ def train_one(
     xtr = tuple(t.to(DEVICE) for t in _tensors(enc, tr, kind))
     xva = tuple(t.to(DEVICE) for t in _tensors(enc, va, kind))
     ytr_t = torch.from_numpy(ytr.astype(np.float32)).to(DEVICE)
-    yva_t = torch.from_numpy(yva.astype(np.float32)).to(DEVICE)
 
     pos = float(ytr.sum())
     neg = float(len(ytr) - pos)
@@ -365,7 +364,6 @@ def train_one(
                 break
     if best_state is not None:
         model.load_state_dict(best_state)
-    del yva_t
     return model
 
 
