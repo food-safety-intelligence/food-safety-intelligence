@@ -125,6 +125,37 @@ def test_fuzzy_address_then_name():
 
 
 # ---------------------------------------------------------------------------
+# A single-occupancy address must still clear a name check
+# ---------------------------------------------------------------------------
+
+
+def test_fuzzy_address_to_lone_record_rejects_a_different_business():
+    """The live Los Angeles failure: an OSM address fuzzily resolved into a bucket
+    holding one unrelated record, and the name gate was skipped for single-occupancy
+    buckets — so "Taco Bell" was handed STARBUCKS COFFEE #9746's risk score. A
+    confident wrong score is worse than a miss (ethics decision record 0005)."""
+    index = _index(RECORD_A)  # lone STARBUCKS record at SHARED_ADDRESS
+    assert _fuzzy_lookup("11601 W TUOHY AVE", "Taco Bell", index) is None
+
+
+def test_exact_address_to_lone_record_rejects_a_different_tenant():
+    """Second live failure: the address matched exactly but the record on it was a
+    different business ("Cafe Etc." -> "CAFFE HUB"). Sharing no distinctive word is
+    enough to rule it out."""
+    index = _index(RECORD_A)
+    assert _fuzzy_lookup(SHARED_ADDRESS, "Cafe Etc.", index) is None
+
+
+def test_exact_address_to_lone_record_keeps_an_honest_rewrite():
+    """An exact address is strong evidence, so a venue the two sources merely spell
+    differently must still match — one shared distinctive word is enough. Gating this
+    on a full name match would have thrown away real coverage."""
+    index = _index(RECORD_A)
+    match = _fuzzy_lookup(SHARED_ADDRESS, "Starbucks Reserve Roastery", index)
+    assert match is not None and match["license_id"] == "LIC_A"
+
+
+# ---------------------------------------------------------------------------
 # Index keeps every shared-address record (no last-writer-wins)
 # ---------------------------------------------------------------------------
 

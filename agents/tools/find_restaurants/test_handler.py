@@ -23,6 +23,7 @@ if _THIS_DIR not in sys.path:
 import handler as h  # noqa: E402
 from chicago_neighborhoods import BBOX, CENTROIDS, CHICAGO_BBOX, CHICAGO_CENTROID  # noqa: E402
 from handler import (  # noqa: E402
+    CITY_ADDRESS_DEFAULTS,
     _build_address,
     _build_overpass_query,
     _cuisine_filter,
@@ -70,17 +71,35 @@ def test_build_overpass_query_contains_bbox_and_limit():
     assert "thai" in q
 
 
+CHI_DEFAULT = ("Chicago", "IL")
+
+
 def test_build_address_variants():
     assert (
-        _build_address({"addr:housenumber": "123", "addr:street": "W Madison St"})
+        _build_address({"addr:housenumber": "123", "addr:street": "W Madison St"}, CHI_DEFAULT)
         == "123 W Madison St, Chicago, IL"
     )
     # Street only, no house number.
-    assert _build_address({"addr:street": "N Clark St"}) == "N Clark St, Chicago, IL"
+    assert _build_address({"addr:street": "N Clark St"}, CHI_DEFAULT) == "N Clark St, Chicago, IL"
     # No address tags -> city/state fall back to their Chicago defaults.
-    assert _build_address({}) == "Chicago, IL"
+    assert _build_address({}, CHI_DEFAULT) == "Chicago, IL"
     # City/state explicitly blank and no street -> truly empty.
-    assert _build_address({"addr:city": "", "addr:state": ""}) == ""
+    assert _build_address({"addr:city": "", "addr:state": ""}, CHI_DEFAULT) == ""
+
+
+def test_build_address_falls_back_to_the_active_city():
+    """An untagged venue must not be labelled with another city's name. Defaulting to
+    Chicago whatever the active city gave Los Angeles venues a "Chicago, IL" address,
+    which the agent then relayed to the user as that venue's address."""
+    la_default = CITY_ADDRESS_DEFAULTS["la"]
+    assert (
+        _build_address({"addr:street": "N Vincent Ave"}, la_default)
+        == "N Vincent Ave, Los Angeles, CA"
+    )
+    assert _build_address({}, la_default) == "Los Angeles, CA"
+    # An explicit OSM tag still wins over the city default.
+    assert _build_address({"addr:city": "Burbank", "addr:state": "CA"}, la_default) == "Burbank, CA"
+    assert CITY_ADDRESS_DEFAULTS["nyc"] == ("New York", "NY")
 
 
 def test_haversine_zero_and_known():

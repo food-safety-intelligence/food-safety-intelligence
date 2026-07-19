@@ -30,6 +30,15 @@ CITY_GEO: dict[str, tuple] = {
     "la": (la.BBOX, la.CENTROIDS, la.LA_BBOX, la.LA_CENTROID, "Los Angeles"),
 }
 
+# Fallback city/state for an OSM venue whose addr:* tags omit them. Must follow the
+# ACTIVE CITY: a hardcoded Chicago default labelled Los Angeles venues "Chicago, IL",
+# which the agent then relayed to the user as that venue's address.
+CITY_ADDRESS_DEFAULTS: dict[str, tuple[str, str]] = {
+    "chicago": ("Chicago", "IL"),
+    "nyc": ("New York", "NY"),
+    "la": ("Los Angeles", "CA"),
+}
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -163,7 +172,9 @@ def handler(event: dict[str, Any], _ctx: Any) -> list[dict[str, Any]] | dict[str
         return {"error": f"Overpass API unavailable: {exc}", "reason": "directory_unavailable"}
 
     elements: list[dict] = raw.get("elements", [])
-    results = _parse_elements(elements, centroid)
+    results = _parse_elements(
+        elements, centroid, CITY_ADDRESS_DEFAULTS.get(city, ("Chicago", "IL"))
+    )
     results.sort(key=lambda r: r["dist_km"])
     return results[:limit]
 
@@ -274,6 +285,7 @@ def _fetch_overpass(query: str) -> dict:
 def _parse_elements(
     elements: list[dict],
     centroid: tuple[float, float],
+    city_default: tuple[str, str] = ("Chicago", "IL"),
 ) -> list[dict[str, Any]]:
     """Convert raw Overpass elements to clean restaurant stubs."""
     results: list[dict[str, Any]] = []
@@ -301,7 +313,7 @@ def _parse_elements(
             {
                 "osm_id": str(el["id"]),
                 "name": name,
-                "address": _build_address(tags),
+                "address": _build_address(tags, city_default),
                 "lat": el_lat,
                 "lon": el_lon,
                 "cuisine": tags.get("cuisine", ""),
@@ -315,13 +327,14 @@ def _parse_elements(
     return results
 
 
-def _build_address(tags: dict[str, str]) -> str:
+def _build_address(tags: dict[str, str], city_default: tuple[str, str]) -> str:
     """Assemble a human-readable address from OSM addr:* tags."""
     parts: list[str] = []
     housenumber = tags.get("addr:housenumber", "")
     street = tags.get("addr:street", "")
-    city = tags.get("addr:city", "Chicago")
-    state = tags.get("addr:state", "IL")
+    default_city, default_state = city_default
+    city = tags.get("addr:city", default_city)
+    state = tags.get("addr:state", default_state)
     postcode = tags.get("addr:postcode", "")
 
     if housenumber and street:
