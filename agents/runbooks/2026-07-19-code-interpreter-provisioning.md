@@ -194,6 +194,49 @@ aws bedrock-agentcore-control list-code-interpreters --region "$REGION" \
   --query 'codeInterpreters[].{id:codeInterpreterId,status:status,net:networkConfiguration}' --output table
 ```
 
+## 6. Request-timeout budget (why charts must be FAST)
+
+A chart is generated inside the normal **synchronous** chat request, so the whole
+round trip (model turns + sandbox session start + data load + render + upload) has
+to finish inside the front-door timeout. Observed in prod: a **504 at exactly 60s**.
+
+Two limits apply and the smaller one wins:
+
+| Hop | Default | Notes |
+|---|---|---|
+| **ALB** idle timeout | **60s** | raise with the CLI below |
+| **CloudFront** origin response timeout | 30s, **max 60s** without a Service Quotas increase | hard ceiling in practice |
+
+Check and raise the ALB idle timeout (run as Deepak):
+
+```bash
+# find the ALB in front of the agent
+aws elbv2 describe-load-balancers --region "$REGION" \
+  --query 'LoadBalancers[].{name:LoadBalancerName,arn:LoadBalancerArn,dns:DNSName}' --output table
+
+export ALB_ARN="arn:aws:elasticloadbalancing:us-west-2:991500268971:loadbalancer/app/food-safety-alb/2cd32d5ed7d53b58"
+
+# current idle timeout
+aws elbv2 describe-load-balancer-attributes --region "$REGION" \
+  --load-balancer-arn "$ALB_ARN" \
+  --query "Attributes[?Key=='idle_timeout.timeout_seconds']" --output table
+
+# raise it (e.g. 180s) to give the chart path headroom
+aws elbv2 modify-load-balancer-attributes --region "$REGION" \
+  --load-balancer-arn "$ALB_ARN" \
+  --attributes Key=idle_timeout.timeout_seconds,Value=180
+```
+
+> **Raising these is headroom, not the fix.** CloudFront caps at 60s without a quota
+> increase, so chart generation must comfortably fit under ~60s regardless. Keep the
+> data written into the sandbox small and the per-request work minimal — the tool
+> ships a slim projection of `scores.json` (chart-relevant columns + pre-computed
+> driver topics) rather than the full 20-40MB file, and has its own internal timeout
+> (`FSI_CHART_TIMEOUT_SECONDS`, default 40s) so a slow run returns a clean message
+> instead of a gateway 504.
+
+---
+
 ## Teardown (if abandoning the feature)
 
 ```bash
