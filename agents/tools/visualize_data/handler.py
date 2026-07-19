@@ -259,25 +259,32 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
         return {"ok": False, "error": f"sandbox error: {exc}"}
 
 
-_SANDBOX_TIMEOUT_S = int(os.environ.get("FSI_CHART_TIMEOUT_SECONDS", "40"))
+_SANDBOX_TIMEOUT_S = int(os.environ.get("FSI_CHART_TIMEOUT_SECONDS", "25"))
 
 
-def _run_sandbox_guarded(code: str, city: str) -> dict[str, Any]:
+def _run_sandbox_guarded(code: str, city: str, timeout_s: float | None = None) -> dict[str, Any]:
     """Run the sandbox under a hard wall-clock cap.
 
     A chart is generated inside a synchronous chat request whose gateway budget is
-    ~60s (ALB idle / CloudFront origin timeout), so a slow or hung sandbox run
-    surfaces as an opaque 504 the user can't act on. Capping it here returns a clean
-    tool error the agent can relay instead.
+    ~60s (ALB idle / CloudFront origin timeout), so a slow or hung run surfaces as an
+    opaque 504. Capping it returns a clean tool error the agent can relay instead.
+
+    `timeout_s` lets the caller shrink the cap to whatever request budget is actually
+    left. That matters because a single cap is NOT enough: on a timeout the model may
+    call the tool again, and two capped attempts still add up past the ceiling. The
+    caller passes the remaining budget so retries can never overrun it.
     """
+    cap = float(timeout_s) if timeout_s else float(_SANDBOX_TIMEOUT_S)
+    cap = max(5.0, min(cap, float(_SANDBOX_TIMEOUT_S)))
     ex = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        return ex.submit(_sandbox_run, code, city).result(timeout=_SANDBOX_TIMEOUT_S)
+        return ex.submit(_sandbox_run, code, city).result(timeout=cap)
     except concurrent.futures.TimeoutError:
         return {
             "ok": False,
+            "timed_out": True,
             "error": (
-                f"chart generation timed out after {_SANDBOX_TIMEOUT_S}s — "
+                f"chart generation timed out after {cap:.0f}s — the dataset is large; "
                 "try a simpler chart or a narrower filter"
             ),
         }
@@ -435,9 +442,18 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
     if not _use_stub() and not os.environ.get("FSI_CHART_BUCKET"):
         return {"status": "error", "error": "chart storage is not configured (FSI_CHART_BUCKET)"}
 
-    run = _stub_run(code, city) if _use_stub() else _run_sandbox_guarded(code, city)
+    run = (
+        _stub_run(code, city)
+        if _use_stub()
+        else _run_sandbox_guarded(code, city, event.get("timeout_s"))
+    )
     if not run.get("ok"):
-        return {"status": "error", "error": run.get("error", "chart generation failed")}
+        out: dict[str, Any] = {"status": "error", "error": run.get("error", "chart failed")}
+        if run.get("timed_out"):
+            # Terminal for this turn: retrying stacks another cap onto an already
+            # spent request budget and lands on the gateway's 504.
+            out["retryable"] = False
+        return out
 
     chart_id = f"chart-{uuid.uuid4().hex[:12]}"
     urls = _upload_artifacts(chart_id, run, code)
