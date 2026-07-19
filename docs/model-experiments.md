@@ -306,3 +306,102 @@ the signal is carried by inspection history + current outcome together, with the
 text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
 NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
 windows before treating those deltas as gate-passing verdicts.
+
+## Label-window feasibility: does Chicago's day-window label extend to NYC/LA?
+
+Context: a separate 2026-07-16 study (Chicago-only, on branch
+`deepak/mle-label-window-study`, not yet merged) found Chicago's model gets
+structurally easier to predict as the forward label window shrinks — XGB
+ROC-AUC 0.919 at 30d vs 0.832 at the served 180d, cleanly monotonic. That study
+couldn't include NYC/LA because their served label (`y_next_bc`/`y_next_bad`)
+is event-anchored ("is this facility's literal next inspection, whenever it
+happens, graded B/C"), not day-window based, so there's no window to vary.
+
+This experiment (`scripts/experiment_label_window_nyc_la.py`,
+`reports/metrics/experiments/label_window_study_nyc_la_2026-07-16.json`) asks
+whether a Chicago-style day-window label can be built for NYC/LA at all, as a
+feasibility check before considering any redesign toward a uniform labeling
+scheme across all three cities. It reuses
+`foodsafety.data.labels.compute_forward_window_label` (generalized from
+Chicago's private forward-scan helper with a `flag_col` param) on top of each
+city's own `build_events()` + `fit_xgb_platt`/`fit_logreg_sigmoid`, so results
+are directly comparable to what each city actually serves.
+
+**Windows tested: 90/180/365d, not Chicago's 30/60/90/180d.** NYC/LA
+facilities are reinspected far less often than Chicago's — median days
+between two consecutive inspections at the same facility: Chicago 232d (10th
+pct **7d**, from complaint-driven re-inspections), NYC 320d (10th pct 39d), LA
+347d (10th pct 98d). Chicago's short windows work because a real share of
+facilities get reinspected within days; NYC/LA mostly don't, so 30d/60d
+windows there would be almost entirely "no inspection happened yet." 365d is
+close to the practical ceiling too: NYC's raw pull ends 2026-07-14 and LA's
+ends 2026-06-30, leaving only ~470d (NYC) / ~545d of headroom past each
+city's served `VAL_END` before a window right-truncates the whole test set.
+
+| City | Window | Base rate | Test right-truncated | XGB ROC-AUC | XGB PR-AUC/prev | XGB lift@10 |
+|---|---|---|---|---|---|---|
+| NYC | served (event-anchored) | 40.9% | n/a | 0.669 | 1.40 | 1.66 |
+| NYC | 90d | 6.4% | **19.8%** | 0.836 | 3.49 | 3.92 |
+| NYC | 180d | 9.9% | **38.6%** | 0.828 | 3.01 | 3.35 |
+| NYC | 365d | 12.8% | **79.5%** | 0.824 | 2.85 | 3.28 |
+| LA | served (event-anchored) | 9.3% | n/a | 0.707 | 1.97 | 2.20 |
+| LA | 90d | **0.6%** | **14.3%** | 0.694 | 3.46 | 2.98 |
+| LA | 180d | 1.0% | **32.3%** | 0.692 | 3.25 | 3.31 |
+| LA | 365d | 2.0% | **62.3%** | 0.723 | 2.78 | 3.29 |
+
+(LogReg tracks XGB closely at every row; full numbers for both models in the
+JSON. `n_test` is fixed per city across windows — 32,989 NYC / 41,950 LA —
+since only the label and the right-truncation flag change per window, not the
+anchor set.)
+
+**Mechanically constructible, but this is not a clean "yes, it extends."**
+Three things complicate a straight read:
+
+1. **Short-window base rates collapse from cadence, not safety.** LA's 90d
+   base rate is 0.6% — about 1 in 170 anchors. That overwhelmingly reflects
+   "this facility hasn't been reinspected again yet," not "verified clean."
+   The label is honest (Chicago's `right_truncated` handles the same
+   phenomenon), but at this prevalence it flags almost nobody in absolute
+   terms — a materially weaker operating signal than the numbers alone suggest.
+2. **Right-truncation swallows the longer windows.** By 365d, 80% of NYC's
+   test set and 62% of LA's has an unresolved forward window (train/val
+   dropped these; test kept them for an honest read, per the same protocol as
+   the Chicago study) — those rows' "0" labels are undercounted, not
+   confirmed. The 365d row's metrics should be read as directional at best;
+   90d is the only window with a genuinely clean read for both cities.
+3. **Chicago's clean monotonic "shorter = easier" pattern does not
+   replicate.** NYC's day-window ROC-AUC is roughly flat across 90/180/365d
+   (0.836 → 0.828 → 0.824); LA's even ticks up at 365d (0.694 → 0.692 →
+   0.723). Neither shows Chicago's clear decline as the window widens — the
+   right-truncation/cadence confound above is the more likely explanation for
+   whatever movement there is, not "short-term risk is inherently easier"
+   the way it demonstrably is in Chicago.
+
+**The day-window variants all beat the served event-anchored label on
+ROC-AUC — but that's likely the mandated-reinspection artifact, not a real
+gain.** NYC's served ROC-AUC is 0.669 vs 0.82-0.84 for every day-window
+variant; LA's gap is smaller and mixed. The most plausible mechanism: a
+facility that inspects bad today is disproportionately likely to be
+reinspected again soon (mandated follow-up), and that near-term reinspection
+is itself disproportionately still bad — so a day-window label picks up
+"will this get reinspected again soon" almost as a side effect of `cur_is_bad`,
+the same `was_fail` -> mandated-reinspection circularity already documented
+for Chicago elsewhere in this log (see the current-inspection-outcome and
+trend-slope rows above). This experiment doesn't isolate that confound (no
+CV, no add-one attribution, single split) — it would need to before anyone
+reads "NYC/LA get easier under a day-window label" as a real finding rather
+than an artifact of how the label is constructed.
+
+**Verdict: don't port Chicago's day-window design onto NYC/LA as a
+"make labeling uniform" project on this evidence.** It's technically
+buildable, but the result isn't a clean win — short windows are dominated by
+inspection-cadence right-censoring (severely so for LA, where 90d prevalence
+is under 1%), longer windows are mostly right-truncated and unreliable, and
+the apparent ease-of-prediction gain over the served label is more likely a
+reinspection-timing artifact than genuine signal. NYC/LA's event-anchored
+label, while structurally different from Chicago's, is the more honest fit
+for their actual (much sparser) inspection cadence as it stands today. If this
+gets revisited, the open question isn't "which window" but whether the
+reinspection-timing confound can be disentangled at all (same territory as
+Chicago's exposure/IPW reweighting experiment, which itself came back null) —
+a modeling research question, not a quick relabel.
