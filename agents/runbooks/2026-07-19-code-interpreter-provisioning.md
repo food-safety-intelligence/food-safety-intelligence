@@ -153,22 +153,29 @@ aws iam put-role-policy \
 
 ---
 
-## 4. Hand these values to the runtime (done in the deploy, not here)
+## 4. Hand these values to the runtime — NOT a CloudShell step
 
-The agent tool reads these env vars. They get wired into the runtime by `deploy-agent.yml`
-/ the CDK stack (feature-branch work) — record the values now:
+These are runtime **environment variables**, not shell commands (don't paste them
+into a terminal). Add them to the runtime's env config in
+**`agentcore-deploy/agentcore/agentcore.json`** → `runtimes[0].envVars` (alongside
+`DATA_BUCKET`, the guardrail vars, etc.); the CDK deploy (`deploy-agent.yml` on
+merge to `main`) applies them on the next deploy:
 
+```jsonc
+{ "name": "FSI_SANDBOX_USE_STUB",    "value": "false" }              // REQUIRED: real execution (default true = stub)
+{ "name": "FSI_CHART_REGION",        "value": "us-west-2" }          // region of the Code Interpreter + charts bucket
+{ "name": "FSI_CHART_BUCKET",        "value": "<CHART_BUCKET>" }
+{ "name": "FSI_CODE_INTERPRETER_ID", "value": "<CODE_INTERPRETER_ID>" }
+// optional: FSI_CHART_URL_TTL_SECONDS = 3600 (presigned URL lifetime; default 1h,
+//           and a presigned URL can't outlive the runtime role's ~1h STS session)
 ```
-FSI_SANDBOX_USE_STUB    = false   # REQUIRED: real execution (default true = stub placeholder)
-FSI_CHART_BUCKET        = <CHART_BUCKET>
-FSI_CODE_INTERPRETER_ID = <CODE_INTERPRETER_ID>
-# optional: FSI_CHART_URL_TTL_SECONDS = 3600   (presigned URL lifetime; default 1h —
-#           a presigned URL can't outlive the runtime role's ~1h STS session anyway)
-```
 
-Without `FSI_SANDBOX_USE_STUB=false` the tool stays in stub mode and returns a
-placeholder chart (it never runs the model's code) — setting it is what switches
-the deployed agent to real charts.
+`FSI_CHART_REGION` matters because the runtime's `AWS_REGION` is **us-east-1** (the
+Bedrock model + the data bucket), but the sandbox and charts bucket live in the
+runtime's own region (**us-west-2**) — without it the tool would look in the wrong
+region and fail. Without `FSI_SANDBOX_USE_STUB=false` the tool stays in stub mode
+and returns a placeholder chart; setting it (with the bucket + interpreter
+provisioned above) is what switches the deployed agent to real charts.
 
 ---
 
