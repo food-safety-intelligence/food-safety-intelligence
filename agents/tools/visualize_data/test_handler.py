@@ -19,6 +19,9 @@ if _THIS_DIR not in sys.path:
 
 from handler import (  # noqa: E402
     MAX_CODE_CHARS,
+    SLIM_COLUMNS,
+    _slim_payload,
+    _slim_record,
     build_chart_block,
     handler,
     merge_chart_blocks,
@@ -121,3 +124,73 @@ def test_merge_does_not_double_when_block_already_present():
 def test_merge_is_noop_without_generated_charts():
     text = "no charts here, just a link [CDC](https://cdc.gov)"
     assert merge_chart_blocks(text, []) == text
+
+
+# _slim_record — the runtime-side projection that keeps the sandbox payload small
+# (shipping the full 20-40MB scores.json blew the 60s request timeout).
+
+
+def test_slim_record_drops_heavy_fields_and_rolls_up_driver_topics():
+    s = _slim_record(
+        {
+            "license_id": "1",
+            "dba_name": "X",
+            "address": "123 Main",
+            "lat": 1.0,
+            "lon": 2.0,
+            "as_of_date": "2026-01-01",
+            "risk_score": 0.5,
+            "risk_tier": "Low",
+            "trend_slope": 0.01,
+            "neighborhood": "N",
+            "zip": "60622",
+            "facility_type": "Restaurant",
+            "trend_ci_low": 0,
+            "trend_ci_high": 1,
+            "top_drivers": [
+                {"feature": "flag_kw_rodent_x", "shap": 0.9},
+                {"feature": "n_priority_this_inspection", "shap": 0.2},
+            ],
+        }
+    )
+    # heavy / unused fields dropped
+    for dropped in ("address", "lat", "lon", "trend_ci_low", "top_drivers"):
+        assert dropped not in s
+    # driver topic precomputed in the runtime, not the sandbox
+    assert s["top_driver"] == "flag_kw_rodent_x"
+    assert s["top_driver_topic"] == "pest"
+    assert s["top_driver_shap"] == 0.9
+    # charting columns kept
+    assert s["risk_tier"] == "Low"
+    assert s["neighborhood"] == "N"
+
+
+def test_slim_record_handles_a_record_with_no_drivers():
+    s = _slim_record({"license_id": "2"})
+    assert s["top_driver"] is None
+    assert s["top_driver_topic"] == "other"
+
+
+def test_slim_payload_is_columnar(tmp_path):
+    """Columnar ({col: [values]}) — a records payload repeats every key name on
+    every row, which is megabytes at 20-40k rows."""
+    p = tmp_path / "scores.json"
+    p.write_text(
+        json.dumps(
+            {
+                "scores": [
+                    {
+                        "license_id": "1",
+                        "risk_tier": "Low",
+                        "top_drivers": [{"feature": "flag_kw_pest_x", "shap": 0.4}],
+                    },
+                    {"license_id": "2", "risk_tier": "High", "top_drivers": []},
+                ]
+            }
+        )
+    )
+    d = json.loads(_slim_payload(str(p)))
+    assert set(d["cols"]) == set(SLIM_COLUMNS)  # one list per column, no per-row keys
+    assert d["cols"]["license_id"] == ["1", "2"]
+    assert d["cols"]["risk_tier"] == ["Low", "High"]
+    assert d["cols"]["top_driver_topic"] == ["pest", "other"]
