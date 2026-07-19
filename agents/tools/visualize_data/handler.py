@@ -32,6 +32,8 @@ from __future__ import annotations
 import base64
 import binascii
 import concurrent.futures
+import functools
+import gzip
 import json
 import os
 import re
@@ -82,6 +84,34 @@ def _chart_region() -> str:
 # driver-icons taxonomy, so "common drivers" means the same thing across the product.
 # Applied in the RUNTIME (not the sandbox) — see _slim_record.
 _TOPIC_PREFIXES = {
+    # Themed violation families. LA and NYC name these `cur_theme_*`; they are listed
+    # before the broader `cur_*` measures so a theme never falls through to a score or
+    # count bucket. Without them LA collapsed to three topics, 57% of them "other",
+    # which made every violation-category chart for that city meaningless.
+    "cur_theme_pest_vermin": "pest",
+    "cur_theme_temperature_control": "temperature",
+    "cur_theme_hygiene_handwashing": "handwashing",
+    "cur_theme_cross_contamination_protection": "cross_contamination",
+    "cur_theme_plumbing_sewage_water": "sewage",
+    "cur_theme_management_certification": "certified_manager",
+    "cur_theme_food_contact_surface": "food_contact_surface",
+    "cur_theme_equipment_nonfood_surface": "equipment_surface",
+    "cur_theme_approved_source_food_safety": "approved_source",
+    "cur_theme_other_administrative": "administrative",
+    # Current / prior inspection measures in the LA and NYC feature sets.
+    "cur_score": "inspection_score",
+    "prev_score": "inspection_score",
+    "prior_mean_score": "inspection_score",
+    "cur_n_viol": "violation_count",
+    "cur_n_critical": "violation_count",
+    "prior_n_critical": "violation_count",
+    "cur_sev": "violation_severity",
+    "prior_cur_sev": "violation_severity",
+    "cur_is_bad": "inspection_outcome",
+    "cur_closed": "closure",
+    "prior_closures": "closure",
+    "prior_bad": "prior_failures",
+    "tenure_days": "license_age",
     "was_fail": "inspection_outcome",
     "n_priority": "priority_violations",
     "n_core": "core_violations",
@@ -122,6 +152,18 @@ def _driver_topic(feature: Any) -> str:
     return "other"
 
 
+def _round(x: Any, places: int) -> Any:
+    """Round a float for the wire, leaving None and non-numerics untouched.
+
+    A calibrated probability serialises at full float64 precision
+    (0.16979999840259552 — 21 bytes), and the frame carries three such columns over
+    tens of thousands of rows. No chart resolves past four decimals, so rounding is
+    free accuracy-wise and takes a material bite out of the payload that has to be
+    uploaded into the sandbox inside the request budget.
+    """
+    return round(x, places) if isinstance(x, (int, float)) and not isinstance(x, bool) else x
+
+
 def _slim_record(r: dict) -> dict:
     """Project one score record to the columns a chart actually needs."""
     drivers = [d for d in (r.get("top_drivers") or []) if isinstance(d, dict)]
@@ -130,14 +172,14 @@ def _slim_record(r: dict) -> dict:
         "license_id": r.get("license_id"),
         "dba_name": r.get("dba_name"),
         "as_of_date": r.get("as_of_date"),
-        "risk_score": r.get("risk_score"),
+        "risk_score": _round(r.get("risk_score"), 4),
         "risk_tier": r.get("risk_tier"),
-        "trend_slope": r.get("trend_slope"),
+        "trend_slope": _round(r.get("trend_slope"), 5),
         "neighborhood": r.get("neighborhood"),
         "zip": r.get("zip"),
         "facility_type": r.get("facility_type"),
         "top_driver": top,
-        "top_driver_shap": drivers[0].get("shap") if drivers else None,
+        "top_driver_shap": _round(drivers[0].get("shap"), 4) if drivers else None,
         "top_driver_topic": _driver_topic(top),
     }
 
@@ -163,10 +205,16 @@ SLIM_COLUMNS = (
 _REQUIRED_COLUMNS = ("license_id", "dba_name", "as_of_date", "risk_score", "risk_tier")
 
 
+@functools.lru_cache(maxsize=3)
 def _slim_payload(path: str) -> tuple[str, tuple[str, ...]]:
     """A city's scores.json projected to the slim chart frame, as COLUMNAR JSON.
 
     Returns (columnar_json, live_columns).
+
+    Cached per city (three cities, warmed to a read-only path at container start)
+    the same way every other tool caches its loader. Uncached, each chart request
+    re-read and re-projected the whole 20-42MB file inside the sandbox time budget,
+    for a result that cannot change between requests.
 
     The published scores.json is 20-40MB per city, dominated by fields a chart never
     needs (address, lat/lon, five nested top_drivers structs per row) — shipping all
@@ -203,18 +251,33 @@ def _slim_payload(path: str) -> tuple[str, tuple[str, ...]]:
     return json.dumps({"cols": {c: cols[c] for c in live}}), live
 
 
+@functools.lru_cache(maxsize=3)
+def _wire_payload(path: str) -> tuple[str, tuple[str, ...]]:
+    """The slim frame as gzipped base64, which is what actually crosses into the box.
+
+    `writeFiles` ships the frame as one text argument, and that upload is the single
+    biggest cost inside the chart time budget — Los Angeles alone is 6.05MB of JSON.
+    Columnar JSON of repeated tiers, ZIPs and driver names compresses to about a
+    quarter (LA: 6.05MB -> 1.59MB), for ~0.05s to compress here and ~0.03s to
+    unpack in the sandbox. Cached per city alongside the projection itself.
+    """
+    text, live = _slim_payload(path)
+    return base64.b64encode(gzip.compress(text.encode("utf-8"), 1)).decode("ascii"), live
+
+
 def _setup_code(live_columns: Sequence[str]) -> str:
     """Setup cell run in the sandbox BEFORE the model's code. The frame is already
     slim and the driver topics are precomputed in the runtime, so this is just a
-    load. The live column list is asserted here so a stale expectation fails loudly
-    inside the cell rather than silently yielding an empty filter."""
+    decompress and load. The live column list is noted here so a stale expectation
+    fails loudly inside the cell rather than silently yielding an empty filter."""
     return f"""
-import json
+import base64, gzip, json
 import matplotlib
 matplotlib.use("Agg")  # headless: render to a file, no display
 import pandas as pd
 
-df = pd.DataFrame(json.load(open({DATA_FILENAME!r}, encoding="utf-8"))["cols"])
+with open({DATA_FILENAME!r}, encoding="ascii") as _fsi_f:
+    df = pd.DataFrame(json.loads(gzip.decompress(base64.b64decode(_fsi_f.read())))["cols"])
 # Columns available for THIS city: {", ".join(live_columns)}
 """
 
@@ -302,7 +365,7 @@ def _sandbox_run(code: str, city: str) -> dict[str, Any]:
     """
     scores_path = _scores_path(city)
     try:
-        scores_text, live_columns = _slim_payload(scores_path)
+        scores_text, live_columns = _wire_payload(scores_path)
     except FileNotFoundError:
         return {"ok": False, "error": f"no data file for {city}"}
     except (json.JSONDecodeError, TypeError, AttributeError) as exc:

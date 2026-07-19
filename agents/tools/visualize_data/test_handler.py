@@ -10,9 +10,12 @@ untrusted code. The live sandbox path is validated on deploy, not here.
 from __future__ import annotations
 
 import base64
+import gzip
 import json
 import os
 import sys
+
+import pytest
 
 _THIS_DIR = os.path.dirname(__file__)
 if _THIS_DIR not in sys.path:
@@ -21,10 +24,12 @@ if _THIS_DIR not in sys.path:
 from handler import (  # noqa: E402
     MAX_CODE_CHARS,
     SLIM_COLUMNS,
+    _driver_topic,
     _missing_column,
     _setup_code,
     _slim_payload,
     _slim_record,
+    _wire_payload,
     build_chart_block,
     handler,
     merge_chart_blocks,
@@ -253,6 +258,121 @@ def test_slim_payload_is_columnar(tmp_path):
     assert d["cols"]["license_id"] == ["1", "2"]
     assert d["cols"]["risk_tier"] == ["Low", "High"]
     assert d["cols"]["top_driver_topic"] == ["pest", "other"]
+
+
+def test_wire_payload_round_trips_through_gzip(tmp_path):
+    """The frame crosses into the sandbox gzipped, because that upload is the biggest
+    cost inside the chart time budget (Los Angeles: 6.05MB of JSON -> ~1.6MB). The
+    setup cell must be able to unpack exactly what was packed."""
+    p = tmp_path / "scores.json"
+    p.write_text(
+        json.dumps(
+            {
+                "scores": [
+                    {"license_id": "1", "risk_tier": "Low", "risk_score": 0.16979999840259552},
+                    {"license_id": "2", "risk_tier": "High", "risk_score": 0.5821000933647156},
+                ]
+            }
+        )
+    )
+    raw, raw_live = _slim_payload(str(p))
+    wire, wire_live = _wire_payload(str(p))
+    assert wire_live == raw_live
+    assert gzip.decompress(base64.b64decode(wire)).decode("utf-8") == raw
+
+
+def test_wire_payload_shrinks_a_realistic_frame(tmp_path):
+    """Compression only pays at real row counts (base64 overhead dominates a handful
+    of rows), and real frames repeat a small vocabulary of tiers, ZIPs and driver
+    names — which is exactly what gzip collapses."""
+    p = tmp_path / "scores.json"
+    p.write_text(
+        json.dumps(
+            {
+                "scores": [
+                    {
+                        "license_id": f"FA{i:07d}",
+                        "dba_name": f"TEST RESTAURANT {i % 500}",
+                        "risk_tier": ["Low", "Moderate", "Elevated", "High"][i % 4],
+                        "zip": str(90001 + (i % 300)),
+                        "risk_score": (i % 1000) / 1000,
+                        "top_drivers": [{"feature": "cur_theme_pest_vermin", "shap": 0.4}],
+                    }
+                    for i in range(5000)
+                ]
+            }
+        )
+    )
+    raw, _ = _slim_payload(str(p))
+    wire, _ = _wire_payload(str(p))
+    assert gzip.decompress(base64.b64decode(wire)).decode("utf-8") == raw
+    # Measured about a quarter on the real Los Angeles frame; keep a loose bound so
+    # this asserts the win without pinning an exact ratio.
+    assert len(wire) < len(raw) / 2
+
+
+def test_scores_are_rounded_for_the_wire(tmp_path):
+    """A calibrated probability serialises at full float64 width (21 bytes) and the
+    frame carries three such columns. No chart resolves past four decimals."""
+    p = tmp_path / "scores.json"
+    p.write_text(
+        json.dumps(
+            {
+                "scores": [
+                    {
+                        "license_id": "1",
+                        "risk_score": 0.16979999840259552,
+                        "trend_slope": 0.123456789,
+                        "top_drivers": [{"feature": "cur_theme_pest_vermin", "shap": 0.48551234}],
+                    }
+                ]
+            }
+        )
+    )
+    cols = json.loads(_slim_payload(str(p))[0])["cols"]
+    assert cols["risk_score"] == [0.1698]
+    assert cols["trend_slope"] == [0.12346]
+    assert cols["top_driver_shap"] == [0.4855]
+
+
+def test_slim_payload_is_cached_per_path(tmp_path):
+    """Every other agent tool caches its loader; this one did not, so each chart
+    re-read and re-projected the whole 20-42MB file inside the time budget."""
+    p = tmp_path / "scores.json"
+    p.write_text(json.dumps({"scores": [{"license_id": "1", "risk_tier": "Low"}]}))
+    first = _slim_payload(str(p))
+    # Rewriting the file must NOT change the answer while the cache is warm — proof
+    # the second call never touched disk.
+    p.write_text(json.dumps({"scores": [{"license_id": "999", "risk_tier": "High"}]}))
+    assert _slim_payload(str(p)) is first
+
+
+@pytest.mark.parametrize(
+    ("feature", "topic"),
+    [
+        # Los Angeles / New York publish themed violation features; none of these
+        # matched the Chicago-only prefix table, so LA collapsed to three topics
+        # with 57% of rows in "other" and violation-category charts were meaningless.
+        ("cur_theme_pest_vermin", "pest"),
+        ("cur_theme_temperature_control", "temperature"),
+        ("cur_theme_hygiene_handwashing", "handwashing"),
+        ("cur_theme_cross_contamination_protection", "cross_contamination"),
+        ("cur_theme_plumbing_sewage_water", "sewage"),
+        ("cur_theme_equipment_nonfood_surface", "equipment_surface"),
+        ("cur_score", "inspection_score"),
+        ("prior_mean_score", "inspection_score"),
+        ("cur_n_viol", "violation_count"),
+        ("cur_sev_T3", "violation_severity"),
+        ("prior_cur_sev_T1", "violation_severity"),
+        ("tenure_days", "license_age"),
+        # Chicago's own vocabulary must be unaffected.
+        ("was_fail", "inspection_outcome"),
+        ("flag_kw_rodent", "pest"),
+        ("days_since_last_inspection", "recency"),
+    ],
+)
+def test_driver_topic_covers_every_city_vocabulary(feature, topic):
+    assert _driver_topic(feature) == topic
 
 
 # ---------------------------------------------------------------------------
