@@ -137,6 +137,15 @@ gains are product/operating-point, not model capacity.
 
 # Cross-city ablations (Chicago, NYC, LA)
 
+> **Refreshed 2026-07-19** on the current shipped models (run_id `20260719_c186cf99a`).
+> The only material change from the 2026-07-12 baseline below is **NYC**, after the
+> closure/tenure feature additions: NYC full PR-AUC **0.583 → 0.615** (prior-only
+> 0.540→0.536, current-only 0.488→0.524, LogReg 0.561→**0.615** — the linear model now
+> ties XGBoost on NYC). The family-contribution *structure* is unchanged: neither
+> family alone matches the full model, and prior history alone gets closest in every
+> city. See figures 12–13 in `notebooks/09_cross_city_eda.ipynb`. The detailed table
+> below is the 2026-07-12 baseline run.
+
 All three cities' served models now sit in one parallel ablation frame, from
 `scripts/run_city_ablations.py`. Each city reuses its **own** production code (so
 numbers match the served model), holds its served temporal split fixed, and

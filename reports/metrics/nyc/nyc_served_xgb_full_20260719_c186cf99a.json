@@ -1,0 +1,156 @@
+{
+  "model": "nyc_served_xgb_full",
+  "city": "nyc",
+  "variant": "served_xgb_full",
+  "estimator": "xgb",
+  "calibration": "sigmoid (platt)",
+  "label": "y_next_bc",
+  "n_features": 32,
+  "data_vintage": "20260701",
+  "run_id": "20260719_c186cf99a",
+  "git_commit": "c186cf99a7b1f9e61c13a6e8b67515241f035ac4",
+  "git_dirty": true,
+  "feature_set_version": "8109e815ddb4",
+  "raw_snapshots": {
+    "data/raw/nyc_inspections.parquet": "438dc202a2c78215cd62b6ca1e35828d78a6c8c9876f05645e1492c5961061a2"
+  },
+  "train_window": {
+    "train_start": "2022-07-01",
+    "train_end": "2024-10-01",
+    "val_end": "2025-04-01"
+  },
+  "split": {
+    "train_n": 35190,
+    "val_n": 8773,
+    "test_n": 9456,
+    "test_prevalence": 0.4097
+  },
+  "base_rate": 0.41,
+  "test": {
+    "n": 9456,
+    "positive_rate": 0.409687,
+    "pr_auc": 0.614842,
+    "roc_auc": 0.698113,
+    "precision_at_5pct": 0.786469,
+    "precision_at_10pct": 0.738901,
+    "precision_at_20pct": 0.67019,
+    "recall_at_5pct": 0.096025,
+    "recall_at_10pct": 0.180434,
+    "recall_at_20pct": 0.32731,
+    "top_decile_lift": 1.803574,
+    "brier_score": 0.214522,
+    "log_loss": 0.619364
+  },
+  "threshold_0p5": {
+    "threshold": 0.5,
+    "precision": 0.646883,
+    "recall": 0.391069,
+    "f1": 0.487452
+  },
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "k": 473,
+      "precision": 0.786469,
+      "recall": 0.096025,
+      "lift": 1.9197
+    },
+    {
+      "frac": 0.1,
+      "k": 946,
+      "precision": 0.738901,
+      "recall": 0.180434,
+      "lift": 1.8036
+    },
+    {
+      "frac": 0.2,
+      "k": 1891,
+      "precision": 0.670016,
+      "recall": 0.327052,
+      "lift": 1.6354
+    }
+  ],
+  "f1_optimal_threshold": {
+    "threshold": 0.293,
+    "precision": 0.506867,
+    "recall": 0.790656,
+    "f1": 0.617727
+  },
+  "feature_importance": [
+    {
+      "feature": "tenure_days",
+      "mean_abs_shap": 0.477148,
+      "share": 0.2723
+    },
+    {
+      "feature": "prior_n_critical",
+      "mean_abs_shap": 0.145834,
+      "share": 0.0832
+    },
+    {
+      "feature": "cur_score",
+      "mean_abs_shap": 0.142673,
+      "share": 0.0814
+    },
+    {
+      "feature": "cur_closed",
+      "mean_abs_shap": 0.118864,
+      "share": 0.0678
+    },
+    {
+      "feature": "prior_bad_rate",
+      "mean_abs_shap": 0.116127,
+      "share": 0.0663
+    },
+    {
+      "feature": "prior_mean_score",
+      "mean_abs_shap": 0.084935,
+      "share": 0.0485
+    },
+    {
+      "feature": "prior_inspections",
+      "mean_abs_shap": 0.076822,
+      "share": 0.0438
+    },
+    {
+      "feature": "cur_n_viol",
+      "mean_abs_shap": 0.073737,
+      "share": 0.0421
+    },
+    {
+      "feature": "prev_score",
+      "mean_abs_shap": 0.065533,
+      "share": 0.0374
+    },
+    {
+      "feature": "cur_theme_temperature_control",
+      "mean_abs_shap": 0.061955,
+      "share": 0.0354
+    },
+    {
+      "feature": "cur_n_critical",
+      "mean_abs_shap": 0.057213,
+      "share": 0.0327
+    },
+    {
+      "feature": "days_since_last_inspection",
+      "mean_abs_shap": 0.054631,
+      "share": 0.0312
+    },
+    {
+      "feature": "prior_cur_sev_T1",
+      "mean_abs_shap": 0.052918,
+      "share": 0.0302
+    },
+    {
+      "feature": "prior_cur_sev_T2",
+      "mean_abs_shap": 0.047431,
+      "share": 0.0271
+    },
+    {
+      "feature": "cur_theme_pest_vermin",
+      "mean_abs_shap": 0.030814,
+      "share": 0.0176
+    }
+  ]
+}
