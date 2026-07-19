@@ -39,7 +39,7 @@
         },
         {
           "name": "FSI_BEDROCK_GUARDRAIL_VERSION",
-          "value": "9"
+          "value": "17"
         },
         {
           "name": "FSI_SANDBOX_USE_STUB",
