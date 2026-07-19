@@ -85,9 +85,18 @@ that parity does not condition on the truth, so it is expected wherever true fai
 rates differ across groups (the model flagging genuinely higher-risk areas, not biased
 errors). The lenses that actually catch unfair errors — equalized odds (FPR/FNR) and
 calibration — fire in only **two** places across all three cities: **NYC cuisine
-(calibration)** and **LA neighborhood (false-positive rate)**, both flagged for
-follow-up below. For every race / income / immigrant-status axis, the model does **not**
-make more errors or run miscalibrated.
+(calibration)** and **LA neighborhood (false-positive rate)**. On the census-derived
+axes (race, income, poverty, foreign-born, limited-English) the model does **not** make
+more errors or run miscalibrated in any city.
+
+Both truth-conditioned findings were then **tested rather than argued**, and both proved
+**real, not artifacts** — an earlier read of this document dismissed them too quickly and
+has been corrected. In NYC, five cuisines are miscalibrated beyond chance and four
+immigrant-associated ones are systematically *under*-predicted (scores read safer than
+reality). In LA, the false-alarm spread across ZIPs is roughly twice what equal rates
+would produce (p = 0.0004). Detail in "The two signals to watch" below. Note that cuisine
+is an ethnicity proxy, so the clean census-axis result above should not be read as an
+all-clear on ethnicity.
 
 | City | Test rows | Prevalence | M1 PR-AUC | Parity findings | Equalized-odds / calibration findings |
 |---|---|---|---|---|---|
@@ -114,34 +123,68 @@ Bangladeshi, where observed failure runs well above predicted (the model
 under-predicts risk); Pizza is the best-calibrated. Chicago and LA have no cuisine
 field (OSM-derived cuisine is a deferred, low-confidence refinement).
 
-*Follow-up resolved (2026-07-19):* the gap is **concentrated in a single cuisine**.
-Bangladeshi (ECE 0.229, n=125) drives it; every other audited cuisine is ≤ 0.09
-(next: Sandwiches 0.09, Caribbean 0.088) and the best-calibrated is Pizza (0.026,
-n=587). It is **stable**, not a thin-tier fluke — it persists at the wider
-Elevated+High operating point (0.20). Conclusion: a real but narrow single-cuisine
-under-prediction. We do **not** recalibrate for one n=125 group now — the gain is
-marginal, it risks overfitting, and a per-segment recalibration is a model change
-outside this audit's measurement-only scope (Jun's call). Logged as a known
-limitation; revisit when NYC has more history.
+*Follow-up tested (2026-07-19).* An earlier read of this called the gap "concentrated in
+a single cuisine" and implied it might be small-count noise. **Testing it showed
+otherwise.** Under perfect calibration a group's positives are Binomial(n, mean
+predicted), so an exact two-sided binomial test says whether each cuisine's deviation is
+a fluke. Five cuisines clear a Bonferroni threshold (α .05 / 20 cuisines = 2.5e-03):
+
+| Cuisine | n | predicted | actual | p (exact) | direction |
+|---|---|---|---|---|---|
+| Bangladeshi | 125 | 0.512 | 0.720 | 2.5e-06 | **under**-predicted |
+| Coffee/Tea | 827 | 0.360 | 0.283 | 2.4e-06 | over-predicted |
+| Chinese | 1055 | 0.466 | 0.530 | 3.5e-05 | **under**-predicted |
+| Caribbean | 449 | 0.433 | 0.519 | 2.4e-04 | **under**-predicted |
+| Latin American | 555 | 0.461 | 0.526 | 2.5e-03 | **under**-predicted |
+
+Bangladeshi is much the largest deviation (21 points) and is nowhere near chance at
+n=125, so it is not a small-sample artifact. But it is **not** an isolated case: four
+immigrant-associated cuisines are systematically **under**-predicted, meaning their
+scores read *safer than reality*, while Coffee/Tea is over-predicted. That is a
+directional pattern across groups, not one odd cuisine, and it is the more
+ethically-salient reading. It is also stable, persisting at the wider Elevated+High
+operating point (0.20).
+
+**Open, not closed.** A per-cuisine recalibration is the obvious fix, but it means
+adjusting a published score using an ethnicity proxy, which raises the same 0004 / 0005
+concern as using cuisine as a feature. So this is a product and ethics decision (Jun),
+not just a modeling one, and it should be made knowing the effect is broader than one
+cuisine.
 
 **LA neighborhood — false-positive rate (new on the 2026-07-19 refresh).** LA's
-false-positive rate (flagging a place High that does not fail within 180 days) now
-differs across neighborhoods by 0.14 (CI [0.11, 0.23]), just clearing the 0.10
-tolerance. Treat this as **provisional**: LA neighborhood coverage is only ~55% and
-LA coordinates use a coarse zip-centroid geocoding fallback, so the neighborhood
-assignment is noisy and the gap may be partly a geocoding artifact rather than a
-stable disparity.
+false-positive rate (flagging a place High that does not fail within 180 days) differs
+across neighborhoods (ZIPs) by 0.14 (CI [0.11, 0.23]), clearing the 0.10 tolerance. This
+was initially read as probably a small-sample / geocoding artifact; **testing showed it
+is not** (see below). LA neighborhood coverage is ~55% and coordinates use a coarse
+zip-centroid fallback, but that noise attenuates rather than manufactures the effect.
 
-*Follow-up resolved (2026-07-19):* the operating-point check is done — the gap
-**persists and grows** (0.14 at High → 0.75 at Elevated+High), so it is **not** a
-thin-High-tier-count artifact. But LA "neighborhood" is **ZIP**, and the gap is a
-max-minus-min range over **71 ZIPs, many with n ≈ 50–86**, under coarse zip-centroid
-geocoding — a range statistic over many small, noisily-assigned groups is inflated
-upward, so a large value is expected even without a true disparity. Conclusion:
-**keep provisional; do not act now.** The remaining "re-check after geocoding
-improves" is blocked (LA is a preview feature). The clean fix, if pursued, is to
-audit LA at a coarser, well-defined geography (e.g. council district) rather than raw
-ZIP — follow-up work, not a blocker.
+*Follow-up tested (2026-07-19) — and the earlier "probably an artifact" read was
+**wrong**.* Two checks:
+
+1. **Operating point.** The gap persists and grows (0.14 at High → 0.75 at
+   Elevated+High), so it is not a thin-High-tier-count artifact.
+2. **Small-sample null.** The worry was that a max-minus-min range over 71 ZIPs (median
+   61 negatives each) is inflated by sampling noise alone. Tested directly: hold every
+   ZIP at the pooled FPR (0.0166) and resample `flagged ~ Binomial(n_negatives, p)`
+   20,000 times. Noise *does* inflate the range, but not nearly enough.
+
+   | | value |
+   |---|---|
+   | Observed max-minus-min range | **0.1356** |
+   | Null mean / p95 / max over 20k draws | 0.0667 / 0.0909 / 0.1556 |
+   | p-value, P(null ≥ observed) | **0.0004** |
+
+**Conclusion: treat this as a real finding, not noise.** The observed spread is roughly
+twice what equal-FPR-everywhere produces and sits beyond the null's 95th percentile.
+Coarse zip-centroid geocoding does not rescue the earlier reading either: measurement
+error in *group assignment* attenuates a real association toward the null, so seeing a
+beyond-chance gap **despite** noisy ZIP assignment makes the disparity more credible,
+not less (and the true gap may be larger). The false-alarm burden really does fall
+unevenly across LA areas.
+
+Next steps: re-audit at a coarser, well-defined geography (e.g. council district) to see
+the effect free of ZIP-centroid noise, and treat LA's false-alarm burden as an open
+fairness issue rather than a deferred curiosity.
 
 ## Why the proxy features stay out (zip, facility type, cuisine)
 
