@@ -71,6 +71,25 @@ Full per-city detail in `docs/fairness_audit.md`; JSON artifacts in
   costs ~6 extra inspections of ~124 flagged — consistent with there being no
   equalized-odds gap to fix.
 
+## Refresh (2026-07-19)
+
+The notebook (`notebooks/08_fairness_census_audit.ipynb`) gained a colorblind-safe
+**visual summary** (five figures saved to `reports/figures/fairness_*.png`) and was
+re-run on current data. Two things changed:
+
+- **NYC/LA numbers moved.** Chicago reproduces exactly (frozen deployed feature
+  snapshot); NYC/LA re-pull live SODA, which has grown (LA 7,197 → 10,045 test rows).
+  The three cities are therefore **not on one as-of date** — a reproducibility gap.
+  **Recommendation:** pin NYC/LA to their raw snapshot (the hash already exists; the
+  adapters just don't read it) so a re-run is deterministic across all three cities.
+- **A new finding: LA neighborhood false-positive-rate gap** (0.14, CI [0.11, 0.23]),
+  the first truth-conditioned finding outside NYC cuisine. Treat as **provisional**:
+  LA neighborhood coverage is ~55% with coarse zip-centroid geocoding, so it may be a
+  geocoding artifact. Re-check after LA geocoding improves and at the wider operating
+  point. The headline is now "almost all findings are parity-only; two truth-
+  conditioned findings (NYC cuisine calibration, LA neighborhood FPR), both flagged
+  for follow-up," not "every finding parity-only except NYC cuisine."
+
 ## Consequences
 
 - The census audit is now reusable and reproducible; adding a city is one adapter.
