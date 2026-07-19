@@ -74,8 +74,9 @@ Full per-city detail in `docs/fairness_audit.md`; JSON artifacts in
 ## Refresh (2026-07-19)
 
 The notebook (`notebooks/08_fairness_census_audit.ipynb`) gained a colorblind-safe
-**visual summary** (five figures saved to `reports/figures/fairness_*.png`) and was
-re-run on current data. Two things changed:
+**visual summary** (a fairness scorecard, two finding close-ups, and a detailed
+appendix, saved to `reports/figures/fairness_*.png`) and was re-run on current data.
+Two things changed:
 
 - **NYC/LA numbers moved.** Chicago reproduces exactly (frozen deployed feature
   snapshot); NYC/LA re-pull live SODA, which has grown (LA 7,197 → 10,045 test rows).
@@ -89,6 +90,25 @@ re-run on current data. Two things changed:
   point. The headline is now "almost all findings are parity-only; two truth-
   conditioned findings (NYC cuisine calibration, LA neighborhood FPR), both flagged
   for follow-up," not "every finding parity-only except NYC cuisine."
+
+### Follow-ups closed out (2026-07-19)
+
+Both truth-conditioned findings were diagnosed further; neither changes the model.
+
+- **NYC cuisine calibration — real but narrow; no action.** The 0.20 ECE gap is
+  **concentrated in a single cuisine**: Bangladeshi (ECE 0.229, n=125). Every other
+  audited cuisine is ≤ 0.09 and the best-calibrated is Pizza (0.026, n=587). It is
+  stable (persists at Elevated+High, 0.20). We do **not** recalibrate for one n=125
+  group — marginal gain, overfitting risk, and a per-segment recalibration is a model
+  change outside the audit's measurement-only scope. Logged as a known limitation;
+  revisit with more NYC history.
+- **LA neighborhood FPR — likely a geography/small-sample artifact; keep provisional.**
+  The operating-point check is done: the gap persists and grows (0.14 → 0.75 at
+  Elevated+High), so it is not a thin-tier count artifact. But LA "neighborhood" is
+  ZIP, and the gap is a range over 71 ZIPs (many n ≈ 50–86) under coarse zip-centroid
+  geocoding, which inflates a max-minus-min statistic. No action now; the clean fix
+  (if pursued) is to audit LA at a coarser, well-defined geography (e.g. council
+  district), and the geocoding re-check stays blocked while LA is a preview feature.
 
 ## Consequences
 

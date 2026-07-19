@@ -111,10 +111,18 @@ make more errors or run miscalibrated.
 and its model shows a **calibration (ECE) gap across cuisines in both the risk model
 and the forecast model** (across-group gap 0.20 vs a 0.05 tolerance). The extreme is
 Bangladeshi, where observed failure runs well above predicted (the model
-under-predicts risk); Pizza is the best-calibrated. Follow-up: is it concentrated in
-a few low-count cuisines, or a genuine miscalibration worth a per-segment
-recalibration? Chicago and LA have no cuisine field (OSM-derived cuisine is a
-deferred, low-confidence refinement).
+under-predicts risk); Pizza is the best-calibrated. Chicago and LA have no cuisine
+field (OSM-derived cuisine is a deferred, low-confidence refinement).
+
+*Follow-up resolved (2026-07-19):* the gap is **concentrated in a single cuisine**.
+Bangladeshi (ECE 0.229, n=125) drives it; every other audited cuisine is ≤ 0.09
+(next: Sandwiches 0.09, Caribbean 0.088) and the best-calibrated is Pizza (0.026,
+n=587). It is **stable**, not a thin-tier fluke — it persists at the wider
+Elevated+High operating point (0.20). Conclusion: a real but narrow single-cuisine
+under-prediction. We do **not** recalibrate for one n=125 group now — the gain is
+marginal, it risks overfitting, and a per-segment recalibration is a model change
+outside this audit's measurement-only scope (Jun's call). Logged as a known
+limitation; revisit when NYC has more history.
 
 **LA neighborhood — false-positive rate (new on the 2026-07-19 refresh).** LA's
 false-positive rate (flagging a place High that does not fail within 180 days) now
@@ -122,8 +130,18 @@ differs across neighborhoods by 0.14 (CI [0.11, 0.23]), just clearing the 0.10
 tolerance. Treat this as **provisional**: LA neighborhood coverage is only ~55% and
 LA coordinates use a coarse zip-centroid geocoding fallback, so the neighborhood
 assignment is noisy and the gap may be partly a geocoding artifact rather than a
-stable disparity. Follow-up: re-check after LA geocoding improves, and confirm it
-persists at the wider Elevated+High operating point.
+stable disparity.
+
+*Follow-up resolved (2026-07-19):* the operating-point check is done — the gap
+**persists and grows** (0.14 at High → 0.75 at Elevated+High), so it is **not** a
+thin-High-tier-count artifact. But LA "neighborhood" is **ZIP**, and the gap is a
+max-minus-min range over **71 ZIPs, many with n ≈ 50–86**, under coarse zip-centroid
+geocoding — a range statistic over many small, noisily-assigned groups is inflated
+upward, so a large value is expected even without a true disparity. Conclusion:
+**keep provisional; do not act now.** The remaining "re-check after geocoding
+improves" is blocked (LA is a preview feature). The clean fix, if pursued, is to
+audit LA at a coarser, well-defined geography (e.g. council district) rather than raw
+ZIP — follow-up work, not a blocker.
 
 ## Mitigation (analysis only)
 
