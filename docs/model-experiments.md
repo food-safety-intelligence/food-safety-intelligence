@@ -1,6 +1,6 @@
 # Model Experiments Log
 
-- **Owner**: Bella · **Last updated**: 2026-07-12
+- **Owner**: Bella · **Last updated**: 2026-07-19
 - One row per modeling experiment: the change + hypothesis, the measured result, and the
   verdict (kept / reverted). **Negative results are logged too** — knowing what *didn't*
   move the needle is the point.
@@ -42,6 +42,7 @@
 | 2026-06-21 | **Label deconfounding — exposure / inverse-propensity weighting (3A)** — the label is only observed through an inspection, so it conflates "risky" with "got inspected." Build an exposure-propensity model P(next inspection ≤180d) from leak-free as-of-date cadence cols, then A/B the risk model with `sample_weight ∝ 1/p` (stabilized) vs the unweighted v36 baseline, both models, same gate. *Does reweighting away the inspection-arrival confound clean up the ranking?* | **Null — reverted.** Confound is real but localized: v36 score corr with exposure-propensity **0.86**, top decile **91% just-failed** — but corr with generic cadence is tiny (`prior_inspections` 0.10), so it's the documented `was_fail`→mandated-re-inspection mechanism, not "inspected often." The stabilized two-arm reweighting *does* deconfound (corr 0.86→0.79 LogReg / 0.91→0.75 XGB) but is flat-to-down on the gate (LogReg −0.004/−0.009; XGB −0.010/0.000) with no fairness win (Children's recall@10% 0.43→0.39); the aggressive `1/p` arm is worse (LogReg −0.027/−0.028). Wrinkle: test labels are equally censored, so the gate can't credit deconfounding anyway — the call rests on diagnostic + fairness, both no. | **Reverted (unwired).** The exposure coupling isn't a separable nuisance — it's the legitimate just-failed signal that drove v36. Script `scripts/run_exposure_ipw_experiment.py` + metrics on branch `bella/mle-deconfound-label-ipw`. Open 3A sub-levers: inspector-strictness (no inspector ID), fail-only (DR 0007). | this PR |
 | 2026-06-27 | **Building-violation features — re-evaluation + revert (corrects PR #44)** — PR #44 re-added 9 block-face building-violation features (aggregate counts/recency + a 5-bureau split: conservation/refrigeration/plumbing/ventilation/electrical) to `ALL_FEATURES`, reporting XGB **+0.0198 PR-AUC / +0.0231 P@10**. That delta compared a freshly-trained candidate (correct RT-dropped test, n≈6,702, base 10.5%) against a **stale stored control on a different test set** (`xgb_20260621_bef769ef8.json`, RT-kept n=13,812, base 8.85%) — a base-rate artifact, not signal (ROC-AUC and top-decile lift, which are base-rate-invariant, both went *down* −0.021 / −0.458). *Re-run honestly: same rows both arms, all three model families.* | **Null — fails the gate on every model.** Same-split A/B on the correct test (n=7,008, base 10.8%): the control's PR-AUC rises 0.3381→0.3597 once moved onto the correct rows — that +0.0216 IS the fake "gain"; the feature's real contribution is **+0.0015 PR-AUC** (noise). Expanding-window CV (6 folds, 180d embargo): **XGB** mean ΔPR-AUC −0.0055, both-gate 2/6; **LogReg** ΔPR-AUC +0.0005, 2/6; **MLP (nb07)** ΔPR-AUC −0.0045, 1/5. Add-one ablation: all 9 columns negative on both metrics. Even under the relaxed one-model gate (DR 0002 amendment), no model clears it. Reproduces the original 2026-06-21 building-permits-and-violations null (row above). | **Reverted** — 9 features removed from `ALL_FEATURES` + driver labels; `features/building_features.py` (incl. the bureau split) kept in-tree, **unwired**. Also corrected **nb07 (MLP)**: it was evaluating on the wrong RT-kept test set (deflated, base 8.8%) — now drops burn-in + right-truncated before splitting, matching the production scorer. | this PR |
 | 2026-06-28 | **Forward-looking trend — last-K-visits slope on a forecast-only model** — the served `trend_slope_90d` (90-day OLS of the *production* score, `predict_batch._compute_trend_slopes`) is null for ~70% of licenses (needs 2 inspections within 90 days) and, when present, tracks the mandated fail→re-inspection swing. Two independent knobs: **window** 90-day→**last-K visits** (coverage) and **score** production→**forecast-only Model 2** (drops `was_fail`/`n_priority_this_inspection`/`n_core_this_inspection`; makes the trend forward-looking). Reconstructs the 2026-06-22 `/tmp` prototype on real data + sweeps K∈{3,4,5,6,8}. Basis: anchors = each license's latest **non-right-truncated** test inspection (n=5,226, base 4.4%, 97.5% clean). XGB both models. | **Coverage 0.29→0.87** (K-independent — only needs 2 of the last K). **Partly forward-looking**: corr(slope, `last_was_fail`) −0.31→−0.19 (residual is legitimate prior-history signal, not the re-inspection bounce). **Clean early-warning** (was_fail==0, base 4.4%): strict top-decile rising slope **2.26× @K=5** (2.1–2.3× for K3–5, decays to 1.74× @K8), strict top-20% ~1.65×, **loose slope>0 ~1.16× (uninformative)**. Reproduces + exceeds the prototype's 1.46×. | **Ship as an additive descriptive trend + early-warning watch-list (DR 0011).** A coverage + honesty win, **not** a predictive improving/worsening/stable label (the loose signal is flat). Replaces `trend_slope_90d` → `trend_slope` (last-K=5 forecast); adds per-inspection forecast scores for a real detail-page chart. | DR 0011, this PR |
+| 2026-07-19 | **Deep tabular models — fair-shot HPO + TabM + XGB ensemble** — put **FT-Transformer** + **ResNet-MLP** (Gorishniy 2021) + **TabM** (Gorishniy 2024, parameter-efficient deep ensemble) against the served XGB, each given the **same tuning budget XGB got** (16-trial random search over expanding-window CV; winner scored once on the 2025-07-01+ test, seed-avg ×3); then blend XGB+DL (weight picked on val). Frozen v36 features; isolated `.venv-torch` (torch not in the lockfile). *Does modern tabular DL — tuned, or ensembled with XGB — beat the tree on 36 features with 2 dominant signals?* | **No — statistical tie; XGB ahead in point estimate.** Tuned DL PR-AUC: FT 0.369 / ResNet 0.368 / TabM 0.372, all < XGB **0.381** (P@10 0.409–0.419 vs 0.415); **HPO moved nothing** vs the untuned benchmark (0.366–0.370). Best ensemble XGB+TabM rank-avg 0.382/0.415 (≈XGB). **Paired bootstrap (2000 resamples, n=7,008): every delta-vs-XGB CI crosses 0** — DL-alone PR-AUC ~−0.011 [P(DL>XGB) 0.07–0.12]; ensembles +0.000–0.001 [P≈0.5–0.6]; a tentative DL-consensus top-decile P@10 edge (+0.006) is **not** significant (P=0.73, CI [−0.014,+0.026]). | **XGB stays served.** Empirically closes the earlier predicted tabular-DL NO-GO: nets reach parity, win nothing distinguishable, and no ensemble justifies serving a torch model. Harnesses + result JSONs kept (`scripts/run_torch_*`, `reports/metrics/mlp/torch_*`). | this PR |
 
 ## Model comparison: LogReg vs XGBoost
 
@@ -121,9 +122,9 @@ remaining DL families are **NO-GO at this scale** (documented, not spiked):
 - **Sequence model** (RNN / temporal-Transformer over each license's ordered
   inspections) — `prior_*` already encodes recency / trend / 365-day / last-outcome;
   ~80k short sequences would relearn those aggregates with more variance. Default NO-GO.
-- **Tabular DL** (FT-Transformer / TabNet) — wrong tool at ~80k rows with heavy
-  structural NaNs; GBMs win this regime and XGBoost already pulled even with LogReg
-  on v36. Expected lift ≈ 0.
+- **Tabular DL** (FT-Transformer / ResNet-MLP / TabM) — **now spiked (2026-07-19),
+  prediction confirmed** (see "Tabular DL spike" below): GBMs win this regime, and even
+  tuned modern nets reach only parity — the "expected lift ≈ 0" held on the test set.
 - **Graph** (operator / inspector / address networks) — the cross-license
   **operator-prior already came up flat** (2026-06-14), and an inspector-linked
   graph would re-create the geographic/demographic proxy we dropped `static_zip`
@@ -131,6 +132,48 @@ remaining DL families are **NO-GO at this scale** (documented, not spiked):
 
 **Net:** no untried DL lever has positive expected value at this scale; the next
 gains are product/operating-point, not model capacity.
+
+### Tabular DL spike — parity, no win (2026-07-19)
+
+The tabular-DL NO-GO above was the one prediction still unspiked, so it got a full
+fair-shot test: three modern architectures — **FT-Transformer** and **ResNet-MLP**
+(Gorishniy 2021), and **TabM** (Gorishniy 2024, a parameter-efficient deep ensemble of
+BatchEnsemble members) — each given the **same tuning budget XGB got** (16-trial random
+search over the same expanding-window CV; the winner scored **once** on the 2025-07-01+
+test, seed-averaged ×3), then blended with the served XGB (blend weight chosen on
+validation, never on test). Frozen v36 features; run JSONs under
+`reports/metrics/mlp/torch_*`; torch lives in an isolated `.venv-torch` (deliberately
+**not** in the lockfile — this is a benchmark, not a serving dependency).
+
+Test set n=7,008, base 10.8%; served XGB on this split = **PR-AUC 0.381 / P@10 0.415**:
+
+| Model (tuned, seed-avg ×3) | PR-AUC | P@10 | vs XGB |
+|---|---|---|---|
+| FT-Transformer | 0.369 | 0.419 | behind on PR-AUC |
+| ResNet-MLP | 0.368 | 0.409 | behind |
+| TabM (best DL) | 0.372 | 0.414 | behind |
+| XGB + TabM (rank-avg) | 0.382 | 0.415 | tie |
+| XGB + all-3-DL consensus (rank) | 0.381 | 0.417 | tie |
+
+**HPO changed nothing.** Tuned PR-AUC (0.368–0.372) is indistinguishable from the untuned
+fixed-config benchmark (0.366–0.370), so the gap is the information ceiling, not
+under-tuning. TabM is the strongest net, as the literature predicts for this regime, and
+still lands short.
+
+**A paired bootstrap (2,000 resamples of the test rows, `torch_bootstrap_ci_*`) settles
+significance: every delta-vs-XGB confidence interval crosses zero.** DL alone runs ~0.011
+PR-AUC behind XGB with P(DL > XGB) ≈ 0.07–0.12 (very likely behind, though not at the 95%
+bar); the XGB+DL ensembles land +0.000–0.001 PR-AUC at P ≈ 0.5–0.6 (a coin-flip tie). A
+tentative top-decile edge from the DL consensus (point P@10 0.424, +0.006 over XGB) does
+**not** survive — P = 0.73, CI [−0.014, +0.026]. Two method notes: the val-chosen blend
+weights kept collapsing toward the DL side (a sign val-weight selection overfits — the
+fixed 50/50 rank-average was more robust), and the test set is peeked at once per model,
+so a sub-0.01 "win" is read as a tie by design.
+
+**Verdict: XGB stays served.** On 36 features with two dominant signals (`was_fail`,
+`n_priority_this_inspection`), modern tabular DL reaches parity but wins nothing
+distinguishable, and no ensemble justifies serving a torch model beside the joblib XGB.
+The tree-vs-DL prediction held; this is the empirical close-out of the tabular-DL bet.
 
 ---
 
