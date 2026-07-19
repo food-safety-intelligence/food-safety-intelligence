@@ -243,13 +243,18 @@ The agent runtime and its logs live in **Deepak's account (991500268971)**, so t
 must run as Deepak (CloudShell). Bella's IAM user gets `AccessDenied` on
 `logs:DescribeLogGroups` — she cannot pull these.
 
+A fresh CloudShell has no exports — set BOTH first, or the tail fails with
+`ParamValidation: Invalid length for parameter logGroupName, value: 0`:
+
 ```bash
-# 1) find the runtime's log group
+# 1) ALWAYS set these first (current values)
+export REGION="us-west-2"
+export LG="/aws/bedrock-agentcore/runtimes/foodsafety_foodsafetyagent-4UtF42EBno-DEFAULT"
+
+# only needed if the runtime was recreated and the group name changed:
 aws logs describe-log-groups --region "$REGION" \
   --query "logGroups[?contains(logGroupName,'agentcore') || contains(logGroupName,'foodsafety') || contains(logGroupName,'bedrock')].logGroupName" \
   --output table
-
-export LG="<log group from above>"
 
 # 2) reproduce the failing request in the app, then read the last few minutes
 aws logs tail "$LG" --region "$REGION" --since 15m --format short
