@@ -11,7 +11,8 @@ import { useEffect, useState, type ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
 import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
 import { sourceNames } from "@/lib/sources";
-import { EvaluationDetail } from "@/components/EvaluationDetail";
+import { EvaluationDetail } from "@/components/MethodologySections";
+export { ChronologicalSplit, FeatureGroups, type FeatureGroup } from "@/components/MethodologySections";
 import type { DateWindow } from "@/lib/methodology-server";
 
 export interface Headline {

@@ -16,15 +16,17 @@ import {
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
 import { glossaryFor } from "@/lib/glossary";
+import type { DateWindow } from "@/lib/methodology-server";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
-import { ModelCard, DataGovernance, MethodologyHero, OperatingPointsTable, TightestSlices, useChicagoHeadline } from "@/components/HowItWorksCards";
+import { ChronologicalSplit, ModelCard, DataGovernance, FeatureGroups, type FeatureGroup, MethodologyHero, OperatingPointsTable, TightestSlices, useChicagoHeadline } from "@/components/HowItWorksCards";
 import { cn } from "@/lib/utils";
 
 interface LaMethodology {
   data_source: string;
   train_window: string;
   test: { n: number; prevalence: number; events: number; split_from: string };
+  windows?: { train: DateWindow; val: DateWindow; test: DateWindow };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   risk_tiers: { label: string; min: number; max: number | null; share: number }[];
   operating_points: { frac: number; n_flagged: number; precision: number; recall: number; lift: number; events_caught: number }[];
@@ -80,6 +82,47 @@ const NAV = [
   ["model-card", "Model card"],
   ["data-governance", "Data governance"],
   ["reference", "Reference"],
+];
+
+
+// The model's inputs, grouped for the "What the model looks at" list. Counts are
+// from the served artifact's feature list (la_xgb_sigmoid: 28) and sum to it.
+const LA_FEATURE_GROUPS: FeatureGroup[] = [
+  {
+    name: "Prior history",
+    count: 5,
+    detail:
+      "how many inspections the establishment has on record, how many were graded B or C, its prior major/critical violation count, and its average past score and past B/C rate",
+  },
+  {
+    name: "Recency & previous visit",
+    count: 3,
+    detail:
+      "days since the last inspection, plus the previous inspection's score and whether it was B or C, so the model sees direction and not just lifetime totals",
+  },
+  {
+    name: "Prior violation severity",
+    count: 3,
+    detail:
+      "counts of past violations at each severity tier (imminent-hazard, major, minor), mapped from LA County codes via the shared violation dictionary",
+  },
+  {
+    name: "Current inspection outcome",
+    count: 4,
+    detail:
+      "this visit's own score out of 100, its total and major/critical violation counts, and whether it was graded B or C",
+  },
+  {
+    name: "Current violation severity",
+    count: 3,
+    detail: "this visit's violations counted at each of the three severity tiers",
+  },
+  {
+    name: "Current violation themes",
+    count: 10,
+    detail:
+      "this visit's violations counted by plain-language theme (temperature control, pest/vermin, hygiene and handwashing, cross-contamination, food-contact surfaces, plumbing and sewage, approved source, equipment, management certification, administrative)",
+  },
 ];
 
 export function HowItWorksLa() {
@@ -195,23 +238,13 @@ export function HowItWorksLa() {
       <div className="mt-10 space-y-8">
         <SectionLabel id="how-its-built" number="02" icon={Wrench}>How it&apos;s built</SectionLabel>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">The model</h2>
+          <h2 className="text-2xl font-medium tracking-tight">What the score predicts</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            A gradient-boosted tree model (XGBoost, depth-3) with sigmoid (Platt)
-            calibration. The per-establishment SHAP driver breakdown and the
-            calibrated-log-odds waterfall on each detail page show which factors
-            moved the score. Scores are computed in a batch job and written to JSON;
-            the site never calls a model at request time.
-          </p>
-        </article>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What we predict</h2>
-          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            For each inspection we ask: at this establishment&apos;s <em>next</em>
+            For each inspection we ask: at this establishment&apos;s <em>next</em>{" "}
             inspection, does the grade drop to B or C (score below 90)? Like NYC and
             unlike Chicago&apos;s fixed 180-day window, the LA label is anchored to
-            the next inspection whenever it occurs. LA&apos;s ~annual cadence makes a
-            short fixed window empty. Source:{" "}
+            the next inspection whenever it occurs, because LA&apos;s roughly annual
+            cadence leaves a short fixed window empty. Source:{" "}
             {m?.data_source ?? "LA County Environmental Health Restaurant and Market Inspections"}.
             Training window: {m?.train_window ?? "2023-04-01 onward"}. LA County&apos;s
             open feed is already post-COVID, so there&apos;s no pre-pandemic cutoff to
@@ -219,20 +252,41 @@ export function HowItWorksLa() {
           </p>
         </article>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">What goes in</h2>
+          <h2 className="text-2xl font-medium tracking-tight">What the model looks at</h2>
+          <FeatureGroups total={28} groups={LA_FEATURE_GROUPS} />
+        </article>
+        <article>
+          <h2 className="text-2xl font-medium tracking-tight">How the datasets connect</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            Leak-free history features: prior inspection count, prior B/C count,
-            average and previous score, prior critical-violation counts, days since
-            the last inspection, plus the current inspection&apos;s own outcome
-            (score, violation counts). LA&apos;s inspections and violations arrive as
-            two feeds, joined on the inspection&apos;s serial number; those violations
-            are mapped through a shared violation dictionary into severity tiers
-            (imminent-hazard / critical / general) and themes (temperature, pest,
-            hygiene, contamination, …) so the same vocabulary describes all three cities. No cuisine or demographic proxy is
-            used. LA&apos;s feed carries no coordinates, so map pins are geocoded from
-            each establishment&apos;s address.
+            LA&apos;s inspections and violations arrive as two feeds, joined on the
+            inspection&apos;s serial number. Every prior-history and recency feature
+            looks only at that establishment&apos;s own earlier inspections, strictly
+            before the one being scored. There is no cross-establishment or
+            map-proximity join. Cuisine is deliberately left out, along with any
+            demographic proxy. The feed carries no coordinates, so map pins are
+            geocoded from each establishment&apos;s street address; those coordinates
+            place the pin and are never a model input.
           </p>
         </article>
+        <article>
+          <h2 className="text-2xl font-medium tracking-tight">The model</h2>
+          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
+            A gradient-boosted tree model (XGBoost, depth-3) with sigmoid (Platt)
+            calibration. The per-establishment SHAP driver breakdown and the
+            calibrated-log-odds waterfall on each detail page show which factors
+            moved the score. Scores are computed in a batch job and written to JSON;
+            the site never calls a model at request time.
+            {m ? (
+              <>
+                {" "}On the time-held-out test split: PR-AUC{" "}
+                {m.headline.pr_auc.toFixed(2)}, ROC-AUC{" "}
+                {m.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
+                {m.headline.top_decile_lift.toFixed(1)}×.
+              </>
+            ) : null}
+          </p>
+        </article>
+        <ChronologicalSplit windows={m?.windows} />
       </div>
 
       {/* 03 — How well it works */}
