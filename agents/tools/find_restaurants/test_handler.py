@@ -127,7 +127,7 @@ def test_parse_elements_dedup_and_skips():
         # No coords -> skipped.
         {"id": 5, "tags": {"name": "Gamma"}},
     ]
-    out = _parse_elements(elements, centroid)
+    out = _parse_elements(elements, centroid, CHI_DEFAULT)
     names = {r["name"] for r in out}
     assert names == {"Alpha", "Beta"}
     beta = next(r for r in out if r["name"] == "Beta")

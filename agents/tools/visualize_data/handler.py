@@ -205,16 +205,14 @@ SLIM_COLUMNS = (
 _REQUIRED_COLUMNS = ("license_id", "dba_name", "as_of_date", "risk_score", "risk_tier")
 
 
-@functools.lru_cache(maxsize=3)
 def _slim_payload(path: str) -> tuple[str, tuple[str, ...]]:
     """A city's scores.json projected to the slim chart frame, as COLUMNAR JSON.
 
     Returns (columnar_json, live_columns).
 
-    Cached per city (three cities, warmed to a read-only path at container start)
-    the same way every other tool caches its loader. Uncached, each chart request
-    re-read and re-projected the whole 20-42MB file inside the sandbox time budget,
-    for a result that cannot change between requests.
+    Deliberately NOT cached: only `_wire_payload` calls it, and that is cached, so
+    caching here too would pin ~12.5MB of raw JSON across the three cities that is
+    never read again.
 
     The published scores.json is 20-40MB per city, dominated by fields a chart never
     needs (address, lat/lon, five nested top_drivers structs per row) — shipping all
@@ -290,6 +288,25 @@ import base64 as _fsi_b64, os as _fsi_os
 if _fsi_os.path.exists({CHART_FILENAME!r}):
     print("{CHART_B64_MARKER}" + _fsi_b64.b64encode(open({CHART_FILENAME!r}, "rb").read()).decode())
 """
+
+
+MAX_SUMMARY_CHARS = 4000
+
+
+def _capped_summary(stdout: str) -> str:
+    """Bound the printed numbers handed back to the model.
+
+    `summary` is whatever the model's code printed, and the model is told to print
+    the rows it wants to talk about. One forgotten slice — `print(df)` on a 42,270-row
+    frame — would otherwise push the entire dataset back through the context. The
+    error paths were already capped; this is the success path.
+    """
+    if len(stdout) <= MAX_SUMMARY_CHARS:
+        return stdout
+    return stdout[:MAX_SUMMARY_CHARS] + (
+        "\n[truncated — the code printed more than fits. Print only the rows or "
+        "aggregates you need, e.g. a head()/nlargest() slice.]"
+    )
 
 
 def _split_chart_b64(text: str) -> tuple[str, str]:
@@ -641,6 +658,6 @@ def handler(event: dict[str, Any], _ctx: Any) -> dict[str, Any]:
     return {
         "status": "ok",
         "chart_id": chart_id,
-        "summary": run.get("stdout", ""),
+        "summary": _capped_summary(run.get("stdout", "")),
         "chart_block": block,
     }

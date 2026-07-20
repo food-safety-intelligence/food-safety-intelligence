@@ -335,16 +335,19 @@ def test_scores_are_rounded_for_the_wire(tmp_path):
     assert cols["top_driver_shap"] == [0.4855]
 
 
-def test_slim_payload_is_cached_per_path(tmp_path):
+def test_wire_payload_is_cached_per_path(tmp_path):
     """Every other agent tool caches its loader; this one did not, so each chart
-    re-read and re-projected the whole 20-42MB file inside the time budget."""
+    re-read and re-projected the whole 20-42MB file inside the time budget. The cache
+    sits on _wire_payload (not _slim_payload), so the raw JSON is not pinned too."""
     p = tmp_path / "scores.json"
     p.write_text(json.dumps({"scores": [{"license_id": "1", "risk_tier": "Low"}]}))
-    first = _slim_payload(str(p))
+    first = _wire_payload(str(p))
     # Rewriting the file must NOT change the answer while the cache is warm — proof
     # the second call never touched disk.
     p.write_text(json.dumps({"scores": [{"license_id": "999", "risk_tier": "High"}]}))
-    assert _slim_payload(str(p)) is first
+    assert _wire_payload(str(p)) is first
+    # The projection itself is intentionally uncached, so it re-reads.
+    assert json.loads(_slim_payload(str(p))[0])["cols"]["license_id"] == ["999"]
 
 
 @pytest.mark.parametrize(

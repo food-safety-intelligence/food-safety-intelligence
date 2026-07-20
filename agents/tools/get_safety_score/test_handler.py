@@ -142,8 +142,32 @@ def test_exact_address_to_lone_record_rejects_a_different_tenant():
     """Second live failure: the address matched exactly but the record on it was a
     different business ("Cafe Etc." -> "CAFFE HUB"). Sharing no distinctive word is
     enough to rule it out."""
-    index = _index(RECORD_A)
+    index = _index({"license_id": "LIC_C", "dba_name": "CAFFE HUB", "address": SHARED_ADDRESS})
     assert _fuzzy_lookup(SHARED_ADDRESS, "Cafe Etc.", index) is None
+
+
+def test_exact_hit_on_a_street_without_a_house_number_uses_the_strict_gate():
+    """New York City publishes 52 addresses with no house number, several of them
+    bare street names. "BROADWAY" is thirteen miles long, so an exact hit on it is
+    NOT evidence that two venues are the same place — without this, every venue on
+    Broadway sharing one word with a deli inherited that deli's published score."""
+    index = _index({"license_id": "LIC_D", "dba_name": "MAMA'S TOO!", "address": "BROADWAY"})
+    # Shares the distinctive word "MAMA'S", but only the weak gate would accept it.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Pizza", index) is None
+    # The genuine venue still resolves, because it clears the full name match.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Too", index) is not None
+
+
+def test_a_street_less_address_never_fuzzy_matches():
+    """An OSM venue with no street tag yields just the city ("Los Angeles, CA" ->
+    "LOS ANGELES"), which difflib scores as 0.72-similar to "435 LOS ANGELES ST"
+    while naming nothing in common with it. A key with no house number must not be
+    fuzzed at all."""
+    index = _index(
+        {"license_id": "LIC_E", "dba_name": "ANTOJITOS PUEBLA", "address": "435 LOS ANGELES ST"}
+    )
+    assert _fuzzy_lookup("Los Angeles, CA", "Antojitos", index) is None
+    assert _fuzzy_lookup("Chicago, IL", "Sweet Vegan Bakes", index) is None
 
 
 def test_exact_address_to_lone_record_keeps_an_honest_rewrite():

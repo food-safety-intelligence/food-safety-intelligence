@@ -285,7 +285,7 @@ def _fetch_overpass(query: str) -> dict:
 def _parse_elements(
     elements: list[dict],
     centroid: tuple[float, float],
-    city_default: tuple[str, str] = ("Chicago", "IL"),
+    city_default: tuple[str, str],
 ) -> list[dict[str, Any]]:
     """Convert raw Overpass elements to clean restaurant stubs."""
     results: list[dict[str, Any]] = []

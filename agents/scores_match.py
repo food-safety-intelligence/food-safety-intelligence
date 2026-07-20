@@ -67,6 +67,38 @@ GENERIC_NAME_TOKENS = frozenset(
         "CUISINE",
         "EATERY",
         "DINER",
+        # Format / cuisine words. Common enough that sharing one says nothing about
+        # two venues being the same place: measured as the tokens behind most of the
+        # false accepts ("SHINWARI GRILL" vs "MACARONI GRILL", "LA MICHOACANA VIP ICE
+        # CREAM PARLOR" vs "CHAMANGO ICE CREAM PLUS").
+        "PIZZA",
+        "PIZZERIA",
+        "COFFEE",
+        "CAFFE",  # Italian spelling of the already-generic CAFE, common in NYC
+        "BAKERY",
+        "DELI",
+        "MARKET",
+        "MART",
+        "LIQUOR",
+        "CHICKEN",
+        "SUSHI",
+        "TACOS",
+        "THAI",
+        "ICE",
+        "CREAM",
+        "HOUSE",
+        "CENTER",
+        "KING",
+        "NEW",
+        # City and borough names, the counterpart of the CHICAGO token above. These
+        # were never added when New York City and Los Angeles landed.
+        "LOS",
+        "ANGELES",
+        "YORK",
+        "BROOKLYN",
+        "QUEENS",
+        "BRONX",
+        "MANHATTAN",
     }
 )
 
@@ -131,9 +163,17 @@ def fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict 
     match (None) is safer than a confident wrong one.
     """
     key = normalise_address(address)
+    # Only a key carrying a house number pins a BUILDING. A bare street or landmark
+    # ("BROADWAY", "PENN STATION", or the "LOS ANGELES" left when an OSM venue has no
+    # street at all) names something miles long, so it is weak evidence however it
+    # matched, and it must never be fuzzed: "LOS ANGELES" is a 0.72-similar string to
+    # "435 LOS ANGELES ST" while naming nothing in common with it.
+    key_pins_a_building = _has_house_number(key)
     bucket = index.get(key)
     address_is_exact = bucket is not None
     if bucket is None:
+        if not key_pins_a_building:
+            return None
         matches = difflib.get_close_matches(key, index.keys(), n=1, cutoff=ADDRESS_CUTOFF)
         if not matches:
             return None
@@ -147,13 +187,16 @@ def fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict 
     #   * the address matches exactly but the city record on it is a different tenant
     #     — "Cafe Etc." resolved to "CAFFE HUB".
     # How hard to gate depends on how much the address already proved. An exact
-    # address is strong evidence, so only rule out names with nothing in common;
-    # demanding a full match there would drop honest rewrites like OSM "Amarit Thai"
-    # vs the city's "AMARIT RESTAURANT". A fuzzy address proved much less, so it has
-    # to clear the full bar.
+    # house-numbered address is strong evidence, so only rule out names with nothing
+    # in common; demanding a full match there would drop honest rewrites like OSM
+    # "Amarit Thai" vs the city's "AMARIT RESTAURANT". Anything weaker — a fuzzy hop,
+    # or an exact hit on a house-number-free key like "BROADWAY", which NYC publishes
+    # 52 of — has to clear the full bar, or every venue on thirteen miles of Broadway
+    # inherits one deli's score.
     if len(bucket) == 1:
         dba = bucket[0].get("dba_name", "")
-        gate = shares_distinctive_token if address_is_exact else names_match
+        strong = address_is_exact and key_pins_a_building
+        gate = shares_distinctive_token if strong else names_match
         return bucket[0] if gate(name, dba) else None
 
     target = normalise_name(name)
@@ -177,6 +220,16 @@ def fuzzy_lookup(address: str, name: str, index: dict[str, list[dict]]) -> dict 
     return best if best_ratio >= NAME_CUTOFF else None
 
 
+def _has_house_number(key: str) -> bool:
+    """True if a normalised address key starts with a street number.
+
+    Both cities' records and OSM put the house number first ("13736 AMAR RD"), so a
+    leading digit is what separates an address that pins one building from a bare
+    street or landmark name.
+    """
+    return bool(key) and key[0].isdigit()
+
+
 def shares_distinctive_token(osm_name: str, dba_name: str) -> bool:
     """True if the two names share at least one non-generic word.
 
@@ -188,9 +241,19 @@ def shares_distinctive_token(osm_name: str, dba_name: str) -> bool:
     matches — but a genuinely different tenant shares no distinctive word at all
     ("Cafe Etc." vs "CAFFE HUB", "Taco Bell" vs "STARBUCKS COFFEE").
     """
-    a = set(normalise_name(osm_name).split()) - GENERIC_NAME_TOKENS
-    b = set(normalise_name(dba_name).split()) - GENERIC_NAME_TOKENS
+    a = _distinctive_tokens(osm_name)
+    b = _distinctive_tokens(dba_name)
     return bool(a & b)
+
+
+def _distinctive_tokens(name: str) -> set[str]:
+    """Identifying words of a name: generic ones dropped, single letters excluded.
+
+    A one-character token carries no identity and collides constantly once
+    punctuation is split ("L.A. Tacos" normalises to L / A / TACOS), so a shared "A"
+    must never be enough to call two venues the same establishment.
+    """
+    return {t for t in normalise_name(name).split() if len(t) > 1} - GENERIC_NAME_TOKENS
 
 
 def names_match(osm_name: str, dba_name: str) -> bool:
