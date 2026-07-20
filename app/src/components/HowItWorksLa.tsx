@@ -15,9 +15,10 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
+import { glossaryFor } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
-import { ModelCard, DataGovernance, MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
+import { ModelCard, DataGovernance, MethodologyHero, OperatingPointsTable, TightestSlices, useChicagoHeadline } from "@/components/HowItWorksCards";
 import { cn } from "@/lib/utils";
 
 interface LaMethodology {
@@ -81,21 +82,6 @@ const NAV = [
   ["reference", "Reference"],
 ];
 
-// LA-appropriate definitions. LA's grade direction is the opposite of NYC's, so
-// the letter-grade and score entries are LA-specific.
-const LA_GLOSSARY: { id: string; term: string; short: string }[] = [
-  { id: "letter-grade", term: "Letter grade (A / B / C)", short: "Los Angeles County's public restaurant grade. It's a threshold on the 0–100 inspection score: A = 90–100, B = 80–89, C = 70–79. Higher is cleaner, the opposite of New York's scale." },
-  { id: "inspection-score", term: "Inspection score", short: "100 minus the points deducted for violations at one inspection (major and critical violations deduct more). The score maps to the letter grade; a place is 'bad' next time if it drops below 90 (a B or C)." },
-  { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to LA's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities (imminent-hazard, critical, or general) mapped from each city's own codes via the shared violation dictionary." },
-  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
-  { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare LA (~0.74) with NYC (~0.66) and Chicago (~0.78)." },
-  { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 2.1× means that slice has 2.1× the B/C rate of the whole population." },
-  { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
-  { id: "shap", term: "SHAP driver", short: "A per-establishment breakdown of which features pushed the score up or down, in log-odds: the signed list you see under 'what's driving the score' on a detail page." },
-  { id: "forecast-trend", term: "Forecast-only model / trend", short: "A second model that scores each past inspection without seeing its own outcome; the slope of its recent scores is the Improving / Worsening / Stable trend." },
-];
-
 export function HowItWorksLa() {
   const [m, setM] = useState<LaMethodology | null>(null);
   useEffect(() => {
@@ -110,6 +96,8 @@ export function HowItWorksLa() {
   }, []);
 
   const prevPct = m ? Math.round(m.test.prevalence * 100) : 8;
+  // Chicago's numbers come from its own methodology.json, not the copy.
+  const chi = useChicagoHeadline();
 
   return (
     <div>
@@ -190,7 +178,7 @@ export function HowItWorksLa() {
           )}
         </article>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">The recent-trend chart</h2>
+          <h2 id="recent-trend" className="scroll-mt-24 text-2xl font-medium tracking-tight">The recent-trend chart</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
             Each detail page plots a forecast-only model&apos;s score across the
             establishment&apos;s recent inspections, and reads the slope of the last
@@ -258,7 +246,8 @@ export function HowItWorksLa() {
               work-list. The honest read isn&apos;t a single number. It&apos;s how
               much of the real risk you catch at the slice you can actually staff.
               LA&apos;s signal is weaker than Chicago&apos;s (ROC-AUC{" "}
-              {m.headline.roc_auc.toFixed(2)} vs ~0.78), so it stays a preview:
+              {m.headline.roc_auc.toFixed(2)}
+              {chi ? ` vs ${chi.roc_auc.toFixed(2)}` : ""}), so it stays a preview:
             </p>
           )}
           {m && <OperatingPointsTable ops={m.operating_points} />}
@@ -354,8 +343,14 @@ export function HowItWorksLa() {
             <p>
               <strong className="text-ink">LA is a coverage feature, not a quality
               upgrade.</strong> Its signal is weaker than Chicago&apos;s
-              (ROC-AUC ~0.74 vs ~0.78; lift ~2.1× vs ~3.4×), though stronger than
-              NYC&apos;s. Treat LA scores as a rougher guide.
+              {m && chi ? (
+                <>
+                  {" "}(ROC-AUC {m.headline.roc_auc.toFixed(2)} vs{" "}
+                  {chi.roc_auc.toFixed(2)}; lift {m.headline.top_decile_lift.toFixed(1)}× vs{" "}
+                  {chi.top_decile_lift.toFixed(1)}×)
+                </>
+              ) : null}
+              , though stronger than NYC&apos;s. Treat LA scores as a rougher guide.
             </p>
             <p>
               <strong className="text-ink">The grade scale is inverted.</strong> LA
@@ -393,7 +388,7 @@ export function HowItWorksLa() {
             inspection history.
           </p>
           <dl className="mt-4 space-y-4 max-w-[62ch]">
-            {LA_GLOSSARY.map((entry) => (
+            {glossaryFor("la").map((entry) => (
               <div key={entry.id} id={entry.id} className="scroll-mt-24 rounded-2xl border border-line bg-card p-4">
                 <dt className="font-medium text-ink">{entry.term}</dt>
                 <dd className="text-sm text-muted leading-relaxed mt-1">{entry.short}</dd>

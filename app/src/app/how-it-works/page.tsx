@@ -20,7 +20,7 @@ import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
 import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
 import { EvaluationDetail } from "@/components/EvaluationDetail";
-import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
+import { glossaryFor } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
 
@@ -1069,21 +1069,18 @@ export default async function HowItWorksPage() {
               inspection history.
             </p>
             <dl className="mt-4 space-y-4">
-              {GLOSSARY_ORDER.map((key) => {
-                const entry = GLOSSARY[key];
-                return (
-                  <div
-                    key={entry.id}
-                    id={entry.id}
-                    className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
-                  >
-                    <dt className="font-medium text-ink">{entry.term}</dt>
-                    <dd className="text-sm text-muted leading-relaxed mt-1">
-                      {entry.short}
-                    </dd>
-                  </div>
-                );
-              })}
+              {glossaryFor("chicago").map((entry) => (
+                <div
+                  key={entry.id}
+                  id={entry.id}
+                  className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
+                >
+                  <dt className="font-medium text-ink">{entry.term}</dt>
+                  <dd className="text-sm text-muted leading-relaxed mt-1">
+                    {entry.short}
+                  </dd>
+                </div>
+              ))}
             </dl>
           </article>
         </section>
