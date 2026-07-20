@@ -57,12 +57,17 @@ SEED = 42
 # The incumbent production config (build_production_xgb + build_xgb_estimator
 # defaults). Every candidate is a delta off this dict; this dict is also the CV
 # control so per-fold deltas are paired on identical folds.
+#
+# Keep this in sync with build_production_xgb. It drifted once: colsample_bytree
+# was promoted 0.85 -> 0.70 by this harness's own 2026-07-18 sweep, but the dict
+# kept the old value, so a later run would have scored candidates against a
+# control that is not what ships.
 INCUMBENT: dict = {
     "n_estimators": 300,
     "max_depth": 3,
     "learning_rate": 0.05,
     "subsample": 0.85,
-    "colsample_bytree": 0.85,
+    "colsample_bytree": 0.70,
     "min_child_weight": 10.0,
     "reg_lambda": 1.0,
     "reg_alpha": 0.0,
