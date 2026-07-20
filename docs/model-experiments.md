@@ -448,3 +448,31 @@ LA/NYC would remove the biggest caveat. Feature code stays in-tree, unwired
 behind `models.baseline.ALCOHOL_TOBACCO_FEATURES`, not in `ALL_FEATURES`; NYC/LA
 join helpers live in `run_city_ablations.py` + `fetch_alcohol_tobacco_licenses.py`,
 not in the served `build_nyc_scores.py` / `build_la_scores.py`).
+
+## Untested lever: LA's `pe_description` (program element)
+
+**Not run — logged so it isn't lost.** LA's raw feed carries `pe_description`, a
+single string encoding venue type, **seat count**, and **LA County's own risk
+grade** (e.g. `RESTAURANT (0-30) SEATS HIGH RISK`), 30 distinct values across
+103,474 inspections. It is dropped before the feature frame is built
+(`audit/adapters/la.py`: "program element is not carried into the feature frame"),
+so it has never been A/B'd.
+
+Why it is worth a run:
+
+- **The county's risk grade is the direct analog of Chicago's `static_risk_tier`,
+  which IS a kept model feature.** LA is the only city not using its regulator's
+  own risk classification.
+- **Seat count is a size proxy** — and size is a genuinely absent axis in all
+  three cities (the how-it-works page tells users we have no traffic or volume
+  data to adjust for kitchen throughput).
+- **It is not an ethnicity proxy**, unlike `facility_type` (DR 0004) or cuisine
+  (DR 0018), so it does not carry their fairness objection. Confirm against the
+  audit before wiring, since ZIP-level FPR is already an open LA finding.
+- LA is the city with the least headroom found so far — features (2026-07-18),
+  architecture, and hyperparameters (2026-07-20) are all null — so a genuinely
+  untried input is the only remaining avenue short of a new data source.
+
+**Caveat:** parse it into *separate* columns (type / seats / county risk), not one
+high-cardinality categorical — 30 sparse levels on a 4.6% base rate would overfit
+the way `static_zip` did in Chicago.

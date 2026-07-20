@@ -20,7 +20,7 @@ judgement calls are called out.
 >    fallback). A new city may need the same coordinate step.
 >
 > Everything else ported cleanly: the flipped A/B/C direction (step 0.2), the
-> shared crosswalk, the calibrated-LogReg served model, `city.ts` `CITY_CONFIG`,
+> shared crosswalk, the served model shape, `city.ts` `CITY_CONFIG`,
 > `CityGate`/`HowItWorksLa`, and the city-aware agent code (incl. city-aware
 > `find_restaurants`). LA `chatSupported` is **true**; it goes live when the agent
 > redeploys on merge (cross-account, Deepak's) — revert the flag if a post-merge
@@ -74,8 +74,12 @@ describe violations consistently across cities.
   (works across cities' different code schemes) and `severity_tier` from the
   city's own critical flag / grade weighting.
 - Append rows `city,native_code,native_desc,theme,severity_tier` to the CSV.
-  Keep the 12-theme set; genuinely non-food-safety codes go to
-  `other_administrative`.
+  Reuse the **11 themes already in the file** — don't invent a new one; genuinely
+  non-food-safety codes go to `other_administrative` (already the largest bucket,
+  ~22% of all codes). The DR-0016 sketch listed 12 themes, but
+  `facility_structure_lighting` and `chemical_toxic` were never built, and
+  `pest_proofing_facility` holds one NYC code and nothing from Chicago or LA, so
+  it can't support a cross-city comparison.
 
 ---
 
@@ -94,8 +98,11 @@ Change per city:
 - **Driver labels** (`nyc_labels`) → city-appropriate plain-English strings.
 - **Tier thresholds** — recalibrate to the city's own `risk_score` distribution
   (they're printed at runtime; don't reuse another city's cutoffs).
-- **Served model stays a calibrated LogReg** (reuses the SHAP-waterfall +
-  calibration-triple machinery); XGBoost is only the eval comparator.
+- **Served model is XGBoost + Platt-on-margin** for both Model 1 (risk) and
+  Model 2 (forecast-only trend), reusing the SHAP-waterfall + calibration-triple
+  machinery, so the app path is unchanged. Model 2 passes `regularized=True`: its
+  thin prior-only feature set over-fits a depth-3 tree. (Superseded the original
+  calibrated-LogReg shape on 2026-07-06, PR #165 — see the DR-0016 update.)
 
 **Schema (critical):** match `main`'s *current* scores schema, not a snapshot.
 Today that is **0.5.0** — column `trend_slope` (not `trend_slope_90d`), totals
