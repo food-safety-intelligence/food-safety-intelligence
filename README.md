@@ -7,11 +7,11 @@
 | agents/city\_context.py                                  |        9 |        9 |        0 |        0 |      0% |     13-44 |
 | agents/lambda\_proxy/handler.py                          |       70 |       21 |       24 |        3 |     70% |69, 74-75, 84, 88, 106-109, 119-122, 129-138 |
 | agents/lambda\_proxy/test\_handler.py                    |       51 |        1 |        6 |        1 |     96% |        25 |
-| agents/scores\_match.py                                  |       93 |        1 |       42 |        1 |     99% |       239 |
+| agents/scores\_match.py                                  |      108 |        1 |       44 |        1 |     99% |       338 |
 | agents/tools/explain\_restaurant/handler.py              |      104 |       19 |       44 |        8 |     78% |28, 30, 36, 38, 49-50, 59-60, 160, 167, 249-255, 284-\>290, 287-288 |
 | agents/tools/find\_inspection\_records/handler.py        |       59 |        1 |       20 |        1 |     97% |       136 |
 | agents/tools/find\_restaurants/chicago\_neighborhoods.py |        4 |        0 |        0 |        0 |    100% |           |
-| agents/tools/find\_restaurants/handler.py                |      113 |        7 |       36 |        2 |     94% |213-215, 260-271, 337 |
+| agents/tools/find\_restaurants/handler.py                |      115 |        7 |       36 |        2 |     94% |224-226, 271-282, 350 |
 | agents/tools/find\_restaurants/la\_neighborhoods.py      |        4 |        0 |        0 |        0 |    100% |           |
 | agents/tools/find\_restaurants/nyc\_neighborhoods.py     |        4 |        0 |        0 |        0 |    100% |           |
 | agents/tools/find\_reviews/handler.py                    |       25 |        0 |        6 |        0 |    100% |           |
@@ -19,7 +19,7 @@
 | agents/tools/get\_safety\_score/handler.py               |       72 |        2 |       20 |        2 |     96% |  149, 194 |
 | agents/tools/get\_safety\_score/sagemaker\_stub.py       |       68 |       17 |       20 |        0 |     76% |   306-355 |
 | agents/tools/look\_up\_establishment/handler.py          |       86 |       10 |       24 |        4 |     87% |51, 53, 59, 61, 71-72, 81-82, 262-263 |
-| agents/tools/visualize\_data/handler.py                  |      199 |       69 |       72 |        4 |     63% |59-63, 76, 122, 303-376, 414-425, 430-435, 449-466, 480, 569-\>573 |
+| agents/tools/visualize\_data/handler.py                  |      212 |       70 |       74 |        5 |     64% |61-65, 78, 152, 306, 383-456, 494-505, 510-515, 529-546, 560, 649-\>653 |
 | src/foodsafety/\_\_init\_\_.py                           |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/audit/\_\_init\_\_.py                     |        1 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/audit/config.py                           |       36 |        2 |        0 |        0 |     94% |  196, 200 |
@@ -59,7 +59,7 @@
 | src/foodsafety/utils/\_\_init\_\_.py                     |        0 |        0 |        0 |        0 |    100% |           |
 | src/foodsafety/utils/geo.py                              |       23 |        0 |        4 |        0 |    100% |           |
 | src/foodsafety/utils/time.py                             |       59 |        2 |       16 |        2 |     95% |133, 150-\>141, 181 |
-| **TOTAL**                                                | **2705** |  **302** |  **762** |  **102** | **87%** |           |
+| **TOTAL**                                                | **2735** |  **303** |  **766** |  **103** | **87%** |           |
 
 
 ## Setup coverage badge
