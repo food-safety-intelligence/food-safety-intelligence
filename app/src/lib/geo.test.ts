@@ -68,4 +68,21 @@ describe("maskFromBoundary", () => {
       }),
     ).toBeNull();
   });
+
+  it("returns null for a FeatureCollection whose features is not an array", () => {
+    expect(maskFromBoundary({ type: "FeatureCollection", features: {} })).toBeNull();
+  });
+
+  it("accepts a bare Geometry and a GeometryCollection", () => {
+    expect(
+      maskFromBoundary({ type: "Polygon", coordinates: [ring] })?.geometry.coordinates,
+    ).toHaveLength(2);
+    expect(
+      maskFromBoundary({
+        type: "GeometryCollection",
+        geometries: [{ type: "Polygon", coordinates: [ring] }],
+      })?.geometry.coordinates,
+    ).toHaveLength(2);
+    expect(maskFromBoundary({ type: "Polygon", coordinates: [] })).toBeNull();
+  });
 });

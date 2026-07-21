@@ -197,7 +197,16 @@ export function MapView({
       zoom: center.zoom,
       duration: 800,
     });
-    m.once("moveend", applyClamp);
+    // Reduced-motion: flyTo falls through to jumpTo, whose moveend has already
+    // fired synchronously inside the call above - the camera has landed, so
+    // clamp now. Otherwise the flight is running and the listener (registered
+    // AFTER flyTo so the interrupting stop's moveend cannot consume it) fires
+    // on this flight's own termination - natural or user-interrupted.
+    if (m.isMoving()) {
+      m.once("moveend", applyClamp);
+    } else {
+      applyClamp();
+    }
     // A rapid second switch mid-flight must not let the OLD listener apply
     // the OLD city's bounds after the NEW flight begins.
     return () => {
@@ -223,6 +232,9 @@ export function MapView({
     // transform path where setMaxBounds/setMinZoom/flyTo all act on the one
     // transform the drag reads. react-maplibre sets the hook once at init and never
     // again, so this stays cleared across re-renders and city switches.
+    // Revisit this override if this map ever becomes controlled (viewState/onMove)
+    // or on any react-map-gl / maplibre-gl upgrade - it depends on verified 8.1.1 /
+    // 5.24.0 internals.
     if (m) m.transformCameraUpdate = null;
     mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
     const { maxBounds: mb, minZoom: mz } = clampRef.current;

@@ -43,8 +43,11 @@ export function maskFromBoundary(boundary: unknown): Feature<Polygon> | null {
 
   const rings: Position[][] = [];
   if (b.type === "FeatureCollection") {
-    for (const f of (b as FeatureCollection).features ?? []) {
-      if (f?.geometry) collectExteriorRings(f.geometry, rings);
+    const features = (b as FeatureCollection).features;
+    if (Array.isArray(features)) {
+      for (const f of features) {
+        if (f?.geometry) collectExteriorRings(f.geometry, rings);
+      }
     }
   } else if (b.type === "Feature") {
     const f = b as Feature;
