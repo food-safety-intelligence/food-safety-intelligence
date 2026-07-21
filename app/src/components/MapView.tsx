@@ -207,9 +207,25 @@ export function MapView({
   const handleLoad = useCallback(() => {
     loadedRef.current = true;
     const c = centerRef.current;
+    const m = mapRef.current?.getMap();
+    // Why setMaxBounds was inert while setMinZoom held: @vis.gl/react-maplibre
+    // unconditionally installs `map.transformCameraUpdate` (its _onCameraUpdate
+    // hook). That switches maplibre-gl into "dual transform" mode — pan/drag
+    // handlers accumulate into a private `_requestedCameraState` clone and each
+    // frame copies it back onto `map.transform`. `setMaxBounds()` writes the pan
+    // constraint (lng/lat range) ONLY to `map.transform`, so the very first drag
+    // runs against the unconstrained clone and then overwrites the constraint
+    // (getMaxBounds() reads back null after one drag). `setMinZoom()` instead goes
+    // through `_getTransformForUpdate()`, which writes the clone, so the zoom floor
+    // survives — that asymmetry is the whole bug. This map is uncontrolled
+    // (initialViewState only) and never reads e.viewState off camera events, so the
+    // hook buys nothing; clearing it returns maplibre to its standard single-
+    // transform path where setMaxBounds/setMinZoom/flyTo all act on the one
+    // transform the drag reads. react-maplibre sets the hook once at init and never
+    // again, so this stays cleared across re-renders and city switches.
+    if (m) m.transformCameraUpdate = null;
     mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
     const { maxBounds: mb, minZoom: mz } = clampRef.current;
-    const m = mapRef.current?.getMap();
     if (m) {
       if (mz !== undefined) m.setMinZoom(mz);
       if (mb) m.setMaxBounds(mb);
