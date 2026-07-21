@@ -16,7 +16,7 @@ import { useCity } from "@/components/CityContext";
 import { MapView } from "@/components/MapView";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
-import { CITY_CONFIG, type City, dataUrl } from "@/lib/city";
+import { boundaryUrl, CITY_CONFIG, type City, dataUrl } from "@/lib/city";
 import { fetchJson } from "@/lib/fetch-json";
 import { iconForFeature } from "@/lib/driver-icons";
 import type {
@@ -568,6 +568,9 @@ export function InspectorWorklist() {
                   lon: CITY_CONFIG[city].center.lon,
                   zoom: CITY_CONFIG[city].zoom,
                 }}
+                maxBounds={CITY_CONFIG[city].maxBounds}
+                minZoom={CITY_CONFIG[city].minZoom}
+                boundaryUrl={boundaryUrl(city)}
               />
             </div>
           )}
