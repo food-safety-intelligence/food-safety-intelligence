@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Layer,
   Map,
   type MapRef,
   Marker,
   Popup,
   NavigationControl,
+  Source,
   useMap,
 } from "react-map-gl/maplibre";
 import Link from "next/link";
@@ -17,6 +19,7 @@ import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
 import { CLOSED_HEX, TIER_HEX } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
+import { maskFromBoundary } from "@/lib/geo";
 
 /**
  * Render a feature's topic icon. The icon component is resolved by the caller
@@ -96,6 +99,12 @@ const VOYAGER_STYLE = {
   ],
 };
 
+// City-boundary GeoJSON, cached per URL for the session (same pattern as the
+// worklist's detail cache) — switching back to a city never refetches.
+// globalThis.Map (not the bare `Map`, which this file imports from
+// react-map-gl as the <Map> component and would otherwise shadow).
+const boundaryCache = new globalThis.Map<string, GeoJSON.GeoJSON>();
+
 /**
  * Zoom → density rule. The cap grows roughly geometrically with zoom; the
  * viewport-clip kicks in at zoom ≥ 13 so we stop drawing pins the user
@@ -113,10 +122,19 @@ export function MapView({
   pins,
   className = "",
   center = CHICAGO_CENTER,
+  maxBounds,
+  minZoom,
+  boundaryUrl,
 }: {
   pins: PinSummary[];
   className?: string;
   center?: { lat: number; lon: number; zoom: number };
+  /** Hard camera clamp [[west, south], [east, north]] (CITY_CONFIG.maxBounds). */
+  maxBounds?: [[number, number], [number, number]];
+  /** Zoom-out floor (CITY_CONFIG.minZoom). */
+  minZoom?: number;
+  /** Committed city-boundary GeoJSON to gray out everything outside of. */
+  boundaryUrl?: string;
 }) {
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -151,6 +169,39 @@ export function MapView({
     mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
   }, []);
 
+  // The mask is decorative: on any failure the map still works and the clamp
+  // (config constants) still applies — so errors skip silently, no retry UI.
+  const [boundary, setBoundary] = useState<GeoJSON.GeoJSON | null>(
+    boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null,
+  );
+  useEffect(() => {
+    if (!boundaryUrl) {
+      // boundaryUrl just went away (city switch mid-fetch): an intentional
+      // synchronous reset, not a derivable-during-render value.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setBoundary(null);
+      return;
+    }
+    const cached = boundaryCache.get(boundaryUrl);
+    // Reset immediately on a city switch so the OLD city's mask never sits on
+    // the NEW city's map while the fetch is in flight.
+    setBoundary(cached ?? null);
+    if (cached) return;
+    let alive = true;
+    fetch(boundaryUrl)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((gj: GeoJSON.GeoJSON) => {
+        boundaryCache.set(boundaryUrl, gj);
+        if (alive) setBoundary(gj);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [boundaryUrl]);
+
+  const mask = useMemo(() => maskFromBoundary(boundary), [boundary]);
+
   return (
     <div className={className}>
       <Map
@@ -162,8 +213,31 @@ export function MapView({
           zoom: center.zoom,
         }}
         mapStyle={VOYAGER_STYLE as never}
+        maxBounds={maxBounds}
+        minZoom={minZoom}
         style={{ width: "100%", height: "100%" }}
       >
+        {mask && (
+          <Source id="city-mask" type="geojson" data={mask}>
+            {/* Warm tint wash: outside stays faintly legible (roads leading
+                in) but reads unmistakably as out of scope. Colour is not the
+                only cue — the boundary line and the pan clamp carry it too. */}
+            <Layer
+              id="city-mask-fill"
+              type="fill"
+              paint={{ "fill-color": "#EDE6D8", "fill-opacity": 0.55 }}
+            />
+          </Source>
+        )}
+        {boundary && mask && (
+          <Source id="city-boundary" type="geojson" data={boundary}>
+            <Layer
+              id="city-boundary-line"
+              type="line"
+              paint={{ "line-color": "#6B7280", "line-width": 1.5, "line-opacity": 0.5 }}
+            />
+          </Source>
+        )}
         <NavigationControl position="bottom-right" showCompass={false} />
 
         <PinLayer
