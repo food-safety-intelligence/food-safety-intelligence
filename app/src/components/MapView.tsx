@@ -154,19 +154,54 @@ export function MapView({
   useEffect(() => {
     centerRef.current = center;
   });
+  // Keep the latest clamp values in a ref too, so `handleLoad` (a stable
+  // callback) can read them. maxBounds/minZoom are no longer passed as <Map>
+  // props (see below) — the library's own reactive prop-diffing only ever
+  // re-applies the clamp correctly on the FIRST change; from the second city
+  // switch onward the enforced camera constraint stays pinned to whichever
+  // bounds were set first, so flyTo lands the data/sidebar on the new city
+  // while the camera itself stays stuck on the old one. Applying the clamp
+  // imperatively from the same app code that already drives the camera
+  // avoids that library-internal diffing path entirely.
+  const clampRef = useRef({ maxBounds, minZoom });
   useEffect(() => {
-    if (loadedRef.current) {
-      mapRef.current?.flyTo({
-        center: [center.lon, center.lat],
-        zoom: center.zoom,
-        duration: 800,
-      });
-    }
-  }, [center.lat, center.lon, center.zoom]);
+    clampRef.current = { maxBounds, minZoom };
+  });
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    const m = mapRef.current?.getMap();
+    if (!m) return;
+    // maplibre clamps flyTo targets to the ACTIVE maxBounds, so the previous
+    // city's clamp must come off before flying to a center outside it; the
+    // new clamp goes on only when the camera lands (moveend), otherwise the
+    // flight itself gets clipped mid-animation.
+    m.setMaxBounds(null);
+    if (minZoom !== undefined) m.setMinZoom(minZoom);
+    const applyClamp = () => {
+      if (maxBounds) m.setMaxBounds(maxBounds);
+    };
+    m.once("moveend", applyClamp);
+    mapRef.current?.flyTo({
+      center: [center.lon, center.lat],
+      zoom: center.zoom,
+      duration: 800,
+    });
+    // A rapid second switch mid-flight must not let the OLD listener apply
+    // the OLD city's bounds after the NEW flight begins.
+    return () => {
+      m.off("moveend", applyClamp);
+    };
+  }, [center.lat, center.lon, center.zoom, maxBounds, minZoom]);
   const handleLoad = useCallback(() => {
     loadedRef.current = true;
     const c = centerRef.current;
     mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
+    const { maxBounds: mb, minZoom: mz } = clampRef.current;
+    const m = mapRef.current?.getMap();
+    if (m) {
+      if (mz !== undefined) m.setMinZoom(mz);
+      if (mb) m.setMaxBounds(mb);
+    }
   }, []);
 
   // The mask is decorative: on any failure the map still works and the clamp
@@ -211,8 +246,6 @@ export function MapView({
           zoom: center.zoom,
         }}
         mapStyle={VOYAGER_STYLE as never}
-        maxBounds={maxBounds}
-        minZoom={minZoom}
         style={{ width: "100%", height: "100%" }}
       >
         {mask && (
