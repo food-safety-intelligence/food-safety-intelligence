@@ -180,12 +180,24 @@ export function MapView({
     const applyClamp = () => {
       if (maxBounds) m.setMaxBounds(maxBounds);
     };
-    m.once("moveend", applyClamp);
+    // Register AFTER flyTo, not before: flyTo()'s first internal action is
+    // stop(), which — if a prior flight is still animating (rapid second
+    // city switch) — fires "moveend" SYNCHRONOUSLY inside the flyTo() call
+    // itself, for the interrupted OLD flight. A listener registered before
+    // flyTo would consume that premature event and clamp mid-flight (a
+    // visible snap to the new bounds while the camera is still mid-nowhere).
+    // Registered after, it can only fire for the NEW flight's own
+    // termination — whether that's a natural landing, or a user grabbing the
+    // map mid-flight (which also cancels the flight and fires "moveend"; the
+    // clamp still applies there, snapping the grabbed camera into the new
+    // city's bounds, which is correct since the app has already switched to
+    // that city's data).
     mapRef.current?.flyTo({
       center: [center.lon, center.lat],
       zoom: center.zoom,
       duration: 800,
     });
+    m.once("moveend", applyClamp);
     // A rapid second switch mid-flight must not let the OLD listener apply
     // the OLD city's bounds after the NEW flight begins.
     return () => {
