@@ -174,19 +174,17 @@ export function MapView({
   const [boundary, setBoundary] = useState<GeoJSON.GeoJSON | null>(
     boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null,
   );
+  // Reset synchronously when the boundary source changes — adjust-state-during-
+  // render (React's recommended alternative to a reset effect; same pattern as
+  // MapExplorer's resultKey), so the OLD city's mask never survives a city
+  // switch, without an effect-tick lag or a set-state-in-effect suppression.
+  const [prevBoundaryUrl, setPrevBoundaryUrl] = useState(boundaryUrl);
+  if (boundaryUrl !== prevBoundaryUrl) {
+    setPrevBoundaryUrl(boundaryUrl);
+    setBoundary(boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null);
+  }
   useEffect(() => {
-    if (!boundaryUrl) {
-      // boundaryUrl just went away (city switch mid-fetch): an intentional
-      // synchronous reset, not a derivable-during-render value.
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setBoundary(null);
-      return;
-    }
-    const cached = boundaryCache.get(boundaryUrl);
-    // Reset immediately on a city switch so the OLD city's mask never sits on
-    // the NEW city's map while the fetch is in flight.
-    setBoundary(cached ?? null);
-    if (cached) return;
+    if (!boundaryUrl || boundaryCache.has(boundaryUrl)) return;
     let alive = true;
     fetch(boundaryUrl)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
