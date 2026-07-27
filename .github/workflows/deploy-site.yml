@@ -1,0 +1,72 @@
+# Publishes the project overview site in `site/` to GitHub Pages.
+#
+# The built-in "deploy from a branch" option can only serve the repo root or
+# `/docs`, and `docs/` here holds decision records and specs. So this uploads
+# `site/` as the Pages artifact instead, which works from any directory.
+#
+# Before the first run someone with admin rights must set
+# Settings -> Pages -> Source to "GitHub Actions". Note this repo is private:
+# Pages needs a paid plan (Pro, Team, or Enterprise) to publish at all, and on
+# Pro or Team the published site is PUBLIC even though the repo is not.
+name: deploy-site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/deploy-site.yml"
+  # Lets a maintainer republish without pushing a commit.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two Pages deploys at once, but let an in-flight one finish rather
+# than cancelling it half-published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fail loudly on a broken relative asset path rather than shipping a page
+      # with missing images. HTML comments are stripped first: the demo-video
+      # and other media slots keep their real markup commented out until someone
+      # drops the file in, and those refs are not live.
+      - name: Check local asset references resolve
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, sys
+
+          html = pathlib.Path("site/index.html").read_text()
+          html = re.sub(r"<!--.*?-->", "", html, flags=re.S)
+
+          missing = [
+              ref
+              for ref in re.findall(r'(?:src|href)="([^"#]+)"', html)
+              if not re.match(r"(https?:)?//|mailto:", ref)
+              and not (pathlib.Path("site") / ref).exists()
+          ]
+          for ref in missing:
+              print(f"::error file=site/index.html::missing asset: {ref}")
+          sys.exit(1 if missing else 0)
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
