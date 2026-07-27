@@ -32,8 +32,8 @@
         <div class="nav__links">
           <a href="#problem">Problem</a>
           <a href="#product">Product</a>
-          <a href="#agent">Agent</a>
           <a href="#architecture">Architecture</a>
+          <a href="#agent">Agent</a>
           <a href="#results">Results</a>
           <a href="#responsible">Responsible AI</a>
           <a href="#team">Team</a>
@@ -683,16 +683,185 @@
             </p>
           </div>
 
+          <!-- ── Model architecture ── -->
+          <p class="section__label" style="margin-top: 64px">Model architecture</p>
+          <h3 style="font-size: 1.5rem; font-weight: 300; letter-spacing: -0.02em">
+            Three architectures tried. <strong>The shallow one won.</strong>
+          </h3>
+          <p class="lede">
+            The signal here is low-order and carried by a handful of features, which
+            is exactly the regime where gradient-boosted trees beat everything
+            fancier. Depth-3 trees outperformed depth-6, and a multilayer perceptron
+            found no deeper interactions to exploit because there were none to find.
+          </p>
+
           <div class="grid-3" style="margin-top: 32px">
             <div class="card">
-              <h3>Model</h3>
+              <p class="section__label" style="margin-bottom: 10px">Baseline</p>
+              <h3>Logistic regression</h3>
               <p>
-                Logistic regression as the interpretable baseline, XGBoost served.
-                A multilayer perceptron was tried and did not win. Explanations
-                come from TreeSHAP, which is why the drivers on a detail page
-                reconcile exactly to the score.
+                The classifier the original Chicago model used, kept as the
+                yardstick every candidate has to beat. Every coefficient is
+                readable, so it doubles as a sanity check on what the data is
+                actually saying.
               </p>
             </div>
+            <div class="card card--mint">
+              <p class="section__label" style="margin-bottom: 10px">Served</p>
+              <h3>XGBoost</h3>
+              <p>
+                Built for tabular data: non-linear interactions, native handling of
+                missing values, and categorical splits without one-hot blowup. Run
+                shallow and monotone-constrained, then sigmoid-calibrated.
+              </p>
+            </div>
+            <div class="card">
+              <p class="section__label" style="margin-bottom: 10px">Explored</p>
+              <h3>Multilayer perceptron</h3>
+              <p>
+                Tried and rejected. There are no deep interactions to find, and the
+                depth-3-beats-depth-6 result says the same thing from the tree side.
+                Several tabular deep-learning families were also tested; none
+                displaced the served model.
+              </p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <caption>
+                Served settings per city. Each city is tuned separately because
+                each one predicts a different target against a different base rate.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Setting</th>
+                  <th scope="col">Chicago</th>
+                  <th scope="col">New York City</th>
+                  <th scope="col">Los Angeles</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Trees / max depth</th>
+                  <td class="num">300 / 3</td>
+                  <td class="num">400 / 2</td>
+                  <td class="num">400 / 3</td>
+                </tr>
+                <tr>
+                  <th scope="row">min_child_weight</th>
+                  <td class="num">10</td>
+                  <td class="num">20</td>
+                  <td class="num">5</td>
+                </tr>
+                <tr>
+                  <th scope="row">Features</th>
+                  <td class="num">36</td>
+                  <td class="num">32</td>
+                  <td class="num">28</td>
+                </tr>
+                <tr>
+                  <th scope="row">Training prevalence</th>
+                  <td class="num">14.5%</td>
+                  <td class="num">35.6%</td>
+                  <td class="num">4.6%</td>
+                </tr>
+                <tr>
+                  <th scope="row">Positive class weight</th>
+                  <td class="num">5.9&times;</td>
+                  <td class="num">1.8&times;</td>
+                  <td class="num">20.6&times;</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-2" style="margin-top: 32px">
+            <div class="card">
+              <h3>Imbalance by weighting, never by resampling</h3>
+              <p>
+                Positives are rare, so the positive class is up-weighted through
+                XGBoost's own <code>scale_pos_weight</code>. Synthetic
+                oversampling is deliberately not used: it inflates
+                precision-recall AUC on a chronological split, which would make
+                every subsequent comparison meaningless.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Calibrated, then explained</h3>
+              <p>
+                Re-weighting distorts the output probabilities, so sigmoid
+                calibration re-grounds them afterwards. That is what makes the 0
+                to 100 score mean something rather than just rank. TreeSHAP then
+                decomposes each calibrated score into the named drivers you see on
+                a detail page.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Two models, not one</h3>
+              <p>
+                The risk model is dominated by what just happened at the most
+                recent visit, so it cannot speak to direction. A second trend model
+                is deliberately blind to that latest inspection, which is what lets
+                the product say "improving" or "worsening" rather than only "high"
+                or "low".
+              </p>
+            </div>
+            <div class="card">
+              <h3>What each city taught us</h3>
+              <p>
+                <strong style="color: var(--ink)">Chicago:</strong> dropping postal
+                code and facility type improved accuracy and removed bias risk at
+                the same time. <strong style="color: var(--ink)">New York:</strong>
+                regularising harder, to depth 2, stopped the overfitting and lifted
+                the operating point to 1.8&times;.
+                <strong style="color: var(--ink)">Los Angeles:</strong> roughly 98
+                percent of inspections end in an A grade, and that base rate is the
+                ceiling.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Features we tested and refused to ship</h3>
+            <p>
+              The published Chicago forecasting model is the direct precedent for
+              this work, and we kept its family of per-facility history features.
+              We did not keep everything.
+            </p>
+            <p>
+              <strong style="color: var(--ink)">Inspector identity</strong> was its
+              single most influential feature, and a later hindsight audit found it
+              unfairly changed predicted risk. A venue cannot choose who walks
+              through the door, so it is excluded.
+              <strong style="color: var(--ink)">Socio-demographic features</strong>
+              are excluded for the same reason: in this literature, part of the
+              accuracy gain simply is the bias.
+            </p>
+            <p>
+              <strong style="color: var(--ink)">Weather</strong> turned out to be
+              redundant. A three-day high-temperature feature measured against plain
+              month and quarter proxies moved precision-recall AUC by −0.0036.
+              <strong style="color: var(--ink)">An alcohol and tobacco licence
+              flag</strong> gained +0.0014 on precision-recall AUC but cost −0.0030
+              at the operating point that matters, so it was not shipped.
+            </p>
+          </div>
+
+          <div class="callout">
+            <h3>Why a 180-day window, when longer windows score better</h3>
+            <p>
+              Stretching the label to 365 days raises precision-recall AUC from
+              0.344 to 0.498, and predicting only the next routine visit raises it
+              to 0.604. Both look like large wins and neither is one. Those targets
+              have far higher base rates, so the score rises while the actual
+              ranking power falls: lift over random drops from 3.9&times; to
+              1.68&times; and then to 1.28&times;. The 180-day window is the one
+              that ranks an inspector's queue best, which is the job.
+            </p>
+          </div>
+
+          <div class="grid-2" style="margin-top: 32px">
             <div class="card">
               <h3>Web app</h3>
               <p>
@@ -1069,7 +1238,7 @@
               />
               <p class="member__name">Arun Agarwal</p>
               <p class="member__role">Data Engineering</p>
-              <p class="member__detail">Ingestion and S3 data lake</p>
+              <p class="member__detail">Data ingestion, S3 data lake</p>
               <div class="member__links">
                 <a href="https://github.com/aagarwal17" aria-label="Arun Agarwal on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
                 <a href="https://www.linkedin.com/in/arunagarwal23/" aria-label="Arun Agarwal on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
@@ -1087,7 +1256,7 @@
               />
               <p class="member__name">Bella Davies</p>
               <p class="member__role">Core ML and Evaluation</p>
-              <p class="member__detail">SHAP, fairness audits, and modeling</p>
+              <p class="member__detail">Modeling, evaluation, SHAP, fairness audits</p>
               <div class="member__links">
                 <a href="https://github.com/bellad21992" aria-label="Bella Davies on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
                 <a href="https://www.linkedin.com/in/bella-davies-5615a1201/" aria-label="Bella Davies on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
@@ -1105,7 +1274,7 @@
               />
               <p class="member__name">Deepak Srivastava</p>
               <p class="member__role">Conversational Agent</p>
-              <p class="member__detail">Guardrails and agent evaluations</p>
+              <p class="member__detail">Agent deployment, tools, guardrails</p>
               <div class="member__links">
                 <a href="https://github.com/dsri-ischool" aria-label="Deepak Srivastava on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
                 <a href="https://www.linkedin.com/in/sdeepak/" aria-label="Deepak Srivastava on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
@@ -1123,7 +1292,7 @@
               />
               <p class="member__name">Aurelia Yang</p>
               <p class="member__role">Deep Learning Experiments</p>
-              <p class="member__detail">Exploratory analysis and app experience</p>
+              <p class="member__detail">EDA, app experience</p>
               <div class="member__links">
                 <a href="https://github.com/aureliay" aria-label="Aurelia Yang on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
                 <a href="https://www.linkedin.com/in/aurelia-yang/" aria-label="Aurelia Yang on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
@@ -1141,7 +1310,7 @@
               />
               <p class="member__name">Jun Xu</p>
               <p class="member__role">Team Lead and PM</p>
-              <p class="member__detail">Web app and deployment</p>
+              <p class="member__detail">Web app, deployment</p>
               <div class="member__links">
                 <a href="https://github.com/junxu315" aria-label="Jun Xu on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
                 <a href="https://www.linkedin.com/in/junxu0/" aria-label="Jun Xu on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
