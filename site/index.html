@@ -625,9 +625,9 @@
           <div class="diagram">
             <img
               src="assets/media/architecture.webp"
-              alt="System architecture. On the left, city inspection data (historical violations and inspection history) lands in a raw S3 data lake. In the centre, a prediction pipeline: a processed S3 data lake feeds SageMaker Feature Store for multivariate feature processing, then SageMaker Studio and SageMaker Training run deep learning and XGBoost, and a batch inference job writes scores.json back to S3. To its right, the end-user app serves a Next.js static export from S3 behind a CloudFront CDN to browsers. On the right, Amazon Bedrock AgentCore runs a Strands agent on Nova 2 Lite with eight tools: find_restaurants, get_safety_score, explain_restaurant, look_up_establishment, find_reviews, find_inspection_records, food_safety_info, and visualize_data. Along the bottom, an MLOps and governance layer of CodePipeline, SageMaker Model Monitor, security management, and CloudWatch."
-              width="1705"
-              height="922"
+              alt="System architecture in three columns. Left, the offline data sources and prediction pipeline: Chicago and New York City via SODA APIs and Los Angeles via ArcGIS Hub, each supplying food inspections, business licences and 311, feeding a Python batch-scoring pipeline built on pandas, DuckDB, scikit-learn and XGBoost that does feature engineering, a temporal train, validation and test split, and SHAP. Its model recipe is a logistic-regression baseline plus calibrated XGBoost with TreeSHAP explainability, producing a risk score and a forecast trend shared across all three cities. That writes scores.parquet, which parquet_to_json.py converts to scores.json per city. Centre, AWS cloud infrastructure: an S3 bucket holding raw and served JSON behind a CloudFront CDN, Bedrock AgentCore running the Nova Lite chat agent and a sandboxed Code Interpreter for charts, a Lambda proxy from the agent to the load balancer, and GitHub Actions OIDC deploys for the web app and the agent. A vertical band across this column reads: the permanent contract, the app and agent only ever read pre-computed JSON, the model never runs at request time. Right, the end-user app and agentic AI platform: a Next.js 16 web app on Amplify and CloudFront offering search, map, restaurant detail, methodology and chat; the Eatelligence chat agent on Bedrock AgentCore with Nova Lite, city-aware, answering Chicago-only restaurant risk plus general food-safety education with cited sources and on-demand charts; and agentic AI tools that read the same scores.json and never call the model. A banner along the bottom lists three takeaways: batch-scored rather than real-time, multi-city on one pipeline, and rigour over raw performance."
+              width="1408"
+              height="768"
               loading="lazy"
             />
           </div>
@@ -1053,8 +1053,9 @@
             beneath each photo, so a non-empty alt would make a screen reader
             announce the same person twice.
 
-            LinkedIn links are not present yet. To add one, put a second anchor
-            beside the GitHub anchor inside that person's .member__links div.
+            Each card links to GitHub, LinkedIn, and email. The icons are inline
+            SVG (no icon font, no external request) and are aria-hidden, so the
+            accessible name comes from the anchor's aria-label.
           -->
           <div class="team">
             <div class="member">
@@ -1069,7 +1070,11 @@
               <p class="member__name">Arun Agarwal</p>
               <p class="member__role">Data Engineering</p>
               <p class="member__detail">Ingestion and S3 data lake</p>
-              <div class="member__links"></div>
+              <div class="member__links">
+                <a href="https://github.com/aagarwal17" aria-label="Arun Agarwal on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/arunagarwal23/" aria-label="Arun Agarwal on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:aagarwal19@berkeley.edu" aria-label="Email Arun Agarwal" title="aagarwal19@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
             </div>
             <div class="member">
               <img
@@ -1084,7 +1089,9 @@
               <p class="member__role">Core ML and Evaluation</p>
               <p class="member__detail">SHAP, fairness audits, and modeling</p>
               <div class="member__links">
-                <a href="https://github.com/bellad21992">GitHub</a>
+                <a href="https://github.com/bellad21992" aria-label="Bella Davies on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/bella-davies-5615a1201/" aria-label="Bella Davies on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:bella_davies@berkeley.edu" aria-label="Email Bella Davies" title="bella_davies@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
               </div>
             </div>
             <div class="member">
@@ -1100,7 +1107,9 @@
               <p class="member__role">Conversational Agent</p>
               <p class="member__detail">Guardrails and agent evaluations</p>
               <div class="member__links">
-                <a href="https://github.com/dsri-ischool">GitHub</a>
+                <a href="https://github.com/dsri-ischool" aria-label="Deepak Srivastava on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/sdeepak/" aria-label="Deepak Srivastava on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:deepak_srivastava@berkeley.edu" aria-label="Email Deepak Srivastava" title="deepak_srivastava@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
               </div>
             </div>
             <div class="member">
@@ -1115,7 +1124,11 @@
               <p class="member__name">Aurelia Yang</p>
               <p class="member__role">Deep Learning Experiments</p>
               <p class="member__detail">Exploratory analysis and app experience</p>
-              <div class="member__links"></div>
+              <div class="member__links">
+                <a href="https://github.com/aureliay" aria-label="Aurelia Yang on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/aurelia-yang/" aria-label="Aurelia Yang on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:ayang103@berkeley.edu" aria-label="Email Aurelia Yang" title="ayang103@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
             </div>
             <div class="member">
               <img
@@ -1130,9 +1143,12 @@
               <p class="member__role">Team Lead and PM</p>
               <p class="member__detail">Web app and deployment</p>
               <div class="member__links">
-                <a href="https://github.com/junxu315">GitHub</a>
+                <a href="https://github.com/junxu315" aria-label="Jun Xu on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/junxu0/" aria-label="Jun Xu on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:jun_xu@berkeley.edu" aria-label="Email Jun Xu" title="jun_xu@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
               </div>
             </div>
+          </div>
           </div>
 
           <div class="callout">
