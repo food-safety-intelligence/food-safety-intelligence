@@ -799,6 +799,15 @@ td.num {
   }
 }
 
+/* Below ~480px a two-column card is narrower than its own contents: three 44px
+   tap targets plus padding need ~176px, but a column is only ~163px at 390px
+   wide. Going single-column is the fix that keeps the targets at 44px. */
+@media (max-width: 480px) {
+  .team {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Column layout + margin-top:auto on the links row keeps every card's links on
    the same baseline, even though the role and detail lines wrap to different
    heights and two people have no links at all. */
@@ -846,21 +855,34 @@ td.num {
 .member__links {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 4px;
   margin-top: auto;
-  padding-top: 12px;
-  min-height: 20px;
+  padding-top: 14px;
 }
 
+/* Icon-only links, so each one carries an aria-label. Sized to the 44px minimum
+   tap target even though the glyph inside is 18px. */
 .member__links a {
-  font-size: 0.76rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   color: var(--green);
   text-decoration: none;
-  padding: 6px 4px;
+  transition: background-color 0.15s, color 0.15s;
 }
 
 .member__links a:hover {
-  text-decoration: underline;
+  background: var(--mint);
+  color: var(--ink);
+}
+
+.member__links .icon {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 /* ─────────────────────────── Callout ─────────────────────────── */
