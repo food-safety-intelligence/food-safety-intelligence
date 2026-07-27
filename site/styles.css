@@ -465,6 +465,18 @@ figcaption {
   gap: 7px;
 }
 
+/* Inline code, for the occasional parameter name in prose. */
+code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  /* Long identifiers must not push a narrow card wider than the viewport. */
+  overflow-wrap: anywhere;
+}
+
 .card li {
   font-size: 0.9rem;
   color: var(--muted);
