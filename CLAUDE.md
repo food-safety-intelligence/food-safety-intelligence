@@ -36,6 +36,17 @@ with the workspace file, this file wins.
 > **Chicago-only**. **No open web search and no news sources**: citations come
 > from a curated allow-list, enforced by the agent eval (allow-list gate + an
 > opt-in live link-resolution check).
+>
+> **NOAA weather data scope widened (2026-06-30 — pending Jun's sign-off as
+> scope guard).** NOAA weather, previously cut from the MVP and listed as a
+> Phase-2 Roadmap item, is now implemented: `foodsafety.io.noaa` (GHCN-Daily,
+> Chicago O'Hare station) and `foodsafety.features.weather_features` (citywide
+> daily features, joined by date, leak-guarded). It is wired as an **opt-in**
+> feature family (`WEATHER_FEATURES` in `baseline.py`) — **not** in
+> `ALL_FEATURES` / the served model — pending the A/B promotion run
+> (`scripts/experiment_weather_features.py`) clearing the both-metrics gate.
+> See [`docs/data_dictionary.md`](docs/data_dictionary.md) § NOAA weather and
+> [0014](docs/decisions/0014-noaa-weather-citywide-station.md).
 
 Predict forward-window food-safety risk for Chicago restaurants from public
 Chicago data (Food Inspections, Business Licenses, 311). Ship two things:
@@ -113,7 +124,6 @@ Three layers, in this order — A and B are required, C is a stretch:
 
 ## What is OUT of scope — do not add, do not stub, do not leave seams
 
-- NOAA weather data
 - Yelp Open Dataset + Yelp fuzzy join
 - Production fairness audit (disparate impact tests, reweighting). Group-perf
   *tables* are in scope; full audit is later.
@@ -149,7 +159,6 @@ when someone asks "what about X?" the answer is "noted, post-demo."
   roadmap is the scheduler that runs it on a daily / weekly timer — no scheduling
   code lives in this repo.
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
-- NOAA weather features, Yelp Open Dataset + fuzzy join
 - Production fairness audit (disparate-impact tests, reweighting)
 - More cities beyond the three now shipped. Chicago is the primary/production
   city; **NYC and LA are live as research-preview cities** (one static build +
