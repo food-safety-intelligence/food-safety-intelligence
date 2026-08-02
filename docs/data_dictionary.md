@@ -150,10 +150,21 @@ project**, via either avenue:
   this is the *why*.
 
 ### NOAA weather
-Cut from the MVP. A plausible *orthogonal* future lever (heat waves stress
-refrigeration and drive pest activity), but `temporal_month` / `temporal_quarter`
-already capture coarse seasonality, so it would need to show *incremental* signal
-over those. Untried.
+Implemented 2026-06-30 (`docs/decisions/0014-noaa-weather-citywide-station.md`):
+`foodsafety.io.noaa.fetch_noaa_ghcnd` pulls Chicago O'Hare's (`USW00094846`)
+GHCN-Daily history; `foodsafety.features.weather_features.add_weather_features`
+computes `prior_tmax_3d_avg`, `prior_tmin_3d_avg`, `prior_precip_7d_sum`,
+`prior_heat_days_30d`, `prior_freeze_days_30d` (citywide, joined by date, leak-
+guarded with a one-day shift). Wired as an opt-in family
+(`WEATHER_FEATURES` in `baseline.py`, `--with-weather` in
+`build_features.py`) — **not yet in `ALL_FEATURES`**. The original
+question — does actual daily weather show *incremental* signal over the
+`temporal_month` / `temporal_quarter` seasonality proxies — is still
+untested: `scripts/experiment_weather_features.py` runs the A/B but
+requires a bootstrapped local/S3 data pipeline and live network access,
+neither available in the sandbox this was authored in. Promotion to
+`ALL_FEATURES` requires that A/B to clear the both-metrics gate (see
+`docs/model-experiments.md`).
 
 ### Census / ACS (tract demographics) — audit-only
 **Audit-only, never a model feature** (it's a direct geographic/demographic
