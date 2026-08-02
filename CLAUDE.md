@@ -159,7 +159,6 @@ when someone asks "what about X?" the answer is "noted, post-demo."
   roadmap is the scheduler that runs it on a daily / weekly timer — no scheduling
   code lives in this repo.
 - AWS (Bedrock, SageMaker, S3) for hosted training / inference
-- Yelp Open Dataset + fuzzy join
 - Production fairness audit (disparate-impact tests, reweighting)
 - More cities beyond the three now shipped. Chicago is the primary/production
   city; **NYC and LA are live as research-preview cities** (one static build +
