@@ -16,6 +16,14 @@ export interface CityConfig {
   /** Map framing. */
   center: { lat: number; lon: number };
   zoom: number;
+  /** Hard camera clamp [[west, south], [east, north]] — padded ~15-25 km past
+   * the boundary so the whole city fits AND a visible band of grayed-out
+   * surroundings shows the mask edge. Constants (not derived from the
+   * boundary fetch) so the clamp works even when the mask doesn't load. */
+  maxBounds: [[number, number], [number, number]];
+  /** Zoom-out floor. LA County is far larger than the two cities, so its
+   * floor is lower. Must stay <= zoom (the default framing). */
+  minZoom: number;
   centerLabel: string;
   /** Copy that changes because the label/window/source differ per city. */
   nounPlural: string; // "food establishments"
@@ -84,6 +92,11 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     dataPrefix: "",
     center: { lat: 41.88, lon: -87.63 },
     zoom: 10,
+    maxBounds: [
+      [-88.15, 41.49],
+      [-87.3, 42.17],
+    ],
+    minZoom: 8.5,
     centerLabel: "Chicago · 41.88, −87.63",
     nounPlural: "licensed food establishments",  // Chicago's feed covers all licensed food establishments
     predictionBlurb:
@@ -117,6 +130,11 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     dataPrefix: "nyc/",
     center: { lat: 40.71, lon: -74.0 },
     zoom: 10,
+    maxBounds: [
+      [-74.46, 40.35],
+      [-73.5, 41.06],
+    ],
+    minZoom: 8.5,
     centerLabel: "New York City · 40.71, −74.00",
     nounPlural: "licensed restaurants",  // NYC's DOHMH feed is restaurant inspections
     predictionBlurb:
@@ -161,6 +179,11 @@ export const CITY_CONFIG: Record<City, CityConfig> = {
     // Chicago/NYC so more of the county is in view on load.
     center: { lat: 34.02, lon: -118.29 },
     zoom: 9,
+    maxBounds: [
+      [-119.2, 33.1],
+      [-117.4, 35.0],
+    ],
+    minZoom: 7.5,
     centerLabel: "Los Angeles County · 34.02, −118.29",
     nounPlural: "restaurants and markets", // LA County's feed covers restaurants + retail food markets
     predictionBlurb:
@@ -215,6 +238,15 @@ export function isCity(v: unknown): v is City {
 export function dataUrl(city: City, file: string): string {
   const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
   return `${base}/data/${CITY_CONFIG[city].dataPrefix}${file}`;
+}
+
+/**
+ * Committed city-boundary GeoJSON (an app asset shipped with the export, not
+ * per-city S3 data — so it deliberately does NOT go through dataPrefix).
+ */
+export function boundaryUrl(city: City): string {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return `${base}/data/boundaries/${city}.json`;
 }
 
 /**

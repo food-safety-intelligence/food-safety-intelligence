@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-07-06T03:46:35.464457+00:00",
+  "generated_at": "2026-07-20T00:11:21.450806+00:00",
   "model_version": "la_xgb_sigmoid",
   "city": "la",
   "data_source": "LA County Environmental Health Restaurant and Market Inspections (ArcGIS)",
@@ -14,6 +14,23 @@
     "prevalence": 0.0866,
     "events": 623,
     "split_from": "2025-01-01"
+  },
+  "windows": {
+    "train": {
+      "start": "2023-04-01",
+      "end": "2024-06-30",
+      "n": 36900
+    },
+    "val": {
+      "start": "2024-07-01",
+      "end": "2024-12-31",
+      "n": 7374
+    },
+    "test": {
+      "start": "2025-01-02",
+      "end": "2026-03-25",
+      "n": 7197
+    }
   },
   "headline": {
     "pr_auc": 0.187,

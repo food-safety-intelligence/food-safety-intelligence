@@ -7,12 +7,45 @@
 // the governance prose is largely city-agnostic (public records, no visitor data)
 // with the city name / sources injected. Chicago keeps its own inline version.
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
-import { CITY_CONFIG, type City } from "@/lib/city";
+import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
 import { sourceNames } from "@/lib/sources";
-import { EvaluationDetail } from "@/components/EvaluationDetail";
+import { EvaluationDetail } from "@/components/MethodologySections";
+export { ChronologicalSplit, FeatureGroups, type FeatureGroup } from "@/components/MethodologySections";
 import type { DateWindow } from "@/lib/methodology-server";
+
+export interface Headline {
+  pr_auc: number;
+  roc_auc: number;
+  top_decile_lift: number;
+}
+
+/**
+ * Chicago's live headline metrics, for the preview cities that describe their
+ * own signal as weaker than Chicago's. Read from Chicago's methodology.json so
+ * the comparison tracks whatever model is actually served, rather than a number
+ * typed into the copy that goes stale at the next retrain.
+ *
+ * Returns null until it loads (or if it fails), so callers must render a
+ * comparison-free sentence in that case.
+ */
+export function useChicagoHeadline(): Headline | null {
+  const [h, setH] = useState<Headline | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(dataUrl("chicago", "methodology.json"))
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d: { headline?: Headline }) => {
+        if (alive && d.headline) setH(d.headline);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return h;
+}
 
 // "a" vs "an" for a percentage read aloud (e.g. "an 8%", "a 41%"). For whole
 // percents 0–100 the vowel-sound-initial numbers are 8, 11, 18, and the 80s.

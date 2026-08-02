@@ -125,6 +125,61 @@ def test_fuzzy_address_then_name():
 
 
 # ---------------------------------------------------------------------------
+# A single-occupancy address must still clear a name check
+# ---------------------------------------------------------------------------
+
+
+def test_fuzzy_address_to_lone_record_rejects_a_different_business():
+    """The live Los Angeles failure: an OSM address fuzzily resolved into a bucket
+    holding one unrelated record, and the name gate was skipped for single-occupancy
+    buckets — so "Taco Bell" was handed STARBUCKS COFFEE #9746's risk score. A
+    confident wrong score is worse than a miss (ethics decision record 0005)."""
+    index = _index(RECORD_A)  # lone STARBUCKS record at SHARED_ADDRESS
+    assert _fuzzy_lookup("11601 W TUOHY AVE", "Taco Bell", index) is None
+
+
+def test_exact_address_to_lone_record_rejects_a_different_tenant():
+    """Second live failure: the address matched exactly but the record on it was a
+    different business ("Cafe Etc." -> "CAFFE HUB"). Sharing no distinctive word is
+    enough to rule it out."""
+    index = _index({"license_id": "LIC_C", "dba_name": "CAFFE HUB", "address": SHARED_ADDRESS})
+    assert _fuzzy_lookup(SHARED_ADDRESS, "Cafe Etc.", index) is None
+
+
+def test_exact_hit_on_a_street_without_a_house_number_uses_the_strict_gate():
+    """New York City publishes 52 addresses with no house number, several of them
+    bare street names. "BROADWAY" is thirteen miles long, so an exact hit on it is
+    NOT evidence that two venues are the same place — without this, every venue on
+    Broadway sharing one word with a deli inherited that deli's published score."""
+    index = _index({"license_id": "LIC_D", "dba_name": "MAMA'S TOO!", "address": "BROADWAY"})
+    # Shares the distinctive word "MAMA'S", but only the weak gate would accept it.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Pizza", index) is None
+    # The genuine venue still resolves, because it clears the full name match.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Too", index) is not None
+
+
+def test_a_street_less_address_never_fuzzy_matches():
+    """An OSM venue with no street tag yields just the city ("Los Angeles, CA" ->
+    "LOS ANGELES"), which difflib scores as 0.72-similar to "435 LOS ANGELES ST"
+    while naming nothing in common with it. A key with no house number must not be
+    fuzzed at all."""
+    index = _index(
+        {"license_id": "LIC_E", "dba_name": "ANTOJITOS PUEBLA", "address": "435 LOS ANGELES ST"}
+    )
+    assert _fuzzy_lookup("Los Angeles, CA", "Antojitos", index) is None
+    assert _fuzzy_lookup("Chicago, IL", "Sweet Vegan Bakes", index) is None
+
+
+def test_exact_address_to_lone_record_keeps_an_honest_rewrite():
+    """An exact address is strong evidence, so a venue the two sources merely spell
+    differently must still match — one shared distinctive word is enough. Gating this
+    on a full name match would have thrown away real coverage."""
+    index = _index(RECORD_A)
+    match = _fuzzy_lookup(SHARED_ADDRESS, "Starbucks Reserve Roastery", index)
+    assert match is not None and match["license_id"] == "LIC_A"
+
+
+# ---------------------------------------------------------------------------
 # Index keeps every shared-address record (no last-writer-wins)
 # ---------------------------------------------------------------------------
 

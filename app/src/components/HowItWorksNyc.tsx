@@ -12,9 +12,11 @@ import {
   Target,
   Wrench,
 } from "lucide-react";
-import { ModelCard, DataGovernance, MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
+import { ChronologicalSplit, ModelCard, DataGovernance, FeatureGroups, type FeatureGroup, MethodologyHero, OperatingPointsTable, TightestSlices, useChicagoHeadline } from "@/components/HowItWorksCards";
 import { useEffect, useState } from "react";
 import { dataUrl } from "@/lib/city";
+import { glossaryFor } from "@/lib/glossary";
+import type { DateWindow } from "@/lib/methodology-server";
 import type { RiskTier } from "@/lib/scores";
 import { TierPill } from "@/components/TierPill";
 import { cn } from "@/lib/utils";
@@ -23,6 +25,7 @@ interface NycMethodology {
   data_source: string;
   train_window: string;
   test: { n: number; prevalence: number; events: number; split_from: string };
+  windows?: { train: DateWindow; val: DateWindow; test: DateWindow };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   risk_tiers: { label: string; min: number; max: number | null; share: number }[];
   operating_points: { frac: number; n_flagged: number; precision: number; recall: number; lift: number; events_caught: number }[];
@@ -80,18 +83,51 @@ const NAV = [
   ["reference", "Reference"],
 ];
 
-// NYC-appropriate definitions (Chicago's glossary is Chicago-specific).
-const NYC_GLOSSARY: { id: string; term: string; short: string }[] = [
-  { id: "letter-grade", term: "Letter grade (A / B / C)", short: "New York's public restaurant grade. It's a threshold on the inspection score: A = 0–13 points, B = 14–27, C = 28+. Lower is cleaner." },
-  { id: "inspection-score", term: "Inspection score", short: "The sum of violation points at one inspection: public-health hazards ≥ 7 points, critical ≥ 5, general ≥ 2. The score maps to the letter grade." },
-  { id: "risk-tier", term: "Risk tier", short: "The Low / Moderate / Elevated / High band shown on the map, list, and detail pages. A bucketing of the predicted probability, recalibrated to NYC's own distribution." },
-  { id: "severity-tier", term: "Severity tier", short: "A shared way to describe how serious a violation is across all three cities (imminent-hazard, critical, or general) mapped from each city's own codes via the shared violation dictionary." },
-  { id: "violation-dictionary", term: "Violation dictionary", short: "A lookup that maps each city's own violation codes to a shared set of plain-language themes (temperature, pest, hygiene, contamination, …) and severity tiers, so one vocabulary describes violations across all three cities even though each city files them differently." },
-  { id: "pr-auc", term: "PR-AUC / ROC-AUC", short: "Ranking-quality scores. PR-AUC rewards finding the minority (B/C) cases; ROC-AUC is base-rate independent, so it's the fairest number to compare NYC (~0.66) with Chicago (~0.78)." },
-  { id: "lift", term: "Top-decile lift", short: "How much better than chance the top 10% by predicted risk is. 1.6× means that slice has 1.6× the B/C rate of the whole population." },
-  { id: "calibration", term: "Calibration", short: "A final step that makes the 0–1 score read as a real probability, so a 0.30 really means ~30% of similar establishments were graded B/C next time." },
-  { id: "shap", term: "SHAP driver", short: "A per-establishment breakdown of which features pushed the score up or down, in log-odds: the signed list you see under 'what's driving the score' on a detail page." },
-  { id: "forecast-trend", term: "Forecast-only model / trend", short: "A second model that scores each past inspection without seeing its own outcome; the slope of its recent scores is the Improving / Worsening / Stable trend." },
+
+// The model's inputs, grouped for the "What the model looks at" list. Counts are
+// from the served artifact's feature list (nyc_xgb_sigmoid: 32) and sum to it.
+const NYC_FEATURE_GROUPS: FeatureGroup[] = [
+  {
+    name: "Prior history",
+    count: 5,
+    detail:
+      "how many inspections the establishment has on record, how many were graded B or C, its prior critical-violation count, and its average past score and past B/C rate",
+  },
+  {
+    name: "Recency & previous visit",
+    count: 3,
+    detail:
+      "days since the last inspection, plus the previous inspection's score and whether it was B or C, so the model sees direction and not just lifetime totals",
+  },
+  {
+    name: "Establishment record",
+    count: 2,
+    detail:
+      "how long the establishment has been in the inspection record, and how many times it has previously been closed",
+  },
+  {
+    name: "Prior violation severity",
+    count: 3,
+    detail:
+      "counts of past violations at each severity tier (imminent-hazard, critical, general), mapped from DOHMH codes via the shared violation dictionary",
+  },
+  {
+    name: "Current inspection outcome",
+    count: 5,
+    detail:
+      "this visit's own score, total and critical violation counts, whether it landed in the B/C range, and whether it resulted in a closure",
+  },
+  {
+    name: "Current violation severity",
+    count: 3,
+    detail: "this visit's violations counted at each of the three severity tiers",
+  },
+  {
+    name: "Current violation themes",
+    count: 11,
+    detail:
+      "this visit's violations counted by plain-language theme (temperature control, pest/vermin, pest-proofing, hygiene and handwashing, cross-contamination, food-contact surfaces, plumbing and sewage, approved source, equipment, management certification, administrative)",
+  },
 ];
 
 export function HowItWorksNyc() {
@@ -108,6 +144,8 @@ export function HowItWorksNyc() {
   }, []);
 
   const prevPct = m ? Math.round(m.test.prevalence * 100) : 41;
+  // Chicago's numbers come from its own methodology.json, not the copy.
+  const chi = useChicagoHeadline();
 
   return (
     <div>
@@ -186,7 +224,7 @@ export function HowItWorksNyc() {
           )}
         </article>
         <article>
-          <h2 className="text-2xl font-medium tracking-tight">The recent-trend chart</h2>
+          <h2 id="recent-trend" className="scroll-mt-24 text-2xl font-medium tracking-tight">The recent-trend chart</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
             Each detail page plots a forecast-only model&apos;s score across the
             establishment&apos;s recent inspections, and reads the slope of the last
@@ -203,6 +241,36 @@ export function HowItWorksNyc() {
       <div className="mt-10 space-y-8">
         <SectionLabel id="how-its-built" number="02" icon={Wrench}>How it&apos;s built</SectionLabel>
         <article>
+          <h2 className="text-2xl font-medium tracking-tight">What the score predicts</h2>
+          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
+            For each inspection we ask: at this establishment&apos;s <em>next</em>{" "}
+            inspection, is the grade B or C (score 14 or more)? Unlike Chicago&apos;s
+            fixed 180-day window, the NYC label is anchored to the next inspection
+            whenever it occurs, because NYC&apos;s roughly annual cadence leaves a
+            short fixed window empty. Source:{" "}
+            {m?.data_source ?? "NYC DOHMH Restaurant Inspection Results"}. Training
+            window: {m?.train_window ?? "post-COVID, 2022 onward"}. Inspections halted
+            in the 2020 COVID shutdown, so earlier data isn&apos;t comparable (the
+            analog of Chicago&apos;s 2019 cutoff).
+          </p>
+        </article>
+        <article>
+          <h2 className="text-2xl font-medium tracking-tight">What the model looks at</h2>
+          <FeatureGroups total={32} groups={NYC_FEATURE_GROUPS} />
+        </article>
+        <article>
+          <h2 className="text-2xl font-medium tracking-tight">How the datasets connect</h2>
+          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
+            Everything comes from a single DOHMH feed, so unlike Chicago there is no
+            cross-dataset join: inspections and their violation rows arrive together,
+            keyed by the establishment&apos;s record id. Every prior-history and
+            recency feature looks only at that establishment&apos;s own earlier
+            inspections, strictly before the one being scored. There is no
+            cross-establishment or map-proximity join. Cuisine is deliberately left
+            out, along with any demographic proxy.
+          </p>
+        </article>
+        <article>
           <h2 className="text-2xl font-medium tracking-tight">The model</h2>
           <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
             A gradient-boosted tree model (XGBoost, depth-3) with sigmoid (Platt)
@@ -210,34 +278,17 @@ export function HowItWorksNyc() {
             calibrated-log-odds waterfall on each detail page show which factors
             moved the score. Scores are computed in a batch job and written to JSON;
             the site never calls a model at request time.
+            {m ? (
+              <>
+                {" "}On the time-held-out test split: PR-AUC{" "}
+                {m.headline.pr_auc.toFixed(2)}, ROC-AUC{" "}
+                {m.headline.roc_auc.toFixed(2)}, top-decile lift{" "}
+                {m.headline.top_decile_lift.toFixed(1)}×.
+              </>
+            ) : null}
           </p>
         </article>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What we predict</h2>
-          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            For each inspection we ask: at this establishment&apos;s <em>next</em>
-            inspection, is the grade B or C (score ≥ 14)? Unlike Chicago&apos;s fixed
-            180-day window, the NYC label is anchored to the next inspection whenever
-            it occurs. NYC&apos;s ~annual cadence makes a short fixed window empty.
-            Source: {m?.data_source ?? "NYC DOHMH Restaurant Inspection Results"}.
-            Training window: {m?.train_window ?? "post-COVID, 2022 onward"}.
-            Inspections halted in the 2020 COVID shutdown, so earlier data isn&apos;t
-            comparable (the analog of Chicago&apos;s 2019 cutoff).
-          </p>
-        </article>
-        <article>
-          <h2 className="text-2xl font-medium tracking-tight">What goes in</h2>
-          <p className="text-muted leading-[1.7] mt-3 max-w-[62ch]">
-            Leak-free history features: prior inspection count, prior B/C count,
-            average and previous score, prior critical-violation counts, days since
-            the last inspection, plus the current inspection&apos;s own outcome
-            (score, violation counts). Violations are mapped through a shared
-            violation dictionary into severity tiers (imminent-hazard / critical /
-            general) and themes (temperature, pest, hygiene, contamination, …) so the
-            same vocabulary describes all three cities. Everything comes from a single
-            DOHMH feed, so there is no cross-dataset join. No cuisine or demographic proxy is used.
-          </p>
-        </article>
+        <ChronologicalSplit windows={m?.windows} />
       </div>
 
       {/* 03 — How well it works */}
@@ -251,7 +302,8 @@ export function HowItWorksNyc() {
               work-list. The honest read isn&apos;t a single number. It&apos;s how
               much of the real risk you catch at the slice you can actually staff.
               NYC&apos;s signal is weaker than Chicago&apos;s (ROC-AUC{" "}
-              {m.headline.roc_auc.toFixed(2)} vs ~0.78), so it stays a preview:
+              {m.headline.roc_auc.toFixed(2)}
+              {chi ? ` vs ${chi.roc_auc.toFixed(2)}` : ""}), so it stays a preview:
             </p>
           )}
           {m && <OperatingPointsTable ops={m.operating_points} />}
@@ -346,8 +398,14 @@ export function HowItWorksNyc() {
             <p>
               <strong className="text-ink">NYC is a coverage feature, not a quality
               upgrade.</strong> Its signal is weaker than Chicago&apos;s
-              (ROC-AUC ~0.66 vs ~0.78; lift ~1.6× vs ~3.4×), so treat NYC scores as
-              a rougher guide.
+              {m && chi ? (
+                <>
+                  {" "}(ROC-AUC {m.headline.roc_auc.toFixed(2)} vs{" "}
+                  {chi.roc_auc.toFixed(2)}; lift {m.headline.top_decile_lift.toFixed(1)}× vs{" "}
+                  {chi.top_decile_lift.toFixed(1)}×)
+                </>
+              ) : null}
+              , so treat NYC scores as a rougher guide.
             </p>
             <p>
               <strong className="text-ink">The data window is shallow.</strong> Only
@@ -379,7 +437,7 @@ export function HowItWorksNyc() {
             inspection history.
           </p>
           <dl className="mt-4 space-y-4 max-w-[62ch]">
-            {NYC_GLOSSARY.map((entry) => (
+            {glossaryFor("nyc").map((entry) => (
               <div key={entry.id} id={entry.id} className="scroll-mt-24 rounded-2xl border border-line bg-card p-4">
                 <dt className="font-medium text-ink">{entry.term}</dt>
                 <dd className="text-sm text-muted leading-relaxed mt-1">{entry.short}</dd>

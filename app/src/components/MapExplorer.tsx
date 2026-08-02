@@ -19,7 +19,7 @@ import { ClosedPill, TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
 import { useCity } from "@/components/CityContext";
-import { CITY_CONFIG, dataUrl } from "@/lib/city";
+import { boundaryUrl, CITY_CONFIG, dataUrl } from "@/lib/city";
 import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/utils";
 
@@ -258,6 +258,9 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
               lon: CITY_CONFIG[city].center.lon,
               zoom: CITY_CONFIG[city].zoom,
             }}
+            maxBounds={CITY_CONFIG[city].maxBounds}
+            minZoom={CITY_CONFIG[city].minZoom}
+            boundaryUrl={boundaryUrl(city)}
           />
 
           {/* Floating search + filter overlay */}

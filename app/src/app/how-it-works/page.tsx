@@ -19,8 +19,8 @@ import { CityGate } from "@/components/CityGate";
 import { HowItWorksNyc } from "@/components/HowItWorksNyc";
 import { HowItWorksLa } from "@/components/HowItWorksLa";
 import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
-import { EvaluationDetail } from "@/components/EvaluationDetail";
-import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
+import { ChronologicalSplit, EvaluationDetail, FeatureGroups, type FeatureGroup } from "@/components/MethodologySections";
+import { glossaryFor } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
 
@@ -153,6 +153,47 @@ export const metadata = {
   description:
     "How the risk score works: what it predicts, what the model looks at, how it's tested, why a score is what it is, and its limits.",
 };
+
+// Chicago's model inputs, grouped for "What the model looks at". Counts are from
+// ALL_FEATURES in foodsafety.models.baseline (36) and sum to it.
+const CHICAGO_FEATURE_GROUPS: FeatureGroup[] = [
+  {
+    name: "Prior history",
+    count: 8,
+    detail:
+      "counts of inspections, failures, priority and core violations across the establishment's full prior record, plus near-miss and visit-trigger history (Pass w/ Conditions, re-inspections, complaint visits)",
+  },
+  {
+    name: "Recency & trend",
+    count: 7,
+    detail:
+      "days since the last inspection and last failure, the previous inspection's outcome and priority-violation count, the priority-violation trend, and 365-day rolling failure and violation counts, so the model can see an establishment improving and not just its lifetime totals",
+  },
+  {
+    name: "Current inspection outcome",
+    count: 3,
+    detail:
+      "whether this visit was a Fail, and its priority and core violation counts: the model's strongest near-term signal",
+  },
+  {
+    name: "Static facility",
+    count: 4,
+    detail:
+      "Chicago's own Risk 1/2/3 classification (a model input, not the output risk bands above), license age and history, and the scheduled visit trigger. ZIP and facility type were dropped as geographic/business-type proxies (see limitations)",
+  },
+  {
+    name: "Violation keywords",
+    count: 12,
+    detail:
+      "regex flags on prior violation text (temperature, cooling, raw food, cross-contamination, expired, rodent, pest, no soap, no paper towels, handwash sink, sewage, certified manager)",
+  },
+  {
+    name: "Calendar",
+    count: 2,
+    detail:
+      "month and quarter (year is excluded: it doesn't generalise across the chronological train/test split)",
+  },
+];
 
 export default async function HowItWorksPage() {
   const methodology = await loadMethodology();
@@ -458,45 +499,7 @@ export default async function HowItWorksPage() {
             <h2 className="text-2xl font-medium tracking-tight">
               What the model looks at
             </h2>
-            <p className="text-md text-muted leading-relaxed mt-2">
-              Thirty-six features, all built leak-free from the public record:
-            </p>
-            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
-              <li>
-                <span className="font-medium">Prior history</span>: counts of
-                inspections, failures, priority and core violations across the
-                food establishment&apos;s full prior record, plus near-miss and
-                visit-trigger history (Pass w/ Conditions, re-inspections,
-                complaint visits)
-              </li>
-              <li>
-                <span className="font-medium">Recency &amp; trend</span>: days
-                since the last inspection/failure, the previous inspection&apos;s
-                outcome, and 365-day rolling failure and violation counts, so
-                the model can see a food establishment improving, not just its
-              lifetime
-                totals
-              </li>
-              <li>
-                <span className="font-medium">Static facility</span>:
-                Chicago&apos;s own Risk 1/2/3 classification (a model{" "}
-                <span className="font-medium text-ink/80">input</span>, not the
-                output risk bands above), license age/history, and the scheduled
-                visit trigger. ZIP and facility type were dropped as
-                geographic/business-type proxies (see limitations)
-              </li>
-              <li>
-                <span className="font-medium">Violation keywords</span>:
-                twelve regex flags on prior violation text (temperature,
-                rodent/pest, raw food, cross-contamination, handwashing, sewage,
-                etc.)
-              </li>
-              <li>
-                <span className="font-medium">Calendar</span>: month + quarter
-                (year is excluded: it doesn&apos;t generalise across the
-                chronological train/test split)
-              </li>
-            </ul>
+            <FeatureGroups total={36} groups={CHICAGO_FEATURE_GROUPS} />
           </article>
 
           <article>
@@ -533,24 +536,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <article>
-            <h2 className="text-2xl font-medium tracking-tight">
-              Tested on the future, not the past
-            </h2>
-            <p className="text-md text-muted leading-relaxed mt-2">
-              Train, validation, and test are carved by date, not shuffled. We{" "}
-              <span className="font-medium">train</span> on inspections before
-              2024-07, <span className="font-medium">calibrate</span> on
-              2024-07 → 2025-07, and <span className="font-medium">test</span>{" "}
-              on 2025-07 onward, and every feature at a given inspection is
-              computed only from data strictly before it. A random shuffle would
-              let the model peek at a food establishment&apos;s future to predict
-              its
-              past, inflating the score into a number that would never hold up
-              in production. The chronological split mirrors how the model is
-              actually used: trained on history, scored on what comes next.
-            </p>
-          </article>
+          <ChronologicalSplit windows={methodology.windows} />
 
           <SectionLabel id="how-well-it-works" number="03" icon={Target}>
             How well it works
@@ -1069,21 +1055,18 @@ export default async function HowItWorksPage() {
               inspection history.
             </p>
             <dl className="mt-4 space-y-4">
-              {GLOSSARY_ORDER.map((key) => {
-                const entry = GLOSSARY[key];
-                return (
-                  <div
-                    key={entry.id}
-                    id={entry.id}
-                    className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
-                  >
-                    <dt className="font-medium text-ink">{entry.term}</dt>
-                    <dd className="text-sm text-muted leading-relaxed mt-1">
-                      {entry.short}
-                    </dd>
-                  </div>
-                );
-              })}
+              {glossaryFor("chicago").map((entry) => (
+                <div
+                  key={entry.id}
+                  id={entry.id}
+                  className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
+                >
+                  <dt className="font-medium text-ink">{entry.term}</dt>
+                  <dd className="text-sm text-muted leading-relaxed mt-1">
+                    {entry.short}
+                  </dd>
+                </div>
+              ))}
             </dl>
           </article>
         </section>

@@ -1,0 +1,1402 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eatelligence · Food Safety Intelligence</title>
+    <meta
+      name="description"
+      content="A predictive, explainable food-safety risk layer for every licensed establishment in Chicago, New York City, and Los Angeles. UC Berkeley MIDS W210 capstone, Summer 2026."
+    />
+    <meta property="og:title" content="Eatelligence · Food Safety Intelligence" />
+    <meta
+      property="og:description"
+      content="A predictive, explainable food-safety risk layer for every licensed establishment in Chicago, New York City, and Los Angeles."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content="assets/screenshots/home-map-desktop.webp" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <nav class="nav" aria-label="Section navigation">
+      <div class="nav__inner">
+        <a class="wordmark" href="#top"><em>Eat</em>elligence</a>
+        <div class="nav__links">
+          <a href="#problem">Problem</a>
+          <a href="#product">Product</a>
+          <a href="#architecture">Architecture</a>
+          <a href="#agent">Agent</a>
+          <a href="#results">Results</a>
+          <a href="#responsible">Responsible AI</a>
+          <a href="#team">Team</a>
+          <a
+            class="nav__cta"
+            href="https://github.com/food-safety-intelligence/food-safety-intelligence"
+            >Repository</a
+          >
+        </div>
+      </div>
+    </nav>
+
+    <main id="main">
+      <!-- ─────────────────────────── Hero ─────────────────────────── -->
+      <header id="top" class="section section--flush hero">
+        <div class="shell">
+          <p class="section__label">UC Berkeley MIDS · W210 Capstone · Summer 2026</p>
+          <h1>
+            A predictive, explainable
+            <strong>food-safety risk layer.</strong>
+          </h1>
+          <p class="lede">
+            Eatelligence scores every licensed food establishment in Chicago, New
+            York City, and Los Angeles for the risk of a bad inspection outcome in
+            the next 180 days, using only public data. Every score comes with the
+            factors that drove it. When there is no record, it says so instead of
+            guessing.
+          </p>
+
+          <div class="pills">
+            <span class="pill pill--green">3 cities</span>
+            <span class="pill">89,719 establishments scored</span>
+            <span class="pill">180-day forecast window</span>
+            <span class="pill pill--mint">Public data only</span>
+          </div>
+
+          <div class="hero__actions">
+            <a class="btn" href="#product">See the product</a>
+            <a
+              class="btn btn--ghost"
+              href="https://github.com/food-safety-intelligence/food-safety-intelligence"
+              >Read the code</a
+            >
+          </div>
+
+          <figure class="hero__shot">
+            <img
+              src="assets/screenshots/home-map-desktop.webp"
+              alt="The Eatelligence search page: a map of Chicago with risk-coloured pins beside a ranked list of the highest-risk food establishments, each showing a risk score, tier, and trend."
+              width="1600"
+              height="1111"
+            />
+          </figure>
+          <p class="note" style="margin-top: 12px">
+            Every licensed venue pinned and colour-coded by tier, with search and
+            filter chips, next to a list ranked by predicted risk.
+          </p>
+
+          <div class="stats">
+            <div class="stat">
+              <div class="stat__num">89,719</div>
+              <div class="stat__label">
+                Licensed food establishments scored across three cities
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__num">3.9&times;</div>
+              <div class="stat__label">
+                More failures found per visit than random inspection order,
+                Chicago
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__num">42%</div>
+              <div class="stat__label">
+                Hit rate in the top-ranked 10 percent, against 11 percent at
+                random
+              </div>
+            </div>
+            <div class="stat">
+              <div class="stat__num">0</div>
+              <div class="stat__label">
+                Model calls at request time. Every score is precomputed in batch
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ─────────────────────────── Problem ─────────────────────────── -->
+      <section id="problem" class="section">
+        <div class="shell">
+          <p class="section__label">Problem space</p>
+          <h2>
+            Public data is fragmented and historical.
+            <strong>It never says what happens next.</strong>
+          </h2>
+          <p class="lede">
+            48 million Americans fall ill from foodborne disease every year,
+            leading to about 128,000 hospitalisations and 3,000 deaths. Cities
+            already publish the inspection records that hint at where the next
+            problem is. What they publish is a backward-looking log: it answers
+            what happened, never whether a place is becoming riskier.
+          </p>
+
+          <div class="grid-2" style="margin-top: 44px">
+            <div class="card card--mint">
+              <h3>Resident and diner</h3>
+              <p style="font-size: 1.05rem; color: var(--ink)">
+                "Is this place risky right now?"
+              </p>
+              <p>
+                A pass from eight months ago says little about today. The public
+                sees one snapshot with no trend and no explanation, and someone
+                choosing for an immunocompromised person needs the difference
+                between a temperature violation and a paperwork violation.
+              </p>
+            </div>
+            <div class="card card--mint">
+              <h3>Inspector and health department</h3>
+              <p style="font-size: 1.05rem; color: var(--ink)">
+                "Which places should we inspect first?"
+              </p>
+              <p>
+                Visits are finite and largely scheduled on a routine cycle. The
+                order of the queue decides how many problems get found, and
+                cadence-driven order treats every establishment the same.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Our mission</h3>
+            <p>
+              Point limited inspection staff at the highest-risk targets, and help
+              protect vulnerable diners from preventable illness. Inspections,
+              complaints, and licence records across three cities, unified into
+              one explainable risk score per venue.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── What users told us ─────────────────────────── -->
+      <section class="section section--tint">
+        <div class="shell">
+          <p class="section__label">Research</p>
+          <h2>What diners and inspectors <strong>told us.</strong></h2>
+          <p class="lede">
+            We went looking for how people actually talk about this, in public
+            forums and in interviews, before deciding what to build.
+          </p>
+
+          <div class="quotes">
+            <div class="quote-group">
+              <h3>City residents</h3>
+              <blockquote>
+                <p>"Yep, if it's not an A I'm not going in."</p>
+                <cite>New York City diner, r/AskNYC (2022)</cite>
+              </blockquote>
+              <blockquote>
+                <p>
+                  "Seeing cockroaches is enough for me to never go back."
+                </p>
+                <cite>Chicago consumer, CBS Chicago reader discussion</cite>
+              </blockquote>
+              <blockquote>
+                <p>
+                  "My wife only eats at A-rated restaurants. If it's not an A she
+                  won't go in."
+                </p>
+                <cite>Los Angeles diner, r/FoodLosAngeles</cite>
+              </blockquote>
+            </div>
+            <div class="quote-group">
+              <h3>Verified health inspectors</h3>
+              <blockquote>
+                <p>"We know that people clean when they know we are coming."</p>
+                <cite>Health inspector, verified Reddit AMA</cite>
+              </blockquote>
+              <blockquote>
+                <p>
+                  "People don't wash their hands, even when they are being
+                  inspected."
+                </p>
+                <cite>Health inspector, verified Reddit AMA</cite>
+              </blockquote>
+              <blockquote>
+                <p>
+                  "A restaurant had sewage leaking into their ice machine. They
+                  were still serving the ice."
+                </p>
+                <cite>Health inspector, verified Reddit AMA</cite>
+              </blockquote>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>The interview that changed the framing</h3>
+            <p>
+              A health-department interview pushed back on our first positioning.
+              An inspector's goal is to promote compliance and protect public
+              health, not to maximise citations. So the product is framed around
+              earlier prevention and better resource allocation, never around
+              catching people out. The worklist is a ranking of where to look
+              first, and it says so on the page.
+            </p>
+            <p>
+              A second theme was localisation: every city is different, and a
+              policy that works in Chicago might not fit a suburban village. That
+              is why each city gets its own model, its own target, and its own
+              vocabulary rather than one blended score.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Three questions ─────────────────────────── -->
+      <section class="section">
+        <div class="shell">
+          <p class="section__label">The product</p>
+          <h2>Three questions, <strong>every venue.</strong></h2>
+          <p class="lede">
+            Every surface, the map, the detail page, the inspector worklist, and
+            the chat agent, exists to answer the same three questions.
+          </p>
+
+          <div class="grid-3" style="margin-top: 44px">
+            <div class="card">
+              <div class="card__num">01</div>
+              <h3>Is predicted risk elevated?</h3>
+              <p>
+                A calibrated probability of a bad inspection outcome within 180
+                days, shown as a 0 to 100 score and a named tier. Tiers are set
+                relative to each city's own base rate, so "High" means the same
+                thing everywhere.
+              </p>
+            </div>
+            <div class="card">
+              <div class="card__num">02</div>
+              <h3>Improving, worsening, or stable?</h3>
+              <p>
+                A second model, deliberately blind to the latest visit, fits a
+                trend over recent inspections. The risk model is dominated by what
+                just happened, so it cannot speak to direction. This one can.
+              </p>
+            </div>
+            <div class="card">
+              <div class="card__num">03</div>
+              <h3>What's driving the signal?</h3>
+              <p>
+                TreeSHAP decomposes every score into named, human-readable
+                drivers. The same waterfall ships on every establishment detail
+                page, so the answer is the why, not just "risky".
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Product tour ─────────────────────────── -->
+      <section id="product" class="section">
+        <div class="shell">
+          <p class="section__label">Live demo</p>
+          <h2>One dataset, <strong>four ways in.</strong></h2>
+          <p class="lede">
+            The web app is a fully static site: search, map, filtering, and the
+            detail page all run in the browser against precomputed scores. It
+            never calls the model while you are looking at it.
+          </p>
+
+          <div class="tour">
+            <div class="tour__text">
+              <h3>Map and <strong>search</strong></h3>
+              <p>
+                Substring search across names and addresses, tier filter chips,
+                and a map clamped to each city's real boundary. The ranked list
+                and the map stay in sync, so you can move between "show me the
+                worst" and "show me near here" without losing your place.
+              </p>
+              <ul class="tour__list">
+                <li>Chicago, New York City, and Los Angeles, switchable in one click</li>
+                <li>Risk tier, trend, and top driver visible without opening a record</li>
+                <li>Closed establishments greyed out but still reachable</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/home-la-desktop.webp"
+                alt="The search page switched to Los Angeles, showing risk-coloured pins across the LA basin beside a ranked list of establishments."
+                width="1600"
+                height="1111"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+
+          <div class="tour tour--flip">
+            <div class="tour__text">
+              <h3>Establishment <strong>detail</strong></h3>
+              <p>
+                Risk and trend score, top drivers, and inspection history on one
+                page. The driver panel shows signed contributions as diverging
+                bars, and a second table reconciles them exactly to the number on
+                the gauge, so nothing about the score is a black box.
+              </p>
+              <ul class="tour__list">
+                <li>Diverging driver bars: raising risk right, lowering risk left</li>
+                <li>A worked walkthrough from model intercept to final probability</li>
+                <li>Every inspection on record, with violation counts and outcomes</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/detail-crop.webp"
+                alt="An establishment detail page showing a risk gauge reading 8 out of 100 in the Moderate tier, a recent-trend sparkline, and a ranked list of five drivers with diverging bars."
+                width="1600"
+                height="1311"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+
+          <div class="tour">
+            <div class="tour__text">
+              <h3>Inspectors <strong>page</strong></h3>
+              <p>
+                A priority queue that answers one question: where should the next
+                visit go? In backtests, visits drawn from the top of this list
+                found failures 3.9 times as often as visits chosen at random, a 42
+                percent hit rate against 11 percent.
+              </p>
+              <ul class="tour__list">
+                <li>Sort by highest risk, most overdue, or fastest worsening</li>
+                <li>Overdue tags, violation filters, and a rising-fast list</li>
+                <li>Framed as a ranking, never as a judgment on any establishment</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/inspectors-crop.webp"
+                alt="The inspector worklist: a priority queue of establishments ordered by risk, with tier and violation-category filters, next to a panel explaining that the ranking finds failures 3.9 times as often as random visits."
+                width="1600"
+                height="1278"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+
+          <div class="tour tour--flip">
+            <div class="tour__text">
+              <h3>For <strong>caregivers</strong></h3>
+              <p>
+                Guidance for someone choosing on behalf of a person with
+                compromised immunity, where the drivers matter more than the
+                score. The page separates kitchen signals, which describe how a
+                kitchen actually operates, from administrative signals, which the
+                model uses but which say nothing about the kitchen.
+              </p>
+              <ul class="tour__list">
+                <li>Weigh more: recurring priority violations, pests, temperature control</li>
+                <li>Weigh less: time since last inspection, licence age</li>
+                <li>Education only, and never a substitute for medical advice</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/caregivers-crop.webp"
+                alt="The caregivers page, explaining how to read a risk signal when choosing for someone with compromised immunity."
+                width="1600"
+                height="1111"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+
+          <div class="tour">
+            <div class="tour__text">
+              <h3>How this <strong>works</strong></h3>
+              <p>
+                The model, the features, and the methodology, written out per
+                city. Trust is the feature, so the page publishes the split
+                windows, the operating points, the weakest slices, and a worked
+                example of how one establishment's score adds up.
+              </p>
+              <ul class="tour__list">
+                <li>A model card with the served estimator and its training windows</li>
+                <li>The operating-point table, including where the model is weakest</li>
+                <li>Data governance and a link to every source dataset</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/how-it-works-crop.webp"
+                alt="The methodology page, opening with a plain-English explanation of what the risk score is and how it is built."
+                width="1600"
+                height="1111"
+                loading="lazy"
+              />
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Demo video ─────────────────────────── -->
+      <section id="demo" class="section section--tint">
+        <div class="shell">
+          <p class="section__label">Demo</p>
+          <h2>The whole thing, <strong>end to end.</strong></h2>
+          <p class="lede">
+            A walkthrough of the live product: search a city, open an
+            establishment, read the drivers, and ask the agent a question.
+          </p>
+
+          <!--
+            MEDIA SLOT: demo video.
+
+            Drop the file at  site/assets/media/demo.mp4  (H.264 / MP4, 1920x1080
+            or 1280x720, ideally under 25 MB so the Pages upload stays quick), and
+            optionally a poster frame at  site/assets/media/demo-poster.webp .
+            Then delete the .placeholder block below and uncomment the
+            .video-frame block underneath it.
+
+            If the video lives on YouTube or Loom instead, replace the whole slot
+            with a link styled as .btn rather than embedding an iframe.
+          
+          <div class="placeholder" style="margin-top: 32px">
+            <p class="placeholder__title">Demo video goes here</p>
+            <p>
+              Drop the recording at <code>site/assets/media/demo.mp4</code>, then
+              swap this block for the commented-out player in
+              <code>site/index.html</code>. A poster frame at
+              <code>site/assets/media/demo-poster.webp</code> is optional but
+              stops the player rendering as a black rectangle before playback.
+            </p>
+          </div>
+          -->  
+          <div class="video-frame" style="margin-top: 32px">
+            <video controls preload="metadata" poster="assets/media/demo-poster.webp">
+              <source src="assets/media/demo.mp4" type="video/mp4" />
+              Your browser does not support embedded video.
+              <a href="assets/media/demo.mp4">Download the demo instead.</a>
+            </video>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Data ─────────────────────────── -->
+      <section id="data" class="section">
+        <div class="shell">
+          <p class="section__label">The data</p>
+          <h2>Three cities, <strong>all public.</strong></h2>
+          <p class="lede">
+            Everything comes from city open-data portals. Nothing is scraped,
+            bought, or combined with private data, and the app collects nothing
+            from the people who visit it. Every dataset behind a score is listed
+            and linked in the product itself.
+          </p>
+
+          <figure class="hero__shot" style="margin-top: 36px">
+            <img
+              src="assets/screenshots/sources-crop.webp"
+              alt="The sources page, listing each public dataset behind the selected city's scores as a linked card, with a separate section for the census data used only to check fairness."
+              width="1400"
+              height="924"
+              loading="lazy"
+            />
+          </figure>
+
+          <div class="table-wrap" style="margin-top: 36px">
+            <table>
+              <caption>
+                Each city is split chronologically into training, validation, and
+                test windows. Never shuffled.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">City</th>
+                  <th scope="col">Sources</th>
+                  <th scope="col">What is covered</th>
+                  <th scope="col">Train / validation / test</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Chicago<br /><span class="note">Primary</span></th>
+                  <td>Inspection history and business licences, joined on the licence number</td>
+                  <td>
+                    69% restaurants; 31% grocery, schools, daycares, hospital
+                    kitchens, bakeries, caterers, mobile vendors
+                  </td>
+                  <td class="num">
+                    Jan 2019 – Jun 2024 (79,268)<br />
+                    Jul 2024 – Jun 2025 (16,564)<br />
+                    Jul 2025 – Dec 2025 (7,008)
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">New York City</th>
+                  <td>
+                    Inspection history; 296,235 raw violation rows collapsed to
+                    about 51,800 inspection events
+                  </td>
+                  <td>Restaurants only, across 33 cuisines</td>
+                  <td class="num">
+                    Jul 2022 – Sep 2024 (35,190)<br />
+                    Oct 2024 – Mar 2025 (8,773)<br />
+                    Apr 2025 – Jun 2026 (9,456)
+                  </td>
+                </tr>
+                <tr>
+                  <th scope="row">Los Angeles</th>
+                  <td>
+                    Inspection and violation history, joined on the inspection
+                    serial number
+                  </td>
+                  <td>75% restaurants across 30 cuisines; 25% retail food markets</td>
+                  <td class="num">
+                    Apr 2023 – Jun 2024 (36,900)<br />
+                    Jul 2024 – Dec 2024 (7,374)<br />
+                    Jan 2025 – Mar 2026 (7,197)
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-3" style="margin-top: 32px">
+            <div class="card">
+              <h3>Every city grades differently</h3>
+              <p>
+                Chicago records Pass, Pass with Conditions, or Fail with violation
+                codes. New York issues a letter grade from a points score where
+                fewer points is cleaner. Los Angeles issues a letter grade from a
+                0 to 100 score where more points is cleaner, the opposite
+                direction.
+              </p>
+            </div>
+            <div class="card">
+              <h3>One hazard, three code systems</h3>
+              <p>
+                A rat in the kitchen is code 13 in Chicago, 04K in New York, and
+                F023 in Los Angeles. We built a crosswalk that maps all three onto
+                eleven shared hazard themes with a severity tier, so a violation
+                means the same thing across cities.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Chicago needed real cleaning</h3>
+              <p>
+                Establishments that closed and reopened created duplicate ghost
+                licence entries for the same physical venue. Left alone, these
+                split one establishment's history in two and hid its prior
+                failures from the model.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Base rates differ, so tiers are relative</h3>
+            <p>
+              Bad outcomes are far more common in New York than in Los Angeles, so
+              a fixed probability cutoff would mean something different in each
+              city. Instead the tiers are defined against each city's own base
+              rate: Low is under half the base rate, Moderate is a half to one
+              times, Elevated is one to two times, and High is two times or more.
+              Base rates are 14 percent in Chicago, 38 percent in New York, and 6
+              percent in Los Angeles.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Architecture ─────────────────────────── -->
+      <section id="architecture" class="section section--tint">
+        <div class="shell">
+          <p class="section__label">Architecture</p>
+          <h2>Two languages, <strong>joined at a JSON seam.</strong></h2>
+          <p class="lede">
+            A Python batch pipeline pulls the public data, builds leak-guarded
+            features, trains and calibrates a model, and scores every
+            establishment. It writes a small set of JSON files. The web app and
+            the agent read only that JSON. This is permanent by design, not a
+            staging step.
+          </p>
+
+          <div class="diagram">
+            <img
+              src="assets/media/architecture.webp"
+              alt="System architecture in three columns. Left, the offline data sources and prediction pipeline: Chicago and New York City via SODA APIs and Los Angeles via ArcGIS Hub, each supplying food inspections, business licences and 311, feeding a Python batch-scoring pipeline built on pandas, DuckDB, scikit-learn and XGBoost that does feature engineering, a temporal train, validation and test split, and SHAP. Its model recipe is a logistic-regression baseline plus calibrated XGBoost with TreeSHAP explainability, producing a risk score and a forecast trend shared across all three cities. That writes scores.parquet, which parquet_to_json.py converts to scores.json per city. Centre, AWS cloud infrastructure: an S3 bucket holding raw and served JSON behind a CloudFront CDN, Bedrock AgentCore running the Nova Lite chat agent and a sandboxed Code Interpreter for charts, a Lambda proxy from the agent to the load balancer, and GitHub Actions OIDC deploys for the web app and the agent. A vertical band across this column reads: the permanent contract, the app and agent only ever read pre-computed JSON, the model never runs at request time. Right, the end-user app and agentic AI platform: a Next.js 16 web app on Amplify and CloudFront offering search, map, restaurant detail, methodology and chat; the Eatelligence chat agent on Bedrock AgentCore with Nova Lite, city-aware, answering Chicago-only restaurant risk plus general food-safety education with cited sources and on-demand charts; and agentic AI tools that read the same scores.json and never call the model. A banner along the bottom lists three takeaways: batch-scored rather than real-time, multi-city on one pipeline, and rigour over raw performance."
+              width="1408"
+              height="768"
+              loading="lazy"
+            />
+          </div>
+          <p class="note" style="margin-top: 12px">
+            Scroll the diagram sideways on a narrow screen.
+          </p>
+
+          <div class="inkblock" style="margin-top: 44px">
+            <p class="section__label">The rules that do not bend</p>
+            <h3>Four constraints, held across every change.</h3>
+            <div class="steps">
+              <div class="step">
+                <div class="step__num">01</div>
+                <h4>No inference at request time</h4>
+                <p>
+                  The app and the agent read precomputed scores. Nothing calls the
+                  model on a page load, so there is no live inference service to
+                  keep running and no way for a page view to change an answer.
+                </p>
+              </div>
+              <div class="step">
+                <div class="step__num">02</div>
+                <h4>Chronological splits only</h4>
+                <p>
+                  Train on the past, validate on the middle, test on the most
+                  recent window. Never a shuffled split, in any city.
+                </p>
+              </div>
+              <div class="step">
+                <div class="step__num">03</div>
+                <h4>Every prior feature is guarded</h4>
+                <p>
+                  Any feature describing an establishment's past is computed with
+                  an explicit cutoff at the prediction date, so the model can
+                  never read a fact that had not happened yet.
+                </p>
+              </div>
+              <div class="step">
+                <div class="step__num">04</div>
+                <h4>Both metrics gate a promotion</h4>
+                <p>
+                  A candidate replaces the served model only if it holds up on
+                  ranking quality and on calibration together. A win on one alone
+                  is not a win.
+                </p>
+              </div>
+            </div>
+            <p style="margin-top: 24px">
+              The same pipeline runs against a laptop's local disk or against
+              cloud storage; one environment variable is the only difference.
+              Training is offline, scoring is batch, and publishing is a file
+              copy.
+            </p>
+          </div>
+
+          <!-- ── Model architecture ── -->
+          <p class="section__label" style="margin-top: 64px">Model architecture</p>
+          <h3 style="font-size: 1.5rem; font-weight: 300; letter-spacing: -0.02em">
+            Three architectures tried. <strong>The shallow one won.</strong>
+          </h3>
+          <p class="lede">
+            The signal here is low-order and carried by a handful of features, which
+            is exactly the regime where gradient-boosted trees beat everything
+            fancier. Depth-3 trees outperformed depth-6, and a multilayer perceptron
+            found no deeper interactions to exploit because there were none to find.
+          </p>
+
+          <div class="grid-3" style="margin-top: 32px">
+            <div class="card">
+              <p class="section__label" style="margin-bottom: 10px">Baseline</p>
+              <h3>Logistic regression</h3>
+              <p>
+                The classifier the original Chicago model used, kept as the
+                yardstick every candidate has to beat. Every coefficient is
+                readable, so it doubles as a sanity check on what the data is
+                actually saying.
+              </p>
+            </div>
+            <div class="card card--mint">
+              <p class="section__label" style="margin-bottom: 10px">Served</p>
+              <h3>XGBoost</h3>
+              <p>
+                Built for tabular data: non-linear interactions, native handling of
+                missing values, and categorical splits without one-hot blowup. Run
+                shallow and monotone-constrained, then sigmoid-calibrated.
+              </p>
+            </div>
+            <div class="card">
+              <p class="section__label" style="margin-bottom: 10px">Explored</p>
+              <h3>Multilayer perceptron</h3>
+              <p>
+                Tried and rejected. There are no deep interactions to find, and the
+                depth-3-beats-depth-6 result says the same thing from the tree side.
+                Several tabular deep-learning families were also tested; none
+                displaced the served model.
+              </p>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <caption>
+                Served settings per city. Each city is tuned separately because
+                each one predicts a different target against a different base rate.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">Setting</th>
+                  <th scope="col">Chicago</th>
+                  <th scope="col">New York City</th>
+                  <th scope="col">Los Angeles</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Trees / max depth</th>
+                  <td class="num">300 / 3</td>
+                  <td class="num">400 / 2</td>
+                  <td class="num">400 / 3</td>
+                </tr>
+                <tr>
+                  <th scope="row">min_child_weight</th>
+                  <td class="num">10</td>
+                  <td class="num">20</td>
+                  <td class="num">5</td>
+                </tr>
+                <tr>
+                  <th scope="row">Features</th>
+                  <td class="num">36</td>
+                  <td class="num">32</td>
+                  <td class="num">28</td>
+                </tr>
+                <tr>
+                  <th scope="row">Training prevalence</th>
+                  <td class="num">14.5%</td>
+                  <td class="num">35.6%</td>
+                  <td class="num">4.6%</td>
+                </tr>
+                <tr>
+                  <th scope="row">Positive class weight</th>
+                  <td class="num">5.9&times;</td>
+                  <td class="num">1.8&times;</td>
+                  <td class="num">20.6&times;</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="grid-2" style="margin-top: 32px">
+            <div class="card">
+              <h3>Imbalance by weighting, never by resampling</h3>
+              <p>
+                Positives are rare, so the positive class is up-weighted through
+                XGBoost's own <code>scale_pos_weight</code>. Synthetic
+                oversampling is deliberately not used: it inflates
+                precision-recall AUC on a chronological split, which would make
+                every subsequent comparison meaningless.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Calibrated, then explained</h3>
+              <p>
+                Re-weighting distorts the output probabilities, so sigmoid
+                calibration re-grounds them afterwards. That is what makes the 0
+                to 100 score mean something rather than just rank. TreeSHAP then
+                decomposes each calibrated score into the named drivers you see on
+                a detail page.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Two models, not one</h3>
+              <p>
+                The risk model is dominated by what just happened at the most
+                recent visit, so it cannot speak to direction. A second trend model
+                is deliberately blind to that latest inspection, which is what lets
+                the product say "improving" or "worsening" rather than only "high"
+                or "low".
+              </p>
+            </div>
+            <div class="card">
+              <h3>What each city taught us</h3>
+              <p>
+                <strong style="color: var(--ink)">Chicago:</strong> dropping postal
+                code and facility type improved accuracy and removed bias risk at
+                the same time. <strong style="color: var(--ink)">New York:</strong>
+                regularising harder, to depth 2, stopped the overfitting and lifted
+                the operating point to 1.8&times;.
+                <strong style="color: var(--ink)">Los Angeles:</strong> roughly 98
+                percent of inspections end in an A grade, and that base rate is the
+                ceiling.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Features we tested and refused to ship</h3>
+            <p>
+              The published Chicago forecasting model is the direct precedent for
+              this work, and we kept its family of per-facility history features.
+              We did not keep everything.
+            </p>
+            <p>
+              <strong style="color: var(--ink)">Inspector identity</strong> was its
+              single most influential feature, and a later hindsight audit found it
+              unfairly changed predicted risk. A venue cannot choose who walks
+              through the door, so it is excluded.
+              <strong style="color: var(--ink)">Socio-demographic features</strong>
+              are excluded for the same reason: in this literature, part of the
+              accuracy gain simply is the bias.
+            </p>
+            <p>
+              <strong style="color: var(--ink)">Weather</strong> turned out to be
+              redundant. A three-day high-temperature feature measured against plain
+              month and quarter proxies moved precision-recall AUC by −0.0036.
+              <strong style="color: var(--ink)">An alcohol and tobacco licence
+              flag</strong> gained +0.0014 on precision-recall AUC but cost −0.0030
+              at the operating point that matters, so it was not shipped.
+            </p>
+          </div>
+
+          <div class="callout">
+            <h3>Why a 180-day window, when longer windows score better</h3>
+            <p>
+              Stretching the label to 365 days raises precision-recall AUC from
+              0.344 to 0.498, and predicting only the next routine visit raises it
+              to 0.604. Both look like large wins and neither is one. Those targets
+              have far higher base rates, so the score rises while the actual
+              ranking power falls: lift over random drops from 3.9&times; to
+              1.68&times; and then to 1.28&times;. The 180-day window is the one
+              that ranks an inspector's queue best, which is the job.
+            </p>
+          </div>
+
+          <div class="grid-2" style="margin-top: 32px">
+            <div class="card">
+              <h3>Web app</h3>
+              <p>
+                Next.js with the App Router, React, and TypeScript in strict mode,
+                exported as a fully static site behind a content delivery network.
+                The map is MapLibre over OpenStreetMap tiles.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Agent</h3>
+              <p>
+                A Strands agent on Amazon Bedrock AgentCore, reached through a
+                signing proxy so the runtime is never publicly exposed. Guardrails
+                and evaluations gate every deploy.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Agent ─────────────────────────── -->
+      <section id="agent" class="section">
+        <div class="shell">
+          <p class="section__label">Conversational AI</p>
+          <h2>A chat surface that <strong>refuses to guess.</strong></h2>
+          <p class="lede">
+            A conversational search assistant for predicted food-safety risk. Every
+            tool reads the active city and answers only from that city's data. It
+            also answers general food-safety questions from a curated list of
+            public-health sources with a link you can check. There is no web
+            search and no news source.
+          </p>
+
+          <div class="tour" style="margin-top: 44px">
+            <div class="tour__text">
+              <h3>Eight tools, <strong>one rule</strong></h3>
+              <p>
+                The agent never calls the model at request time. Its tools read
+                the same precomputed scores the web app reads. If an establishment
+                is not in the batch run, the answer is an explicit "no record",
+                not an estimate.
+              </p>
+              <ul class="tour__list">
+                <li>Find establishments in an area, then attach their published scores</li>
+                <li>Explain one establishment's drivers and inspection history</li>
+                <li>Resolve a name to its authoritative record, and ask when a name is ambiguous</li>
+                <li>Link out to the city's own inspection records</li>
+                <li>Answer a general food-safety question with a cited public-health source</li>
+                <li>Chart the city's scores by writing code that runs in a network-isolated sandbox</li>
+              </ul>
+            </div>
+            <figure class="tour__shot">
+              <img
+                src="assets/screenshots/chat-desktop.webp"
+                alt="The chat page: a user asks for low-risk sushi near Lincoln Square and gets three establishments ranked by predicted risk, then asks how common food poisoning is and gets an answer with CDC and FoodSafety.gov links."
+                width="1600"
+                height="1201"
+                loading="lazy"
+              />
+              <figcaption>
+                Illustrative transcript. Every establishment, address, tier, score,
+                and driver shown is copied from the published scores file, and the
+                CDC figures are that agency's own published estimates.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="grid-3" style="margin-top: 48px">
+            <div class="card card--mint">
+              <h3>What it will not do</h3>
+              <ul>
+                <li>Give an eat or do-not-eat verdict</li>
+                <li>Answer a personal medical question</li>
+                <li>Score a city it does not cover</li>
+                <li>Invent a score for an establishment with no record</li>
+              </ul>
+            </div>
+            <div class="card card--mint">
+              <h3>When it asks first</h3>
+              <ul>
+                <li>Several establishments share the name you gave</li>
+                <li>It cannot place the neighbourhood you named</li>
+                <li>Before pulling third-party reviews, which are never a score input</li>
+              </ul>
+            </div>
+            <div class="card card--mint">
+              <h3>How it is tested</h3>
+              <ul>
+                <li>
+                  Deterministic gates, free to run, on every pull request:
+                  faithfulness against the published data, name lookup resolving
+                  to the correct record, and citations checked against an
+                  allow-list plus live link verification
+                </li>
+                <li>
+                  A judge model grades what string matching cannot: tone that
+                  stays calm and empathetic toward sick or vulnerable users
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Results ─────────────────────────── -->
+      <section id="results" class="section section--tint">
+        <div class="shell">
+          <p class="section__label">Evaluation</p>
+          <h2>Measured on data the model <strong>never saw.</strong></h2>
+          <p class="lede">
+            Each city is a separate model with its own target, trained and
+            evaluated on its own chronological split. Precision at 10 percent is
+            the operating point that matters: a city inspects a fixed number of
+            venues, so that is the number that maps to the job.
+          </p>
+
+          <div class="table-wrap">
+            <table>
+              <caption>
+                Held-out test performance by city. Lift is how many more failures
+                the top-ranked 10 percent finds than random selection.
+              </caption>
+              <thead>
+                <tr>
+                  <th scope="col">City</th>
+                  <th scope="col">Base rate</th>
+                  <th scope="col">Precision at 10%</th>
+                  <th scope="col">Lift</th>
+                  <th scope="col">PR-AUC</th>
+                  <th scope="col">Trees / depth</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Chicago</th>
+                  <td class="num">11%</td>
+                  <td class="num">42% (295 / 701)</td>
+                  <td class="num">3.9&times;</td>
+                  <td class="num">0.382</td>
+                  <td class="num">300 / 3</td>
+                </tr>
+                <tr>
+                  <th scope="row">New York City</th>
+                  <td class="num">41%</td>
+                  <td class="num">74% (699 / 946)</td>
+                  <td class="num">1.8&times;</td>
+                  <td class="num">0.615</td>
+                  <td class="num">400 / 2</td>
+                </tr>
+                <tr>
+                  <th scope="row">Los Angeles</th>
+                  <td class="num">9%</td>
+                  <td class="num">22% (157 / 726)</td>
+                  <td class="num">2.5&times;</td>
+                  <td class="num">0.187</td>
+                  <td class="num">400 / 3</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="callout">
+            <h3>Read the PR-AUC column carefully</h3>
+            <p>
+              Area under the precision-recall curve is bounded below by the base
+              rate, so it is not comparable across these three rows. New York's
+              0.615 against a 41 percent base rate is a weaker result than
+              Chicago's 0.382 against 11 percent, not a stronger one. The lift
+              column is the fair cross-city comparison. The three cities also
+              predict different targets: Chicago predicts a failed inspection or a
+              priority violation, while New York and Los Angeles predict a drop in
+              letter grade, on scales that run in opposite directions.
+            </p>
+          </div>
+
+          <div class="grid-3" style="margin-top: 32px">
+            <div class="card">
+              <h3>The use case that works</h3>
+              <p>
+                A ranked worklist for inspectors. The top 10 percent of predicted
+                risk catches up to 3.9 times what random inspection order finds on
+                held-out data. That is the number worth optimising, more than
+                another point of area under a curve.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Where the ceiling is</h3>
+              <p>
+                More diverse datasets did not mean better signal. The gains came
+                from feature engineering on the datasets that mattered. Weather,
+                building permits, menu and cuisine enrichment, and chain
+                membership were each tested and each came back null.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Trees beat fancier architectures</h3>
+              <p>
+                Modern networks do not beat boosted trees on tabular data with a
+                handful of strong features. A multilayer perceptron and several
+                deep-learning families were tested; none displaced XGBoost.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Edge cases we publish rather than bury</h3>
+            <p>
+              <strong style="color: var(--ink)">Chicago</strong> is nearly blind to
+              brand-new restaurants. On venues that have never failed, PR-AUC drops
+              to 0.13 against a 0.38 headline.
+            </p>
+            <p>
+              <strong style="color: var(--ink)">New York's</strong> Low tier still
+              sees 23 percent actual failures, which is why the interface says
+              "lower risk for New York" and never "safe".
+            </p>
+            <p>
+              <strong style="color: var(--ink)">Los Angeles</strong> false alarms
+              cluster geographically: the false-positive rate varies by 0.14 across
+              postal codes, even though postal code was dropped as a feature. That
+              is an open fairness finding, and it is on the site rather than in a
+              drawer.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Responsible AI ─────────────────────────── -->
+      <section id="responsible" class="section">
+        <div class="shell">
+          <p class="section__label">Responsible AI</p>
+          <h2>What we checked, and <strong>what we found.</strong></h2>
+          <p class="lede">
+            A model that ranks businesses for inspection can concentrate
+            enforcement on particular neighbourhoods or communities. We built a
+            reusable fairness audit and ran it on all three cities before treating
+            any of this as finished.
+          </p>
+
+          <div class="grid-2" style="margin-top: 44px">
+            <div class="card">
+              <h3>Demographics are measured, never modelled</h3>
+              <p>
+                Census data is joined to an establishment's location only after
+                the model has produced a score, purely to check whether flags and
+                errors fall unevenly. No demographic value is ever a model input,
+                and none appears in the published data or the app.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Facility type was removed on purpose</h3>
+              <p>
+                Cuisine and facility-type fields correlate with the ethnicity of
+                an establishment's owners and customers. Using them would let the
+                model encode that correlation as risk, so they are excluded from
+                the feature set and from the agent's chart filters.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Three lenses, not one</h3>
+              <p>
+                Each axis is tested for statistical parity, for equal error rates,
+                and for calibration, each with bootstrap confidence intervals. A
+                gap counts as a finding only when it is both material and
+                statistically confident.
+              </p>
+            </div>
+            <div class="card">
+              <h3>The finding</h3>
+              <p>
+                Across all three cities, every demographic finding was
+                parity-only: flag rates differ across groups, but error rates and
+                calibration do not. That is what you expect where true failure
+                rates genuinely differ. One exception is being followed up: a
+                calibration gap across cuisines in the New York model.
+              </p>
+            </div>
+          </div>
+
+          <div class="callout">
+            <h3>Limits we are explicit about</h3>
+            <p>
+              A risk score is a prediction about the public record, not a verdict
+              on a business and not a health judgment. A high score means the
+              patterns in an establishment's history resemble those that have
+              historically preceded a bad outcome. It does not mean the food is
+              unsafe today, and the product never tells anyone where to eat.
+            </p>
+            <p>
+              The data covers all licensed food establishments, not only
+              restaurants, so a large share of what is scored in Chicago is
+              grocery stores, school and hospital kitchens, bakeries, and
+              caterers. Inspection records reflect where inspectors have already
+              been, so historical enforcement patterns are present in the labels.
+              Mitigation work, including per-group thresholds, was priced but
+              deliberately left as analysis rather than applied to the served
+              model, because changing the operating point is a policy decision
+              rather than an engineering one.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Roadmap ─────────────────────────── -->
+      <section id="roadmap" class="section section--tint">
+        <div class="shell">
+          <p class="section__label">Closing</p>
+          <h2>With more time.</h2>
+
+          <div class="grid-3" style="margin-top: 40px">
+            <div class="card">
+              <h3>Automated weekly refresh</h3>
+              <p>
+                Schedule the incremental ingest that already exists, add drift
+                detection, then retrain, rescore, and republish on a timer. The
+                capability is built; the scheduler is not.
+              </p>
+            </div>
+            <div class="card">
+              <h3>Accounts and saved sessions</h3>
+              <p>
+                A database and the surrounding infrastructure so inspectors can
+                keep chat history and saved worklists between shifts.
+              </p>
+            </div>
+            <div class="card">
+              <h3>More cities, real users</h3>
+              <p>
+                Onboard further cities and demo to city health departments to
+                power live inspector worklists, closing the loop: departments
+                publish new results, we retrain and republish.
+              </p>
+            </div>
+          </div>
+
+          <div class="inkblock" style="margin-top: 32px">
+            <h3>
+              Build explainable food-safety intelligence from public data, helping
+              diners, inspectors, and communities navigate risk with confidence.
+            </h3>
+          </div>
+        </div>
+      </section>
+
+      <!-- ─────────────────────────── Team ─────────────────────────── -->
+      <section id="team" class="section">
+        <div class="shell">
+          <p class="section__label">The team</p>
+          <h2>Five people, <strong>one capstone.</strong></h2>
+          <p class="lede">
+            Master of Information and Data Science, UC Berkeley School of
+            Information. W210 capstone, Summer 2026.
+          </p>
+
+          <!--
+            Headshots are the slide-2 photos from the final presentation deck,
+            cropped square. alt is intentionally empty: the name sits directly
+            beneath each photo, so a non-empty alt would make a screen reader
+            announce the same person twice.
+
+            Each card links to GitHub, LinkedIn, and email. The icons are inline
+            SVG (no icon font, no external request) and are aria-hidden, so the
+            accessible name comes from the anchor's aria-label.
+          -->
+          <div class="team">
+            <div class="member">
+              <img
+                class="member__photo"
+                src="assets/team/arun.webp"
+                alt=""
+                width="88"
+                height="88"
+                loading="lazy"
+              />
+              <p class="member__name">Arun Agarwal</p>
+              <p class="member__role">Data Engineering</p>
+              <p class="member__detail">Data ingestion, S3 data lake</p>
+              <div class="member__links">
+                <a href="https://github.com/aagarwal17" aria-label="Arun Agarwal on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/arunagarwal23/" aria-label="Arun Agarwal on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:aagarwal19@berkeley.edu" aria-label="Email Arun Agarwal" title="aagarwal19@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
+            </div>
+            <div class="member">
+              <img
+                class="member__photo"
+                src="assets/team/bella.webp"
+                alt=""
+                width="88"
+                height="88"
+                loading="lazy"
+              />
+              <p class="member__name">Bella Davies</p>
+              <p class="member__role">Core ML and Evaluation</p>
+              <p class="member__detail">Modeling, evaluation, SHAP, fairness audits</p>
+              <div class="member__links">
+                <a href="https://github.com/bellad21992" aria-label="Bella Davies on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/bella-davies-5615a1201/" aria-label="Bella Davies on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:bella_davies@berkeley.edu" aria-label="Email Bella Davies" title="bella_davies@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
+            </div>
+            <div class="member">
+              <img
+                class="member__photo"
+                src="assets/team/deepak.webp"
+                alt=""
+                width="88"
+                height="88"
+                loading="lazy"
+              />
+              <p class="member__name">Deepak Srivastava</p>
+              <p class="member__role">Conversational Agent</p>
+              <p class="member__detail">Agent deployment, tools, guardrails</p>
+              <div class="member__links">
+                <a href="https://github.com/dsri-ischool" aria-label="Deepak Srivastava on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/sdeepak/" aria-label="Deepak Srivastava on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:deepak_srivastava@berkeley.edu" aria-label="Email Deepak Srivastava" title="deepak_srivastava@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
+            </div>
+            <div class="member">
+              <img
+                class="member__photo"
+                src="assets/team/aurelia.webp"
+                alt=""
+                width="88"
+                height="88"
+                loading="lazy"
+              />
+              <p class="member__name">Aurelia Yang</p>
+              <p class="member__role">Deep Learning Experiments</p>
+              <p class="member__detail">EDA, app experience</p>
+              <div class="member__links">
+                <a href="https://github.com/aureliay" aria-label="Aurelia Yang on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/aurelia-yang/" aria-label="Aurelia Yang on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:ayang103@berkeley.edu" aria-label="Email Aurelia Yang" title="ayang103@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
+            </div>
+            <div class="member">
+              <img
+                class="member__photo"
+                src="assets/team/jun.webp"
+                alt=""
+                width="88"
+                height="88"
+                loading="lazy"
+              />
+              <p class="member__name">Jun Xu</p>
+              <p class="member__role">Team Lead and PM</p>
+              <p class="member__detail">Web app, deployment</p>
+              <div class="member__links">
+                <a href="https://github.com/junxu315" aria-label="Jun Xu on GitHub" title="GitHub"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a>
+                <a href="https://www.linkedin.com/in/junxu0/" aria-label="Jun Xu on LinkedIn" title="LinkedIn"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M0 1.146C0 .513.526 0 1.175 0h13.65C15.474 0 16 .513 16 1.146v13.708c0 .633-.526 1.146-1.175 1.146H1.175C.526 16 0 15.487 0 14.854V1.146zm4.943 12.248V6.169H2.542v7.225h2.401zm-1.2-8.212c.837 0 1.358-.554 1.358-1.248-.015-.709-.52-1.248-1.342-1.248-.822 0-1.359.54-1.359 1.248 0 .694.521 1.248 1.327 1.248h.016zm4.908 8.212V9.359c0-.216.016-.432.08-.586.173-.431.568-.878 1.232-.878.869 0 1.216.662 1.216 1.634v3.865h2.401V9.25c0-2.22-1.185-3.252-2.764-3.252-1.274 0-1.845.7-2.165 1.193v.025h-.016a5.54 5.54 0 0 1 .016-.025V6.169h-2.4c.03.678 0 7.225 0 7.225h2.4z"/></svg></a>
+                <a href="mailto:jun_xu@berkeley.edu" aria-label="Email Jun Xu" title="jun_xu@berkeley.edu"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path fill="currentColor" d="M.05 3.555A2 2 0 0 1 2 2h12a2 2 0 0 1 1.95 1.555L8 8.414.05 3.555ZM0 4.697v7.104l5.803-3.558L0 4.697ZM6.761 8.83l-6.57 4.027A2 2 0 0 0 2 14h12a2 2 0 0 0 1.808-1.144l-6.57-4.027L8 9.586l-1.239-.757Zm3.436-.586L16 11.801V4.697l-5.803 3.546Z"/></svg></a>
+              </div>
+            </div>
+          </div>
+          </div>
+
+          <div class="callout">
+            <h3>Acknowledgements</h3>
+            <p>
+              Our instructors and advisors, for weekly feedback that shaped the
+              target, the evaluation, and the final presentation. The
+              responsible-AI review of our trust, privacy, and governance
+              practices. And the friends and target users who tested the app and
+              the agent.
+            </p>
+            <p>
+              Related work and attributions: the original Chicago Department of
+              Public Health food-inspection forecasting model (2015) and its 2019
+              hindsight audit; the FINDER paper on search-location signals; CDC
+              foodborne-illness estimates; and the Chicago, New York, and Los
+              Angeles open-data portals.
+            </p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- ─────────────────────────── Footer ─────────────────────────── -->
+    <footer class="footer">
+      <div class="shell">
+        <div class="footer__grid">
+          <div>
+            <h4>Eatelligence</h4>
+            <p>
+              An open-data project pairing city food-inspection records with
+              licence data to estimate forward-window food-safety risk. Built as a
+              UC Berkeley MIDS capstone. Not affiliated with, or endorsed by, the
+              City of Chicago, the City of New York, or Los Angeles County.
+            </p>
+          </div>
+          <div>
+            <h4>Data sources</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://data.cityofchicago.org/Health-Human-Services/Food-Inspections/4ijn-s7e5"
+                  >Chicago Food Inspections</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://data.cityofchicago.org/Community-Economic-Development/Business-Licenses-Current-Active/uupf-x98q"
+                  >Chicago Business Licenses</a
+                >
+              </li>
+              <li>
+                <a
+                  href="https://data.cityofnewyork.us/Health/DOHMH-New-York-City-Restaurant-Inspection-Results/43nn-pn8j"
+                  >NYC Restaurant Inspection Results</a
+                >
+              </li>
+              <li><span>LA County Restaurant and Market Inspections</span></li>
+            </ul>
+          </div>
+          <div>
+            <h4>Project</h4>
+            <ul>
+              <li>
+                <a
+                  href="https://github.com/food-safety-intelligence/food-safety-intelligence"
+                  >Source repository</a
+                >
+              </li>
+              <li><a href="#architecture">Architecture</a></li>
+              <li><a href="#results">Results</a></li>
+              <li><a href="#responsible">Responsible AI</a></li>
+            </ul>
+          </div>
+        </div>
+        <p class="footer__bottom">
+          Risk scores are model predictions from public records. They are not a
+          health inspection, not a safety verdict, and not advice about where to
+          eat.
+        </p>
+      </div>
+    </footer>
+  </body>
+</html>
