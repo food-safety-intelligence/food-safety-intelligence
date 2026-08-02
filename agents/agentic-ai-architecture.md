@@ -100,8 +100,9 @@ AgentCore's 30 s init budget). The tools read the local /tmp copy per query.
 The tools run **in-process** inside the one AgentCore Runtime artifact (they are
 `@tool`-wrapped Python functions in `entrypoint.py`), not as separate per-tool
 Lambdas. The only Lambda is the front-door proxy. The diagram shows the discovery
-path; a seventh tool, `look_up_establishment`, is used in general chat to resolve
-a named venue directly against the city data (see §6).
+path; two more tools sit outside it — `look_up_establishment`, used in general chat
+to resolve a named venue directly against the city data (see §6), and
+`visualize_data`, the sandboxed chart tool (see Tool 8).
 
 ---
 
@@ -435,7 +436,7 @@ plus its in-process tools in `entrypoint.py` — via the CDK and
 
 `agents/harness.yaml` describes an **alternate** per-tool-Lambda harness
 (`agentcore deploy --config agents/harness.yaml`). It is **not the wired deploy
-path** and is kept for reference only; its content (three tools, thinking budgets,
+path** and is kept for reference only; its content (five tools, thinking budgets,
 off-topic/PII guardrail wording) predates the current design and should not be read
 as the live configuration.
 
