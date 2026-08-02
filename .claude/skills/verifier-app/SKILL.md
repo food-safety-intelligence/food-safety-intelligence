@@ -248,6 +248,36 @@ const anchors = await page.$$eval("a", (els) =>
   els.map((a) => ({ text: a.textContent, href: a.href, rel: a.rel })));
 ```
 
+## The floating chat widget is its own surface — verify it separately
+
+The chat renders in two places from ONE component (`ChatInterface`): the full
+`/chat` page and the **floating widget** (`FloatingChat`, mounted in the root
+layout on every page except `/chat`, opened by the corner "Ask" button). The
+widget passes `compact`; verifying `/chat` alone hides two classes of bug that
+only surface in the widget:
+
+- **`sm:` / `md:` breakpoints key off the VIEWPORT, but the widget is a fixed
+  ~384px on any screen.** A control that fits at a 1280px viewport can overflow or
+  clip inside the widget. Anything that must adapt to the widget's width has to
+  key off a `compact`-style prop (or a container query), not a viewport
+  breakpoint — so screenshot the widget on a **desktop** viewport too, not only
+  mobile.
+- **The widget has its own document-level Escape-to-close.** A modal/overlay
+  opened from inside the widget must scope its own Escape (capture phase +
+  `stopPropagation`), or one Esc closes the whole chat. Assert that after Esc the
+  overlay is gone but the widget's content is still there.
+
+To exercise it, load a **non-`/chat`** client-rendered route (e.g.
+`/how-it-works/`) so the widget shows, click the corner "Ask" button, then drive
+the content. Seed the transcript the same way as `/chat` above (`fsi_chat_messages`
++ `fsi_chat_session` via `addInitScript`) — the widget reuses the same component
+and sessionStorage. If a first-visit **city-picker** modal intercepts clicks in a
+fresh context, pre-seed the city before load:
+
+```js
+await page.addInitScript(() => { try { localStorage.setItem("fsi.city", "chicago"); } catch {} });
+```
+
 ## Put the screenshots in the PR (this repo is private)
 
 Capture **every state and viewport** the change affects (desktop + mobile 390px,

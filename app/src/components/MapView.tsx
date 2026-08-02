@@ -1,11 +1,13 @@
 "use client";
 
 import {
+  Layer,
   Map,
   type MapRef,
   Marker,
   Popup,
   NavigationControl,
+  Source,
   useMap,
 } from "react-map-gl/maplibre";
 import Link from "next/link";
@@ -17,6 +19,7 @@ import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
 import { CLOSED_HEX, TIER_HEX } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
+import { maskFromBoundary } from "@/lib/geo";
 
 /**
  * Render a feature's topic icon. The icon component is resolved by the caller
@@ -96,6 +99,12 @@ const VOYAGER_STYLE = {
   ],
 };
 
+// City-boundary GeoJSON, cached per URL for the session (same pattern as the
+// worklist's detail cache) — switching back to a city never refetches.
+// globalThis.Map (not the bare `Map`, which this file imports from
+// react-map-gl as the <Map> component and would otherwise shadow).
+const boundaryCache = new globalThis.Map<string, GeoJSON.GeoJSON>();
+
 /**
  * Zoom → density rule. The cap grows roughly geometrically with zoom; the
  * viewport-clip kicks in at zoom ≥ 13 so we stop drawing pins the user
@@ -113,10 +122,19 @@ export function MapView({
   pins,
   className = "",
   center = CHICAGO_CENTER,
+  maxBounds,
+  minZoom,
+  boundaryUrl,
 }: {
   pins: PinSummary[];
   className?: string;
   center?: { lat: number; lon: number; zoom: number };
+  /** Hard camera clamp [[west, south], [east, north]] (CITY_CONFIG.maxBounds). */
+  maxBounds?: [[number, number], [number, number]];
+  /** Zoom-out floor (CITY_CONFIG.minZoom). */
+  minZoom?: number;
+  /** Committed city-boundary GeoJSON to gray out everything outside of. */
+  boundaryUrl?: string;
 }) {
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
@@ -136,20 +154,126 @@ export function MapView({
   useEffect(() => {
     centerRef.current = center;
   });
+  // Keep the latest clamp values in a ref too, so `handleLoad` (a stable
+  // callback) can read them. maxBounds/minZoom are no longer passed as <Map>
+  // props (see below) — the library's own reactive prop-diffing only ever
+  // re-applies the clamp correctly on the FIRST change; from the second city
+  // switch onward the enforced camera constraint stays pinned to whichever
+  // bounds were set first, so flyTo lands the data/sidebar on the new city
+  // while the camera itself stays stuck on the old one. Applying the clamp
+  // imperatively from the same app code that already drives the camera
+  // avoids that library-internal diffing path entirely.
+  const clampRef = useRef({ maxBounds, minZoom });
   useEffect(() => {
-    if (loadedRef.current) {
-      mapRef.current?.flyTo({
-        center: [center.lon, center.lat],
-        zoom: center.zoom,
-        duration: 800,
-      });
+    clampRef.current = { maxBounds, minZoom };
+  });
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    const m = mapRef.current?.getMap();
+    if (!m) return;
+    // maplibre clamps flyTo targets to the ACTIVE maxBounds, so the previous
+    // city's clamp must come off before flying to a center outside it; the
+    // new clamp goes on only when the camera lands (moveend), otherwise the
+    // flight itself gets clipped mid-animation.
+    m.setMaxBounds(null);
+    if (minZoom !== undefined) m.setMinZoom(minZoom);
+    const applyClamp = () => {
+      if (maxBounds) m.setMaxBounds(maxBounds);
+    };
+    // Register AFTER flyTo, not before: flyTo()'s first internal action is
+    // stop(), which — if a prior flight is still animating (rapid second
+    // city switch) — fires "moveend" SYNCHRONOUSLY inside the flyTo() call
+    // itself, for the interrupted OLD flight. A listener registered before
+    // flyTo would consume that premature event and clamp mid-flight (a
+    // visible snap to the new bounds while the camera is still mid-nowhere).
+    // Registered after, it can only fire for the NEW flight's own
+    // termination — whether that's a natural landing, or a user grabbing the
+    // map mid-flight (which also cancels the flight and fires "moveend"; the
+    // clamp still applies there, snapping the grabbed camera into the new
+    // city's bounds, which is correct since the app has already switched to
+    // that city's data).
+    mapRef.current?.flyTo({
+      center: [center.lon, center.lat],
+      zoom: center.zoom,
+      duration: 800,
+    });
+    // Reduced-motion: flyTo falls through to jumpTo, whose moveend has already
+    // fired synchronously inside the call above - the camera has landed, so
+    // clamp now. Otherwise the flight is running and the listener (registered
+    // AFTER flyTo so the interrupting stop's moveend cannot consume it) fires
+    // on this flight's own termination - natural or user-interrupted.
+    if (m.isMoving()) {
+      m.once("moveend", applyClamp);
+    } else {
+      applyClamp();
     }
-  }, [center.lat, center.lon, center.zoom]);
+    // A rapid second switch mid-flight must not let the OLD listener apply
+    // the OLD city's bounds after the NEW flight begins.
+    return () => {
+      m.off("moveend", applyClamp);
+    };
+  }, [center.lat, center.lon, center.zoom, maxBounds, minZoom]);
   const handleLoad = useCallback(() => {
     loadedRef.current = true;
     const c = centerRef.current;
+    const m = mapRef.current?.getMap();
+    // Why setMaxBounds was inert while setMinZoom held: @vis.gl/react-maplibre
+    // unconditionally installs `map.transformCameraUpdate` (its _onCameraUpdate
+    // hook). That switches maplibre-gl into "dual transform" mode — pan/drag
+    // handlers accumulate into a private `_requestedCameraState` clone and each
+    // frame copies it back onto `map.transform`. `setMaxBounds()` writes the pan
+    // constraint (lng/lat range) ONLY to `map.transform`, so the very first drag
+    // runs against the unconstrained clone and then overwrites the constraint
+    // (getMaxBounds() reads back null after one drag). `setMinZoom()` instead goes
+    // through `_getTransformForUpdate()`, which writes the clone, so the zoom floor
+    // survives — that asymmetry is the whole bug. This map is uncontrolled
+    // (initialViewState only) and never reads e.viewState off camera events, so the
+    // hook buys nothing; clearing it returns maplibre to its standard single-
+    // transform path where setMaxBounds/setMinZoom/flyTo all act on the one
+    // transform the drag reads. react-maplibre sets the hook once at init and never
+    // again, so this stays cleared across re-renders and city switches.
+    // Revisit this override if this map ever becomes controlled (viewState/onMove)
+    // or on any react-map-gl / maplibre-gl upgrade - it depends on verified 8.1.1 /
+    // 5.24.0 internals.
+    if (m) m.transformCameraUpdate = null;
     mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
+    const { maxBounds: mb, minZoom: mz } = clampRef.current;
+    if (m) {
+      if (mz !== undefined) m.setMinZoom(mz);
+      if (mb) m.setMaxBounds(mb);
+    }
   }, []);
+
+  // The mask is decorative: on any failure the map still works and the clamp
+  // (config constants) still applies — so errors skip silently, no retry UI.
+  const [boundary, setBoundary] = useState<GeoJSON.GeoJSON | null>(
+    boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null,
+  );
+  // Reset synchronously when the boundary source changes — adjust-state-during-
+  // render (React's recommended alternative to a reset effect; same pattern as
+  // MapExplorer's resultKey), so the OLD city's mask never survives a city
+  // switch, without an effect-tick lag or a set-state-in-effect suppression.
+  const [prevBoundaryUrl, setPrevBoundaryUrl] = useState(boundaryUrl);
+  if (boundaryUrl !== prevBoundaryUrl) {
+    setPrevBoundaryUrl(boundaryUrl);
+    setBoundary(boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null);
+  }
+  useEffect(() => {
+    if (!boundaryUrl || boundaryCache.has(boundaryUrl)) return;
+    let alive = true;
+    fetch(boundaryUrl)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((gj: GeoJSON.GeoJSON) => {
+        boundaryCache.set(boundaryUrl, gj);
+        if (alive) setBoundary(gj);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [boundaryUrl]);
+
+  const mask = useMemo(() => maskFromBoundary(boundary), [boundary]);
 
   return (
     <div className={className}>
@@ -164,6 +288,27 @@ export function MapView({
         mapStyle={VOYAGER_STYLE as never}
         style={{ width: "100%", height: "100%" }}
       >
+        {mask && (
+          <Source id="city-mask" type="geojson" data={mask}>
+            {/* Warm tint wash: outside stays faintly legible (roads leading
+                in) but reads unmistakably as out of scope. Colour is not the
+                only cue — the boundary line and the pan clamp carry it too. */}
+            <Layer
+              id="city-mask-fill"
+              type="fill"
+              paint={{ "fill-color": "#EDE6D8", "fill-opacity": 0.55 }}
+            />
+          </Source>
+        )}
+        {boundary && mask && (
+          <Source id="city-boundary" type="geojson" data={boundary}>
+            <Layer
+              id="city-boundary-line"
+              type="line"
+              paint={{ "line-color": "#6B7280", "line-width": 1.5, "line-opacity": 0.5 }}
+            />
+          </Source>
+        )}
         <NavigationControl position="bottom-right" showCompass={false} />
 
         <PinLayer

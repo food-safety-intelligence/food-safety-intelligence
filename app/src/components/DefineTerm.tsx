@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
-import { GLOSSARY, type GlossaryEntry, type GlossaryKey } from "@/lib/glossary";
+import { glossaryEntry, type GlossaryEntry, type GlossaryKey } from "@/lib/glossary";
+import { useCity } from "@/components/CityContext";
 import { cn } from "@/lib/utils";
 
 // Popover ideal width; clamped to the viewport on open.
@@ -28,7 +29,11 @@ export function DefineTerm({
   termKey: GlossaryKey;
   className?: string;
 }) {
-  const entry: GlossaryEntry = GLOSSARY[termKey];
+  // City-aware: the definition names the outcome this city predicts, and its
+  // anchor exists in that city's Definitions section, so "Full definition"
+  // never lands on a missing anchor.
+  const { city } = useCity();
+  const entry: GlossaryEntry = glossaryEntry(termKey, city);
   const btnRef = useRef<HTMLButtonElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number; width: number } | null>(

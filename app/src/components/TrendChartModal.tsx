@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Minus, Plus, RotateCcw, X } from "lucide-react";
 import { TrendCaptionLead, TrendChart, type TrendPoint } from "@/components/TrendChart";
+import { ModalOverlay } from "@/components/ModalOverlay";
 import { applyTrendPan, applyTrendZoom, clampFrac } from "@/lib/utils";
 
 /**
@@ -80,25 +81,6 @@ export function TrendChartModal({
     const url = `${window.location.pathname}${window.location.search}#${p.anchorId}`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
-
-  // Move focus to the close button on open (the modal is only mounted while open).
-  useEffect(() => {
-    closeRef.current?.focus();
-  }, []);
-
-  // Esc closes; lock background scroll while open.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prevOverflow;
-    };
-  }, [onClose]);
 
   // Track the available width so the chart fills the panel responsively.
   useEffect(() => {
@@ -207,20 +189,12 @@ export function TrendChartModal({
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-      {/* Backdrop — click to dismiss. */}
-      <button
-        aria-label="Close enlarged trend chart"
-        onClick={onClose}
-        className="absolute inset-0 bg-ink/40 cursor-default"
-      />
-
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-label="Risk trend, enlarged"
-        className="relative z-10 w-full max-w-3xl rounded-2xl border border-line bg-card soft-shadow-lg p-5 sm:p-6"
-      >
+    <ModalOverlay
+      onClose={onClose}
+      label="Risk trend, enlarged"
+      backdropLabel="Close enlarged trend chart"
+      initialFocusRef={closeRef}
+    >
         <div className="flex items-center justify-between gap-3 mb-4">
           <div className="flex items-center gap-3 min-w-0">
             <span className="text-2xs tracking-widest uppercase text-muted">Recent trend</span>
@@ -303,7 +277,6 @@ export function TrendChartModal({
           <TrendCaptionLead /> Zooming changes only what you see, not which visits set the
           direction. Select a point to open that inspection&apos;s record in a new tab.
         </p>
-      </div>
-    </div>
+    </ModalOverlay>
   );
 }

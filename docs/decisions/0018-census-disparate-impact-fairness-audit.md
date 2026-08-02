@@ -71,6 +71,62 @@ Full per-city detail in `docs/fairness_audit.md`; JSON artifacts in
   costs ~6 extra inspections of ~124 flagged — consistent with there being no
   equalized-odds gap to fix.
 
+## Refresh (2026-07-19)
+
+The notebook (`notebooks/08_fairness_census_audit.ipynb`) gained a colorblind-safe
+**visual summary** (a fairness scorecard, two finding close-ups, and a detailed
+appendix, saved to `reports/figures/fairness_*.png`) and was re-run on current data.
+Two things changed:
+
+- **NYC/LA numbers moved.** Chicago reproduces exactly (frozen deployed feature
+  snapshot); NYC/LA re-pull live SODA, which has grown (LA 7,197 → 10,045 test rows).
+  The three cities are therefore **not on one as-of date** — a reproducibility gap.
+  **Recommendation:** pin NYC/LA to their raw snapshot (the hash already exists; the
+  adapters just don't read it) so a re-run is deterministic across all three cities.
+- **A new finding: LA neighborhood false-positive-rate gap** (0.14, CI [0.11, 0.23]),
+  the first truth-conditioned finding outside NYC cuisine. Treat as **provisional**:
+  LA neighborhood coverage is ~55% with coarse zip-centroid geocoding, so it may be a
+  geocoding artifact. Re-check after LA geocoding improves and at the wider operating
+  point. The headline is now "almost all findings are parity-only; two truth-
+  conditioned findings (NYC cuisine calibration, LA neighborhood FPR), both flagged
+  for follow-up," not "every finding parity-only except NYC cuisine."
+
+### Follow-ups tested (2026-07-19) — both findings are real, both stay open
+
+Both were first written up as probably-minor. **Testing them showed both are real**, and
+the write-ups have been corrected. This matters for sign-off.
+
+- **NYC cuisine calibration — real, and broader than one cuisine.** An exact binomial
+  test per cuisine (perfect calibration ⇒ positives ~ Binomial(n, mean predicted)) puts
+  **five** cuisines beyond a Bonferroni threshold: Bangladeshi (p 2.5e-06), Coffee/Tea
+  (2.4e-06), Chinese (3.5e-05), Caribbean (2.4e-04), Latin American (2.5e-03).
+  Bangladeshi is the largest deviation (0.512 predicted vs 0.720 actual) and is nowhere
+  near chance at n=125. Four of the five are immigrant-associated cuisines and are
+  systematically **under**-predicted, i.e. their scores read safer than reality. The
+  earlier "concentrated in a single cuisine, marginal" reading was wrong. Per-cuisine
+  recalibration is the obvious fix but means adjusting a published score by an ethnicity
+  proxy, raising the same 0004 / 0005 concern as using cuisine as a feature, so it is a
+  product/ethics call (Jun), not just a modeling one. **Open.**
+- **LA neighborhood FPR — real, not a small-sample artifact.** Holding every ZIP at the
+  pooled FPR and resampling `flagged ~ Binomial(n_negatives, p)` 20,000 times gives an
+  expected max-minus-min range of 0.067 (p95 0.091). The observed range is **0.136,
+  p = 0.0004** — roughly twice the noise-only expectation and beyond the null's 95th
+  percentile. Coarse zip-centroid geocoding does not explain it away either: error in
+  group assignment attenuates a real association toward the null, so a beyond-chance gap
+  *despite* noisy ZIPs is more credible, not less. The earlier "probably a geocoding
+  artifact" reading was wrong. Next: re-audit at a coarser geography (e.g. council
+  district) and treat LA's uneven false-alarm burden as an open fairness issue. **Open.**
+- **Proxy-feature ablation — the exclusions are load-bearing, not just cautious.** None
+  of the three cities feeds zip, facility type, or cuisine to its model, so we tested the
+  ablation in reverse: adding them back (train-only target encoding, same recipe/split).
+  Adding **zip** buys +0.004–0.011 PR-AUC but roughly **doubles the ZIP false-positive-rate
+  gap** (NYC 0.015 → 0.039; LA 0.136 → 0.254) — the exact harm the LA finding describes.
+  Adding **NYC cuisine** improves both accuracy and the cuisine calibration gap
+  (0.203 → 0.167), but only by pricing risk on an ethnicity proxy, which 0004 / 0005
+  forbid — so it stays out and the trade is now recorded rather than assumed. This also
+  confirms the NYC calibration gap is **not** fixable by dropping cuisine: the model never
+  saw it. Table + method in `docs/fairness_audit.md`.
+
 ## Consequences
 
 - The census audit is now reusable and reproducible; adding a city is one adapter.

@@ -22,6 +22,7 @@ import importlib.util
 import os
 import re
 import sys
+import time
 
 # ---------------------------------------------------------------------------
 # Path setup — add tool dirs so handler.py files import their siblings.
@@ -35,6 +36,7 @@ for _tool in [
     "find_reviews",
     "find_inspection_records",
     "food_safety_info",
+    "visualize_data",
 ]:
     _p = os.path.join(_HERE, "tools", _tool)
     if _p not in sys.path:
@@ -64,6 +66,23 @@ import contextvars  # noqa: E402
 import city_context  # noqa: E402 — shared per-city framing (see run_local.py too)
 
 _ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
+
+# Chart blocks generated during ONE request. The visualize_data wrapper appends
+# each block here; invoke() guarantees they land in the reply text even if the
+# model omitted them (see merge_chart_blocks). Per-request via contextvar so
+# concurrent invocations stay isolated; invoke() sets a fresh list each request.
+_PENDING_CHARTS: contextvars.ContextVar = contextvars.ContextVar("pending_charts", default=None)
+
+# Wall-clock budget for ALL chart generation in ONE request. The whole reply must
+# land inside the gateway's ~60s ceiling (ALB idle / CloudFront origin timeout), and
+# the model may call visualize_data more than once (it is told it may retry a broken
+# snippet). Capping each call individually is not enough — two capped calls still
+# overrun — so invoke() sets a deadline and the wrapper spends against it.
+_CHART_BUDGET_S = float(os.environ.get("FSI_CHART_REQUEST_BUDGET_SECONDS", "35"))
+# Below this much remaining, a fresh sandbox run can't finish; refuse instead of
+# starting one we know will time out.
+_CHART_MIN_RUN_S = 8.0
+_CHART_DEADLINE: contextvars.ContextVar = contextvars.ContextVar("chart_deadline", default=None)
 
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
@@ -132,6 +151,7 @@ _lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
 _records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
+_viz_handler = _load_handler("visualize_data")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
@@ -293,6 +313,95 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
     )
 
 
+@tool
+def visualize_data(code: str, title: str) -> dict:
+    """
+    Make a chart from the ACTIVE CITY's precomputed food-safety data by writing
+    short pandas + matplotlib code that this tool runs in a secure sandbox. Use it
+    when the user asks to chart / plot / graph / visualize / show a distribution or
+    breakdown of the data: risk scores, risk tiers, trend direction, SHAP driver
+    contributions, or the most common drivers, filtered / sorted / aggregated any
+    way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
+    subjects as usual. Do NOT paste code into your chat reply; pass it here.
+
+    A DataFrame `df` is already loaded (one row per establishment). Use ONLY the
+    columns below, and NEVER invent one — anything else raises KeyError.
+
+    Always present:
+      license_id, dba_name, as_of_date, zip,
+      risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
+      trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
+      top_driver (dominant SHAP feature name), top_driver_shap (its contribution),
+      top_driver_topic (its plain hazard family, e.g. "temperature", "pest",
+      "handwashing", "priority_violations", "inspection_outcome"). Use
+      top_driver_topic for "common drivers" / "violation category" questions —
+      it is the category each establishment's STRONGEST driver falls into, so
+      value_counts() gives the number of establishments per category.
+
+    Varies by city — do NOT assume either exists:
+      neighborhood — the area the city publishes: NYC boroughs, or LA cities like
+        Santa Monica and West Hollywood. ABSENT for Chicago.
+      facility_type — the kind of establishment (Restaurant, Grocery Store,
+        School, Daycare, Bakery, Long Term Care, …). Chicago ONLY. Descriptive
+        breakdowns only; it is never part of the risk model. It has a LONG TAIL
+        of ~190 rare one-off values, so ALWAYS take the top N (about 10, which
+        covers ~96% of establishments) rather than plotting every category.
+    For a geographic breakdown prefer zip, which every city has. If you use a
+    column this city doesn't publish, the tool returns an error listing the ones
+    that do exist — rewrite using those, or tell the user that breakdown isn't
+    available for this city. Never say the city has no such places.
+
+    Your `code` MUST:
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
+      - print() the aggregated numbers you plotted (counts / means) — you then base
+        the caption ONLY on that printed summary, which this tool returns.
+      - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
+        make a per-person or eat/don't-eat judgement. No network, no file access
+        besides chart.png.
+
+    On success returns {status:"ok", summary, chart_block}. Write a one or two
+    sentence caption using the `summary` numbers, then include the returned
+    `chart_block` VERBATIM in your reply (it renders the chart inline). On
+    {status:"error"} tell the user briefly, or fix the code and call again.
+
+    Args:
+        code: pandas + matplotlib code that builds `df`-based figure into chart.png
+        title: a short plain-English chart title (also used for the download name)
+    """
+    # Spend against this request's chart budget, so a retry after a timeout can't
+    # push the whole reply past the gateway ceiling (that produced a 504).
+    deadline = _CHART_DEADLINE.get()
+    remaining = (deadline - time.monotonic()) if deadline else None
+    if remaining is not None and remaining < _CHART_MIN_RUN_S:
+        return {
+            "status": "error",
+            "retryable": False,
+            "error": (
+                "no time left to build a chart in this reply — tell the user the chart "
+                "took too long and to ask again, and do NOT call this tool again now"
+            ),
+        }
+    result = _viz_handler.handler(
+        {
+            "code": code,
+            "title": title,
+            "city": _ACTIVE_CITY.get(),
+            "timeout_s": remaining,
+        },
+        None,
+    )
+    # Stash the block so invoke() can guarantee it reaches the reply even if the
+    # model drops it or reformats it (see _PENDING_CHARTS / merge_chart_blocks).
+    if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
+        pending = _PENDING_CHARTS.get()
+        if pending is not None:
+            pending.append(result["chart_block"])
+    return result
+
+
 # ---------------------------------------------------------------------------
 # System prompt.
 # ---------------------------------------------------------------------------
@@ -447,6 +556,7 @@ def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent
             find_reviews,
             find_inspection_records,
             food_safety_info,
+            visualize_data,
         ],
         system_prompt=city_prefix + persona_prefix + SYSTEM_PROMPT,
     )
@@ -480,6 +590,8 @@ def invoke(payload: dict) -> dict:
     # The marker is stripped before the model sees the query.
     query, city = _extract_city(query, payload.get("city"))
     _ACTIVE_CITY.set(city)
+    _PENDING_CHARTS.set([])  # fresh per-request collector for generated chart blocks
+    _CHART_DEADLINE.set(time.monotonic() + _CHART_BUDGET_S)  # bound ALL chart work
 
     # Persona (For Inspectors / For Caregivers chat entry points): same
     # precedence and marker mechanism as city, extracted from what's left of the
@@ -491,7 +603,11 @@ def invoke(payload: dict) -> dict:
     # follow-up questions have context. History is client-supplied and validated.
     agent = _build_agent(_coerce_history(payload.get("history")), persona)
     result = agent(query)
-    return {"result": str(result)}
+    # Guarantee any generated chart block reaches the reply even if the model
+    # dropped or reformatted it (Nova sometimes emits a markdown image instead of
+    # the block the chat renders).
+    text = _viz_handler.merge_chart_blocks(str(result), _PENDING_CHARTS.get() or [])
+    return {"result": text}
 
 
 _CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc|la)\]\]\s*")

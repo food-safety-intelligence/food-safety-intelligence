@@ -152,6 +152,19 @@ def expanding_year_folds(
     return folds
 
 
+def split_window(df: pd.DataFrame, *, date_col: str = "inspection_date") -> dict:
+    """Date range + row count of a split, for a methodology ``windows`` block.
+
+    Returns ``{"start": ISO date, "end": ISO date, "n": row count}``.
+    """
+    d = pd.to_datetime(df[date_col])
+    return {
+        "start": d.min().date().isoformat(),
+        "end": d.max().date().isoformat(),
+        "n": int(len(df)),
+    }
+
+
 @dataclass(frozen=True)
 class SplitSummary:
     """Compact stats about a split — useful for log lines and model metadata.

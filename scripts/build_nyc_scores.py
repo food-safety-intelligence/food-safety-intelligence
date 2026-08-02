@@ -39,9 +39,14 @@ from xgboost import XGBClassifier
 from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
-from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.serve.predict_batch import (
+    DISPLAY_GEOGRAPHY_COLUMNS,
+    add_display_geography,
+    assign_risk_tiers,
+    write_scores_json,
+)
 from foodsafety.tracking import snapshot_provenance
-from foodsafety.utils.time import temporal_split
+from foodsafety.utils.time import split_window, temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
 CW = REPO / "reference" / "violation_crosswalk.csv"
@@ -278,6 +283,7 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
             zip=("zipcode", first),
             lat=("latitude", first),
             lon=("longitude", first),
+            action=("action", first),
         )
         .reset_index()
     )
@@ -287,12 +293,26 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
     ev = ev[ev["cur_score"].notna()].copy()
     ev = ev.sort_values(["camis", "inspection_date"], kind="mergesort").reset_index(drop=True)
     ev["cur_is_bad"] = (ev["cur_score"] >= BC_THRESHOLD).astype("int8")
+    # DOHMH enforcement action at this inspection: closed / re-closed by the dept
+    # (the "action" field). A strong own-outcome signal beyond the numeric score —
+    # gate-validated to add both PR-AUC and precision@10% (see model-experiments).
+    # Observed at as-of (the current visit's outcome), like cur_is_bad.
+    ev["cur_closed"] = (
+        ev["action"].astype("string").str.contains("closed", case=False, na=False).astype("int8")
+    )
 
     theme_cols = [c for c in ev.columns if c.startswith("cur_theme_")]
     sev_cols = [c for c in ev.columns if c.startswith("cur_sev_")]
 
     g = ev.groupby("camis", sort=False)
     ev["prior_inspections"] = g.cumcount().astype("int32")
+    # Prior closures (cumsum-minus-self, leak-free) + establishment tenure (days
+    # since first inspection on record). Tenure is forecast-safe, so both go in the
+    # PRIOR set; cur_closed is the current outcome and stays in CURRENT.
+    ev["prior_closures"] = (g["cur_closed"].cumsum() - ev["cur_closed"]).astype("int32")
+    ev["tenure_days"] = (
+        ev["inspection_date"] - g["inspection_date"].transform("min")
+    ).dt.days.astype("float32")
     ev["prior_bad"] = (g["cur_is_bad"].cumsum() - ev["cur_is_bad"]).astype("int32")
     ev["prior_n_critical"] = (g["cur_n_critical"].cumsum() - ev["cur_n_critical"]).astype("int32")
     _cum = g["cur_score"].cumsum() - ev["cur_score"]
@@ -333,8 +353,14 @@ def build_events() -> tuple[pd.DataFrame, list[str], list[str], list[str], list[
         "prev_score",
         "prev_is_bad",
         "days_since_last_inspection",
+        "tenure_days",
+        "prior_closures",
     ] + prior_sev
-    CURRENT = ["cur_score", "cur_n_viol", "cur_n_critical", "cur_is_bad"] + sev_cols + theme_cols
+    CURRENT = (
+        ["cur_score", "cur_n_viol", "cur_n_critical", "cur_is_bad", "cur_closed"]
+        + sev_cols
+        + theme_cols
+    )
     return ev, PRIOR, CURRENT, theme_cols, sev_cols, raw
 
 
@@ -357,6 +383,12 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
         "prev_score": "Previous inspection score: {value}",
         "prev_is_bad": {True: "Previous inspection was B/C", False: "Previous inspection was A"},
         "days_since_last_inspection": "{value} days since the last inspection",
+        "cur_closed": {
+            True: "Closed by the health department at this inspection",
+            False: "Not closed at this inspection",
+        },
+        "prior_closures": "{value} prior health-department closures",
+        "tenure_days": "{value:.0f} days of inspection history on record",
     }
     for c in sev_cols:
         t = c.replace("cur_sev_", "")
@@ -369,7 +401,7 @@ def nyc_labels(theme_cols, sev_cols) -> dict:
 
 
 # --------------------------------------------------------------------- fit + calibrate
-def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False):
+def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False, params=None):
     """Fit XGB + Platt-on-margin calibration, mirroring Chicago's serve path.
 
     Returns ``(xgb, coef, inter)``: the calibrated risk is
@@ -380,6 +412,10 @@ def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False):
     prior-history feature set (deeper trees over-fit that set — see gate CV).
     Non-monotone: NYC/LA feature names don't map to Chicago's monotone direction
     conventions, and the non-monotone config is the one that won the gate.
+
+    ``params`` overrides individual booster hyperparameters on top of the chosen
+    config. Used only by the HPO harness (``scripts/run_city_xgb_hpo.py``);
+    serving passes nothing, so the served config is unchanged by construction.
     """
     y = train[label].astype(int)
     spw = (len(y) - float(y.sum())) / max(float(y.sum()), 1.0)
@@ -404,16 +440,22 @@ def fit_xgb_platt(train, val, feats, label="y_next_bc", *, regularized=False):
             **common,
         )
     else:
+        # depth-2 + min_child_weight=20: the closure/tenure features (2026-07-18)
+        # made the older depth-3 config slightly over-fit; regularizing harder is
+        # a seed-robust HPO win (+0.011 PR-AUC / +0.006 P@10, 7/8 seeds) on top of
+        # the feature gain. See docs/model-experiments.md.
         clf = XGBClassifier(
             n_estimators=400,
-            max_depth=3,
+            max_depth=2,
             learning_rate=0.05,
             subsample=0.8,
             colsample_bytree=0.8,
             reg_lambda=1.0,
-            min_child_weight=5,
+            min_child_weight=20,
             **common,
         )
+    if params:
+        clf.set_params(**params)
     clf.fit(train[feats], y)
     # Platt on the raw margin (1-D logistic) — the {a, b} the app waterfall expects
     # live in margin space, unlike CalibratedClassifierCV's double-squash.
@@ -554,12 +596,17 @@ def main():
         )
     print(f"Saved models → {models_dir}/{MODEL_VERSION}_{ver}.joblib (+ forecast)")
 
+    # Same derivation Chicago uses, so all three cities agree on what these
+    # columns mean instead of each writer inventing its own (they were empty in
+    # every city until this was shared).
+    latest = add_display_geography(latest)
     cols = [
         "license_id",
         "dba_name",
         "address",
         "lat",
         "lon",
+        *DISPLAY_GEOGRAPHY_COLUMNS,
         "as_of_date",
         "risk_score",
         "risk_tier",
@@ -646,6 +693,11 @@ def main():
             "prevalence": round(float(y_test.mean()), 4),
             "events": int(y_test.sum()),
             "split_from": VAL_END,
+        },
+        "windows": {
+            "train": split_window(sp.train),
+            "val": split_window(sp.val),
+            "test": split_window(sp.test),
         },
         "headline": {
             "pr_auc": round(test_metrics["pr_auc"], 4),
