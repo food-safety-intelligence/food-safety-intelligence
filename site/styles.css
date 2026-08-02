@@ -1,0 +1,988 @@
+/*
+ * Eatelligence project site.
+ *
+ * Palette and type are taken from the final capstone deck
+ * ("Food Safety Intelligence - Final Presentation.pptx"): a deep forest green
+ * on warm cream, near-black ink, a sand hairline, and mint tints for panels.
+ * These are the literal fill values used across the deck's slides, so the site,
+ * the deck, and the poster read as one system.
+ *
+ * Contrast: every text colour here clears WCAG AA on the cream background.
+ * --green 8.7:1, --muted 5.5:1, --green-mid 5.3:1. The orange accent (#D35400)
+ * measures 3.9:1 and is therefore a FILL only; --rust is its text-safe variant
+ * at 6.4:1.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --cream: #faf7f1;
+  --cream-2: #f5f3ec;
+  --tint: #f1ece2;
+  --card: #ffffff;
+
+  --ink: #1c2430;
+  --muted: #5c6672;
+  --line: #ddd5c7;
+
+  --green: #005140;
+  --green-mid: #007560;
+  --mint: #dbf1ea;
+  --mint-2: #c4ded6;
+
+  --orange: #d35400;
+  --rust: #9c3e00;
+
+  --radius: 16px;
+  --radius-lg: 24px;
+  --shell: 1120px;
+
+  --shadow: 0 1px 2px rgba(28, 36, 48, 0.04), 0 8px 24px rgba(28, 36, 48, 0.05);
+  --shadow-lg: 0 1px 2px rgba(28, 36, 48, 0.05), 0 24px 48px rgba(28, 36, 48, 0.08);
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Anchor targets clear the sticky nav. */
+  scroll-padding-top: 88px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background: var(--cream);
+  color: var(--ink);
+  font-family: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "kern";
+  /* Wide children (tables, the architecture diagram) scroll inside their own
+     container; the page body itself must never scroll sideways. */
+  overflow-x: hidden;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+a {
+  color: var(--green);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+a:hover {
+  color: var(--rust);
+}
+
+:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.serif {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-weight: 400;
+}
+
+/* ─────────────────────────── Layout ─────────────────────────── */
+
+.shell {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.section {
+  padding: 88px 0;
+  border-top: 1px solid var(--line);
+}
+
+.section--flush {
+  border-top: none;
+}
+
+.section--tint {
+  background: var(--cream-2);
+}
+
+.section__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 18px;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+  font-weight: 300;
+}
+
+h2 {
+  font-size: clamp(1.9rem, 4vw, 2.6rem);
+  max-width: 22ch;
+}
+
+h2 strong,
+h1 strong {
+  font-weight: 600;
+}
+
+h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.lede {
+  font-size: 1.06rem;
+  color: var(--muted);
+  line-height: 1.7;
+  max-width: 64ch;
+  margin-top: 20px;
+}
+
+.note {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────── Skip link + nav ─────────────────────────── */
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--ink);
+  color: var(--cream);
+  padding: 12px 20px;
+  border-radius: 0 0 12px 0;
+  z-index: 100;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+.nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(250, 247, 241, 0.92);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.nav__inner {
+  max-width: var(--shell);
+  margin: 0 auto;
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.wordmark {
+  font-size: 1.22rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wordmark em {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--green);
+  font-size: 1.12em;
+  padding-right: 0.04em;
+}
+
+.nav__links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.nav__links a {
+  font-size: 0.83rem;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 7px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.nav__links a:hover {
+  background: var(--mint);
+  color: var(--green);
+}
+
+.nav__links a.nav__cta {
+  background: var(--green);
+  color: #fff;
+  font-weight: 500;
+}
+
+.nav__links a.nav__cta:hover {
+  background: var(--green-mid);
+  color: #fff;
+}
+
+@media (max-width: 900px) {
+  .nav__links a:not(.nav__cta) {
+    display: none;
+  }
+}
+
+/* ─────────────────────────── Hero ─────────────────────────── */
+
+.hero {
+  padding: 72px 0 64px;
+}
+
+.hero h1 {
+  font-size: clamp(2.3rem, 6vw, 3.9rem);
+  max-width: 18ch;
+  margin-top: 20px;
+}
+
+.hero .lede {
+  font-size: 1.14rem;
+  max-width: 62ch;
+}
+
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 28px;
+}
+
+.pill {
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 5px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.pill--green {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+}
+
+.pill--mint {
+  background: var(--mint);
+  border-color: var(--mint-2);
+  color: var(--green);
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #fff;
+  /* ≥44px tap target. */
+  min-height: 44px;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn:hover {
+  background: var(--green-mid);
+  border-color: var(--green-mid);
+  color: #fff;
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+.btn--ghost:hover {
+  background: var(--card);
+  border-color: var(--green);
+  color: var(--ink);
+}
+
+.hero__shot {
+  margin-top: 56px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  background: var(--card);
+}
+
+figure {
+  margin: 0;
+}
+
+figcaption {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 12px;
+  line-height: 1.55;
+}
+
+/* ─────────────────────────── Stat band ─────────────────────────── */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 48px;
+}
+
+.stat {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 24px;
+}
+
+.stat__num {
+  font-size: 1.85rem;
+  font-weight: 300;
+  letter-spacing: -0.03em;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat__label {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.5;
+}
+
+@media (max-width: 780px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─────────────────────────── Cards ─────────────────────────── */
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+}
+
+@media (max-width: 880px) {
+  .grid-2,
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 26px 28px;
+}
+
+.card--mint {
+  background: var(--mint);
+  border-color: var(--mint-2);
+}
+
+.card__num {
+  font-family: "Instrument Serif", Georgia, serif;
+  font-size: 1.6rem;
+  color: var(--green);
+  line-height: 1;
+  margin-bottom: 12px;
+}
+
+.card p {
+  font-size: 0.93rem;
+  color: var(--muted);
+  line-height: 1.65;
+  margin-top: 10px;
+}
+
+.card ul {
+  margin-top: 12px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+/* Inline code, for the occasional parameter name in prose. */
+code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--tint);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 1px 5px;
+  /* Long identifiers must not push a narrow card wider than the viewport. */
+  overflow-wrap: anywhere;
+}
+
+.card li {
+  font-size: 0.9rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* ─────────────────────────── Quotes ─────────────────────────── */
+
+.quotes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  margin-top: 40px;
+}
+
+@media (max-width: 880px) {
+  .quotes {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quote-group h3 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 14px;
+}
+
+blockquote {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  padding: 18px 22px;
+  margin-bottom: 12px;
+}
+
+blockquote p {
+  font-size: 0.97rem;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+blockquote cite {
+  display: block;
+  font-size: 0.78rem;
+  font-style: normal;
+  color: var(--muted);
+  margin-top: 9px;
+}
+
+/* ─────────────────────────── Tour rows ─────────────────────────── */
+
+.tour {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 48px;
+  align-items: center;
+  margin-top: 56px;
+}
+
+.tour--flip .tour__text {
+  order: 2;
+}
+
+.tour__shot {
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  background: var(--card);
+}
+
+.tour__text h3 {
+  font-size: 1.5rem;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+}
+
+.tour__text h3 strong {
+  font-weight: 600;
+}
+
+.tour__text p {
+  font-size: 0.96rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 14px;
+}
+
+.tour__list {
+  margin-top: 16px;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tour__list li {
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 900px) {
+  .tour {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    margin-top: 44px;
+  }
+
+  .tour--flip .tour__text {
+    order: 0;
+  }
+}
+
+/* ─────────────────────────── Media placeholder ─────────────────────────── */
+
+.placeholder {
+  border: 2px dashed var(--mint-2);
+  border-radius: var(--radius-lg);
+  background: var(--mint);
+  padding: 64px 32px;
+  text-align: center;
+}
+
+.placeholder__title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--green);
+}
+
+.placeholder p {
+  font-size: 0.9rem;
+  color: var(--muted);
+  margin-top: 10px;
+  line-height: 1.65;
+  max-width: 58ch;
+  margin-inline: auto;
+}
+
+.placeholder code {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+  font-size: 0.85em;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 2px 6px;
+}
+
+.video-frame {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  overflow: hidden;
+  background: #000;
+  box-shadow: var(--shadow-lg);
+}
+
+.video-frame video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* The architecture diagram is dense; let it scroll rather than shrink to
+   illegibility on a phone. */
+.diagram {
+  margin-top: 32px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--line);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+  padding: 16px;
+}
+
+.diagram img {
+  min-width: 720px;
+}
+
+/* ─────────────────────────── Ink block ─────────────────────────── */
+
+.inkblock {
+  background: var(--green);
+  color: #fff;
+  border-radius: var(--radius-lg);
+  padding: 40px 44px;
+}
+
+.inkblock .section__label {
+  color: var(--mint-2);
+}
+
+.inkblock h2,
+.inkblock h3 {
+  color: #fff;
+  max-width: 28ch;
+}
+
+.inkblock p {
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 0.95rem;
+  line-height: 1.7;
+  margin-top: 14px;
+  max-width: 64ch;
+}
+
+.inkblock a {
+  color: var(--mint);
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-top: 28px;
+}
+
+.step {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  padding: 20px 22px;
+}
+
+.step__num {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--mint-2);
+  margin-bottom: 8px;
+}
+
+.step h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.step p {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 7px;
+  line-height: 1.6;
+}
+
+@media (max-width: 980px) {
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+
+  .inkblock {
+    padding: 32px 26px;
+  }
+}
+
+/* ─────────────────────────── Table ─────────────────────────── */
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  margin-top: 28px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 640px;
+  font-size: 0.9rem;
+}
+
+caption {
+  font-size: 0.85rem;
+  color: var(--muted);
+  line-height: 1.6;
+  padding: 14px 20px;
+  text-align: left;
+}
+
+th,
+td {
+  text-align: left;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+thead th {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--green);
+  background: var(--mint);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+td.num {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─────────────────────────── Team ─────────────────────────── */
+
+.team {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 40px;
+}
+
+@media (max-width: 1000px) {
+  .team {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .team {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Below ~480px a two-column card is narrower than its own contents: three 44px
+   tap targets plus padding need ~176px, but a column is only ~163px at 390px
+   wide. Going single-column is the fix that keeps the targets at 44px. */
+@media (max-width: 480px) {
+  .team {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Column layout + margin-top:auto on the links row keeps every card's links on
+   the same baseline, even though the role and detail lines wrap to different
+   heights and two people have no links at all. */
+.member {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px 18px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+}
+
+.member__photo {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  margin: 0 auto 14px;
+  object-fit: cover;
+  background: var(--mint);
+  border: 2px solid var(--mint-2);
+}
+
+.member__name {
+  font-size: 0.97rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.member__role {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--green);
+  margin-top: 6px;
+  line-height: 1.45;
+}
+
+.member__detail {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 5px;
+  line-height: 1.5;
+}
+
+.member__links {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+/* Icon-only links, so each one carries an aria-label. Sized to the 44px minimum
+   tap target even though the glyph inside is 18px. */
+.member__links a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--green);
+  text-decoration: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.member__links a:hover {
+  background: var(--mint);
+  color: var(--ink);
+}
+
+.member__links .icon {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+/* ─────────────────────────── Callout ─────────────────────────── */
+
+.callout {
+  background: var(--tint);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  margin-top: 28px;
+}
+
+.callout h3 {
+  font-size: 0.98rem;
+  color: var(--rust);
+}
+
+.callout p {
+  font-size: 0.92rem;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-top: 8px;
+}
+
+.callout p + p {
+  margin-top: 12px;
+}
+
+/* ─────────────────────────── Footer ─────────────────────────── */
+
+.footer {
+  border-top: 1px solid var(--line);
+  padding: 48px 0 64px;
+  background: var(--tint);
+}
+
+.footer__grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 780px) {
+  .footer__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.footer h4 {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 12px;
+}
+
+.footer p,
+.footer li {
+  font-size: 0.87rem;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.footer ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Footer links are the smallest interactive targets on the page. Pad them out
+   to the 44px minimum rather than leaving a 17px line of text to hit. */
+.footer li {
+  display: flex;
+}
+
+.footer li a,
+.footer li > span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 4px 0;
+}
+
+.footer__bottom {
+  margin-top: 40px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+  font-size: 0.8rem;
+  color: var(--muted);
+}

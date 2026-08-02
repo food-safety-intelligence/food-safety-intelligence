@@ -38,6 +38,7 @@ from foodsafety.models.xgb import (
     prepare_xgb_features,
 )
 from foodsafety.tracking import provenance
+from foodsafety.utils.time import split_window
 
 # Tier bands are read from the served scores.json (the unified thresholds this run
 # actually used, DR 0017) — not recomputed here — so the page can't drift from it.
@@ -233,6 +234,12 @@ def main() -> None:
             "prevalence": round(float(report.positive_rate), 4),
             "events": int(y.sum()),
             "split_from": TEST_START.date().isoformat(),
+        },
+        # Train / validation / test date ranges (the chronological split).
+        "windows": {
+            "train": split_window(train),
+            "val": split_window(val),
+            "test": split_window(test),
         },
         "headline": {
             "pr_auc": round(float(report.pr_auc), 4),

@@ -53,9 +53,14 @@ from xgboost import XGBClassifier
 from foodsafety.config import RANDOM_STATE
 from foodsafety.explain.shap_drivers import top_drivers_for_row, tree_contributions
 from foodsafety.models.evaluate import evaluate, operating_point_table
-from foodsafety.serve.predict_batch import assign_risk_tiers, write_scores_json
+from foodsafety.serve.predict_batch import (
+    DISPLAY_GEOGRAPHY_COLUMNS,
+    add_display_geography,
+    assign_risk_tiers,
+    write_scores_json,
+)
 from foodsafety.tracking import snapshot_provenance
-from foodsafety.utils.time import temporal_split
+from foodsafety.utils.time import split_window, temporal_split
 
 REPO = Path(__file__).resolve().parent.parent
 CW = REPO / "reference" / "violation_crosswalk.csv"
@@ -490,7 +495,7 @@ def build_history(
 
 
 # --------------------------------------------------------------------- fit + calibrate
-def fit_xgb_platt(train, val, feats, label="y_next_bad", *, regularized=False):
+def fit_xgb_platt(train, val, feats, label="y_next_bad", *, regularized=False, params=None):
     """Fit XGB + Platt-on-margin calibration, mirroring Chicago's serve path.
 
     Returns ``(xgb, coef, inter)``: the calibrated risk is
@@ -501,6 +506,10 @@ def fit_xgb_platt(train, val, feats, label="y_next_bad", *, regularized=False):
     prior-history feature set (deeper trees over-fit that set — see gate CV).
     Non-monotone: NYC/LA feature names don't map to Chicago's monotone direction
     conventions, and the non-monotone config is the one that won the gate.
+
+    ``params`` overrides individual booster hyperparameters on top of the chosen
+    config. Used only by the HPO harness (``scripts/run_city_xgb_hpo.py``);
+    serving passes nothing, so the served config is unchanged by construction.
     """
     y = train[label].astype(int)
     spw = (len(y) - float(y.sum())) / max(float(y.sum()), 1.0)
@@ -535,6 +544,8 @@ def fit_xgb_platt(train, val, feats, label="y_next_bad", *, regularized=False):
             min_child_weight=5,
             **common,
         )
+    if params:
+        clf.set_params(**params)
     clf.fit(train[feats], y)
     # Platt on the raw margin (1-D logistic) — the {a, b} the app waterfall expects
     # live in margin space, unlike CalibratedClassifierCV's double-squash.
@@ -684,12 +695,17 @@ def main():
         )
     print(f"Saved models → {models_dir}/{MODEL_VERSION}_{ver}.joblib (+ forecast)")
 
+    # Same derivation Chicago uses, so all three cities agree on what these
+    # columns mean instead of each writer inventing its own (they were empty in
+    # every city until this was shared).
+    latest = add_display_geography(latest)
     cols = [
         "license_id",
         "dba_name",
         "address",
         "lat",
         "lon",
+        *DISPLAY_GEOGRAPHY_COLUMNS,
         "as_of_date",
         "risk_score",
         "risk_tier",
@@ -772,6 +788,11 @@ def main():
             "prevalence": round(float(y_test.mean()), 4),
             "events": int(y_test.sum()),
             "split_from": VAL_END,
+        },
+        "windows": {
+            "train": split_window(sp.train),
+            "val": split_window(sp.val),
+            "test": split_window(sp.test),
         },
         "headline": {
             "pr_auc": round(test_metrics["pr_auc"], 4),

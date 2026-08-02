@@ -7,9 +7,45 @@
 // the governance prose is largely city-agnostic (public records, no visitor data)
 // with the city name / sources injected. Chicago keeps its own inline version.
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ClipboardList, ShieldCheck, type LucideIcon } from "lucide-react";
-import { CITY_CONFIG, type City } from "@/lib/city";
+import { CITY_CONFIG, dataUrl, type City } from "@/lib/city";
+import { sourceNames } from "@/lib/sources";
+import { EvaluationDetail } from "@/components/MethodologySections";
+export { ChronologicalSplit, FeatureGroups, type FeatureGroup } from "@/components/MethodologySections";
+import type { DateWindow } from "@/lib/methodology-server";
+
+export interface Headline {
+  pr_auc: number;
+  roc_auc: number;
+  top_decile_lift: number;
+}
+
+/**
+ * Chicago's live headline metrics, for the preview cities that describe their
+ * own signal as weaker than Chicago's. Read from Chicago's methodology.json so
+ * the comparison tracks whatever model is actually served, rather than a number
+ * typed into the copy that goes stale at the next retrain.
+ *
+ * Returns null until it loads (or if it fails), so callers must render a
+ * comparison-free sentence in that case.
+ */
+export function useChicagoHeadline(): Headline | null {
+  const [h, setH] = useState<Headline | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(dataUrl("chicago", "methodology.json"))
+      .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
+      .then((d: { headline?: Headline }) => {
+        if (alive && d.headline) setH(d.headline);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return h;
+}
 
 // "a" vs "an" for a percentage read aloud (e.g. "an 8%", "a 41%"). For whole
 // percents 0–100 the vowel-sound-initial numbers are 8, 11, 18, and the 80s.
@@ -68,6 +104,7 @@ interface Methodology {
   data_source?: string;
   train_window?: string;
   test?: { split_from?: string; n?: number };
+  windows?: { train: DateWindow; val: DateWindow; test: DateWindow };
 }
 
 function CardSectionLabel({ id, number, icon: Icon, children }: {
@@ -281,6 +318,8 @@ export function ModelCard({ city, m, number, limitations }: {
           <a href="#how-well-it-works" className="text-teal hover:underline">How well it works</a>.
         </p>
 
+        <EvaluationDetail windows={m?.windows} />
+
         {limitations && (
           <>
             <h3 id="limits" className="scroll-mt-24 text-lg font-medium tracking-tight mt-6">Limitations</h3>
@@ -308,7 +347,7 @@ export function DataGovernance({ city, m, number }: { city: City; m: Methodology
       <article>
         <h2 className="text-2xl font-medium tracking-tight">Where the data comes from and how it&apos;s handled</h2>
         <p className="text-md text-muted leading-relaxed mt-2 max-w-[62ch]">
-          Every input is a public record: {m?.data_source ?? c.sources.join(", ")}. The
+          Every input is a public record: {m?.data_source ?? sourceNames(city).join(", ")}. The
           app collects nothing from the people who visit it (no accounts, no login, no
           personal data), so the questions below are about public business records, not
           private user data. The full source list is on the{" "}

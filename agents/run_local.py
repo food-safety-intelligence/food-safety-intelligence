@@ -43,6 +43,7 @@ for _tool_dir in [
     os.path.join(_AGENTS_DIR, "tools", "find_reviews"),
     os.path.join(_AGENTS_DIR, "tools", "find_inspection_records"),
     os.path.join(_AGENTS_DIR, "tools", "food_safety_info"),
+    os.path.join(_AGENTS_DIR, "tools", "visualize_data"),
 ]:
     if _tool_dir not in sys.path:
         sys.path.insert(0, _tool_dir)
@@ -74,6 +75,19 @@ from strands.models.bedrock import BedrockModel  # noqa: E402
 # The CLI stays Chicago; the eval calls set_active_city() to exercise NYC / LA.
 _ACTIVE_CITY = "chicago"
 
+# Chart blocks generated during one query (mirrors entrypoint._PENDING_CHARTS).
+# The visualize_data wrapper appends; finalize() merges them into the reply and
+# clears the list, so local runs and the eval match the deployed invoke().
+_PENDING_CHARTS: list = []
+
+
+def finalize(text: str) -> str:
+    """Apply the deployed chart-block guarantee to a raw agent reply, then clear
+    the per-query collector. Call on every reply so local == production."""
+    merged = _viz_handler.merge_chart_blocks(text, list(_PENDING_CHARTS))
+    _PENDING_CHARTS.clear()
+    return merged
+
 
 def set_active_city(city: str) -> None:
     """Set the city all tool wrappers + the prompt prefix use for this run."""
@@ -97,6 +111,7 @@ _lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
 _records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
+_viz_handler = _load_handler("visualize_data")
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +299,70 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
     )
 
 
+@tool
+def visualize_data(code: str, title: str) -> dict:
+    """
+    Make a chart from the ACTIVE CITY's precomputed food-safety data by writing
+    short pandas + matplotlib code that this tool runs in a secure sandbox. Use it
+    when the user asks to chart / plot / graph / visualize / show a distribution or
+    breakdown of the data: risk scores, risk tiers, trend direction, SHAP driver
+    contributions, or the most common drivers, filtered / sorted / aggregated any
+    way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
+    subjects as usual. Do NOT paste code into your chat reply; pass it here.
+
+    A DataFrame `df` is already loaded (one row per establishment). Use ONLY the
+    columns below, and NEVER invent one — anything else raises KeyError.
+
+    Always present:
+      license_id, dba_name, as_of_date, zip,
+      risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
+      trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
+      top_driver (dominant SHAP feature name), top_driver_shap (its contribution),
+      top_driver_topic (its plain hazard family, e.g. "temperature", "pest",
+      "handwashing", "priority_violations", "inspection_outcome"). Use
+      top_driver_topic for "common drivers" / "violation category" questions —
+      it is the category each establishment's STRONGEST driver falls into, so
+      value_counts() gives the number of establishments per category.
+
+    Varies by city — do NOT assume either exists:
+      neighborhood — the area the city publishes: NYC boroughs, or LA cities like
+        Santa Monica and West Hollywood. ABSENT for Chicago.
+      facility_type — the kind of establishment (Restaurant, Grocery Store,
+        School, Daycare, Bakery, Long Term Care, …). Chicago ONLY. Descriptive
+        breakdowns only; it is never part of the risk model. It has a LONG TAIL
+        of ~190 rare one-off values, so ALWAYS take the top N (about 10, which
+        covers ~96% of establishments) rather than plotting every category.
+    For a geographic breakdown prefer zip, which every city has. If you use a
+    column this city doesn't publish, the tool returns an error listing the ones
+    that do exist — rewrite using those, or tell the user that breakdown isn't
+    available for this city. Never say the city has no such places.
+
+    Your `code` MUST:
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
+      - print() the aggregated numbers you plotted (counts / means) — you then base
+        the caption ONLY on that printed summary, which this tool returns.
+      - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
+        make a per-person or eat/don't-eat judgement. No network, no file access
+        besides chart.png.
+
+    On success returns {status:"ok", summary, chart_block}. Write a one or two
+    sentence caption using the `summary` numbers, then include the returned
+    `chart_block` VERBATIM in your reply (it renders the chart inline). On
+    {status:"error"} tell the user briefly, or fix the code and call again.
+
+    Args:
+        code: pandas + matplotlib code that builds a `df`-based figure into chart.png
+        title: a short plain-English chart title (also used for the download name)
+    """
+    result = _viz_handler.handler({"code": code, "title": title, "city": _ACTIVE_CITY}, None)
+    if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
+        _PENDING_CHARTS.append(result["chart_block"])
+    return result
+
+
 # ---------------------------------------------------------------------------
 # System prompt — single source of truth in system_prompt.txt (shared with
 # entrypoint.py, which reads the same file for the deployed agent).
@@ -346,6 +425,7 @@ def build_agent(messages: list | None = None) -> Agent:
             find_reviews,
             find_inspection_records,
             food_safety_info,
+            visualize_data,
         ],
         # Prepend the ACTIVE CITY block (grade framing + scope) exactly as the
         # deployed runtime does, so the local agent and the eval frame identically.
@@ -386,7 +466,7 @@ def main():
         _banner()
         print(f"Query: {query}\n")
         agent = build_agent()
-        response = agent(query)
+        response = finalize(str(agent(query)))
         print(f"\n{response}")
         return
 
@@ -407,7 +487,7 @@ def main():
             break
 
         try:
-            response = agent(query)
+            response = finalize(str(agent(query)))
             print(f"\nAgent: {response}\n")
         except Exception as exc:
             print(f"\n[Error] {exc}\n")

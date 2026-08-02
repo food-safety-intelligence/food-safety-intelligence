@@ -64,12 +64,26 @@ export interface Waterfall {
   probability: number;
 }
 
+/** One split's date range and row count. */
+export interface DateWindow {
+  start: string;
+  end: string;
+  n: number;
+}
+
 export interface Methodology {
   generated_at: string;
   model_version: string;
   /** Absent in older JSON written before provenance was added. */
   provenance?: Provenance;
   test: { n: number; prevalence: number; events: number; split_from: string };
+  /** Chronological split date ranges (train / validation / test). Absent in
+   *  older JSON written before the windows were surfaced. */
+  windows?: {
+    train: DateWindow;
+    val: DateWindow;
+    test: DateWindow;
+  };
   headline: { pr_auc: number; roc_auc: number; top_decile_lift: number };
   /** Score→tier bands (Low/Moderate/Elevated/High) for the badge legend.
    *  Probability cutoffs (top band's `max` is null) + `share` (fraction of

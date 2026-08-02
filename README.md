@@ -1,12 +1,13 @@
-# Food Safety Intelligence — Capstone
+# Eatelligence: Food Safety Intelligence Platform
 
-Predicting forward-window food-safety risk for Chicago restaurants from public
-inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
+UC Berkeley Summer 2026 Capstone
+
+https://www.ischool.berkeley.edu/programs/mids/capstone/2026b-summer/eatelligence-food-safety-intelligence
+
+Predicting forward-window food-safety risk for Chicago, New York City, and Los Angeles restaurants 
+from public inspection data and business-license data. 
 
 **Team**: Jun Xu (PM), Arun Agarwal, Bella Davies, Deepak Srivastava, Aurelia Yang
-
-> **Latest status**: see [`docs/weekly/`](docs/weekly/) — newest dated file is
-> the current snapshot of what's built, what's open, and how to verify locally.
 
 ## What we're building this iteration
 

@@ -24,8 +24,12 @@ import pandas as pd
 
 from foodsafety.models.baseline import ALL_FEATURES, LABEL_COL, build_baseline_pipeline
 from foodsafety.serve.predict_batch import (
+    DISPLAY_GEOGRAPHY_COLUMNS,
     TREND_STABLE_BAND,
+    _area_series,
+    _clean_zip,
     _row_to_json,
+    add_display_geography,
     assign_risk_tiers,
     build_scores_table,
     out_of_business_status,
@@ -37,6 +41,11 @@ from foodsafety.serve.predict_batch import (
 KEEP_COLUMNS = ("license_id", "dba_name", "address", "lat", "lon")
 CONTRACT_COLUMNS = [
     *KEEP_COLUMNS,
+    # Display geography, derived from the feed rather than caller-supplied, so it
+    # sits outside KEEP_COLUMNS. Empty string is a legal value for both.
+    "neighborhood",
+    "zip",
+    "facility_type",
     "as_of_date",
     "risk_score",
     "risk_tier",
@@ -416,3 +425,153 @@ def test_assign_risk_tiers_high_stays_rare_for_a_low_base_city():
     tiers, _ = assign_risk_tiers(scores, base_rate=0.087)
     high_share = (tiers == "High").mean()
     assert high_share <= 0.03
+
+
+# ---------------------------------------------------------------------------
+# Display geography (neighborhood / zip)
+#
+# These columns shipped empty in every city for months: `_row_to_json` hardcoded
+# "" and no test looked. The chart tool advertised them as filters, so every
+# neighborhood chart silently returned an empty frame. The tests below pin the
+# derivation AND the empty case, because empty is a legitimate value for one city
+# and a bug in another — only asserting the source-shape distinction separates them.
+# ---------------------------------------------------------------------------
+
+
+def test_area_series_uses_nyc_borough_column():
+    df = pd.DataFrame({"boro": ["Manhattan", "Brooklyn", "Queens", "Manhattan"]})
+    assert list(_area_series(df)) == ["Manhattan", "Brooklyn", "Queens", "Manhattan"]
+
+
+def test_area_series_prefers_borough_over_city():
+    # NYC carries both; boro is the meaningful area, city is not.
+    df = pd.DataFrame({"city": ["NEW YORK"] * 3, "boro": ["Bronx", "Queens", "Bronx"]})
+    assert list(_area_series(df)) == ["Bronx", "Queens", "Bronx"]
+
+
+def test_area_series_title_cases_shouted_la_city_names():
+    df = pd.DataFrame({"city": ["LOS ANGELES", "WEST HOLLYWOOD", "SANTA MONICA"]})
+    assert list(_area_series(df)) == ["Los Angeles", "West Hollywood", "Santa Monica"]
+
+
+def test_area_series_is_empty_for_a_single_city_feed():
+    # Chicago's feed has a `city` column, but it says CHICAGO on ~every row, so it
+    # distinguishes nothing. A dead filter is worse than no filter: it returns an
+    # empty frame with no error, which reads as "no such places in this city".
+    df = pd.DataFrame({"city": ["CHICAGO"] * 999 + ["EVANSTON"]})
+    assert set(_area_series(df)) == {""}
+
+
+def test_area_series_ignores_typo_variants_when_measuring_dominance():
+    # The real Chicago feed has Cchicago / CHicago / CHICAGOCHICAGO. Counting
+    # DISTINCT values would see variety (54 of them) and wrongly keep the column;
+    # dominance case-folds so the variants collapse onto the dominant value.
+    df = pd.DataFrame({"city": ["CHICAGO"] * 900 + ["chicago"] * 60 + ["CHicago"] * 40})
+    assert set(_area_series(df)) == {""}
+
+
+def test_area_series_blanks_placeholder_values():
+    # NYC's boro column uses "0" for unknown; it must not become a label.
+    df = pd.DataFrame({"boro": ["Manhattan", "0", "Brooklyn", "Manhattan"]})
+    assert list(_area_series(df)) == ["Manhattan", "", "Brooklyn", "Manhattan"]
+
+
+def test_area_series_empty_when_no_source_column_exists():
+    df = pd.DataFrame({"license_id": ["L0", "L1"]})
+    assert list(_area_series(df)) == ["", ""]
+
+
+def test_clean_zip_keeps_five_digits_and_drops_the_rest():
+    raw = pd.Series(["60614", "60614-1234", " 90210 ", "", None, "ABCDE", "123"])
+    assert list(_clean_zip(raw)) == ["60614", "60614", "90210", "", "", "", ""]
+
+
+def test_row_to_json_emits_derived_geography_not_placeholders():
+    # The exact regression: these three keys were hardcoded to "" here, discarding
+    # whatever the scores table had computed.
+    features = _make_features()
+    model = _fit_model(features)
+    scores = build_scores_table(model, features, ALL_FEATURES)
+    scores["neighborhood"] = "Brooklyn"
+    scores["zip"] = "11201"
+    scores["facility_type"] = "Restaurant"
+
+    row = next(scores.itertuples(index=False))
+    payload = _row_to_json(row)
+
+    assert payload["neighborhood"] == "Brooklyn"
+    assert payload["zip"] == "11201"
+    assert payload["facility_type"] == "Restaurant"
+
+
+def test_facility_type_collapses_the_vulnerable_population_families():
+    # normalize_facility_type consolidates the families the fairness audit cares
+    # about (the Daycare family alone spans ~20 raw spellings). Descriptive use
+    # only — DR 0004 keeps facility type as a group-performance dimension while
+    # barring it as a model feature.
+    features = _make_features()
+    features["facility_type"] = ["DAYCARE (2 - 6 YEARS)", "Day Care 1023"] * (len(features) // 2)
+    model = _fit_model(features)
+    scores = build_scores_table(model, features, ALL_FEATURES)
+
+    assert set(scores["facility_type"]) == {"Daycare"}
+
+
+def test_facility_type_keeps_a_faithful_long_tail():
+    # It does NOT collapse to a small closed vocabulary: only the vulnerable-
+    # population families are consolidated, so ~190 rare one-off values survive in
+    # real Chicago data (they cover ~1.6% of rows; the top 10 cover ~96%).
+    #
+    # That is deliberate. The app's detail page displays this value for a SINGLE
+    # establishment, so bucketing the tail into "Other" would replace a real venue's
+    # type with a meaningless label. The tail is handled where it actually matters —
+    # the chart tool's guidance says to plot the top N, not every category.
+    features = _make_features()
+    features["facility_type"] = ["Airport Lounge", "Restaurant"] * (len(features) // 2)
+    model = _fit_model(features)
+    scores = build_scores_table(model, features, ALL_FEATURES)
+
+    assert set(scores["facility_type"]) == {"Airport Lounge", "Restaurant"}
+
+
+def test_facility_type_empty_when_the_feed_lacks_it():
+    features = _make_features()  # no facility_type column at all
+    model = _fit_model(features)
+    scores = build_scores_table(model, features, ALL_FEATURES)
+
+    assert set(scores["facility_type"]) == {""}
+
+
+def test_add_display_geography_is_the_one_shared_derivation():
+    # Chicago's build_scores_table and the NYC / LA scripts all route through this,
+    # so a city cannot ship its own idea of what these columns mean. Each city's
+    # feed populates a different subset, which is expected, not a defect.
+    nyc = add_display_geography(
+        pd.DataFrame({"boro": ["Manhattan", "Queens"], "zip": ["10003", "11354"]})
+    )
+    assert list(nyc["neighborhood"]) == ["Manhattan", "Queens"]
+    assert list(nyc["zip"]) == ["10003", "11354"]
+    assert list(nyc["facility_type"]) == ["", ""]  # NYC's feed has none
+
+    la = add_display_geography(
+        pd.DataFrame({"city": ["WEST HOLLYWOOD", "TORRANCE"], "zip": ["90069", "90501"]})
+    )
+    assert list(la["neighborhood"]) == ["West Hollywood", "Torrance"]
+
+    chicago = add_display_geography(
+        pd.DataFrame(
+            {"city": ["CHICAGO"] * 50, "zip": ["60614"] * 50, "facility_type": ["Restaurant"] * 50}
+        )
+    )
+    assert set(chicago["neighborhood"]) == {""}  # no area signal in the feed
+    assert set(chicago["zip"]) == {"60614"}
+    assert set(chicago["facility_type"]) == {"Restaurant"}
+
+
+def test_add_display_geography_always_emits_every_column():
+    # A feed with none of the source columns still gets all three, empty — so a
+    # downstream writer selecting them can never raise KeyError on a new city.
+    out = add_display_geography(pd.DataFrame({"license_id": ["L0", "L1"]}))
+    assert set(DISPLAY_GEOGRAPHY_COLUMNS) <= set(out.columns)
+    for col in DISPLAY_GEOGRAPHY_COLUMNS:
+        assert list(out[col]) == ["", ""]
