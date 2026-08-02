@@ -12,7 +12,8 @@ with the workspace file, this file wins.
 > past the MVP demo and is **built on AWS**: raw data + served JSON live in S3
 > (CloudFront-fronted), the chat agent runs on Bedrock (AgentCore + Nova 2
 > Lite), transformer/LLM NLP is used for **batch** feature extraction, and the
-> web app is live on AWS Amplify, auto-deploying on push to `main` — so
+> web app is a static export deployed to S3 + CloudFront by GitHub Actions
+> (`deploy-web.yml`) on push to `main` — so
 > **merging to `main` publishes to production** (verify app changes before
 > merging). What does **not** change: the permanent **batch-score-to-JSON**
 > pattern (the app never calls the model at request time), the temporal-split /
@@ -101,8 +102,9 @@ Three product questions the UI must answer for any restaurant:
 - Web app (Next.js): search (substring on `dba_name`) + map + restaurant detail
   + methodology page + the chat agent
 - AWS: S3 for raw data + served JSON (CloudFront-fronted), the chat agent on
-  Bedrock (AgentCore + Nova 2 Lite), GitHub Actions deploys, and weekly
-  scheduled raw-data ingestion (design approved, implementation in flight)
+  Bedrock (AgentCore + Nova 2 Lite), GitHub Actions deploys, and incremental
+  raw-data ingestion run manually (`ingest_raw.py --incremental`; the
+  scheduler that would run it on a timer stays out of scope — see Roadmap)
 - Training runs locally or on AWS SageMaker; either way, scores are produced
   in batch and published as JSON
 
@@ -198,7 +200,8 @@ model + writes `scores.parquet`; a small Python script converts that to
 - **Map**: `react-map-gl` + `maplibre-gl` with OpenStreetMap-style raster
   tiles (no API key needed). Can swap to Mapbox vector tiles later if we
   want, but only with a PR justifying it.
-- **Charts**: Recharts. No plotly in the web app.
+- **Charts**: hand-rolled SVG components (gauge, waterfall, trend chart,
+  timeline) — no charting library, no plotly in the web app.
 - **Server components by default**. Use `"use client"` only when the
   component needs interactivity, state, or browser-only APIs.
 - No new top-level deps without a PR comment justifying it.
@@ -261,7 +264,7 @@ require a PR tagging every owner** (Arun, Bella, Deepak, Aurelia, Jun).
 | `data/processed/inspections_labeled.parquet` | `(license_id, inspection_date)` | Arun | Includes label `y_fail_or_critical_next_180d`. Burn-in rows (pre-2019) flagged `is_burnin=True` |
 | `data/processed/features.parquet` | `(license_id, as_of_date)` | Bella + Deepak | All `prior_*` features MUST use `.shift()` or `< as_of_date` guards |
 | `data/predictions/scores.parquet` | `(license_id, as_of_date)` | Bella | Columns: `license_id, dba_name, address, lat, lon, as_of_date, risk_score, risk_tier, top_drivers (list[dict]), trend_slope_90d` |
-| `app/public/data/scores.json` | same | Bella (auto-generated) | `scores.parquet` converted via `scripts/parquet_to_json.py`. Dates as ISO strings, `top_drivers` as array of objects. The web app reads this. |
+| `app/public/data/scores.json` | same | Bella (auto-generated) | Written by `write_scores_json()` in `src/foodsafety/serve/predict_batch.py` as part of the retrain scripts. Dates as ISO strings, `top_drivers` as array of objects. The web app reads this. |
 
 The full schema for each lives in `docs/interface_contracts.md` — that doc is
 source of truth.
@@ -431,8 +434,10 @@ Process:
 ## Reproducibility
 
 - `RANDOM_STATE = 42` in `src/foodsafety/config.py`. Used everywhere.
-- Python pipeline runnable end-to-end via `make all` on a fresh clone after
-  `uv sync`. Web app runnable via `cd app && pnpm install && pnpm dev`.
+- Python pipeline runnable end-to-end via `make data features retrain history`
+  on a fresh clone after `uv sync` (label construction runs from
+  `notebooks/02_label_construction.ipynb` between `data` and `features`).
+  Web app runnable via `cd app && npm install && npm run dev`.
 - Cache dir configurable via `FOODSAFETY_DATA_DIR` env var (defaults to `./data/`).
   This is the seam that lets the same pipeline run against local disk or S3.
 

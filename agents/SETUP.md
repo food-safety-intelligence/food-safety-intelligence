@@ -209,11 +209,12 @@ The agent works out of the box in both cases:
 
 | State | What happens |
 |---|---|
-| `app/public/data/scores.json` exists | Full ~28k Chicago restaurant scores used for address matching |
+| `app/public/data/scores.json` exists | Full ~20k Chicago establishment scores used for address matching |
 | File missing (fresh clone) | Falls back to `scores_mock.json` — 8 sample restaurants |
 
-To generate the real scores, run the Python ML pipeline (`make all` — requires
-Chicago data download). The agent's Overpass restaurant discovery works regardless;
+To generate the real scores, run the Python ML pipeline (`make data features
+retrain history`, with label construction from `notebooks/02_label_construction.ipynb`
+— requires Chicago data download). The agent's Overpass restaurant discovery works regardless;
 only the address-match enrichment is limited with mock data.
 
 ---

@@ -18,6 +18,7 @@ Your query
       → find_reviews       — third-party review links (opt-in; not a score input)
       → find_inspection_records — authoritative city-record links (compare/list/area)
       → food_safety_info   — general food-safety facts + authoritative citations
+      → visualize_data     — sandboxed pandas/matplotlib chart of the city's scores
   → Plain-English ranked response
 ```
 
@@ -568,12 +569,12 @@ Deploy with the wrapper script (defaults: region `us-west-2`, the deploy account
 ./scripts/deploy_aws.sh [region] [account-id]
 ```
 
-This zips `agents/` (entrypoint + the seven `tools/` handlers + `system_prompt.txt` +
+This zips `agents/` (entrypoint + the eight `tools/` handlers + `system_prompt.txt` +
 `city_context.py` + `scores_match.py`), deploys/updates the `foodsafetyagent` runtime, and points the
 `food-safety-agent-proxy` Lambda at it — the request path is CloudFront `/api/agent`
 → ALB → that Lambda → the runtime. The runtime warms each covered city's precomputed
 `scores.json` from S3 at startup and reads it for scoring; it never calls the model
-for a score (the batch-score-to-JSON contract). `run_local.py` runs the same six
+for a score (the batch-score-to-JSON contract). `run_local.py` runs the same eight
 `handler.py` files locally via Strands.
 
 `harness.yaml` describes a different, per-tool-Lambda harness and is **not** the
