@@ -41,6 +41,11 @@ def main() -> None:
         action="store_true",
         help="include block-face building permit/violation features (for A/B experiment)",
     )
+    ap.add_argument(
+        "--with-weather",
+        action="store_true",
+        help="include citywide NOAA weather features (for A/B experiment)",
+    )
     args = ap.parse_args()
 
     labeled_path = storage.join(str(PROCESSED_DIR), "inspections_labeled.parquet")
@@ -74,6 +79,18 @@ def main() -> None:
         if building_permits is None and building_violations is None:
             print("  WARNING: --with-buildings but no building parquets found; skipping")
 
+    weather = None
+    if args.with_weather:
+        weather_path = storage.join(str(RAW_DIR), "weather.parquet")
+        if storage.exists(weather_path):
+            print(f"  {weather_path}")
+            weather = storage.read_parquet(weather_path)
+        else:
+            print(
+                "  WARNING: --with-weather but no weather parquet found; skipping "
+                "(run scripts/ingest_raw.py weather first)"
+            )
+
     # 311 complaints are intentionally left unwired (None) — the feature family was
     # dropped from ALL_FEATURES (see baseline.py + docs/model-experiments.md).
     features = build_features(
@@ -82,6 +99,7 @@ def main() -> None:
         licenses_historical=licenses_historical,
         building_permits=building_permits,
         building_violations=building_violations,
+        weather=weather,
     )
 
     missing_cols = [c for c in ALL_FEATURES if c not in features.columns]

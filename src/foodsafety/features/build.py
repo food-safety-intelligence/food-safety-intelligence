@@ -32,6 +32,7 @@ from foodsafety.features.keyword_flags import add_keyword_flags
 from foodsafety.features.license_features import add_license_features
 from foodsafety.features.license_history_features import add_license_history_features
 from foodsafety.features.temporal_features import add_temporal_features
+from foodsafety.features.weather_features import add_weather_features
 from foodsafety.utils.geo import warn_and_null_out_of_bbox
 
 MODELABLE_RESULTS = frozenset({"Pass", "Pass w/ Conditions", "Fail"})
@@ -43,6 +44,7 @@ def build_features(
     licenses_historical: pd.DataFrame | None = None,
     building_permits: pd.DataFrame | None = None,
     building_violations: pd.DataFrame | None = None,
+    weather: pd.DataFrame | None = None,
     *,
     drop_burnin: bool = True,
     drop_invalid_license: bool = True,
@@ -59,6 +61,8 @@ def build_features(
             the complaint features are skipped — handy for tests.
         licenses_historical: optional Business Licenses history dataframe.
             If None, license-history features are skipped.
+        weather: optional NOAA GHCN-Daily dataframe (``foodsafety.io.noaa.
+            fetch_noaa_ghcnd`` output). If None, weather features are skipped.
         drop_burnin: drop rows with ``is_burnin=True`` from output.
         drop_invalid_license: drop rows with ``license_id`` in {"", "0"}.
         drop_non_modelable: drop rows whose ``results`` is not in
@@ -107,6 +111,12 @@ def build_features(
     # lives in add_building_features.
     if building_permits is not None or building_violations is not None:
         df = add_building_features(df, building_permits, building_violations)
+
+    # Citywide daily weather (NOAA GHCN-Daily, O'Hare). Skipped if no weather
+    # df is provided. Joined on date only, not grouped by license — see
+    # weather_features.py for the leak guard.
+    if weather is not None:
+        df = add_weather_features(df, weather)
 
     # Add as_of_date as a synonym of inspection_date — per contract the row
     # key is (license_id, as_of_date). We set them equal here so the contract

@@ -26,6 +26,7 @@ from foodsafety.config import DATASETS, INGEST_SPECS, RAW_DIR, RELEVANT_SR_TYPES
 from foodsafety.ingest import ingest_dataset
 from foodsafety.io import storage
 from foodsafety.io.cache import load_or_fetch
+from foodsafety.io.noaa import fetch_noaa_ghcnd
 from foodsafety.io.soda import fetch_soda, fetch_soda_keyset
 
 
@@ -99,6 +100,12 @@ def _fetch_building_violations():
     )
 
 
+def _fetch_weather():
+    # Not a SODA dataset — NOAA GHCN-Daily publishes one plain CSV per station,
+    # whole-history each time (no keyset/incremental pull; the file is small).
+    return fetch_noaa_ghcnd()
+
+
 FETCHERS = {
     "inspections": _fetch_inspections,
     "complaints_311": _fetch_311,
@@ -106,6 +113,7 @@ FETCHERS = {
     "licenses_historical": _fetch_licenses_historical,
     "building_permits": _fetch_building_permits,
     "building_violations": _fetch_building_violations,
+    "weather": _fetch_weather,
 }
 
 
