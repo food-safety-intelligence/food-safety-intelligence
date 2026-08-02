@@ -365,6 +365,64 @@ text/theme layer a small extra (a genuine +0.011 in Chicago, redundant in
 NYC/LA). Next step if pursued: expanding-window CV on the thin NYC/LA post-COVID
 windows before treating those deltas as gate-passing verdicts.
 
+## Label window: is short-term easier than mid-term? (Chicago only)
+
+Hypothesis: the served 180-day ("mid-term") label should be structurally
+harder to predict than a shorter window, since there's less time for
+confounding events to intervene between the anchor inspection and the
+outcome. Tested by re-deriving the label at 30d/60d/90d/180d via
+`foodsafety.data.labels.build_labels(label_window_days=W)` — the label build
+is independent of feature engineering, so the same `features.parquet` /
+`ALL_FEATURES` / production LogReg + XGB configs are reused for every window,
+same chronological split (train_end 2024-07-01, val_end 2025-07-01), same
+honest-test protocol (drop `right_truncated` from train/val, score the full
+test). Script: `scripts/experiment_label_window.py`
+(`reports/metrics/experiments/label_window_study_2026-07-16.json`). NYC/LA
+have no analog — their label is "next inspection graded B/C" (event-anchored,
+no day-window parameter to vary).
+
+**Raw PR-AUC is close to flat across windows and not the right read** — a
+shorter window has structurally lower prevalence (5.0% at 30d vs 8.8% at
+180d), and PR-AUC scales with prevalence, the same confound flagged in the
+2026-06-21 fail-only-label row above. The base-rate-normalized metrics
+(ROC-AUC, PR-AUC/prevalence, top-decile lift) are the fair comparison, and
+all three move the same way:
+
+| Window | Test base rate | Model | PR-AUC | PR-AUC / prevalence | ROC-AUC | P@10 | lift@10 |
+|---|---|---|---|---|---|---|---|
+| 30d | 5.02% | LogReg | 0.3583 | **7.14** | **0.9160** | 0.3126 | **6.23** |
+| 30d | 5.02% | XGB | 0.3667 | **7.30** | **0.9188** | 0.3215 | **6.40** |
+| 60d | 5.73% | LogReg | 0.3576 | 6.24 | 0.8957 | 0.3245 | 5.66 |
+| 60d | 5.73% | XGB | 0.3589 | 6.26 | 0.8997 | 0.3319 | 5.79 |
+| 90d | 6.36% | LogReg | 0.3526 | 5.54 | 0.8787 | 0.3378 | 5.31 |
+| 90d | 6.36% | XGB | 0.3572 | 5.62 | 0.8805 | 0.3400 | 5.35 |
+| 180d (served) | 8.76% | LogReg | 0.3425 | 3.91 | 0.8267 | 0.3673 | 4.20 |
+| 180d (served) | 8.76% | XGB | 0.3612 | 4.13 | **0.8320** | **0.3740** | **4.27** |
+
+**Yes — cleanly, monotonically, across both models.** ROC-AUC falls from
+0.919 (30d, XGB) to 0.832 (180d, XGB) as the window widens; PR-AUC/prevalence
+falls from 7.30 to 4.13; top-decile lift falls from 6.40 to 4.27. Every
+window's train/val/test row counts are identical (79,268 / 16,564 / 13,521) —
+right-truncation never fires inside train/val for any window here since the
+raw data extends well past val_end + 180d, so the shrinking metrics are pure
+label-difficulty, not a shrinking-sample artifact. Raw P@10 rising with
+window length (0.313 → 0.367) is the same prevalence confound working in the
+other direction — a bigger positive pool makes the top-10% slice look better
+in absolute precision without the ranking actually improving, which is
+exactly why lift (precision ÷ base rate) is the metric that matters here, not
+raw P@10. XGB beats LogReg at every window, with the gap narrowing as the
+window shortens (30d: 0.9188 vs 0.9160 ROC-AUC; 180d: 0.8320 vs 0.8267).
+
+**Verdict:** confirms the hypothesis — short-term risk is genuinely easier to
+rank correctly. Whether to *ship* a shorter window is a product decision, not
+just a modeling one: 180d was chosen for actionability (enough runway to
+schedule a re-inspection or intervene), and a 30d score is a much narrower
+"is something about to go wrong right now" signal with a much rarer positive
+class in absolute terms (5.0%), which may or may not suit the app's current
+"predicted risk" framing. Recommend a product conversation (Jun) before
+touching the served window; this result only says the modeling headroom is
+there.
+
 ## Closing the Chicago feature gap (NYC / LA feature additions, 2026-07-18)
 
 NYC/LA shipped a leaner feature set than Chicago: they lacked the time-windowed
