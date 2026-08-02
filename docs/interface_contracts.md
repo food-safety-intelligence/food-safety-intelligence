@@ -447,8 +447,8 @@ The served model is **model-agnostic** (`baseline_sigmoid_*` for LogReg or
 overwritten) because the binary is gitignored, so S3 is the only rollback copy; a
 `_metadata.json` sidecar is published when the retrain emits one. A newly-trained model goes
 live in **two steps** — publish the
-JSON to S3, **then** rebuild/redeploy the app (an Amplify/Vercel rebuild re-reads S3 and
-re-exports); publishing alone does not change the live site. See the `update-model` skill,
+JSON to S3, **then** rebuild/redeploy the app (the GitHub Actions `deploy-web.yml` build
+re-reads S3 and re-exports); publishing alone does not change the live site. See the `update-model` skill,
 Step 6.
 
 ---
