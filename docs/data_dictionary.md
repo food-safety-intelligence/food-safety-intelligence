@@ -87,13 +87,51 @@ collapses to one row per `(camis, inspection_date)`.
 - **Training window:** **2022-07-01 onward.** NYC halted inspections in March 2020
   (COVID) and grades/scores only normalise from 2022 — the analog of Chicago's
   2019 cutoff for the July-2018 procedure change.
-- **Served model:** a calibrated logistic-regression, reusing Chicago's SHAP /
-  calibration / risk-tier machinery; XGBoost is only the eval comparator. Output
-  is written to `app/public/data/nyc/{scores,inspection_history,methodology}.json`
-  in the same schema Chicago uses (decision record 0016).
+- **Served model:** XGBoost with Platt-on-margin calibration (`nyc_xgb_sigmoid`),
+  reusing Chicago's SHAP / calibration / risk-tier machinery. Output is written to
+  `app/public/data/nyc/{scores,inspection_history,methodology}.json` in the same
+  schema Chicago uses (decision record 0016). LA is the same shape
+  (`la_xgb_sigmoid`). Both served a calibrated logistic regression until
+  2026-07-06 (PR #165), when XGBoost cleared the gate on a deploy-realistic split.
 - **Violation vocabulary:** NYC's codes are mapped to the shared theme + severity
   crosswalk in `reference/violation_crosswalk.csv` so the product describes
   violations consistently across cities.
+
+### LA County Restaurant + Market Inspections and Violations (third city)
+Los Angeles County Environmental Health, published as **ArcGIS Hub bulk CSVs**,
+not Socrata: inspections item `19b6607a…` + violations item `5eaea9f8…`, covering
+**2023-04-01 → 2026-03-31**. LA County left Socrata (its SODA endpoint redirects
+to a dead page) and the surviving City-of-LA Socrata feed `29fd-3paw` is frozen at
+2018-07-31. Pulled by its own producer, `scripts/build_la_scores.py`, which joins
+violations to inspection headers on `serial_number`.
+- **Key columns (inspections):** `serial_number`, `facility_id`, `facility_name`,
+  `facility_address`, `facility_city`, `facility_zip`, `activity_date`,
+  `service_description` (routine vs owner-initiated), `score`, `grade`,
+  `pe_description` (program element).
+- **Key columns (violations):** `serial_number`, `violation_code`,
+  `violation_description`, `points`.
+- **Scope:** restaurants **and** retail food markets — ~75% / ~25% by facility
+  (32,208 / 10,831 of 43,053), a near-mirror of Chicago's 69/31. Unlike Chicago
+  there are effectively no institutional kitchens: only 14 facilities fall outside
+  those two categories, so LA has no school / daycare / hospital coverage.
+- **Grade direction is FLIPPED:** 0–100 where **higher is cleaner** (A = 90–100,
+  B = 80–89, C = 70–79), the opposite of Chicago and NYC. Label `y_next_bad` = the
+  next inspection scores **below 90**. Same-day collapse takes the **minimum**
+  (worst) score, where NYC takes the max.
+- **No coordinates in the feed.** Facilities are geocoded once via the free US
+  Census batch geocoder (95.7% matched, ZIP-centroid fallback) and cached in
+  `reference/la_facility_coords.csv` so rebuilds are offline. Coordinates are
+  therefore approximate — see the neighborhood false-positive finding in
+  `fairness_audit.md`.
+- **No burn-in cutoff needed:** the feed starts post-COVID (2023-04) and mean score
+  is flat ~94.5 across 2023–2026.
+- **`pe_description` is in the raw feed but NOT carried into the feature frame**
+  (`src/foodsafety/audit/adapters/la.py`). It encodes venue type, **seat count**,
+  and **LA County's own risk grade** in one string (e.g.
+  `RESTAURANT (0-30) SEATS HIGH RISK`) — 30 distinct values. The county risk grade
+  is the direct analog of Chicago's `static_risk_tier`, which **is** a kept model
+  feature, and unlike facility type it is not an ethnicity proxy. Untested lever in
+  the city that is furthest from its ceiling; see `model-experiments.md`.
 
 ## Data sources considered but NOT used
 
