@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, Heart } from "lucide-react";
+import { Heart, MessageSquarePlus } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BackToSearch } from "@/components/BackToSearch";
 import { DemoBanner } from "@/components/DemoBanner";
 import { DriverList } from "@/components/DriverList";
 import { InspectionTimeline } from "@/components/InspectionTimeline";
@@ -12,6 +13,8 @@ import { ResultTally } from "@/components/ResultTally";
 import { ScoreCard } from "@/components/ScoreCard";
 import { Waterfall } from "@/components/Waterfall";
 import type { DetailBundle, DetailGlobals } from "@/lib/scores";
+import { useCity } from "@/components/CityContext";
+import { CITY_CONFIG, dataUrl, formatLocationLine, type City } from "@/lib/city";
 import { formatInspectionDate } from "@/lib/utils";
 
 type LoadState =
@@ -28,23 +31,25 @@ type LoadState =
  */
 export function RestaurantDetail() {
   const id = useSearchParams().get("id");
+  const { city } = useCity();
   // No id → nothing to load; render not-found during render (not via an effect).
-  // Key the loader on id so a new id remounts it back to the loading state,
-  // keeping the effect's setState calls confined to async callbacks.
+  // Key the loader on city+id so either change remounts it back to the initial
+  // loading state, keeping the effect's setState calls confined to async
+  // callbacks (no synchronous setState in the effect body).
   if (!id) return <DetailNotFound />;
-  return <DetailLoader key={id} id={id} />;
+  return <DetailLoader key={`${city}:${id}`} id={id} city={city} />;
 }
 
-function DetailLoader({ id }: { id: string }) {
+function DetailLoader({ id, city }: { id: string; city: City }) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
     let cancelled = false;
     Promise.all([
-      fetch(`/data/detail/${encodeURIComponent(id)}.json`).then((r) =>
+      fetch(dataUrl(city, `detail/${encodeURIComponent(id)}.json`)).then((r) =>
         r.ok ? (r.json() as Promise<DetailBundle>) : Promise.reject(r.status),
       ),
-      fetch(`/data/detail-globals.json`).then((r) =>
+      fetch(dataUrl(city, "detail-globals.json")).then((r) =>
         r.ok ? (r.json() as Promise<DetailGlobals>) : Promise.reject(r.status),
       ),
     ])
@@ -57,7 +62,7 @@ function DetailLoader({ id }: { id: string }) {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, city]);
 
   if (state.status === "loading") return <DetailSkeleton />;
   if (state.status === "notfound") return <DetailNotFound />;
@@ -76,14 +81,8 @@ function DetailLoader({ id }: { id: string }) {
 
   // Location line — join only the parts we have so a missing neighborhood/zip
   // doesn't leave orphaned "·" separators.
-  const cityLine = `Chicago, IL${restaurant.zip.trim() ? ` ${restaurant.zip.trim()}` : ""}`;
-  const locationLine = [
-    restaurant.address.trim(),
-    restaurant.neighborhood.trim(),
-    cityLine,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // Placement of the area part is per-city — see formatLocationLine.
+  const locationLine = formatLocationLine(restaurant, city);
 
   const facilityType = restaurant.facility_type.trim();
 
@@ -97,16 +96,31 @@ function DetailLoader({ id }: { id: string }) {
         name={restaurant.dba_name}
       />
       <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm text-teal hover:underline"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Back to search
-        </Link>
+        <BackToSearch className="inline-flex items-center gap-2 text-sm text-teal hover:underline" />
       </div>
 
       {is_mock && <DemoBanner />}
+
+      {restaurant.is_out_of_business && (
+        <div className="w-full max-w-[1240px] mx-auto px-8 mt-5">
+          <div
+            role="note"
+            className="rounded-xl border border-line bg-tint px-5 py-3.5 text-sm text-ink"
+          >
+            <span className="font-semibold">
+              This establishment appears to be out of business
+            </span>
+            {restaurant.closed_since && (
+              <>
+                :{" "}
+                an inspector found it closed on{" "}
+                {formatInspectionDate(restaurant.closed_since)}
+              </>
+            )}
+            . The risk information below is historical, not a current signal.
+          </div>
+        </div>
+      )}
 
       {/* max-w-full on mobile (capped to the viewport) so content wraps instead
           of forcing a horizontal scroll; overflow-x-clip trims any small residual
@@ -115,31 +129,46 @@ function DetailLoader({ id }: { id: string }) {
       <main className="w-full max-w-full lg:max-w-[1240px] overflow-x-clip mx-auto px-8 pt-8 pb-24 flex-1">
         {/* Hero */}
         <section className="mb-10">
-          <div className="mb-6">
-            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-              Food establishment profile
-            </p>
-            <h1 className="text-6xl font-light leading-[1.04] tracking-tight">
-              {restaurant.dba_name}
-            </h1>
-            <p className="text-lg text-muted mt-4 leading-relaxed">
-              {locationLine}
-            </p>
-            <div className="flex flex-wrap gap-2 mt-4 items-center text-xs text-muted">
-              <span className="px-2.5 py-1 rounded-full bg-tint">
-                License #{restaurant.license_id}
-              </span>
-              {facilityType && (
+          <div className="mb-6 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+            <div>
+              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
+                Food establishment profile
+              </p>
+              <h1 className="text-6xl font-light leading-[1.04] tracking-tight">
+                {restaurant.dba_name}
+              </h1>
+              <p className="text-lg text-muted mt-4 leading-relaxed">
+                {locationLine}
+              </p>
+              <div className="flex flex-wrap gap-2 mt-4 items-center text-xs text-muted">
                 <span className="px-2.5 py-1 rounded-full bg-tint">
-                  {facilityType}
+                  License #{restaurant.license_id}
                 </span>
-              )}
-              {lastInspection && (
-                <span className="px-2.5 py-1 rounded-full bg-tint">
-                  Last inspected · {formatInspectionDate(lastInspection)}
-                </span>
-              )}
+                {facilityType && (
+                  <span className="px-2.5 py-1 rounded-full bg-tint">
+                    {facilityType}
+                  </span>
+                )}
+                {lastInspection && (
+                  <span className="px-2.5 py-1 rounded-full bg-tint">
+                    Last inspected · {formatInspectionDate(lastInspection)}
+                  </span>
+                )}
+              </div>
             </div>
+            {/* Contextual feedback — top-right by the name; carries this
+                establishment's id + name to the feedback form so a data
+                correction is tied to the right listing (the form still lets the
+                user clear the venue). */}
+            <Link
+              href={`/feedback?venue=${encodeURIComponent(
+                restaurant.license_id,
+              )}&name=${encodeURIComponent(restaurant.dba_name)}`}
+              className="shrink-0 self-start inline-flex items-center gap-1.5 rounded-full border border-line px-3.5 py-2 text-sm text-teal hover:bg-tint transition-colors"
+            >
+              <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+              Something look wrong?
+            </Link>
           </div>
 
           <ScoreCard
@@ -197,10 +226,10 @@ function DetailLoader({ id }: { id: string }) {
               </div>
               <p className="text-base text-muted leading-relaxed mb-4 max-w-[60ch]">
                 The same drivers as the bars above, rescaled to the model&apos;s
-                calibrated scale so they add up — so the numbers here are smaller
+                calibrated scale so they add up, so the numbers here are smaller
                 than the bars (which show raw influence and don&apos;t sum). The
                 base, each driver, and everything else total one number, which a
-                sigmoid turns into the probability on the gauge — so this column
+                sigmoid turns into the probability on the gauge, so this column
                 reconciles exactly with the score.
               </p>
               <Waterfall restaurant={restaurant} calibration={calibration} />
@@ -243,15 +272,12 @@ function DetailLoader({ id }: { id: string }) {
                 className="serif italic text-terra"
                 style={{ fontSize: "1.05em" }}
               >
-                {history.filter((e) => e.result === "Fail").length} failure
-                {history.filter((e) => e.result === "Fail").length === 1
-                  ? ""
-                  : "s"}
-                .
+                {history.filter((e) => CITY_CONFIG[city].isBadOutcome(e.result)).length}{" "}
+                {CITY_CONFIG[city].outcomeNoun}.
               </span>
             </h2>
             <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
-              Real Chicago Department of Public Health records, independent of the
+              Real {CITY_CONFIG[city].healthDept} records, independent of the
               predicted risk score above.
             </p>
           </div>
@@ -286,8 +312,7 @@ function DetailLoader({ id }: { id: string }) {
               <p className="font-medium mb-2">It is a prediction.</p>
               <p>
                 A model estimate, drawn from the public record, of whether this
-                establishment will fail an inspection or be cited for a priority
-                violation in the next 180 days.
+                establishment will {CITY_CONFIG[city].outcomeSentence}.
               </p>
             </div>
             <div className="col-span-12 md:col-span-6">
@@ -303,13 +328,7 @@ function DetailLoader({ id }: { id: string }) {
         </section>
 
         <div className="text-center mt-10">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Back to search
-          </Link>
+          <BackToSearch className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors" />
         </div>
       </main>
     </>
@@ -343,13 +362,7 @@ function DetailNotFound() {
         We couldn&apos;t find a food establishment for this link. It may have been
         removed from the dataset, or the link may be incomplete.
       </p>
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors"
-      >
-        <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-        Back to search
-      </Link>
+      <BackToSearch className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors" />
     </main>
   );
 }

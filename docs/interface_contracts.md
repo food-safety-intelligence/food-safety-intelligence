@@ -286,9 +286,13 @@ Layer-C TF-IDF→SVD(50) violation-text embedding.
 
 ## 3. `data/predictions/scores.parquet`
 
-**Grain**: one row per `(license_id, as_of_date)`. The app reads the latest
-`as_of_date` per license for the current view, and earlier dates for the
-trend chart.
+**Grain**: one row per **physical establishment**, keyed by `license_id`. Each
+license is first anchored on its most recent inspection (`as_of_date`); licenses
+that share a normalised `dba_name` + `address` (a reopen/renewal that minted a
+new `license_id`) are then collapsed to the most-recently-inspected one, so a
+restaurant is served once rather than as a live entry beside a stale ghost. Rows
+stay uniquely keyed by `license_id`; the trend chart reads earlier `as_of_date`s
+for that surviving license.
 **Key**: `(license_id, as_of_date)`.
 **Producer**: `src/foodsafety/serve/predict_batch.py` (Bella).
 **Consumer**: the Next.js web app, via the exported `app/public/data/scores.json`.
@@ -302,6 +306,9 @@ model inference happens in the app** — predictions are precomputed and written
 | `license_id` | `string` | no | The restaurant's license number. |
 | `dba_name` | `string` | no | For display + search. |
 | `address` | `string` | yes | For display. |
+| `neighborhood` | `string` | no | Display area, derived from the city feed's own area column: NYC's `boro` (5 boroughs), LA's `city` (separate incorporated cities like West Hollywood, and postal cities like Van Nuys). **Empty string for Chicago**, whose feed has only a `city` column reading `CHICAGO` on 99.6% of rows. Never null — empty means "this city publishes no area". Consumers must treat it as optional: the app omits it from the detail-page location line, and the chart tool drops it from the available filters rather than offering one that matches nothing. |
+| `zip` | `string` | no | 5-digit ZIP, from the feed. Populated in all three cities (Chicago 100%, LA 100%, NYC 98.9%). Empty string when the feed has no parseable 5-digit value. This is the geographic column that works everywhere. |
+| `facility_type` | `string` | no | Canonical facility bucket (Restaurant, Grocery Store, Daycare, School, Long Term Care, …) via `license_features.normalize_facility_type` — never the raw feed value, which is operator-entered free text with ~500 spellings. Empty string when missing. **Descriptive only.** [Decision 0004](decisions/0004-fairness-audit-and-proxy-feature-removal.md) dropped `static_facility_type` as a *model feature* (it is "only partly a proxy") while keeping facility type as a group-performance dimension; this column is that dimension, and the same distinction applies to `zip` / `static_zip`. Grouping by it is in scope precisely because vulnerable-population facilities (daycare, school, hospital, long-term care) are. It must never become a model input. |
 | `lat` | `float64` | yes | For the map. Null if no geocode. |
 | `lon` | `float64` | yes | For the map. Null if no geocode. |
 | `as_of_date` | `datetime64[ns]` | no | Date the prediction is anchored to. |
@@ -309,10 +316,17 @@ model inference happens in the app** — predictions are precomputed and written
 | `risk_tier` | `string` | no | `Low` / `Moderate` / `Elevated` / `High`. Discretized from `risk_score` via thresholds in `src/foodsafety/serve/predict_batch.py`. |
 | `top_drivers` | `list[struct]` | no | 3–5 top SHAP-style drivers. Each struct: `{feature: string, value: string, shap: float, label: string}` where `label` is the plain-English UI string. |
 | `trend_slope` | `float64` | yes | OLS slope of the **forecast-only model's** score over this license's last `TREND_K_VISITS` (=5) inspections — *visits*, not a calendar window. Positive = worsening. Null if <2 scored points. Forward-looking basis: the forecast model ignores each visit's own pass/fail, so a failed inspection and its required re-check don't dominate the trend; see [decision 0011](decisions/0011-trend-signal-forecast-model-last-k-visits.md). **Renamed from `trend_slope_90d`** in `schema_version` 0.5.0. |
+| `is_out_of_business` | `bool` | no | The license's **latest inspection event** (any type, from `inspections_labeled.parquet`) has result `Out of Business` or `Business Not Located`. Latest-event-only: a venue that reopens does so under a new `license_id`, so an old closure never marks a live license. `No Entry` / `Not Ready` are NOT closure signals. The app greys these venues out (map pin, list row, detail banner) and never presents their score as a current signal; they sort after active venues in risk-sorted views. Added in `schema_version` 0.6.0 — see [decision 0014](decisions/0014-out-of-business-establishments.md). |
+| `closed_since` | `datetime64[ns]` | yes | Date of the closing inspection event. Null unless `is_out_of_business`. ISO date string in `scores.json`. |
 
-**Top-level JSON envelope** (`scores.json`, `schema_version` `0.5.0`): alongside
+**Top-level JSON envelope** (`scores.json`, `schema_version` `0.6.0`): alongside
 `scores`, the file carries `generated_at`, `as_of_date`, `model_version`,
-`label_window_days`, `totals`, and **`calibration`**. `calibration` is the
+`label_window_days`, `totals` (which as of 0.6.0 includes an
+`out_of_business` count, and whose `worsening` / `improving` counts cover
+**active venues only** — a closed business can't be "worsening"),
+**`risk_tier_thresholds`** (the unified tier cutoffs this run used, `[[cutoff,
+label], …]` with `High` last — decision record 0017; `methodology.json` reads it),
+and **`calibration`**. `calibration` is the
 Platt triple `{a, b, intercept}` shipped **once** (not per row). The detail page
 uses it to reconstruct each establishment's calibrated-log-odds driver
 *waterfall* from the row's own `risk_score` + `top_drivers` shap values
@@ -320,22 +334,30 @@ uses it to reconstruct each establishment's calibrated-log-odds driver
 full per-profile waterfall costs three floats total. `top_drivers` now ships
 **5** drivers per row (within the documented 3–5).
 
-**Risk-tier thresholds** (recalibrated in Phase 6 against the actual score distribution):
 
-| Score range | Tier | Approx population share |
-|---|---|---|
-| `[0.00, 0.04)` | Low | ~25% |
-| `[0.04, 0.13)` | Moderate | ~62% |
-| `[0.13, 0.30)` | Elevated | ~11% |
-| `[0.30, 1.00]` | High | ~1% |
+**Risk-tier thresholds** — one **unified cross-city rule** (decision record
+[0017](decisions/0017-seasonality-asof-scoring-and-low-tier-widening.md)), anchored
+to each city's base rate (label prevalence) because the three models predict
+different events: Low `< 0.5× base`, Moderate `0.5–1× base`, Elevated
+`1× base – High_cut`, High `≥ High_cut` where `High_cut = max(2× base, city p98)`.
+Per-city cutoffs (base rate in parens):
 
-Note: the mock fixture (`tests/fixtures/scores_mock.parquet`) still uses
-the original (0.20 / 0.40 / 0.65) thresholds — those were appropriate for
-uniformly-distributed synthetic scores. Real calibrated probabilities from
-the model are much more concentrated near zero (median ~0.06, p95 ~0.18),
-so the production thresholds were recalibrated to produce a useful UI
-distribution. Single source of truth: ``RISK_TIER_THRESHOLDS`` in
-``src/foodsafety/serve/predict_batch.py``.
+| City | Low `<` | Moderate `<` | Elevated `<` | High `≥` |
+|---|---|---|---|---|
+| Chicago (0.108) | 0.054 | 0.108 | 0.216 | 0.216 |
+| NYC (0.41) | 0.205 | 0.41 | 0.82 | 0.82 |
+| LA (0.087) | 0.0435 | 0.087 | 0.306 | 0.306 |
+
+Cutoffs are computed by `assign_risk_tiers` (`src/foodsafety/serve/predict_batch.py`)
+and the exact values a run used are recorded in `scores.json`'s top-level
+**`risk_tier_thresholds`** (`[[cutoff, label], …]`, High last); `methodology.json`
+reads them so the how-it-works bands can't drift. Chicago's shares are also
+**as-of-month dependent** (0017 § A freezes scoring to the current month) — read
+`scoring_month` in the metrics report before treating a share shift as a data change.
+
+Note: the mock fixture (`tests/fixtures/scores_mock.parquet`) still uses the
+original (0.20 / 0.40 / 0.65) thresholds — appropriate for its uniformly-distributed
+synthetic scores.
 
 **Mock fixture**: `tests/fixtures/scores_mock.parquet` conforms to this schema
 and is used by the UI team in Phase 1 (walking skeleton) before the real
@@ -370,6 +392,20 @@ to the committed/locally-generated copies under `app/public/data/`).
   pages. Producer `_shard_of()` and the web app's `commentShardOf()` must use
   the same md5 scheme. Regenerate and upload `inspection_history.json` and the
   shards **together** so the index alignment holds.
+
+  **Per city (NYC, LA).** The same scheme lives under each city prefix —
+  `web-app-data/nyc/comments/<xx>.json` and `web-app-data/la/comments/<xx>.json`,
+  emitted by `build_nyc_scores.py` / `build_la_scores.py` (`write_comment_shards`)
+  in the same aligned pass as that city's `inspection_history.json`. Format
+  differs by source: **LA** lines carry the point deduction (`"<item> (−N pts)"`,
+  LA scores start at 100 and deduct per violation); **NYC** flags critical
+  citations (`"<description> (critical)"`). Neither feed has a per-line inspector
+  note, so the timeline renders a flat list (the nested-note expansion stays
+  Chicago-only). `prebuild-sync-s3.mjs` pulls all three cities' shards and
+  re-shards them per license at build; `package.json`'s NYC/LA `build-detail-data`
+  steps read the synced dirs. Gitignored like Chicago's — S3 is the source of
+  truth; whoever republishes a city's `web-app-data/<city>/` must sync its
+  `comments/` subdir too.
 
 - **`detail/<license_id>.json` + `detail-globals.json`** (build artifacts, #119,
   decision 0013) — since #119 the detail page is **client-rendered**

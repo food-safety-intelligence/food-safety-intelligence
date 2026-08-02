@@ -1,0 +1,32 @@
+[
+  {
+    "slug": "pests",
+    "label": "Pests and rodents",
+    "patterns": ["rodent", "\\bmice\\b", "\\bmouse\\b", "\\brats?\\b", "roach", "insect", "\\bpests?\\b", "vermin", "\\bfl(y|ies)\\b"]
+  },
+  {
+    "slug": "temp",
+    "label": "Temperature control",
+    "patterns": ["temperature", "cold holding", "hot holding", "\\bcool", "refrigerat", "thermometer", "reheat"]
+  },
+  {
+    "slug": "contamination",
+    "label": "Contamination and food source",
+    "patterns": ["contaminat", "adulterat", "approved source", "unapproved", "sewage", "\\bprotected\\b"]
+  },
+  {
+    "slug": "hygiene",
+    "label": "Hygiene and handwashing",
+    "patterns": ["handwash", "hand wash", "hand sink", "handsink", "hygien", "\\bsoap\\b", "towel", "bare hand"]
+  },
+  {
+    "slug": "sanitizing",
+    "label": "Cleaning and sanitizing",
+    "patterns": ["saniti", "\\bclean"]
+  },
+  {
+    "slug": "facility",
+    "label": "Facility and equipment",
+    "patterns": ["\\bfloors?\\b", "\\bwalls?\\b", "ceiling", "plumbing", "\\brepair", "garbage", "refuse", "toilet", "restroom", "ventilat", "lighting", "\\bleak"]
+  }
+]

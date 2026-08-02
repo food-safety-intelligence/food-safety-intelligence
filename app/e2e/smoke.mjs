@@ -70,6 +70,7 @@ function routesToCheck(restaurantId) {
     `/restaurant/?id=${restaurantId}`,
     "/how-it-works/",
     "/chat/",
+    "/inspectors/",
     "/sources/",
     "/caregivers/",
   ];

@@ -1,10 +1,11 @@
 import {
-  ArrowLeft,
   BookMarked,
   BookOpen,
+  ClipboardList,
   type LucideIcon,
+  MessageSquarePlus,
+  ShieldCheck,
   Target,
-  TriangleAlert,
   Wrench,
 } from "lucide-react";
 import Link from "next/link";
@@ -13,9 +14,26 @@ import { SiteHeader } from "@/components/SiteHeader";
 import { TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { loadMethodology } from "@/lib/methodology-server";
-import { GLOSSARY, GLOSSARY_ORDER } from "@/lib/glossary";
+import { BackToSearch } from "@/components/BackToSearch";
+import { CityGate } from "@/components/CityGate";
+import { HowItWorksNyc } from "@/components/HowItWorksNyc";
+import { HowItWorksLa } from "@/components/HowItWorksLa";
+import { MethodologyHero, OperatingPointsTable, TightestSlices } from "@/components/HowItWorksCards";
+import { ChronologicalSplit, EvaluationDetail, FeatureGroups, type FeatureGroup } from "@/components/MethodologySections";
+import { glossaryFor } from "@/lib/glossary";
 import type { RiskTier } from "@/lib/scores";
 import { cn } from "@/lib/utils";
+
+/**
+ * Human labels for the internal model-family slug stored in methodology.json's
+ * `model_version`. An unrecognised slug falls back to the raw value, so the card
+ * stays correct — never blank or a stale friendly name — if the served model
+ * changes.
+ */
+const MODEL_TYPE_LABELS: Record<string, string> = {
+  xgb_monotone: "Gradient-boosted trees (XGBoost)",
+  baseline_logreg: "Logistic regression",
+};
 
 /**
  * One row of the worked-example waterfall: a label on the left and its signed
@@ -131,10 +149,51 @@ function HeroStat({
 }
 
 export const metadata = {
-  title: "How this works · Food Safety",
+  title: "How this works · Eatelligence Food Safety",
   description:
     "How the risk score works: what it predicts, what the model looks at, how it's tested, why a score is what it is, and its limits.",
 };
+
+// Chicago's model inputs, grouped for "What the model looks at". Counts are from
+// ALL_FEATURES in foodsafety.models.baseline (36) and sum to it.
+const CHICAGO_FEATURE_GROUPS: FeatureGroup[] = [
+  {
+    name: "Prior history",
+    count: 8,
+    detail:
+      "counts of inspections, failures, priority and core violations across the establishment's full prior record, plus near-miss and visit-trigger history (Pass w/ Conditions, re-inspections, complaint visits)",
+  },
+  {
+    name: "Recency & trend",
+    count: 7,
+    detail:
+      "days since the last inspection and last failure, the previous inspection's outcome and priority-violation count, the priority-violation trend, and 365-day rolling failure and violation counts, so the model can see an establishment improving and not just its lifetime totals",
+  },
+  {
+    name: "Current inspection outcome",
+    count: 3,
+    detail:
+      "whether this visit was a Fail, and its priority and core violation counts: the model's strongest near-term signal",
+  },
+  {
+    name: "Static facility",
+    count: 4,
+    detail:
+      "Chicago's own Risk 1/2/3 classification (a model input, not the output risk bands above), license age and history, and the scheduled visit trigger. ZIP and facility type were dropped as geographic/business-type proxies (see limitations)",
+  },
+  {
+    name: "Violation keywords",
+    count: 12,
+    detail:
+      "regex flags on prior violation text (temperature, cooling, raw food, cross-contamination, expired, rodent, pest, no soap, no paper towels, handwash sink, sewage, certified manager)",
+  },
+  {
+    name: "Calendar",
+    count: 2,
+    detail:
+      "month and quarter (year is excluded: it doesn't generalise across the chronological train/test split)",
+  },
+];
 
 export default async function HowItWorksPage() {
   const methodology = await loadMethodology();
@@ -180,6 +239,20 @@ export default async function HowItWorksPage() {
       })()
     : null;
 
+  // Model-card provenance — the served model, when its metrics were last built,
+  // and the test window — read from methodology.json so the card can never drift
+  // from the numbers rendered above it. ISO date sliced to YYYY-MM-DD (the JSON
+  // stores a UTC timestamp) to avoid any locale/hydration formatting surprises.
+  const modelVersion = methodology.model_version || null;
+  const modelType = modelVersion
+    ? (MODEL_TYPE_LABELS[modelVersion] ?? modelVersion)
+    : null;
+  const metricsDate = methodology.generated_at
+    ? methodology.generated_at.slice(0, 10)
+    : null;
+  const testFrom = methodology.test.split_from || null;
+  const testN = methodology.test.n || null;
+
   return (
     <>
       <SiteHeader activeNav="how" />
@@ -189,63 +262,37 @@ export default async function HowItWorksPage() {
           residual overhang from intrinsic-width content (operating-points table)
           without clipping text. Desktop keeps the 820 reading cap. */}
       <main className="w-full max-w-full lg:max-w-[820px] overflow-x-clip mx-auto px-8 pt-10 pb-24 flex-1">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-xs text-teal hover:underline"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={2.5} />
-          Back to search
-        </Link>
+        {/* Back link lives outside CityGate so Chicago, NYC, and LA all get it
+            (each city's methodology subtree starts at its own hero). */}
+        <BackToSearch className="inline-flex items-center gap-2 text-xs text-teal hover:underline" />
 
-        {/* Hero band — a soft diagonal wash (cream → white) with a faint sage
-            glow lifts the page out of plain-document territory while staying in
-            the muted Clinical Quiet palette. The headline metrics sit here as
-            stat cards so the page leads with what the model actually does. */}
-        <header
-          className="relative mt-6 overflow-hidden rounded-3xl border border-line p-7 sm:p-10 soft-shadow"
-          style={{
-            background:
-              "linear-gradient(135deg, #EFE9DC 0%, #F6F1E9 48%, #FFFFFF 100%)",
-          }}
-        >
-          <div
-            aria-hidden
-            className="pointer-events-none absolute -top-24 -right-20 w-72 h-72 rounded-full blur-3xl"
-            style={{ background: "rgba(122, 143, 106, 0.16)" }}
-          />
-          <div className="relative">
-            <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-              Methodology
-            </p>
-            <h1 className="text-5xl font-light leading-[1.05] tracking-tight">
-              How this <span className="serif italic text-teal">works</span>
-            </h1>
-            <p className="text-lg text-muted leading-[1.65] mt-5 max-w-[58ch]">
-              A gradient-boosted decision-tree model (XGBoost) fit on six years
-              of Chicago inspection history. The score is a calibrated
-              probability that a food establishment will fail an inspection or be
-              cited for a priority violation in the next 180 days.
-            </p>
-
-            <dl className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <CityGate nyc={<HowItWorksNyc />} la={<HowItWorksLa />}>
+        {/* Hero band — the shared MethodologyHero card (soft cream→white wash +
+            faint sage glow), so Chicago, NYC, and LA open identically. The
+            headline metrics sit here as stat cards so the page leads with what
+            the model actually does. */}
+        <MethodologyHero
+          eyebrow="Methodology · Chicago"
+          title={<>How this <span className="serif italic text-teal">works</span></>}
+          stats={
+            <>
               <HeroStat
                 value={`${methodology.headline.top_decile_lift.toFixed(1)}×`}
                 label="more hits than random, working the top 10% by risk"
                 accent
               />
               <HeroStat
-                value={top20 ? `${Math.round(top20.recall * 100)}%` : "—"}
-                label="of next-180-day events caught in the top 20%"
+                value={methodology.headline.roc_auc.toFixed(2)}
+                label="ROC-AUC: ranks venues headed for a fail or priority citation above those that won't"
               />
-              <HeroStat
-                value={methodology.headline.pr_auc.toFixed(2)}
-                label={`precision–recall AUC, vs a ${Math.round(
-                  methodology.test.prevalence * 100,
-                )}% base rate`}
-              />
-            </dl>
-          </div>
-        </header>
+            </>
+          }
+        >
+          A gradient-boosted decision-tree model (XGBoost) fit on six years
+          of Chicago inspection history. The score is a calibrated
+          probability that a food establishment will fail an inspection or be
+          cited for a priority violation in the next 180 days.
+        </MethodologyHero>
 
         {/* Sticky jump-nav — lets a reader skip to any part without scrolling
             the whole methodology. Plain anchors (server component); deep-links
@@ -274,10 +321,16 @@ export default async function HowItWorksPage() {
             How well it works
           </a>
           <a
-            href="#limits"
+            href="#model-card"
             className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
           >
-            Limits
+            Model card
+          </a>
+          <a
+            href="#data-governance"
+            className="px-2.5 py-1 rounded-full text-muted hover:text-ink hover:bg-tint transition-colors"
+          >
+            Data governance
           </a>
           <a
             href="#reference"
@@ -296,7 +349,7 @@ export default async function HowItWorksPage() {
               How to read a score
             </h2>
             <p className="text-md text-muted leading-relaxed mt-2">
-              Every establishment gets one number — a calibrated probability,
+              Every establishment gets one number: a calibrated probability,
               shown as a percentage, that it fails an inspection or draws a
               priority violation in the next 180 days. &ldquo;Calibrated&rdquo;
               means the number is honest about its own odds: across the
@@ -305,12 +358,12 @@ export default async function HowItWorksPage() {
               risk band and a recent trend. Each score is anchored to the
               establishment&apos;s{" "}
               <span className="font-medium text-ink/80">most recent inspection on
-              file</span>{" "}— its{" "}
+              file</span>, its{" "}
               <span className="font-medium text-ink/80">current inspection</span>. The
               score is the risk{" "}
               <span className="font-medium text-ink/80">as of that date</span>{" "}
               (shown next to &ldquo;Last inspected&rdquo; on the detail page), not a
-              fixed window — so an establishment inspected long ago shows older data
+              fixed window, so an establishment inspected long ago shows older data
               throughout, not a fresh reading.
             </p>
 
@@ -318,7 +371,7 @@ export default async function HowItWorksPage() {
               Risk bands
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
-              The percentage is bucketed into four bands — the coloured badges on
+              The percentage is bucketed into four bands, the coloured badges on
               the map, list, and detail pages. These are the model&apos;s{" "}
               <span className="font-medium text-ink/80">output</span>{" "}bands;
               don&apos;t confuse them with Chicago&apos;s own Risk 1/2/3
@@ -361,7 +414,7 @@ export default async function HowItWorksPage() {
             )}
             <p className="text-xs text-muted leading-relaxed mt-3">
               Bands are fixed cutoffs on the predicted probability, set once
-              (decision record 0008) — they don&apos;t shift per establishment.
+              (decision record 0008). They don&apos;t shift per establishment.
               &ldquo;Share&rdquo; is the portion of all scored establishments in
               each band: real scores cluster low, so most sit in Low or Moderate
               and only the small Elevated / High slice is the signal worth acting
@@ -380,39 +433,43 @@ export default async function HowItWorksPage() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-7 gap-y-2 text-sm text-ink/85">
               <span className="inline-flex items-center gap-2">
-                <TrendIndicator slope={-0.01} /> — risk falling
+                <TrendIndicator slope={-0.01} />, risk falling
               </span>
               <span className="inline-flex items-center gap-2">
-                <TrendIndicator slope={0.01} /> — risk rising
+                <TrendIndicator slope={0.01} />, risk rising
               </span>
               <span className="inline-flex items-center gap-2">
-                <TrendIndicator slope={0} /> — little change
+                <TrendIndicator slope={0} />, little change
               </span>
             </div>
             <p className="text-sm text-muted leading-relaxed mt-3">
-              On the detail page this becomes a small chart. Each dot is a{" "}
-              <span className="font-medium text-ink/80">predicted</span>{" "}risk — the
-              model&apos;s 180-day-forward estimate{" "}
+              On the detail page this becomes a small chart. Each dot is the{" "}
+              <span className="font-medium text-ink/80">trend estimate</span>: the
+              forecast model&apos;s 180-day-forward read{" "}
               <span className="font-medium text-ink/80">as of that inspection&apos;s
-              date</span>, from 0 to 1, not the pass/fail result (that&apos;s in the
-              inspection list below). Hover a dot for its date and value. A 2019 dot
-              is what the model would have estimated back in 2019, not a guess made
-              in hindsight. Only inspections the model can score appear — 2019
-              onward, each with a usable result, up to the five most recent — so a
-              place may show just two or three dots.
+              date</span>, from 0 to 100, with that visit&apos;s own result removed
+              (the pass/fail is in the inspection list below). Hover a dot for its
+              date and value. A dashed line marks the headline{" "}
+              <span className="font-medium text-ink/80">risk score</span>; because
+              that score counts the latest inspection&apos;s result and the trend
+              does not, the last dot can sit above or below it. A 2019 dot is what
+              the model would have estimated back in 2019, not a guess made in
+              hindsight. Only inspections the model can score appear: 2019 onward,
+              each with a usable result, up to the five most recent, so a place may
+              show just two or three dots.
             </p>
             <p className="text-sm text-muted leading-relaxed mt-2">
               The score and the trend come from{" "}
               <span className="font-medium text-ink/80">two related models</span>.
               The headline score{" "}
               <span className="font-medium text-ink/80">uses the current
-              inspection&apos;s own outcome</span>{" "}— whether it passed that day and
-              what violations were cited — the strongest signal of near-term risk.
+              inspection&apos;s own outcome</span>{" "}(whether it passed that day and
+              what violations were cited), the strongest signal of near-term risk.
               The trend uses a separate{" "}
               <span className="font-medium text-ink/80">forecast model</span>: the
               same 180-day prediction, but trained{" "}
               <span className="font-medium text-ink/80">without</span>{" "}that outcome.
-              That sidesteps a quirk — a failed inspection triggers a required
+              That sidesteps a quirk: a failed inspection triggers a required
               re-inspection that usually passes, which would otherwise pull the score
               down and read as &quot;improving&quot; for procedural reasons. So the
               trend shows direction over time, not a second risk number.
@@ -430,7 +487,7 @@ export default async function HowItWorksPage() {
               For each inspection, we ask: in the 180 days that follow, does
               the same food establishment have either a Fail result OR a priority
               violation (Chicago codes 1–29)? Priority violations are the
-              serious tier — temperature abuse, handwashing failures,
+              serious tier: temperature abuse, handwashing failures,
               cross-contamination, sewage/plumbing issues. Pre-2019
               inspections are used only as burn-in to compute prior-history
               features, never as training labels (Chicago changed inspection
@@ -442,45 +499,23 @@ export default async function HowItWorksPage() {
             <h2 className="text-2xl font-medium tracking-tight">
               What the model looks at
             </h2>
+            <FeatureGroups total={36} groups={CHICAGO_FEATURE_GROUPS} />
+          </article>
+
+          <article>
+            <h2 className="text-2xl font-medium tracking-tight">
+              How the datasets connect
+            </h2>
             <p className="text-md text-muted leading-relaxed mt-2">
-              Thirty-six features, all built leak-free from the public record:
+              Food Inspections is the backbone: one row per inspection, keyed by the
+              establishment&apos;s license number. Business Licenses join on that same
+              license number to add license age and history. Everything else is built
+              per establishment from its own earlier inspections: every prior-history
+              and recency feature looks only at that establishment&apos;s record
+              strictly before the inspection being scored. There is no
+              cross-establishment or map-proximity join. Each place is scored from its
+              own history and the current visit.
             </p>
-            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
-              <li>
-                <span className="font-medium">Prior history</span> — counts of
-                inspections, failures, priority and core violations across the
-                food establishment&apos;s full prior record, plus near-miss and
-                visit-trigger history (Pass w/ Conditions, re-inspections,
-                complaint visits)
-              </li>
-              <li>
-                <span className="font-medium">Recency &amp; trend</span> — days
-                since the last inspection/failure, the previous inspection&apos;s
-                outcome, and 365-day rolling failure and violation counts — so
-                the model can see a food establishment improving, not just its
-              lifetime
-                totals
-              </li>
-              <li>
-                <span className="font-medium">Static facility</span> —
-                Chicago&apos;s own Risk 1/2/3 classification (a model{" "}
-                <span className="font-medium text-ink/80">input</span>, not the
-                output risk bands above), license age/history, and the scheduled
-                visit trigger. ZIP and facility type were dropped as
-                geographic/business-type proxies (see limitations)
-              </li>
-              <li>
-                <span className="font-medium">Violation keywords</span> —
-                twelve regex flags on prior violation text (temperature,
-                rodent/pest, raw food, cross-contamination, handwashing, sewage,
-                etc.)
-              </li>
-              <li>
-                <span className="font-medium">Calendar</span> — month + quarter
-                (year is excluded — it doesn&apos;t generalise across the
-                chronological train/test split)
-              </li>
-            </ul>
           </article>
 
           <article>
@@ -501,24 +536,7 @@ export default async function HowItWorksPage() {
             </p>
           </article>
 
-          <article>
-            <h2 className="text-2xl font-medium tracking-tight">
-              Tested on the future, not the past
-            </h2>
-            <p className="text-md text-muted leading-relaxed mt-2">
-              Train, validation, and test are carved by date, not shuffled. We{" "}
-              <span className="font-medium">train</span> on inspections before
-              2024-07, <span className="font-medium">calibrate</span> on
-              2024-07 → 2025-07, and <span className="font-medium">test</span>{" "}
-              on 2025-07 onward — and every feature at a given inspection is
-              computed only from data strictly before it. A random shuffle would
-              let the model peek at a food establishment&apos;s future to predict
-              its
-              past, inflating the score into a number that would never hold up
-              in production. The chronological split mirrors how the model is
-              actually used: trained on history, scored on what comes next.
-            </p>
-          </article>
+          <ChronologicalSplit windows={methodology.windows} />
 
           <SectionLabel id="how-well-it-works" number="03" icon={Target}>
             How well it works
@@ -529,97 +547,39 @@ export default async function HowItWorksPage() {
             </h2>
             <p className="text-md text-muted leading-relaxed mt-2">
               Inspectors are capacity-limited, so the score is really a ranked
-              work-list. The honest read isn&apos;t a single number — it&apos;s
+              work-list. The honest read isn&apos;t a single number. It&apos;s
               how much of the real risk you catch at the slice you can actually
               staff:
             </p>
-            <div className="mt-4 rounded-2xl border border-line bg-card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="text-left text-sage text-xs tracking-[0.08em] uppercase border-b border-line bg-tint/40">
-                      <th className="py-2.5 px-4 font-medium">Inspect top</th>
-                      <th className="py-2.5 px-4 font-medium">Establishments</th>
-                      <th className="py-2.5 px-4 font-medium">Precision</th>
-                      <th className="py-2.5 px-4 font-medium">Events caught</th>
-                      <th className="py-2.5 px-4 font-medium">Lift</th>
-                    </tr>
-                  </thead>
-                  <tbody className="num text-ink/85">
-                    {methodology.operating_points.map((p) => (
-                      <tr
-                        key={p.frac}
-                        className="border-b border-line last:border-b-0"
-                      >
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.frac * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {p.n_flagged.toLocaleString()}
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.precision * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">
-                          {Math.round(p.recall * 100)}%
-                        </td>
-                        <td className="py-2.5 px-4">{p.lift.toFixed(1)}×</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <OperatingPointsTable ops={methodology.operating_points} />
             <p className="text-xs text-muted leading-relaxed mt-3">
               Working the top 20% by risk surfaces{" "}
               {top20 ? Math.round(top20.recall * 100) : 54}% of the next-180-day
-              events — {top20 ? top20.lift.toFixed(1) : "2.7"}× better than
+              events, {top20 ? top20.lift.toFixed(1) : "2.7"}× better than
               inspecting a random 20%. Baseline model, time-held-out test from{" "}
               {methodology.test.split_from || "2025-07-01"} onward (n ≈{" "}
               {methodology.test.n
-                ? methodology.test.n.toLocaleString()
+                ? methodology.test.n.toLocaleString("en-US")
                 : "7,000"}{" "}
               inspections, {Math.round(methodology.test.prevalence * 100) || 11}%
               with an event). &ldquo;Lift&rdquo; is precision divided by that
               base rate.
             </p>
 
-            <div className="mt-5 rounded-md bg-tint/60 px-4 py-3 text-sm leading-relaxed text-ink/85">
-              <p className="font-medium mb-1.5">
-                Reading the two tightest slices
-              </p>
-              <ul className="space-y-1.5 list-disc pl-5">
-                <li>
-                  <span className="font-medium">Top 5%</span>
-                  {top5
-                    ? ` (~${top5.n_flagged.toLocaleString()} food establishments): about ${Math.round(
-                        top5.precision * 100,
-                      )}% of those visits find a real problem — ${top5.lift.toFixed(
-                        1,
-                      )}× better than picking at random — and that sliver alone covers ${Math.round(
-                        top5.recall * 100,
-                      )}% of every problem city-wide.`
-                    : " — run the metrics pipeline to populate."}
-                </li>
-                <li>
-                  <span className="font-medium">Top 10%</span>
-                  {top10
-                    ? ` (~${top10.n_flagged.toLocaleString()} food establishments): roughly ${Math.round(
-                        top10.precision * 100,
-                      )}% of visits find a problem (${top10.lift.toFixed(
-                        1,
-                      )}× random), catching about ${Math.round(
-                        top10.recall * 100,
-                      )}% of all problems.`
-                    : ""}
-                </li>
-              </ul>
-              <p className="mt-2 text-xs text-muted">
-                The tighter the slice, the higher the hit-rate but the fewer
-                problems you cover — that&apos;s the precision/recall trade an
-                inspection team tunes to its capacity.
-              </p>
-            </div>
+            <p className="text-md text-muted leading-relaxed mt-4">
+              These are also the two numbers we{" "}
+              <span className="text-ink/85">select</span> the model on:{" "}
+              <span className="text-ink/85">PR-AUC</span> and{" "}
+              <span className="text-ink/85">precision in the top 10%</span>, both
+              measured on this held-out split and required to hold up under
+              expanding-window cross-validation before a model is promoted. Lift
+              and ROC-AUC describe how well the chosen model works; these two are
+              how it was chosen.
+            </p>
+
+            <TightestSlices top5={top5} top10={top10} unit="food establishments" />
+
+            <EvaluationDetail windows={methodology.windows} />
           </article>
 
           <article>
@@ -627,7 +587,7 @@ export default async function HowItWorksPage() {
               Why a score is what it is
             </h2>
             <p className="text-md text-muted leading-relaxed mt-2">
-              Per-establishment SHAP attribution — log-odds contributions from
+              Per-establishment SHAP attribution: log-odds contributions from
               each feature, summed to recover the model&apos;s logit. The detail
               page surfaces the top drivers, signed so positive contributions
               push risk up and negative contributions push it down.
@@ -641,7 +601,7 @@ export default async function HowItWorksPage() {
             </h3>
             <p className="text-sm text-muted leading-relaxed mt-1.5">
               Averaged across every establishment in the test set, this is how
-              much each feature moves the prediction — the mean size of its
+              much each feature moves the prediction: the mean size of its
               log-odds contribution. It says nothing about direction; that&apos;s
               per-establishment.
             </p>
@@ -676,8 +636,8 @@ export default async function HowItWorksPage() {
               </p>
             )}
             <p className="text-xs text-muted leading-relaxed mt-3">
-              Each number is the <span className="font-medium">mean |log-odds|</span>{" "}
-              — the feature&apos;s average influence on the model&apos;s internal
+              Each number is the <span className="font-medium">mean |log-odds|</span>:{" "}
+              the feature&apos;s average influence on the model&apos;s internal
               score, counted in either direction. It&apos;s a relative scale
               (bigger = more sway), not a probability or a percentage.
             </p>
@@ -694,8 +654,8 @@ export default async function HowItWorksPage() {
             <p className="text-sm text-muted leading-relaxed mt-1.5">
               For one (anonymised) establishment, here is how the score is built.
               The rows are in{" "}
-              <span className="font-medium text-ink/80">calibrated log-odds</span>{" "}
-              — the model&apos;s internal additive scale (a running sum, not a
+              <span className="font-medium text-ink/80">calibrated log-odds</span>:{" "}
+              the model&apos;s internal additive scale (a running sum, not a
               percentage), adjusted so the total lands on the real-world
               probability. So the base, the drivers, and everything else add up to
               one number, which a sigmoid then turns into the % on the gauge.
@@ -736,19 +696,226 @@ export default async function HowItWorksPage() {
             )}
             <p className="text-xs text-muted leading-relaxed mt-3">
               A positive number pushes risk up; a negative number pulls it down.
-              The detail page shows the same drivers as bars — this page shows
+              The detail page shows the same drivers as bars. This page shows
               the arithmetic behind a single score.
             </p>
           </article>
 
-          <SectionLabel id="limits" number="04" icon={TriangleAlert}>
-            Limits
+          <SectionLabel id="model-card" number="04" icon={ClipboardList}>
+            Model card
           </SectionLabel>
           <article>
             <h2 className="text-2xl font-medium tracking-tight">
-              What it doesn&apos;t do
+              What this model is for
             </h2>
-            <ul className="text-md leading-relaxed mt-3 space-y-2 list-disc pl-5 text-ink/85">
+            <p className="text-md text-muted leading-relaxed mt-2">
+              A model card gathers, in one place, who the model is for, how it was
+              tested, where it falls short, and how it&apos;s kept up to date. The
+              points below restate and link to the fuller detail elsewhere on this
+              page. It covers <span className="font-medium text-ink/80">two
+              models</span>: the risk score and a separate trend forecast,
+              introduced just below.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              The two models
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The product ships two models, trained together. One produces the
+              headline score; the other drives the trend.
+            </p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 1 · Risk score
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  The headline percentage: the chance of a Fail or priority
+                  violation in the next 180 days. It uses the current
+                  inspection&apos;s own outcome, the strongest near-term signal. The
+                  model details and evaluation on this card describe this model.
+                </p>
+              </div>
+              <div className="rounded-2xl border border-line bg-card p-4">
+                <p className="text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Model 2 · Trend forecast
+                </p>
+                <p className="text-sm text-muted leading-relaxed mt-2">
+                  Drives the trend arrow and chart. It predicts the same 180-day
+                  risk but <span className="font-medium text-ink/80">ignores the
+                  current inspection&apos;s own pass/fail</span>, so a failed visit
+                  and its mandated re-inspection don&apos;t read as a swing. It is
+                  used only to show direction over time; it never sets the risk
+                  score.
+                </p>
+              </div>
+            </div>
+
+            {/* Provenance strip — the served risk-score model's type, when its
+                metrics were built, and the test window, read from methodology.json
+                so the card can't drift from the numbers above it. The internal
+                model slug is mapped to a human label via MODEL_TYPE_LABELS. */}
+            {(modelType || metricsDate || testFrom) && (
+              <>
+                <p className="mt-6 text-xs uppercase tracking-[0.08em] text-sage font-medium">
+                  Risk-score model
+                </p>
+                <dl className="mt-2 rounded-2xl border border-line bg-card overflow-hidden text-sm">
+                  {modelType && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Model type</dt>
+                      <dd className="text-ink/85">{modelType}</dd>
+                    </div>
+                  )}
+                  {metricsDate && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Metrics generated</dt>
+                      <dd className="num text-ink/85">{metricsDate}</dd>
+                    </div>
+                  )}
+                  {testFrom && (
+                    <div className="flex items-center justify-between gap-4 px-4 py-2.5 border-b border-line last:border-b-0">
+                      <dt className="text-muted">Tested on</dt>
+                      <dd className="num text-ink/85">
+                        inspections from {testFrom} onward
+                        {testN ? ` (n ${testN.toLocaleString("en-US")})` : ""}
+                      </dd>
+                    </div>
+                  )}
+                </dl>
+              </>
+            )}
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              Intended users
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The model is built for the people who plan food-safety inspections:
+              a public-health department or inspection team deciding where limited
+              inspector time should go. The web app opens the same signal to the
+              public for transparency, but the model is designed as decision
+              support for inspection planning, not a consumer safety rating.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Intended use
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Prioritisation. The score ranks food establishments by their risk of
+              failing an inspection or drawing a priority violation in the next 180
+              days, so a capacity-limited team can work the riskiest places first.
+              It is a triage signal that routes a human inspector. The value is in
+              the ranking, not in any single establishment&apos;s number.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Out-of-scope uses
+            </h3>
+            <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85">
+              <li>
+                <span className="font-medium">Not a verdict.</span> A high score is
+                not a finding that an establishment is unsafe or dirty. Most
+                flagged places do not actually have an event in the window.
+              </li>
+              <li>
+                <span className="font-medium">Not an enforcement or licensing
+                input.</span> It should not be used on its own to fine, close, deny
+                a licence, or otherwise penalise a business without a human
+                inspection.
+              </li>
+              <li>
+                <span className="font-medium">Not a live diner guarantee.</span> It
+                does not tell a diner whether a specific meal is safe right now.
+              </li>
+              <li>
+                <span className="font-medium">Not another city.</span> It is trained
+                only on Chicago data and is not validated anywhere else.
+              </li>
+              <li>
+                <span className="font-medium">Not automated action.</span> No
+                decision should be taken from the score without a person in the
+                loop.
+              </li>
+            </ul>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              How the models are evaluated
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The <span className="font-medium text-ink/80">risk score</span> is
+              measured on a time-held-out test set, never a random shuffle: the
+              model is trained on the earliest inspections, calibrated on a later
+              held-out slice, and tested on the most recent window ({testFrom ||
+              "2025-07-01"} onward), with every feature computed only from data
+              strictly before the inspection it describes.
+              We report ranked-work-list metrics at the operating points a team
+              would actually staff (precision, coverage, and lift by top-K)
+              rather than one headline number, and a retrained model is promoted
+              only if it holds up on <span className="font-medium">both</span>{" "}
+              precision–recall and ROC area, not just one. The full table and a
+              worked example are under{" "}
+              <a href="#how-well-it-works" className="text-teal hover:underline">
+                How well it works
+              </a>
+              .
+            </p>
+
+            <p className="text-sm text-muted leading-relaxed mt-2">
+              The <span className="font-medium text-ink/80">trend forecast</span> is
+              judged differently: as direction over time, not a second risk number.
+              We publish it for coverage and transparency, but the loose{" "}
+              <span className="font-medium text-ink/80">improving / worsening /
+              stable</span> direction is descriptive: on its own it barely beats
+              chance. Only a strict slice (steeply rising{" "}
+              <span className="font-medium text-ink/80">and</span> currently clean)
+              carries a real forward signal, and that slice is treated as an
+              early-warning watch-list, never a verdict. How it reads on the page is
+              under{" "}
+              <a href="#recent-trend" className="text-teal hover:underline">
+                The recent trend
+              </a>
+              .
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Fairness testing
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Group performance is checked across facility type and ZIP (precision,
+              coverage, and ranking quality per group) and the known proxy features
+              were removed: ZIP and facility type were dropped so the model keys on
+              an establishment&apos;s own conduct, not who-lives-where. Demographic
+              data is used only to audit disparate impact, never as a model input.
+            </p>
+            <p className="text-sm text-muted leading-relaxed mt-3">
+              The full demographic disparate-impact audit has now been run for all
+              three cities. Neighborhood demographics are matched to each
+              establishment <span className="font-medium text-ink/80">after</span>{" "}
+              the model has scored it, and every group is then checked three ways:
+              whether it gets flagged more often, whether the model&apos;s false
+              alarms and missed risks differ, and whether its risk scores are equally
+              accurate. Almost every difference shows up only on the first check,
+              which is what you expect wherever groups genuinely fail inspections at
+              different rates. Two results did not, and both were then tested rather
+              than assumed. In New York, several cuisines get risk scores that are
+              measurably off, and most of those are{" "}
+              <span className="font-medium text-ink/80">under</span>-scored, meaning
+              they read safer than they turn out to be. In Los Angeles, the rate of
+              false alarms (flagged as high risk but no problem found) varies by area
+              by more than chance would produce. Both are open, and we are treating
+              them as real rather than as measurement quirks. Residual risks (a
+              detection feedback loop in the prior-history and current-outcome
+              signals, geographic miscalibration where history is sparse, and unstable
+              metrics for very small groups) stay documented.
+            </p>
+
+            <h3
+              id="limits"
+              className="scroll-mt-24 text-lg font-medium tracking-tight mt-6"
+            >
+              Limitations
+            </h3>
+            <ul className="text-sm leading-relaxed mt-2 space-y-2 list-disc pl-5 text-ink/85">
               <li>
                 Only six years of training data. The model can&apos;t recognise
                 patterns that pre-date 2019.
@@ -759,22 +926,124 @@ export default async function HowItWorksPage() {
                 diners experience.
               </li>
               <li>
-                No establishment-level traffic or revenue data — the score
+                No establishment-level traffic or revenue data: the score
                 doesn&apos;t adjust for kitchen volume.
               </li>
               <li>
-                Group performance is audited across facility type and ZIP —
+                Group performance is audited across facility type and ZIP:
                 per-group precision, coverage, and ranking quality. No systematic
                 unfairness shows up on the coverage lens, though a few small,
                 low-event groups dip on the strictest ranking metric (a base-rate
-                artifact, not bias). The fuller demographic disparate-impact audit
-                — joining census data — is deferred to a later phase, so expect
-                uneven calibration where training history is sparse.
+                artifact, not bias). The demographic disparate-impact audit has
+                since been completed for all three cities, with two open follow-ups
+                (see Fairness testing above); calibration can still be uneven where
+                training history is sparse.
               </li>
             </ul>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Retraining policy
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Both models are retrained together, on demand (when new data or a
+              feature change warrants it), not on a fixed automatic schedule; there
+              is no live or streaming update. Each training run is tied to the exact code that
+              produced it (its commit is recorded with the run), and a retrained
+              model replaces the served one only after it clears the promotion gate
+              on the held-out test set. Saved model files are versioned and never
+              overwritten, so any published score set can be traced back to the
+              model and data that produced it. The risk-score model&apos;s type and
+              the date its metrics were generated are shown at the top of this card.
+            </p>
           </article>
 
-          <SectionLabel id="reference" number="05" icon={BookMarked}>
+          <SectionLabel id="data-governance" number="05" icon={ShieldCheck}>
+            Data governance
+          </SectionLabel>
+          <article>
+            <h2 className="text-2xl font-medium tracking-tight">
+              Where the data comes from and how it&apos;s handled
+            </h2>
+            <p className="text-md text-muted leading-relaxed mt-2">
+              Every input is a public record from the Chicago Open Data portal.
+              The app itself collects nothing from the people who visit it (no
+              accounts, no login, no personal data), so the governance questions
+              below are mostly about public business records, not private user
+              data.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-8">
+              Data sources &amp; retention
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The inputs are Chicago&apos;s public Food Inspections and Business
+              Licenses datasets. We keep a cached copy of
+              the fields needed to build features and scores for as long as the
+              product is maintained; it is refreshed in place rather than kept as a
+              growing archive of dated snapshots. Because no visitor data is
+              gathered, there is no personal information to retain.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Deletion policy
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The app stores no visitor or user data, so there is nothing personal
+              to delete. The establishment records it shows are public
+              business-inspection records, not ours to erase; they mirror the
+              city&apos;s source and change only when the city&apos;s record
+              changes. Cached working files and each published score set can be
+              regenerated from scratch from the public source at any time, and each
+              publish replaces the previous served score file rather than keeping a
+              back-history.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Storage &amp; security
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Scores are published as static JSON and served through a
+              content-delivery network. The website is read-only static pages with
+              no login and no server-side database, and it never runs the model on a
+              page load: it only ever reads the pre-computed JSON (the
+              batch-score-to-JSON contract). Source and working data sit in a
+              private cloud-storage bucket that is not publicly readable or
+              writable; access is limited to the project team&apos;s own
+              credentials. Because the site holds no user data and does no live
+              computation, its exposure surface is a set of public-record JSON
+              files.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Handling of updated source data
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              Chicago updates its inspection and licence records continuously:
+              new inspections, late-arriving results, and corrections to old ones.
+              We do not read the city&apos;s feed live; instead we re-pull it and
+              re-score in a batch job, then publish a fresh JSON. The scores you see
+              are a snapshot as of the last publish (the detail page shows each
+              establishment&apos;s &ldquo;as of&rdquo; date), not a live reading.
+              When the city corrects or adds a record, the next batch run picks it
+              up; the ingest resumes from where it left off rather than re-pulling
+              the whole history.
+            </p>
+
+            <h3 className="text-lg font-medium tracking-tight mt-6">
+              Use and retention of location data
+            </h3>
+            <p className="text-sm text-muted leading-relaxed mt-1.5">
+              The only location data is the establishment&apos;s own address and map
+              coordinates, taken straight from the public inspection record: it
+              locates a business, not a person. We use it to place the establishment
+              on the map and include it in the published JSON. The app never asks
+              for, collects, or stores a visitor&apos;s location: there is no
+              geolocation prompt and no device tracking. Establishment coordinates
+              are retained on the same terms as the rest of the public record.
+            </p>
+          </article>
+
+          <SectionLabel id="reference" number="06" icon={BookMarked}>
             Reference
           </SectionLabel>
           <article id="definitions">
@@ -786,24 +1055,44 @@ export default async function HowItWorksPage() {
               inspection history.
             </p>
             <dl className="mt-4 space-y-4">
-              {GLOSSARY_ORDER.map((key) => {
-                const entry = GLOSSARY[key];
-                return (
-                  <div
-                    key={entry.id}
-                    id={entry.id}
-                    className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
-                  >
-                    <dt className="font-medium text-ink">{entry.term}</dt>
-                    <dd className="text-sm text-muted leading-relaxed mt-1">
-                      {entry.short}
-                    </dd>
-                  </div>
-                );
-              })}
+              {glossaryFor("chicago").map((entry) => (
+                <div
+                  key={entry.id}
+                  id={entry.id}
+                  className="scroll-mt-24 rounded-2xl border border-line bg-card p-4"
+                >
+                  <dt className="font-medium text-ink">{entry.term}</dt>
+                  <dd className="text-sm text-muted leading-relaxed mt-1">
+                    {entry.short}
+                  </dd>
+                </div>
+              ))}
             </dl>
           </article>
         </section>
+        </CityGate>
+
+        {/* Feedback CTA — readers who reach the end of the methodology are the
+            most engaged, so invite a note here alongside the footer link.
+            Outside CityGate so both Chicago and NYC readers see it. */}
+        <aside className="mt-12 rounded-3xl border border-line bg-tint p-7 flex flex-col sm:flex-row sm:items-center gap-5 justify-between">
+          <div>
+            <h2 className="text-xl font-medium tracking-tight">
+              Was this useful?
+            </h2>
+            <p className="text-sm text-muted leading-relaxed mt-1.5 max-w-[52ch]">
+              If something here is wrong, unclear, or missing, tell us. It goes
+              straight to the team.
+            </p>
+          </div>
+          <Link
+            href="/feedback?source=how-it-works"
+            className="shrink-0 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-ink text-cream text-base font-medium hover:bg-teal transition-colors min-h-[44px]"
+          >
+            <MessageSquarePlus className="w-4 h-4" strokeWidth={2} />
+            Give feedback
+          </Link>
+        </aside>
       </main>
 
       <SiteFooter />

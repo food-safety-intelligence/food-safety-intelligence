@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import re
 import sys
+import time
 
 # ---------------------------------------------------------------------------
 # Path setup — add tool dirs so handler.py files import their siblings.
@@ -30,8 +32,11 @@ for _tool in [
     "find_restaurants",
     "get_safety_score",
     "explain_restaurant",
+    "look_up_establishment",
     "find_reviews",
+    "find_inspection_records",
     "food_safety_info",
+    "visualize_data",
 ]:
     _p = os.path.join(_HERE, "tools", _tool)
     if _p not in sys.path:
@@ -42,10 +47,42 @@ for _tool in [
 # ---------------------------------------------------------------------------
 os.environ.setdefault("SCORES_JSON_PATH", "/tmp/scores.json")
 os.environ.setdefault("HISTORY_JSON_PATH", "/tmp/inspection_history.json")
+# NYC (multi-city, DR 0016) — a second city under the nyc/ S3 prefix.
+os.environ.setdefault("SCORES_JSON_PATH_NYC", "/tmp/nyc_scores.json")
+os.environ.setdefault("HISTORY_JSON_PATH_NYC", "/tmp/nyc_inspection_history.json")
+# LA (multi-city, DR 0016) — a third city under the la/ S3 prefix.
+os.environ.setdefault("SCORES_JSON_PATH_LA", "/tmp/la_scores.json")
+os.environ.setdefault("HISTORY_JSON_PATH_LA", "/tmp/la_inspection_history.json")
 os.environ.setdefault("SAGEMAKER_USE_STUB", "true")
 os.environ.setdefault("AWS_REGION", "us-east-1")
 os.environ.setdefault("DATA_BUCKET", "food-safety-intelligence-data")
 os.environ.setdefault("DATA_PREFIX", "web-app-data")
+
+# The selected city rides through one request via a contextvar: the frontend
+# tags the query, invoke() sets it, and the @tool wrappers pass it to handlers
+# (the LLM never chooses the city). Defaults to Chicago.
+import contextvars  # noqa: E402
+
+import city_context  # noqa: E402 — shared per-city framing (see run_local.py too)
+
+_ACTIVE_CITY: contextvars.ContextVar[str] = contextvars.ContextVar("active_city", default="chicago")
+
+# Chart blocks generated during ONE request. The visualize_data wrapper appends
+# each block here; invoke() guarantees they land in the reply text even if the
+# model omitted them (see merge_chart_blocks). Per-request via contextvar so
+# concurrent invocations stay isolated; invoke() sets a fresh list each request.
+_PENDING_CHARTS: contextvars.ContextVar = contextvars.ContextVar("pending_charts", default=None)
+
+# Wall-clock budget for ALL chart generation in ONE request. The whole reply must
+# land inside the gateway's ~60s ceiling (ALB idle / CloudFront origin timeout), and
+# the model may call visualize_data more than once (it is told it may retry a broken
+# snippet). Capping each call individually is not enough — two capped calls still
+# overrun — so invoke() sets a deadline and the wrapper spends against it.
+_CHART_BUDGET_S = float(os.environ.get("FSI_CHART_REQUEST_BUDGET_SECONDS", "35"))
+# Below this much remaining, a fresh sandbox run can't finish; refuse instead of
+# starting one we know will time out.
+_CHART_MIN_RUN_S = 8.0
+_CHART_DEADLINE: contextvars.ContextVar = contextvars.ContextVar("chart_deadline", default=None)
 
 # ---------------------------------------------------------------------------
 # Cold-start data warm-up — downloads from S3 once per container lifetime.
@@ -59,15 +96,32 @@ def _warm_data_files() -> None:
     prefix = os.environ["DATA_PREFIX"]
     s3 = boto3.client("s3", region_name=os.environ["AWS_REGION"])
 
-    files = {
+    # Chicago is required; the extra cities (nyc/, la/ prefixes) are best-effort so
+    # the agent still serves Chicago if a city's data hasn't been published to S3
+    # yet — that city's lookup then finds no scores and the tool returns "no
+    # record" (DR 0010), rather than failing the whole request.
+    required = {
         os.environ["SCORES_JSON_PATH"]: f"{prefix}/scores.json",
         os.environ["HISTORY_JSON_PATH"]: f"{prefix}/inspection_history.json",
     }
-    for local_path, s3_key in files.items():
+    optional = {
+        os.environ["SCORES_JSON_PATH_NYC"]: f"{prefix}/nyc/scores.json",
+        os.environ["HISTORY_JSON_PATH_NYC"]: f"{prefix}/nyc/inspection_history.json",
+        os.environ["SCORES_JSON_PATH_LA"]: f"{prefix}/la/scores.json",
+        os.environ["HISTORY_JSON_PATH_LA"]: f"{prefix}/la/inspection_history.json",
+    }
+    for local_path, s3_key in required.items():
         if not os.path.exists(local_path):
             print(f"[warm-up] Downloading s3://{bucket}/{s3_key} → {local_path}")
             s3.download_file(bucket, s3_key, local_path)
             print(f"[warm-up] Done: {os.path.getsize(local_path):,} bytes")
+    for local_path, s3_key in optional.items():
+        if not os.path.exists(local_path):
+            try:
+                s3.download_file(bucket, s3_key, local_path)
+                print(f"[warm-up] Done ({s3_key}): {os.path.getsize(local_path):,} bytes")
+            except Exception as e:  # noqa: BLE001 — extra-city data is optional
+                print(f"[warm-up] extra-city data not available ({s3_key}): {e}")
 
 
 # NOTE: _warm_data_files() is intentionally NOT called here at import time. The
@@ -93,8 +147,11 @@ def _load_handler(tool_name: str):
 _find_handler = _load_handler("find_restaurants")
 _score_handler = _load_handler("get_safety_score")
 _explain_handler = _load_handler("explain_restaurant")
+_lookup_handler = _load_handler("look_up_establishment")
 _reviews_handler = _load_handler("find_reviews")
+_records_handler = _load_handler("find_inspection_records")
 _info_handler = _load_handler("food_safety_info")
+_viz_handler = _load_handler("visualize_data")
 
 # ---------------------------------------------------------------------------
 # Strands tool wrappers.
@@ -114,11 +171,11 @@ def find_restaurants(
     limit: int = 20,
 ) -> list:
     """
-    Find restaurants near a Chicago neighborhood or lat/lon coordinates using
-    OpenStreetMap (free, no API key). Filters by cuisine when provided.
-    ALWAYS call this first before get_safety_score.
+    Find restaurants near a neighborhood or lat/lon coordinates (in the active
+    city — see ACTIVE CITY) using OpenStreetMap (free, no API key). Filters by
+    cuisine when provided. ALWAYS call this first before get_safety_score.
     """
-    ev: dict = {"radius_km": radius_km, "limit": limit}
+    ev: dict = {"radius_km": radius_km, "limit": limit, "city": _ACTIVE_CITY.get()}
     if neighborhood:
         ev["neighborhood"] = neighborhood
     if lat and lon:
@@ -135,7 +192,7 @@ def get_safety_score(restaurants: list) -> list:
     Score restaurants using the XGBoost model (stub or real SageMaker endpoint).
     Call after find_restaurants with the full restaurant list.
     """
-    return _score_handler.handler({"restaurants": restaurants}, None)
+    return _score_handler.handler({"restaurants": restaurants, "city": _ACTIVE_CITY.get()}, None)
 
 
 @tool
@@ -144,7 +201,31 @@ def explain_restaurant(license_id: str) -> dict:
     Get full SHAP driver breakdown and inspection history for one restaurant.
     Call for the 2-3 lowest predicted-risk results.
     """
-    return _explain_handler.handler({"license_id": license_id}, None)
+    return _explain_handler.handler({"license_id": license_id, "city": _ACTIVE_CITY.get()}, None)
+
+
+@tool
+def look_up_establishment(names: list) -> list:
+    """
+    Look up one or more establishments BY NAME in the ACTIVE CITY's inspection
+    data and return each one's authoritative record (address, ZIP, facility type,
+    last inspection, risk score/tier/trend, license_id) straight from the city
+    data. Use this in general chat when the user names a place directly ("what's
+    the address of Lou Malnati's?", "compare Giordano's and Pequod's") — it does
+    NOT need find_restaurants first. Pass ALL the names in one call.
+
+    Always call this before stating any fact about a named establishment, so the
+    address and every other detail come from the data, not from memory. Each
+    result has a `status`: "matched" (use `match`), "ambiguous" (several venues
+    share the name — ask the user which, by address/neighborhood, using
+    `candidates`), or "no_inspection_record" (say there is no city record and
+    give no address or score). On a detail page where a license_id is already
+    provided, use explain_restaurant instead of this.
+
+    Args:
+        names: establishment names to look up, e.g. ["Lou Malnati's", "Pequod's"]
+    """
+    return _lookup_handler.handler({"names": names, "city": _ACTIVE_CITY.get()}, None)
 
 
 @tool
@@ -168,14 +249,58 @@ def find_reviews(name: str, address: str = "", topics: list | None = None) -> di
 
 
 @tool
+def find_inspection_records(
+    license_ids: list | None = None,
+    zip_code: str = "",
+    lat: float | None = None,
+    lon: float | None = None,
+    radius_m: float | None = None,
+) -> dict:
+    """
+    Build a link to the ACTIVE CITY's AUTHORITATIVE food-inspection records for a
+    SET of establishments — a comparison, a short list, or an area. This is the
+    city's own data (the source behind the risk score), so it needs no disclaimer.
+    Use it when the user compares/lists several places, or asks about an area, and
+    would want to see or verify the underlying city records. Returns a {url, mode,
+    note} link the user clicks through to — nothing is fetched. (Chicago and NYC
+    return a filtered grid; LA returns its county inspections page.)
+
+    Provide EXACTLY ONE filter:
+      license_ids: the establishments to compare/list. Use the license_id values
+        get_safety_score returned, and pass ONLY non-null ones (a place with no
+        inspection record has none). Preferred for named places.
+      zip_code: a ZIP in the active city, for "records in <ZIP>".
+      lat + lon + radius_m: a point and radius in metres, for "records near here".
+
+    Args:
+        license_ids: license_id strings from get_safety_score (non-null only)
+        zip_code: a ZIP in the active city (area mode)
+        lat: latitude of the area centre (with lon + radius_m)
+        lon: longitude of the area centre (with lat + radius_m)
+        radius_m: search radius in metres (with lat + lon)
+    """
+    return _records_handler.handler(
+        {
+            "license_ids": license_ids or [],
+            "zip": zip_code,
+            "lat": lat,
+            "lon": lon,
+            "radius_m": radius_m,
+            "city": _ACTIVE_CITY.get(),
+        },
+        None,
+    )
+
+
+@tool
 def food_safety_info(query: str, topics: list | None = None) -> dict:
     """
     Answer a GENERAL food-safety / foodborne-illness question (what a germ is, how
     common illness is, safe cooking temperatures, who is most at risk, how to
     prevent it) with short vetted facts AND a citation to an authoritative public
-    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or Chicago/Illinois
-    public health). Use for general questions NOT about one Chicago restaurant's
-    score. Base any statistic on the returned summary and cite the returned source
+    health source (CDC, FDA, USDA, FoodSafety.gov, WHO, NIH, or a city/state
+    public health department). Use for general questions NOT about one specific
+    restaurant's score. Base any statistic on the returned summary and cite the returned source
     links. Education, not medical advice — never use it to judge what is safe for
     someone personally.
 
@@ -183,7 +308,98 @@ def food_safety_info(query: str, topics: list | None = None) -> dict:
         query: The user's general food-safety question, passed through verbatim
         topics: Optional explicit subset of topic keys; omit to match on the query
     """
-    return _info_handler.handler({"query": query, "topics": topics or []}, None)
+    return _info_handler.handler(
+        {"query": query, "topics": topics or [], "city": _ACTIVE_CITY.get()}, None
+    )
+
+
+@tool
+def visualize_data(code: str, title: str) -> dict:
+    """
+    Make a chart from the ACTIVE CITY's precomputed food-safety data by writing
+    short pandas + matplotlib code that this tool runs in a secure sandbox. Use it
+    when the user asks to chart / plot / graph / visualize / show a distribution or
+    breakdown of the data: risk scores, risk tiers, trend direction, SHAP driver
+    contributions, or the most common drivers, filtered / sorted / aggregated any
+    way they ask. Only for the ACTIVE CITY's own food-safety data — decline other
+    subjects as usual. Do NOT paste code into your chat reply; pass it here.
+
+    A DataFrame `df` is already loaded (one row per establishment). Use ONLY the
+    columns below, and NEVER invent one — anything else raises KeyError.
+
+    Always present:
+      license_id, dba_name, as_of_date, zip,
+      risk_score (0-1), risk_tier ("Low"|"Moderate"|"Elevated"|"High"),
+      trend_slope (>0 worsening, <0 improving, stable within +/-0.0003),
+      top_driver (dominant SHAP feature name), top_driver_shap (its contribution),
+      top_driver_topic (its plain hazard family, e.g. "temperature", "pest",
+      "handwashing", "priority_violations", "inspection_outcome"). Use
+      top_driver_topic for "common drivers" / "violation category" questions —
+      it is the category each establishment's STRONGEST driver falls into, so
+      value_counts() gives the number of establishments per category.
+
+    Varies by city — do NOT assume either exists:
+      neighborhood — the area the city publishes: NYC boroughs, or LA cities like
+        Santa Monica and West Hollywood. ABSENT for Chicago.
+      facility_type — the kind of establishment (Restaurant, Grocery Store,
+        School, Daycare, Bakery, Long Term Care, …). Chicago ONLY. Descriptive
+        breakdowns only; it is never part of the risk model. It has a LONG TAIL
+        of ~190 rare one-off values, so ALWAYS take the top N (about 10, which
+        covers ~96% of establishments) rather than plotting every category.
+    For a geographic breakdown prefer zip, which every city has. If you use a
+    column this city doesn't publish, the tool returns an error listing the ones
+    that do exist — rewrite using those, or tell the user that breakdown isn't
+    available for this city. Never say the city has no such places.
+
+    Your `code` MUST:
+      - use the preloaded `df` DIRECTLY. Do NOT read any file — no pd.read_csv, no
+        pd.read_json, no open(). There is NO csv/json file in the sandbox; `df` is
+        already in memory and ready to use.
+      - build a matplotlib figure and save it with fig.savefig("chart.png").
+      - print() the aggregated numbers you plotted (counts / means) — you then base
+        the caption ONLY on that printed summary, which this tool returns.
+      - stay a chart of aggregates; never label a place "safe"/"unsafe" and never
+        make a per-person or eat/don't-eat judgement. No network, no file access
+        besides chart.png.
+
+    On success returns {status:"ok", summary, chart_block}. Write a one or two
+    sentence caption using the `summary` numbers, then include the returned
+    `chart_block` VERBATIM in your reply (it renders the chart inline). On
+    {status:"error"} tell the user briefly, or fix the code and call again.
+
+    Args:
+        code: pandas + matplotlib code that builds `df`-based figure into chart.png
+        title: a short plain-English chart title (also used for the download name)
+    """
+    # Spend against this request's chart budget, so a retry after a timeout can't
+    # push the whole reply past the gateway ceiling (that produced a 504).
+    deadline = _CHART_DEADLINE.get()
+    remaining = (deadline - time.monotonic()) if deadline else None
+    if remaining is not None and remaining < _CHART_MIN_RUN_S:
+        return {
+            "status": "error",
+            "retryable": False,
+            "error": (
+                "no time left to build a chart in this reply — tell the user the chart "
+                "took too long and to ask again, and do NOT call this tool again now"
+            ),
+        }
+    result = _viz_handler.handler(
+        {
+            "code": code,
+            "title": title,
+            "city": _ACTIVE_CITY.get(),
+            "timeout_s": remaining,
+        },
+        None,
+    )
+    # Stash the block so invoke() can guarantee it reaches the reply even if the
+    # model drops it or reformats it (see _PENDING_CHARTS / merge_chart_blocks).
+    if isinstance(result, dict) and result.get("status") == "ok" and result.get("chart_block"):
+        pending = _PENDING_CHARTS.get()
+        if pending is not None:
+            pending.append(result["chart_block"])
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -286,7 +502,20 @@ def _coerce_history(raw: object) -> list[dict]:
     return cleaned
 
 
-def _build_agent(messages: list[dict] | None = None) -> Agent:
+# Persona a request can be tagged with (frontend: the For Inspectors / For
+# Caregivers pages), and which system-prompt section each one activates by
+# default. See the matching sections in system_prompt.txt.
+_PERSONA_LABELS = {
+    "inspector": "Food-safety inspector",
+    "caregiver": "Caregiver (immunocompromised, elderly, child, or critically ill patient)",
+}
+_PERSONA_SECTIONS = {
+    "inspector": "INSPECTOR CONTEXT",
+    "caregiver": "CAREGIVER / IMMUNOCOMPROMISED CONTEXT",
+}
+
+
+def _build_agent(messages: list[dict] | None = None, persona: str = "") -> Agent:
     """Build a fresh agent for ONE request.
 
     The model is shared (stateless), but each invocation gets its OWN Agent so its
@@ -298,6 +527,24 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
     ``messages`` seeds the new agent with the caller's prior turns so a follow-up
     question has context. It stays scoped to this one request, so isolation holds.
     """
+    # Tell the model which city this request is scoped to (multi-city, DR 0016).
+    # The tools already read the right city's data; this keeps the model's
+    # framing + "no record" wording aligned to the active city.
+    # ACTIVE CITY block: per-city grade framing + scope. Shared with run_local.py
+    # via city_context so the deployed agent and the eval frame a request identically.
+    city_prefix = city_context.city_prefix(_ACTIVE_CITY.get())
+    # Tell the model which audience opened this chat (frontend: the For
+    # Inspectors / For Caregivers pages), so the relevant system-prompt section
+    # applies by default rather than only when the user's own words trigger it
+    # (e.g. a caregiver who never says "immunocompromised").
+    persona_prefix = ""
+    if persona in _PERSONA_LABELS:
+        persona_prefix = (
+            f"ACTIVE PERSONA: {_PERSONA_LABELS[persona]}. The user opened this chat "
+            f'from the For {persona.title()}s page. Apply the "{_PERSONA_SECTIONS[persona]}" '
+            f"rules below by default for this conversation, even if they don't use "
+            f"those words themselves. All FRAMING & GUARDRAILS rules still apply.\n\n"
+        )
     return Agent(
         model=model,
         messages=messages or [],
@@ -305,10 +552,13 @@ def _build_agent(messages: list[dict] | None = None) -> Agent:
             find_restaurants,
             get_safety_score,
             explain_restaurant,
+            look_up_establishment,
             find_reviews,
+            find_inspection_records,
             food_safety_info,
+            visualize_data,
         ],
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=city_prefix + persona_prefix + SYSTEM_PROMPT,
     )
 
 
@@ -334,11 +584,66 @@ def invoke(payload: dict) -> dict:
     if not query:
         return {"error": "query is required"}
 
+    # City (multi-city, DR 0016): prefer an explicit payload field; else parse a
+    # leading `[[city:nyc]]` marker the frontend prepends (the deployed proxy
+    # reliably forwards only the query string, so the marker is the robust path).
+    # The marker is stripped before the model sees the query.
+    query, city = _extract_city(query, payload.get("city"))
+    _ACTIVE_CITY.set(city)
+    _PENDING_CHARTS.set([])  # fresh per-request collector for generated chart blocks
+    _CHART_DEADLINE.set(time.monotonic() + _CHART_BUDGET_S)  # bound ALL chart work
+
+    # Persona (For Inspectors / For Caregivers chat entry points): same
+    # precedence and marker mechanism as city, extracted from what's left of the
+    # query after the city marker above (frontend emits city marker first, then
+    # persona marker, then the establishment-scope tag / user text).
+    query, persona = _extract_persona(query, payload.get("persona"))
+
     # Fresh, isolated agent per request, seeded with the caller's prior turns so
     # follow-up questions have context. History is client-supplied and validated.
-    agent = _build_agent(_coerce_history(payload.get("history")))
+    agent = _build_agent(_coerce_history(payload.get("history")), persona)
     result = agent(query)
-    return {"result": str(result)}
+    # Guarantee any generated chart block reaches the reply even if the model
+    # dropped or reformatted it (Nova sometimes emits a markdown image instead of
+    # the block the chat renders).
+    text = _viz_handler.merge_chart_blocks(str(result), _PENDING_CHARTS.get() or [])
+    return {"result": text}
+
+
+_CITY_MARKER = re.compile(r"^\s*\[\[city:(chicago|nyc|la)\]\]\s*")
+
+
+def _extract_city(query: str, field: object) -> tuple[str, str]:
+    """Resolve the request city and strip its marker from the query.
+
+    Precedence: an explicit `city` payload field, else a leading `[[city:...]]`
+    marker in the query. Unknown / missing → Chicago.
+    """
+    if isinstance(field, str) and field.lower() in ("chicago", "nyc", "la"):
+        return _CITY_MARKER.sub("", query), field.lower()
+    m = _CITY_MARKER.match(query)
+    if m:
+        return query[m.end() :], m.group(1)
+    return query, "chicago"
+
+
+_PERSONA_MARKER = re.compile(r"^\s*\[\[persona:(inspector|caregiver)\]\]\s*")
+
+
+def _extract_persona(query: str, field: object) -> tuple[str, str]:
+    """Resolve the request persona and strip its marker from the query.
+
+    Mirrors ``_extract_city``: an explicit `persona` payload field takes
+    precedence over a leading `[[persona:...]]` marker (the frontend's fallback
+    for the deployed proxy, which forwards only the query string). Unknown or
+    missing → "" (no persona framing — the default, unscoped chat).
+    """
+    if isinstance(field, str) and field.lower() in _PERSONA_LABELS:
+        return _PERSONA_MARKER.sub("", query), field.lower()
+    m = _PERSONA_MARKER.match(query)
+    if m:
+        return query[m.end() :], m.group(1)
+    return query, ""
 
 
 # ---------------------------------------------------------------------------

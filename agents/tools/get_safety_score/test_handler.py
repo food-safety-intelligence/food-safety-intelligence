@@ -25,6 +25,11 @@ import pytest
 _THIS_DIR = os.path.dirname(__file__)
 if _THIS_DIR not in sys.path:
     sys.path.insert(0, _THIS_DIR)
+# handler imports the shared matcher (agents/scores_match.py), so the agents/
+# dir must be importable too — same dir the deployed runtime and run_eval add.
+_AGENTS_DIR = os.path.dirname(os.path.dirname(_THIS_DIR))
+if _AGENTS_DIR not in sys.path:
+    sys.path.insert(0, _AGENTS_DIR)
 
 # handler imports sagemaker_stub, which imports boto3. Provide a minimal stub
 # so the module imports without the AWS SDK installed.
@@ -36,6 +41,7 @@ from handler import (  # noqa: E402
     _fuzzy_lookup,
     _load_scores_index,
     _normalise_name,
+    _trend_label,
 )
 
 # ---------------------------------------------------------------------------
@@ -119,6 +125,61 @@ def test_fuzzy_address_then_name():
 
 
 # ---------------------------------------------------------------------------
+# A single-occupancy address must still clear a name check
+# ---------------------------------------------------------------------------
+
+
+def test_fuzzy_address_to_lone_record_rejects_a_different_business():
+    """The live Los Angeles failure: an OSM address fuzzily resolved into a bucket
+    holding one unrelated record, and the name gate was skipped for single-occupancy
+    buckets — so "Taco Bell" was handed STARBUCKS COFFEE #9746's risk score. A
+    confident wrong score is worse than a miss (ethics decision record 0005)."""
+    index = _index(RECORD_A)  # lone STARBUCKS record at SHARED_ADDRESS
+    assert _fuzzy_lookup("11601 W TUOHY AVE", "Taco Bell", index) is None
+
+
+def test_exact_address_to_lone_record_rejects_a_different_tenant():
+    """Second live failure: the address matched exactly but the record on it was a
+    different business ("Cafe Etc." -> "CAFFE HUB"). Sharing no distinctive word is
+    enough to rule it out."""
+    index = _index({"license_id": "LIC_C", "dba_name": "CAFFE HUB", "address": SHARED_ADDRESS})
+    assert _fuzzy_lookup(SHARED_ADDRESS, "Cafe Etc.", index) is None
+
+
+def test_exact_hit_on_a_street_without_a_house_number_uses_the_strict_gate():
+    """New York City publishes 52 addresses with no house number, several of them
+    bare street names. "BROADWAY" is thirteen miles long, so an exact hit on it is
+    NOT evidence that two venues are the same place — without this, every venue on
+    Broadway sharing one word with a deli inherited that deli's published score."""
+    index = _index({"license_id": "LIC_D", "dba_name": "MAMA'S TOO!", "address": "BROADWAY"})
+    # Shares the distinctive word "MAMA'S", but only the weak gate would accept it.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Pizza", index) is None
+    # The genuine venue still resolves, because it clears the full name match.
+    assert _fuzzy_lookup("Broadway, New York, NY", "Mama's Too", index) is not None
+
+
+def test_a_street_less_address_never_fuzzy_matches():
+    """An OSM venue with no street tag yields just the city ("Los Angeles, CA" ->
+    "LOS ANGELES"), which difflib scores as 0.72-similar to "435 LOS ANGELES ST"
+    while naming nothing in common with it. A key with no house number must not be
+    fuzzed at all."""
+    index = _index(
+        {"license_id": "LIC_E", "dba_name": "ANTOJITOS PUEBLA", "address": "435 LOS ANGELES ST"}
+    )
+    assert _fuzzy_lookup("Los Angeles, CA", "Antojitos", index) is None
+    assert _fuzzy_lookup("Chicago, IL", "Sweet Vegan Bakes", index) is None
+
+
+def test_exact_address_to_lone_record_keeps_an_honest_rewrite():
+    """An exact address is strong evidence, so a venue the two sources merely spell
+    differently must still match — one shared distinctive word is enough. Gating this
+    on a full name match would have thrown away real coverage."""
+    index = _index(RECORD_A)
+    match = _fuzzy_lookup(SHARED_ADDRESS, "Starbucks Reserve Roastery", index)
+    assert match is not None and match["license_id"] == "LIC_A"
+
+
+# ---------------------------------------------------------------------------
 # Index keeps every shared-address record (no last-writer-wins)
 # ---------------------------------------------------------------------------
 
@@ -156,7 +217,7 @@ _GEO_SCORES = {
             "lon": -87.62935,
             "risk_score": 0.0352,
             "risk_tier": "Low",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "Loop",
             "top_drivers": [],
         },
@@ -168,7 +229,7 @@ _GEO_SCORES = {
             "lon": -87.63410,
             "risk_score": 0.11,
             "risk_tier": "Moderate",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "River North",
             "top_drivers": [],
         },
@@ -180,9 +241,12 @@ _GEO_SCORES = {
             "lon": -87.63100,
             "risk_score": 0.20,
             "risk_tier": "Moderate",
-            "trend_slope_90d": 0.0,
+            "trend_slope": 0.0,
             "neighborhood": "Loop",
             "top_drivers": [],
+            # Closed venue (scores schema 0.6.0, decision 0014).
+            "is_out_of_business": True,
+            "closed_since": "2020-06-01",
         },
     ]
 }
@@ -223,6 +287,48 @@ def test_geo_fallback_recovers_venue_with_no_osm_address(_geo_scores):
     assert out["status"] == "scored"
     assert out["license_id"] == "1801618"
     assert out["risk_tier"] == "Low"
+    # Guards the field name: the fixture record carries trend_slope (0.0 ->
+    # "stable"). Reading the wrong key would silently yield None ->
+    # "not enough inspection history" — the exact prod bug from decision 0011's
+    # trend_slope_90d -> trend_slope rename half-landing.
+    assert out["trend"] == "stable"
+
+
+def test_trend_label_maps_slope_including_null():
+    assert _trend_label(0.0) == "stable"
+    assert _trend_label(0.5) == "worsening"
+    assert _trend_label(-0.5) == "improving"
+    # Null slope = <2 scored inspections under scores schema 0.5.0: reported as
+    # "we can't say", not a confident flat trend (see decision 0011).
+    assert _trend_label(None) == "not enough inspection history"
+
+
+def test_closed_venue_flag_passes_through(_geo_scores):
+    # A closed record (CHINA CAFE) must surface is_out_of_business + closed_since
+    # so the agent can frame its score as historical (decision 0014). An active
+    # venue must report the flag as False, not omit it.
+    closed = _score_one(
+        {"osm_id": "9", "name": "China Cafe", "address": "", "lat": 41.88401, "lon": -87.63099}
+    )
+    assert closed["matched_scores_json"] is True
+    assert closed["is_out_of_business"] is True
+    assert closed["closed_since"] == "2020-06-01"
+
+    active = _score_one(
+        {"osm_id": "10", "name": "Amarit", "address": "", "lat": 41.87450, "lon": -87.62930}
+    )
+    assert active["is_out_of_business"] is False
+    assert active["closed_since"] is None
+
+
+def test_no_record_reports_not_closed(_geo_scores):
+    # An unmatched venue carries the closure keys too (no record either way).
+    out = _score_one(
+        {"osm_id": "11", "name": "Nowhere Diner", "address": "", "lat": 41.95, "lon": -87.70}
+    )
+    assert out["status"] == "no_inspection_record"
+    assert out["is_out_of_business"] is False
+    assert out["closed_since"] is None
 
 
 def test_geo_fallback_token_subset_name(_geo_scores):

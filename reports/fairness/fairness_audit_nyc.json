@@ -1,0 +1,3937 @@
+{
+  "city": "nyc",
+  "provenance": {
+    "test_rows": 9951,
+    "test_window": [
+      "2025-04-01",
+      "2026-07-13"
+    ],
+    "label_prevalence": 0.4088,
+    "model1_test_pr_auc": 0.571221189643538,
+    "model2_forecast_test_pr_auc": 0.5389425208680384,
+    "acs_year": 2022
+  },
+  "operating_points": {
+    "primary": "High",
+    "secondary": "Elevated+High"
+  },
+  "tolerances": {
+    "disparate_impact_ratio_min": 0.8,
+    "fpr_gap_max": 0.1,
+    "fnr_gap_max": 0.1,
+    "ece_gap_max": 0.05,
+    "min_group_n": 50,
+    "min_group_positives": 50
+  },
+  "model1_risk": {
+    "axes": {
+      "neighborhood": {
+        "column": "neighborhood",
+        "coverage": 0.9989,
+        "n_audited_groups": 5,
+        "flag_vs_prevalence_corr": 0.864,
+        "direction": {
+          "least_flagged": {
+            "group": "Bronx",
+            "flag_rate": 0.0,
+            "prevalence": 0.4088,
+            "n": 976
+          },
+          "most_flagged": {
+            "group": "Queens",
+            "flag_rate": 0.0049,
+            "prevalence": 0.4725,
+            "n": 2673
+          }
+        },
+        "group_table": [
+          {
+            "group": "Manhattan",
+            "n": 3500,
+            "positives": 1346,
+            "prevalence": 0.3846,
+            "flag_rate": 0.0011,
+            "fpr": 0.0,
+            "fnr": 0.997,
+            "ece": 0.0189,
+            "mean_pred": 0.3961,
+            "mean_obs": 0.3846,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Queens",
+            "n": 2673,
+            "positives": 1263,
+            "prevalence": 0.4725,
+            "flag_rate": 0.0049,
+            "fpr": 0.0035,
+            "fnr": 0.9937,
+            "ece": 0.0378,
+            "mean_pred": 0.4394,
+            "mean_obs": 0.4725,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Brooklyn",
+            "n": 2508,
+            "positives": 957,
+            "prevalence": 0.3816,
+            "flag_rate": 0.0012,
+            "fpr": 0.0,
+            "fnr": 0.9969,
+            "ece": 0.0262,
+            "mean_pred": 0.4036,
+            "mean_obs": 0.3816,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Bronx",
+            "n": 976,
+            "positives": 399,
+            "prevalence": 0.4088,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0305,
+            "mean_pred": 0.4073,
+            "mean_obs": 0.4088,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Staten Island",
+            "n": 283,
+            "positives": 99,
+            "prevalence": 0.3498,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0449,
+            "mean_pred": 0.3779,
+            "mean_obs": 0.3498,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.0,
+            "ci_low": 0.0,
+            "ci_high": 0.0,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0035,
+            "ci_low": 0.0007,
+            "ci_high": 0.007,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0063,
+            "ci_low": 0.0032,
+            "ci_high": 0.0111,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.026,
+            "ci_low": 0.0181,
+            "ci_high": 0.0853,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.6225,
+            "ci_low": 0.5254,
+            "ci_high": 0.7393,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.1505,
+            "ci_low": 0.0852,
+            "ci_high": 0.2144,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.2016,
+            "ci_low": 0.1035,
+            "ci_high": 0.3024,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": true
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.026,
+            "ci_low": 0.0181,
+            "ci_high": 0.0853,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.86), consistent with the model flagging genuinely higher-risk places rather than bias. Persists at the wider Elevated+High operating point."
+      },
+      "income": {
+        "column": "area_income_q",
+        "coverage": 0.9696,
+        "n_audited_groups": 4,
+        "flag_vs_prevalence_corr": 0.691,
+        "direction": {
+          "least_flagged": {
+            "group": "Q3",
+            "flag_rate": 0.0004,
+            "prevalence": 0.4042,
+            "n": 2412
+          },
+          "most_flagged": {
+            "group": "Q2",
+            "flag_rate": 0.0033,
+            "prevalence": 0.442,
+            "n": 2412
+          }
+        },
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2412,
+            "positives": 1065,
+            "prevalence": 0.4415,
+            "flag_rate": 0.0029,
+            "fpr": 0.0015,
+            "fnr": 0.9953,
+            "ece": 0.0168,
+            "mean_pred": 0.4298,
+            "mean_obs": 0.4415,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2412,
+            "positives": 1066,
+            "prevalence": 0.442,
+            "flag_rate": 0.0033,
+            "fpr": 0.0015,
+            "fnr": 0.9944,
+            "ece": 0.0196,
+            "mean_pred": 0.4223,
+            "mean_obs": 0.442,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2412,
+            "positives": 975,
+            "prevalence": 0.4042,
+            "flag_rate": 0.0004,
+            "fpr": 0.0,
+            "fnr": 0.999,
+            "ece": 0.0174,
+            "mean_pred": 0.4011,
+            "mean_obs": 0.4042,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2412,
+            "positives": 830,
+            "prevalence": 0.3441,
+            "flag_rate": 0.0012,
+            "fpr": 0.0006,
+            "fnr": 0.9976,
+            "ece": 0.0485,
+            "mean_pred": 0.3889,
+            "mean_obs": 0.3441,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.125,
+            "ci_low": 0.0,
+            "ci_high": 0.3473,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0015,
+            "ci_low": 0.0007,
+            "ci_high": 0.0043,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0046,
+            "ci_low": 0.0019,
+            "ci_high": 0.0104,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0317,
+            "ci_low": 0.0117,
+            "ci_high": 0.0477,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.8051,
+            "ci_low": 0.7526,
+            "ci_high": 0.8529,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0577,
+            "ci_low": 0.0333,
+            "ci_high": 0.0957,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.097,
+            "ci_low": 0.0629,
+            "ci_high": 0.1443,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0317,
+            "ci_low": 0.0117,
+            "ci_high": 0.0477,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.69), consistent with the model flagging genuinely higher-risk places rather than bias. Does not persist at the wider Elevated+High operating point."
+      },
+      "race_nonwhite": {
+        "column": "area_pct_nonwhite_q",
+        "coverage": 0.9866,
+        "n_audited_groups": 4,
+        "flag_vs_prevalence_corr": 0.873,
+        "direction": {
+          "least_flagged": {
+            "group": "Q1 (lowest)",
+            "flag_rate": 0.0008,
+            "prevalence": 0.3475,
+            "n": 2455
+          },
+          "most_flagged": {
+            "group": "Q3",
+            "flag_rate": 0.0033,
+            "prevalence": 0.4279,
+            "n": 2454
+          }
+        },
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 853,
+            "prevalence": 0.3475,
+            "flag_rate": 0.0008,
+            "fpr": 0.0006,
+            "fnr": 0.9988,
+            "ece": 0.0469,
+            "mean_pred": 0.3929,
+            "mean_obs": 0.3475,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1142,
+            "prevalence": 0.4652,
+            "flag_rate": 0.0029,
+            "fpr": 0.0015,
+            "fnr": 0.9956,
+            "ece": 0.0334,
+            "mean_pred": 0.4346,
+            "mean_obs": 0.4652,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 963,
+            "prevalence": 0.3924,
+            "flag_rate": 0.0012,
+            "fpr": 0.0,
+            "fnr": 0.9969,
+            "ece": 0.0227,
+            "mean_pred": 0.3948,
+            "mean_obs": 0.3924,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1050,
+            "prevalence": 0.4279,
+            "flag_rate": 0.0033,
+            "fpr": 0.0014,
+            "fnr": 0.9943,
+            "ece": 0.0191,
+            "mean_pred": 0.4201,
+            "mean_obs": 0.4279,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.2499,
+            "ci_low": 0.0,
+            "ci_high": 0.4894,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0015,
+            "ci_low": 0.0007,
+            "ci_high": 0.004,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0045,
+            "ci_low": 0.0019,
+            "ci_high": 0.0105,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0278,
+            "ci_low": 0.0095,
+            "ci_high": 0.0462,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.8096,
+            "ci_low": 0.7547,
+            "ci_high": 0.8444,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0722,
+            "ci_low": 0.0435,
+            "ci_high": 0.1101,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0967,
+            "ci_low": 0.067,
+            "ci_high": 0.1437,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0278,
+            "ci_low": 0.0095,
+            "ci_high": 0.0462,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.87), consistent with the model flagging genuinely higher-risk places rather than bias. Does not persist at the wider Elevated+High operating point."
+      },
+      "race_dominant": {
+        "column": "area_dominant_group",
+        "coverage": 0.9866,
+        "n_audited_groups": 5,
+        "flag_vs_prevalence_corr": 0.777,
+        "direction": {
+          "least_flagged": {
+            "group": "Hispanic",
+            "flag_rate": 0.0007,
+            "prevalence": 0.4253,
+            "n": 1500
+          },
+          "most_flagged": {
+            "group": "Asian",
+            "flag_rate": 0.0084,
+            "prevalence": 0.5051,
+            "n": 1077
+          }
+        },
+        "group_table": [
+          {
+            "group": "White",
+            "n": 3756,
+            "positives": 1364,
+            "prevalence": 0.3632,
+            "flag_rate": 0.0011,
+            "fpr": 0.0004,
+            "fnr": 0.9978,
+            "ece": 0.0328,
+            "mean_pred": 0.3924,
+            "mean_obs": 0.3632,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "no majority",
+            "n": 2533,
+            "positives": 1034,
+            "prevalence": 0.4082,
+            "flag_rate": 0.002,
+            "fpr": 0.0013,
+            "fnr": 0.9971,
+            "ece": 0.0144,
+            "mean_pred": 0.4104,
+            "mean_obs": 0.4082,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Hispanic",
+            "n": 1500,
+            "positives": 638,
+            "prevalence": 0.4253,
+            "flag_rate": 0.0007,
+            "fpr": 0.0,
+            "fnr": 0.9984,
+            "ece": 0.0334,
+            "mean_pred": 0.4161,
+            "mean_obs": 0.4253,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Asian",
+            "n": 1077,
+            "positives": 544,
+            "prevalence": 0.5051,
+            "flag_rate": 0.0084,
+            "fpr": 0.0038,
+            "fnr": 0.9871,
+            "ece": 0.05,
+            "mean_pred": 0.4609,
+            "mean_obs": 0.5051,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Black",
+            "n": 952,
+            "positives": 428,
+            "prevalence": 0.4496,
+            "flag_rate": 0.0011,
+            "fpr": 0.0,
+            "fnr": 0.9977,
+            "ece": 0.0371,
+            "mean_pred": 0.4172,
+            "mean_obs": 0.4496,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.0798,
+            "ci_low": 0.0,
+            "ci_high": 0.1937,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0038,
+            "ci_low": 0.0007,
+            "ci_high": 0.0096,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0113,
+            "ci_low": 0.0041,
+            "ci_high": 0.0228,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0356,
+            "ci_low": 0.0157,
+            "ci_high": 0.061,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.6911,
+            "ci_low": 0.6489,
+            "ci_high": 0.7378,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.1434,
+            "ci_low": 0.1009,
+            "ci_high": 0.1945,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": true
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.1505,
+            "ci_low": 0.1134,
+            "ci_high": 0.207,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": true
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0356,
+            "ci_low": 0.0157,
+            "ci_high": 0.061,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.78), consistent with the model flagging genuinely higher-risk places rather than bias. Persists at the wider Elevated+High operating point."
+      },
+      "poverty": {
+        "column": "area_pct_poverty_q",
+        "coverage": 0.9866,
+        "n_audited_groups": 4,
+        "flag_vs_prevalence_corr": 0.511,
+        "direction": {
+          "least_flagged": {
+            "group": "Q1 (lowest)",
+            "flag_rate": 0.0016,
+            "prevalence": 0.3727,
+            "n": 2455
+          },
+          "most_flagged": {
+            "group": "Q4 (highest)",
+            "flag_rate": 0.0024,
+            "prevalence": 0.4301,
+            "n": 2455
+          }
+        },
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 915,
+            "prevalence": 0.3727,
+            "flag_rate": 0.0016,
+            "fpr": 0.0013,
+            "fnr": 0.9978,
+            "ece": 0.0345,
+            "mean_pred": 0.4019,
+            "mean_obs": 0.3727,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1056,
+            "prevalence": 0.4301,
+            "flag_rate": 0.0024,
+            "fpr": 0.0014,
+            "fnr": 0.9962,
+            "ece": 0.0182,
+            "mean_pred": 0.423,
+            "mean_obs": 0.4301,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 1003,
+            "prevalence": 0.4087,
+            "flag_rate": 0.0024,
+            "fpr": 0.0,
+            "fnr": 0.994,
+            "ece": 0.0107,
+            "mean_pred": 0.406,
+            "mean_obs": 0.4087,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1034,
+            "prevalence": 0.4214,
+            "flag_rate": 0.0016,
+            "fpr": 0.0007,
+            "fnr": 0.9971,
+            "ece": 0.0217,
+            "mean_pred": 0.4115,
+            "mean_obs": 0.4214,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.6664,
+            "ci_low": 0.0,
+            "ci_high": 0.7525,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0014,
+            "ci_low": 0.0007,
+            "ci_high": 0.0038,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0038,
+            "ci_low": 0.0013,
+            "ci_high": 0.0099,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0238,
+            "ci_low": 0.0075,
+            "ci_high": 0.0384,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.9123,
+            "ci_low": 0.8526,
+            "ci_high": 0.948,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.026,
+            "ci_low": 0.0117,
+            "ci_high": 0.0648,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0355,
+            "ci_low": 0.0159,
+            "ci_high": 0.0838,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0238,
+            "ci_low": 0.0075,
+            "ci_high": 0.0384,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.51), consistent with the model flagging genuinely higher-risk places rather than bias. Does not persist at the wider Elevated+High operating point."
+      },
+      "foreign_born": {
+        "column": "area_pct_foreign_born_q",
+        "coverage": 0.9866,
+        "n_audited_groups": 4,
+        "flag_vs_prevalence_corr": 0.785,
+        "direction": {
+          "least_flagged": {
+            "group": "Q3",
+            "flag_rate": 0.0004,
+            "prevalence": 0.4201,
+            "n": 2454
+          },
+          "most_flagged": {
+            "group": "Q4 (highest)",
+            "flag_rate": 0.0057,
+            "prevalence": 0.4794,
+            "n": 2455
+          }
+        },
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 862,
+            "prevalence": 0.3511,
+            "flag_rate": 0.0012,
+            "fpr": 0.0,
+            "fnr": 0.9965,
+            "ece": 0.0379,
+            "mean_pred": 0.3848,
+            "mean_obs": 0.3511,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1177,
+            "prevalence": 0.4794,
+            "flag_rate": 0.0057,
+            "fpr": 0.0031,
+            "fnr": 0.9915,
+            "ece": 0.0372,
+            "mean_pred": 0.4442,
+            "mean_obs": 0.4794,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 938,
+            "prevalence": 0.3822,
+            "flag_rate": 0.0008,
+            "fpr": 0.0,
+            "fnr": 0.9979,
+            "ece": 0.027,
+            "mean_pred": 0.4021,
+            "mean_obs": 0.3822,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1031,
+            "prevalence": 0.4201,
+            "flag_rate": 0.0004,
+            "fpr": 0.0007,
+            "fnr": 1.0,
+            "ece": 0.0173,
+            "mean_pred": 0.4113,
+            "mean_obs": 0.4201,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.0715,
+            "ci_low": 0.0,
+            "ci_high": 0.1941,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0031,
+            "ci_low": 0.0008,
+            "ci_high": 0.0063,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0085,
+            "ci_low": 0.0042,
+            "ci_high": 0.0141,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0206,
+            "ci_low": 0.0068,
+            "ci_high": 0.0405,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.704,
+            "ci_low": 0.6585,
+            "ci_high": 0.7517,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.1242,
+            "ci_low": 0.0892,
+            "ci_high": 0.1607,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.1353,
+            "ci_low": 0.0909,
+            "ci_high": 0.174,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0206,
+            "ci_low": 0.0068,
+            "ci_high": 0.0405,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.78), consistent with the model flagging genuinely higher-risk places rather than bias. Persists at the wider Elevated+High operating point."
+      },
+      "limited_english": {
+        "column": "area_pct_limited_english_q",
+        "coverage": 0.986,
+        "n_audited_groups": 4,
+        "flag_vs_prevalence_corr": 0.988,
+        "direction": {
+          "least_flagged": {
+            "group": "Q1 (lowest)",
+            "flag_rate": 0.0,
+            "prevalence": 0.3587,
+            "n": 2453
+          },
+          "most_flagged": {
+            "group": "Q4 (highest)",
+            "flag_rate": 0.0041,
+            "prevalence": 0.4631,
+            "n": 2453
+          }
+        },
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2453,
+            "positives": 880,
+            "prevalence": 0.3587,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0357,
+            "mean_pred": 0.3917,
+            "mean_obs": 0.3587,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2453,
+            "positives": 950,
+            "prevalence": 0.3873,
+            "flag_rate": 0.0016,
+            "fpr": 0.0,
+            "fnr": 0.9958,
+            "ece": 0.0284,
+            "mean_pred": 0.3985,
+            "mean_obs": 0.3873,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2453,
+            "positives": 1041,
+            "prevalence": 0.4244,
+            "flag_rate": 0.0024,
+            "fpr": 0.0021,
+            "fnr": 0.9971,
+            "ece": 0.0134,
+            "mean_pred": 0.4165,
+            "mean_obs": 0.4244,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2453,
+            "positives": 1136,
+            "prevalence": 0.4631,
+            "flag_rate": 0.0041,
+            "fpr": 0.0015,
+            "fnr": 0.993,
+            "ece": 0.0313,
+            "mean_pred": 0.4356,
+            "mean_obs": 0.4631,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.0,
+            "ci_low": 0.0,
+            "ci_high": 0.0,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0021,
+            "ci_low": 0.0007,
+            "ci_high": 0.0048,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.007,
+            "ci_low": 0.0038,
+            "ci_high": 0.0127,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0223,
+            "ci_low": 0.0064,
+            "ci_high": 0.038,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.7769,
+            "ci_low": 0.7279,
+            "ci_high": 0.8217,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0786,
+            "ci_low": 0.052,
+            "ci_high": 0.1172,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.1033,
+            "ci_low": 0.0707,
+            "ci_high": 0.1464,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.0223,
+            "ci_low": 0.0064,
+            "ci_high": 0.038,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "Flag-rate parity gap, but no false-positive, false-negative, or calibration disparity. The flag rate tracks group prevalence (corr 0.99), consistent with the model flagging genuinely higher-risk places rather than bias. Does not persist at the wider Elevated+High operating point."
+      },
+      "cuisine": {
+        "column": "cuisine",
+        "coverage": 0.9309,
+        "n_audited_groups": 33,
+        "flag_vs_prevalence_corr": 0.41,
+        "direction": {
+          "least_flagged": {
+            "group": "Coffee/Tea",
+            "flag_rate": 0.0,
+            "prevalence": 0.283,
+            "n": 827
+          },
+          "most_flagged": {
+            "group": "Eastern European",
+            "flag_rate": 0.0185,
+            "prevalence": 0.3889,
+            "n": 54
+          }
+        },
+        "group_table": [
+          {
+            "group": "American",
+            "n": 1292,
+            "positives": 464,
+            "prevalence": 0.3591,
+            "flag_rate": 0.0031,
+            "fpr": 0.0012,
+            "fnr": 0.9935,
+            "ece": 0.0472,
+            "mean_pred": 0.3946,
+            "mean_obs": 0.3591,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Chinese",
+            "n": 1055,
+            "positives": 559,
+            "prevalence": 0.5299,
+            "flag_rate": 0.0047,
+            "fpr": 0.002,
+            "fnr": 0.9928,
+            "ece": 0.0649,
+            "mean_pred": 0.4661,
+            "mean_obs": 0.5299,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Coffee/Tea",
+            "n": 827,
+            "positives": 234,
+            "prevalence": 0.283,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0823,
+            "mean_pred": 0.3605,
+            "mean_obs": 0.283,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Pizza",
+            "n": 587,
+            "positives": 241,
+            "prevalence": 0.4106,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0263,
+            "mean_pred": 0.4031,
+            "mean_obs": 0.4106,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Latin American",
+            "n": 555,
+            "positives": 292,
+            "prevalence": 0.5261,
+            "flag_rate": 0.0036,
+            "fpr": 0.0,
+            "fnr": 0.9932,
+            "ece": 0.0687,
+            "mean_pred": 0.4614,
+            "mean_obs": 0.5261,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Bakery Products/Desserts",
+            "n": 484,
+            "positives": 201,
+            "prevalence": 0.4153,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0338,
+            "mean_pred": 0.4054,
+            "mean_obs": 0.4153,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Caribbean",
+            "n": 449,
+            "positives": 233,
+            "prevalence": 0.5189,
+            "flag_rate": 0.0022,
+            "fpr": 0.0,
+            "fnr": 0.9957,
+            "ece": 0.0884,
+            "mean_pred": 0.4326,
+            "mean_obs": 0.5189,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Mexican",
+            "n": 372,
+            "positives": 133,
+            "prevalence": 0.3575,
+            "flag_rate": 0.0027,
+            "fpr": 0.0042,
+            "fnr": 1.0,
+            "ece": 0.0592,
+            "mean_pred": 0.412,
+            "mean_obs": 0.3575,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Chicken",
+            "n": 304,
+            "positives": 114,
+            "prevalence": 0.375,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0303,
+            "mean_pred": 0.3944,
+            "mean_obs": 0.375,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Japanese",
+            "n": 287,
+            "positives": 117,
+            "prevalence": 0.4077,
+            "flag_rate": 0.0035,
+            "fpr": 0.0,
+            "fnr": 0.9915,
+            "ece": 0.0635,
+            "mean_pred": 0.428,
+            "mean_obs": 0.4077,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Italian",
+            "n": 238,
+            "positives": 94,
+            "prevalence": 0.395,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0276,
+            "mean_pred": 0.4074,
+            "mean_obs": 0.395,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Juice, Smoothies, Fruit Salads",
+            "n": 228,
+            "positives": 75,
+            "prevalence": 0.3289,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0528,
+            "mean_pred": 0.3671,
+            "mean_obs": 0.3289,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Spanish",
+            "n": 224,
+            "positives": 101,
+            "prevalence": 0.4509,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0654,
+            "mean_pred": 0.4329,
+            "mean_obs": 0.4509,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Donuts",
+            "n": 219,
+            "positives": 47,
+            "prevalence": 0.2146,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.276,
+            "mean_obs": 0.2146,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Asian/Asian Fusion",
+            "n": 211,
+            "positives": 96,
+            "prevalence": 0.455,
+            "flag_rate": 0.0047,
+            "fpr": 0.0087,
+            "fnr": 1.0,
+            "ece": 0.0729,
+            "mean_pred": 0.4432,
+            "mean_obs": 0.455,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Sandwiches",
+            "n": 209,
+            "positives": 71,
+            "prevalence": 0.3397,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0898,
+            "mean_pred": 0.3585,
+            "mean_obs": 0.3397,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Thai",
+            "n": 152,
+            "positives": 74,
+            "prevalence": 0.4868,
+            "flag_rate": 0.0066,
+            "fpr": 0.0,
+            "fnr": 0.9865,
+            "ece": 0.0526,
+            "mean_pred": 0.4729,
+            "mean_obs": 0.4868,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Indian",
+            "n": 151,
+            "positives": 81,
+            "prevalence": 0.5364,
+            "flag_rate": 0.0066,
+            "fpr": 0.0,
+            "fnr": 0.9877,
+            "ece": 0.0851,
+            "mean_pred": 0.4792,
+            "mean_obs": 0.5364,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Hamburgers",
+            "n": 143,
+            "positives": 38,
+            "prevalence": 0.2657,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.294,
+            "mean_obs": 0.2657,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Korean",
+            "n": 140,
+            "positives": 62,
+            "prevalence": 0.4429,
+            "flag_rate": 0.0071,
+            "fpr": 0.0,
+            "fnr": 0.9839,
+            "ece": 0.0456,
+            "mean_pred": 0.4532,
+            "mean_obs": 0.4429,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Bagels/Pretzels",
+            "n": 132,
+            "positives": 49,
+            "prevalence": 0.3712,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3885,
+            "mean_obs": 0.3712,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Middle Eastern",
+            "n": 128,
+            "positives": 55,
+            "prevalence": 0.4297,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": 1.0,
+            "ece": 0.0391,
+            "mean_pred": 0.4222,
+            "mean_obs": 0.4297,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Bangladeshi",
+            "n": 125,
+            "positives": 90,
+            "prevalence": 0.72,
+            "flag_rate": 0.008,
+            "fpr": 0.0286,
+            "fnr": 1.0,
+            "ece": 0.2288,
+            "mean_pred": 0.5119,
+            "mean_obs": 0.72,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "Frozen Desserts",
+            "n": 116,
+            "positives": 37,
+            "prevalence": 0.319,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3462,
+            "mean_obs": 0.319,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Jewish/Kosher",
+            "n": 104,
+            "positives": 44,
+            "prevalence": 0.4231,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4252,
+            "mean_obs": 0.4231,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Tex-Mex",
+            "n": 82,
+            "positives": 20,
+            "prevalence": 0.2439,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3395,
+            "mean_obs": 0.2439,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Mediterranean",
+            "n": 77,
+            "positives": 32,
+            "prevalence": 0.4156,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4187,
+            "mean_obs": 0.4156,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "French",
+            "n": 71,
+            "positives": 16,
+            "prevalence": 0.2254,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.381,
+            "mean_obs": 0.2254,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Other",
+            "n": 67,
+            "positives": 23,
+            "prevalence": 0.3433,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.394,
+            "mean_obs": 0.3433,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Seafood",
+            "n": 65,
+            "positives": 24,
+            "prevalence": 0.3692,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3901,
+            "mean_obs": 0.3692,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Sandwiches/Salads/Mixed Buffet",
+            "n": 63,
+            "positives": 22,
+            "prevalence": 0.3492,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3845,
+            "mean_obs": 0.3492,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Eastern European",
+            "n": 54,
+            "positives": 21,
+            "prevalence": 0.3889,
+            "flag_rate": 0.0185,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4374,
+            "mean_obs": 0.3889,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "African",
+            "n": 52,
+            "positives": 29,
+            "prevalence": 0.5577,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4772,
+            "mean_obs": 0.5577,
+            "audited": true,
+            "odds_reliable": false
+          },
+          {
+            "group": "Irish",
+            "n": 48,
+            "positives": 21,
+            "prevalence": 0.4375,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3804,
+            "mean_obs": 0.4375,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Greek",
+            "n": 40,
+            "positives": 16,
+            "prevalence": 0.4,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4422,
+            "mean_obs": 0.4,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Southeast Asian",
+            "n": 38,
+            "positives": 13,
+            "prevalence": 0.3421,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4418,
+            "mean_obs": 0.3421,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Pakistani",
+            "n": 37,
+            "positives": 23,
+            "prevalence": 0.6216,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.477,
+            "mean_obs": 0.6216,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Fusion",
+            "n": 35,
+            "positives": 11,
+            "prevalence": 0.3143,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3888,
+            "mean_obs": 0.3143,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Peruvian",
+            "n": 32,
+            "positives": 15,
+            "prevalence": 0.4688,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4121,
+            "mean_obs": 0.4688,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Soul Food",
+            "n": 30,
+            "positives": 16,
+            "prevalence": 0.5333,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4532,
+            "mean_obs": 0.5333,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Filipino",
+            "n": 29,
+            "positives": 13,
+            "prevalence": 0.4483,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4816,
+            "mean_obs": 0.4483,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Vegan",
+            "n": 28,
+            "positives": 6,
+            "prevalence": 0.2143,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4386,
+            "mean_obs": 0.2143,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Salads",
+            "n": 28,
+            "positives": 3,
+            "prevalence": 0.1071,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3303,
+            "mean_obs": 0.1071,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "New American",
+            "n": 27,
+            "positives": 6,
+            "prevalence": 0.2222,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3856,
+            "mean_obs": 0.2222,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Turkish",
+            "n": 27,
+            "positives": 19,
+            "prevalence": 0.7037,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4338,
+            "mean_obs": 0.7037,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Steakhouse",
+            "n": 21,
+            "positives": 10,
+            "prevalence": 0.4762,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3543,
+            "mean_obs": 0.4762,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Creole",
+            "n": 19,
+            "positives": 14,
+            "prevalence": 0.7368,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.5279,
+            "mean_obs": 0.7368,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Pancakes/Waffles",
+            "n": 18,
+            "positives": 8,
+            "prevalence": 0.4444,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3721,
+            "mean_obs": 0.4444,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Chinese/Japanese",
+            "n": 17,
+            "positives": 7,
+            "prevalence": 0.4118,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.5276,
+            "mean_obs": 0.4118,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Vegetarian",
+            "n": 16,
+            "positives": 3,
+            "prevalence": 0.1875,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3245,
+            "mean_obs": 0.1875,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Australian",
+            "n": 16,
+            "positives": 9,
+            "prevalence": 0.5625,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4734,
+            "mean_obs": 0.5625,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Russian",
+            "n": 16,
+            "positives": 5,
+            "prevalence": 0.3125,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.385,
+            "mean_obs": 0.3125,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Barbecue",
+            "n": 14,
+            "positives": 7,
+            "prevalence": 0.5,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3382,
+            "mean_obs": 0.5,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Continental",
+            "n": 14,
+            "positives": 5,
+            "prevalence": 0.3571,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4205,
+            "mean_obs": 0.3571,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Soups/Salads/Sandwiches",
+            "n": 14,
+            "positives": 6,
+            "prevalence": 0.4286,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3713,
+            "mean_obs": 0.4286,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Tapas",
+            "n": 10,
+            "positives": 3,
+            "prevalence": 0.3,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3149,
+            "mean_obs": 0.3,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Hotdogs",
+            "n": 10,
+            "positives": 4,
+            "prevalence": 0.4,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3575,
+            "mean_obs": 0.4,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Bottled Beverages",
+            "n": 10,
+            "positives": 2,
+            "prevalence": 0.2,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.269,
+            "mean_obs": 0.2,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Brazilian",
+            "n": 8,
+            "positives": 2,
+            "prevalence": 0.25,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3398,
+            "mean_obs": 0.25,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Ethiopian",
+            "n": 8,
+            "positives": 2,
+            "prevalence": 0.25,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4057,
+            "mean_obs": 0.25,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Chinese/Cuban",
+            "n": 7,
+            "positives": 3,
+            "prevalence": 0.4286,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4869,
+            "mean_obs": 0.4286,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "New French",
+            "n": 7,
+            "positives": 3,
+            "prevalence": 0.4286,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3387,
+            "mean_obs": 0.4286,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Hawaiian",
+            "n": 7,
+            "positives": 2,
+            "prevalence": 0.2857,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3082,
+            "mean_obs": 0.2857,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Portuguese",
+            "n": 6,
+            "positives": 2,
+            "prevalence": 0.3333,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3485,
+            "mean_obs": 0.3333,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "German",
+            "n": 6,
+            "positives": 3,
+            "prevalence": 0.5,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3611,
+            "mean_obs": 0.5,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "English",
+            "n": 5,
+            "positives": 1,
+            "prevalence": 0.2,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4132,
+            "mean_obs": 0.2,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Polish",
+            "n": 5,
+            "positives": 4,
+            "prevalence": 0.8,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4955,
+            "mean_obs": 0.8,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Hotdogs/Pretzels",
+            "n": 5,
+            "positives": 1,
+            "prevalence": 0.2,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3744,
+            "mean_obs": 0.2,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Afghan",
+            "n": 4,
+            "positives": 1,
+            "prevalence": 0.25,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3761,
+            "mean_obs": 0.25,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Moroccan",
+            "n": 4,
+            "positives": 2,
+            "prevalence": 0.5,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3849,
+            "mean_obs": 0.5,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Cajun",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3721,
+            "mean_obs": 0.3333,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Fruits/Vegetables",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.391,
+            "mean_obs": 0.3333,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Creole/Cajun",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3955,
+            "mean_obs": 0.3333,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Armenian",
+            "n": 2,
+            "positives": 1,
+            "prevalence": 0.5,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.2906,
+            "mean_obs": 0.5,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Scandinavian",
+            "n": 2,
+            "positives": 1,
+            "prevalence": 0.5,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3017,
+            "mean_obs": 0.5,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Southwestern",
+            "n": 2,
+            "positives": 0,
+            "prevalence": 0.0,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4964,
+            "mean_obs": 0.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Basque",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "flag_rate": 0.0,
+            "fpr": null,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.491,
+            "mean_obs": 1.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Californian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.3698,
+            "mean_obs": 0.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Egyptian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.5831,
+            "mean_obs": 0.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Lebanese",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "flag_rate": 0.0,
+            "fpr": null,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4177,
+            "mean_obs": 1.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Iranian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.0954,
+            "mean_obs": 0.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Indonesian",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "flag_rate": 0.0,
+            "fpr": null,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.5612,
+            "mean_obs": 1.0,
+            "audited": false,
+            "odds_reliable": false
+          },
+          {
+            "group": "Soups",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "flag_rate": 0.0,
+            "fpr": 0.0,
+            "fnr": null,
+            "ece": null,
+            "mean_pred": 0.4197,
+            "mean_obs": 0.0,
+            "audited": false,
+            "odds_reliable": false
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.0,
+            "ci_low": 0.0,
+            "ci_high": 0.0,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0286,
+            "ci_low": 0.0023,
+            "ci_high": 0.093,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0161,
+            "ci_low": 0.0114,
+            "ci_high": 0.06,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.2025,
+            "ci_low": 0.1327,
+            "ci_high": 0.2716,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": true
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.1275,
+            "ci_low": 0.0757,
+            "ci_high": 0.1722,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": true
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.565,
+            "ci_low": 0.4776,
+            "ci_high": 0.769,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": true
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.462,
+            "ci_low": 0.3775,
+            "ci_high": 0.7691,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": true
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.2025,
+            "ci_low": 0.1327,
+            "ci_high": 0.2716,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": true
+          }
+        ],
+        "verdict": "Equalized-odds / calibration disparity on ece_gap \u2014 the model makes uneven errors across these groups. Investigate."
+      },
+      "tenure": {
+        "column": "tenure_bucket",
+        "coverage": 1.0,
+        "n_audited_groups": 2,
+        "flag_vs_prevalence_corr": -1.0,
+        "direction": {
+          "least_flagged": {
+            "group": "new (<1yr)",
+            "flag_rate": 0.0012,
+            "prevalence": 0.4615,
+            "n": 2561
+          },
+          "most_flagged": {
+            "group": "established (1-3yr)",
+            "flag_rate": 0.0023,
+            "prevalence": 0.3905,
+            "n": 7390
+          }
+        },
+        "group_table": [
+          {
+            "group": "established (1-3yr)",
+            "n": 7390,
+            "positives": 2886,
+            "prevalence": 0.3905,
+            "flag_rate": 0.0023,
+            "fpr": 0.0009,
+            "fnr": 0.9955,
+            "ece": 0.0164,
+            "mean_pred": 0.3984,
+            "mean_obs": 0.3905,
+            "audited": true,
+            "odds_reliable": true
+          },
+          {
+            "group": "new (<1yr)",
+            "n": 2561,
+            "positives": 1182,
+            "prevalence": 0.4615,
+            "flag_rate": 0.0012,
+            "fpr": 0.0007,
+            "fnr": 0.9983,
+            "ece": 0.0254,
+            "mean_pred": 0.4445,
+            "mean_obs": 0.4615,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.5092,
+            "ci_low": 0.0,
+            "ci_high": 0.9629,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.0002,
+            "ci_low": 0.0,
+            "ci_high": 0.0019,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0028,
+            "ci_low": 0.0003,
+            "ci_high": 0.0062,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.009,
+            "ci_low": 0.0005,
+            "ci_high": 0.0305,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "gaps_secondary_elevated_high": [
+          {
+            "metric": "disparate_impact_ratio",
+            "value": 0.8282,
+            "ci_low": 0.7894,
+            "ci_high": 0.8667,
+            "tolerance": 0.8,
+            "direction": "min",
+            "finding": false
+          },
+          {
+            "metric": "fpr_gap",
+            "value": 0.1216,
+            "ci_low": 0.0934,
+            "ci_high": 0.1525,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "fnr_gap",
+            "value": 0.0062,
+            "ci_low": 0.0006,
+            "ci_high": 0.0388,
+            "tolerance": 0.1,
+            "direction": "max",
+            "finding": false
+          },
+          {
+            "metric": "ece_gap",
+            "value": 0.009,
+            "ci_low": 0.0005,
+            "ci_high": 0.0305,
+            "tolerance": 0.05,
+            "direction": "max",
+            "finding": false
+          }
+        ],
+        "verdict": "No disparity finding."
+      },
+      "facility_type": {
+        "column": "facility_type_norm",
+        "coverage": 1.0,
+        "n_audited_groups": 1,
+        "flag_vs_prevalence_corr": null,
+        "direction": {
+          "least_flagged": {
+            "group": "Restaurant",
+            "flag_rate": 0.002,
+            "prevalence": 0.4088,
+            "n": 9951
+          },
+          "most_flagged": {
+            "group": "Restaurant",
+            "flag_rate": 0.002,
+            "prevalence": 0.4088,
+            "n": 9951
+          }
+        },
+        "group_table": [
+          {
+            "group": "Restaurant",
+            "n": 9951,
+            "positives": 4068,
+            "prevalence": 0.4088,
+            "flag_rate": 0.002,
+            "fpr": 0.0008,
+            "fnr": 0.9963,
+            "ece": 0.0087,
+            "mean_pred": 0.4102,
+            "mean_obs": 0.4088,
+            "audited": true,
+            "odds_reliable": true
+          }
+        ],
+        "gaps_primary_high": [],
+        "gaps_secondary_elevated_high": [],
+        "verdict": "Too few audited groups to compare."
+      }
+    },
+    "summary": [
+      {
+        "axis": "neighborhood",
+        "column": "neighborhood",
+        "n_audited_groups": 5,
+        "coverage": 0.999,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "income",
+        "column": "area_income_q",
+        "n_audited_groups": 4,
+        "coverage": 0.97,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "race_nonwhite",
+        "column": "area_pct_nonwhite_q",
+        "n_audited_groups": 4,
+        "coverage": 0.987,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "race_dominant",
+        "column": "area_dominant_group",
+        "n_audited_groups": 5,
+        "coverage": 0.987,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "poverty",
+        "column": "area_pct_poverty_q",
+        "n_audited_groups": 4,
+        "coverage": 0.987,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "foreign_born",
+        "column": "area_pct_foreign_born_q",
+        "n_audited_groups": 4,
+        "coverage": 0.987,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "limited_english",
+        "column": "area_pct_limited_english_q",
+        "n_audited_groups": 4,
+        "coverage": 0.986,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio"
+      },
+      {
+        "axis": "cuisine",
+        "column": "cuisine",
+        "n_audited_groups": 33,
+        "coverage": 0.931,
+        "any_finding": true,
+        "findings": "disparate_impact_ratio, ece_gap"
+      },
+      {
+        "axis": "tenure",
+        "column": "tenure_bucket",
+        "n_audited_groups": 2,
+        "coverage": 1.0,
+        "any_finding": false,
+        "findings": ""
+      },
+      {
+        "axis": "facility_type",
+        "column": "facility_type_norm",
+        "n_audited_groups": 1,
+        "coverage": 1.0,
+        "any_finding": false,
+        "findings": ""
+      }
+    ]
+  },
+  "model2_forecast": {
+    "note": "calibration + coverage only; the forecast has no flagging operating point",
+    "axes": {
+      "neighborhood": {
+        "column": "neighborhood",
+        "coverage": 0.9989,
+        "ece_gap": 0.0572,
+        "ece_gap_ci": [
+          0.0341,
+          0.1115
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Manhattan",
+            "n": 3500,
+            "positives": 1346,
+            "prevalence": 0.3846,
+            "mean_forecast": 0.3806,
+            "mean_obs": 0.3846,
+            "ece": 0.0112,
+            "reliable": true
+          },
+          {
+            "group": "Queens",
+            "n": 2673,
+            "positives": 1263,
+            "prevalence": 0.4725,
+            "mean_forecast": 0.4161,
+            "mean_obs": 0.4725,
+            "ece": 0.0568,
+            "reliable": true
+          },
+          {
+            "group": "Brooklyn",
+            "n": 2508,
+            "positives": 957,
+            "prevalence": 0.3816,
+            "mean_forecast": 0.3915,
+            "mean_obs": 0.3816,
+            "ece": 0.0263,
+            "reliable": true
+          },
+          {
+            "group": "Bronx",
+            "n": 976,
+            "positives": 399,
+            "prevalence": 0.4088,
+            "mean_forecast": 0.3863,
+            "mean_obs": 0.4088,
+            "ece": 0.0265,
+            "reliable": true
+          },
+          {
+            "group": "Staten Island",
+            "n": 283,
+            "positives": 99,
+            "prevalence": 0.3498,
+            "mean_forecast": 0.3614,
+            "mean_obs": 0.3498,
+            "ece": 0.0684,
+            "reliable": true
+          }
+        ]
+      },
+      "income": {
+        "column": "area_income_q",
+        "coverage": 0.9696,
+        "ece_gap": 0.0193,
+        "ece_gap_ci": [
+          0.0079,
+          0.0453
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2412,
+            "positives": 1065,
+            "prevalence": 0.4415,
+            "mean_forecast": 0.4106,
+            "mean_obs": 0.4415,
+            "ece": 0.0328,
+            "reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2412,
+            "positives": 1066,
+            "prevalence": 0.442,
+            "mean_forecast": 0.4032,
+            "mean_obs": 0.442,
+            "ece": 0.046,
+            "reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2412,
+            "positives": 975,
+            "prevalence": 0.4042,
+            "mean_forecast": 0.3858,
+            "mean_obs": 0.4042,
+            "ece": 0.0267,
+            "reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2412,
+            "positives": 830,
+            "prevalence": 0.3441,
+            "mean_forecast": 0.3729,
+            "mean_obs": 0.3441,
+            "ece": 0.0328,
+            "reliable": true
+          }
+        ]
+      },
+      "race_nonwhite": {
+        "column": "area_pct_nonwhite_q",
+        "coverage": 0.9866,
+        "ece_gap": 0.0283,
+        "ece_gap_ci": [
+          0.0098,
+          0.0504
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 853,
+            "prevalence": 0.3475,
+            "mean_forecast": 0.3756,
+            "mean_obs": 0.3475,
+            "ece": 0.0282,
+            "reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1142,
+            "prevalence": 0.4652,
+            "mean_forecast": 0.4133,
+            "mean_obs": 0.4652,
+            "ece": 0.0518,
+            "reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 963,
+            "prevalence": 0.3924,
+            "mean_forecast": 0.3805,
+            "mean_obs": 0.3924,
+            "ece": 0.0236,
+            "reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1050,
+            "prevalence": 0.4279,
+            "mean_forecast": 0.4037,
+            "mean_obs": 0.4279,
+            "ece": 0.0304,
+            "reliable": true
+          }
+        ]
+      },
+      "race_dominant": {
+        "column": "area_dominant_group",
+        "coverage": 0.9866,
+        "ece_gap": 0.054,
+        "ece_gap_ci": [
+          0.0302,
+          0.083
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "White",
+            "n": 3756,
+            "positives": 1364,
+            "prevalence": 0.3632,
+            "mean_forecast": 0.3768,
+            "mean_obs": 0.3632,
+            "ece": 0.0173,
+            "reliable": true
+          },
+          {
+            "group": "no majority",
+            "n": 2533,
+            "positives": 1034,
+            "prevalence": 0.4082,
+            "mean_forecast": 0.3928,
+            "mean_obs": 0.4082,
+            "ece": 0.0301,
+            "reliable": true
+          },
+          {
+            "group": "Hispanic",
+            "n": 1500,
+            "positives": 638,
+            "prevalence": 0.4253,
+            "mean_forecast": 0.3929,
+            "mean_obs": 0.4253,
+            "ece": 0.0324,
+            "reliable": true
+          },
+          {
+            "group": "Asian",
+            "n": 1077,
+            "positives": 544,
+            "prevalence": 0.5051,
+            "mean_forecast": 0.4442,
+            "mean_obs": 0.5051,
+            "ece": 0.0712,
+            "reliable": true
+          },
+          {
+            "group": "Black",
+            "n": 952,
+            "positives": 428,
+            "prevalence": 0.4496,
+            "mean_forecast": 0.4026,
+            "mean_obs": 0.4496,
+            "ece": 0.0538,
+            "reliable": true
+          }
+        ]
+      },
+      "poverty": {
+        "column": "area_pct_poverty_q",
+        "coverage": 0.9866,
+        "ece_gap": 0.0138,
+        "ece_gap_ci": [
+          0.0056,
+          0.0363
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 915,
+            "prevalence": 0.3727,
+            "mean_forecast": 0.3817,
+            "mean_obs": 0.3727,
+            "ece": 0.0167,
+            "reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1056,
+            "prevalence": 0.4301,
+            "mean_forecast": 0.4054,
+            "mean_obs": 0.4301,
+            "ece": 0.0274,
+            "reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 1003,
+            "prevalence": 0.4087,
+            "mean_forecast": 0.39,
+            "mean_obs": 0.4087,
+            "ece": 0.0201,
+            "reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1034,
+            "prevalence": 0.4214,
+            "mean_forecast": 0.396,
+            "mean_obs": 0.4214,
+            "ece": 0.0304,
+            "reliable": true
+          }
+        ]
+      },
+      "foreign_born": {
+        "column": "area_pct_foreign_born_q",
+        "coverage": 0.9866,
+        "ece_gap": 0.0365,
+        "ece_gap_ci": [
+          0.0173,
+          0.0584
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2455,
+            "positives": 862,
+            "prevalence": 0.3511,
+            "mean_forecast": 0.3747,
+            "mean_obs": 0.3511,
+            "ece": 0.0254,
+            "reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2455,
+            "positives": 1177,
+            "prevalence": 0.4794,
+            "mean_forecast": 0.4231,
+            "mean_obs": 0.4794,
+            "ece": 0.0563,
+            "reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2454,
+            "positives": 938,
+            "prevalence": 0.3822,
+            "mean_forecast": 0.3845,
+            "mean_obs": 0.3822,
+            "ece": 0.0198,
+            "reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2454,
+            "positives": 1031,
+            "prevalence": 0.4201,
+            "mean_forecast": 0.3908,
+            "mean_obs": 0.4201,
+            "ece": 0.0294,
+            "reliable": true
+          }
+        ]
+      },
+      "limited_english": {
+        "column": "area_pct_limited_english_q",
+        "coverage": 0.986,
+        "ece_gap": 0.0332,
+        "ece_gap_ci": [
+          0.0122,
+          0.0519
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Q1 (lowest)",
+            "n": 2453,
+            "positives": 880,
+            "prevalence": 0.3587,
+            "mean_forecast": 0.377,
+            "mean_obs": 0.3587,
+            "ece": 0.024,
+            "reliable": true
+          },
+          {
+            "group": "Q2",
+            "n": 2453,
+            "positives": 950,
+            "prevalence": 0.3873,
+            "mean_forecast": 0.3804,
+            "mean_obs": 0.3873,
+            "ece": 0.0165,
+            "reliable": true
+          },
+          {
+            "group": "Q3",
+            "n": 2453,
+            "positives": 1041,
+            "prevalence": 0.4244,
+            "mean_forecast": 0.4024,
+            "mean_obs": 0.4244,
+            "ece": 0.0339,
+            "reliable": true
+          },
+          {
+            "group": "Q4 (highest)",
+            "n": 2453,
+            "positives": 1136,
+            "prevalence": 0.4631,
+            "mean_forecast": 0.4133,
+            "mean_obs": 0.4631,
+            "ece": 0.0498,
+            "reliable": true
+          }
+        ]
+      },
+      "cuisine": {
+        "column": "cuisine",
+        "coverage": 1.0,
+        "ece_gap": 0.1903,
+        "ece_gap_ci": [
+          0.12,
+          0.2621
+        ],
+        "finding": true,
+        "group_table": [
+          {
+            "group": "American",
+            "n": 1292,
+            "positives": 464,
+            "prevalence": 0.3591,
+            "mean_forecast": 0.3726,
+            "mean_obs": 0.3591,
+            "ece": 0.0202,
+            "reliable": true
+          },
+          {
+            "group": "Chinese",
+            "n": 1055,
+            "positives": 559,
+            "prevalence": 0.5299,
+            "mean_forecast": 0.4429,
+            "mean_obs": 0.5299,
+            "ece": 0.0891,
+            "reliable": true
+          },
+          {
+            "group": "Coffee/Tea",
+            "n": 827,
+            "positives": 234,
+            "prevalence": 0.283,
+            "mean_forecast": 0.3623,
+            "mean_obs": 0.283,
+            "ece": 0.0794,
+            "reliable": true
+          },
+          {
+            "group": "Pizza",
+            "n": 587,
+            "positives": 241,
+            "prevalence": 0.4106,
+            "mean_forecast": 0.3806,
+            "mean_obs": 0.4106,
+            "ece": 0.0371,
+            "reliable": true
+          },
+          {
+            "group": "Latin American",
+            "n": 555,
+            "positives": 292,
+            "prevalence": 0.5261,
+            "mean_forecast": 0.4279,
+            "mean_obs": 0.5261,
+            "ece": 0.1024,
+            "reliable": true
+          },
+          {
+            "group": "Bakery Products/Desserts",
+            "n": 484,
+            "positives": 201,
+            "prevalence": 0.4153,
+            "mean_forecast": 0.3961,
+            "mean_obs": 0.4153,
+            "ece": 0.038,
+            "reliable": true
+          },
+          {
+            "group": "Caribbean",
+            "n": 449,
+            "positives": 233,
+            "prevalence": 0.5189,
+            "mean_forecast": 0.4084,
+            "mean_obs": 0.5189,
+            "ece": 0.1148,
+            "reliable": true
+          },
+          {
+            "group": "Mexican",
+            "n": 372,
+            "positives": 133,
+            "prevalence": 0.3575,
+            "mean_forecast": 0.3886,
+            "mean_obs": 0.3575,
+            "ece": 0.0349,
+            "reliable": true
+          },
+          {
+            "group": "Chicken",
+            "n": 304,
+            "positives": 114,
+            "prevalence": 0.375,
+            "mean_forecast": 0.3736,
+            "mean_obs": 0.375,
+            "ece": 0.0341,
+            "reliable": true
+          },
+          {
+            "group": "Japanese",
+            "n": 287,
+            "positives": 117,
+            "prevalence": 0.4077,
+            "mean_forecast": 0.3928,
+            "mean_obs": 0.4077,
+            "ece": 0.0346,
+            "reliable": true
+          },
+          {
+            "group": "Italian",
+            "n": 238,
+            "positives": 94,
+            "prevalence": 0.395,
+            "mean_forecast": 0.3842,
+            "mean_obs": 0.395,
+            "ece": 0.0493,
+            "reliable": true
+          },
+          {
+            "group": "Juice, Smoothies, Fruit Salads",
+            "n": 228,
+            "positives": 75,
+            "prevalence": 0.3289,
+            "mean_forecast": 0.3543,
+            "mean_obs": 0.3289,
+            "ece": 0.0253,
+            "reliable": true
+          },
+          {
+            "group": "Spanish",
+            "n": 224,
+            "positives": 101,
+            "prevalence": 0.4509,
+            "mean_forecast": 0.4096,
+            "mean_obs": 0.4509,
+            "ece": 0.0688,
+            "reliable": true
+          },
+          {
+            "group": "Donuts",
+            "n": 219,
+            "positives": 47,
+            "prevalence": 0.2146,
+            "mean_forecast": 0.301,
+            "mean_obs": 0.2146,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Asian/Asian Fusion",
+            "n": 211,
+            "positives": 96,
+            "prevalence": 0.455,
+            "mean_forecast": 0.4223,
+            "mean_obs": 0.455,
+            "ece": 0.0828,
+            "reliable": true
+          },
+          {
+            "group": "Sandwiches",
+            "n": 209,
+            "positives": 71,
+            "prevalence": 0.3397,
+            "mean_forecast": 0.3705,
+            "mean_obs": 0.3397,
+            "ece": 0.0493,
+            "reliable": true
+          },
+          {
+            "group": "Thai",
+            "n": 152,
+            "positives": 74,
+            "prevalence": 0.4868,
+            "mean_forecast": 0.4345,
+            "mean_obs": 0.4868,
+            "ece": 0.0692,
+            "reliable": true
+          },
+          {
+            "group": "Indian",
+            "n": 151,
+            "positives": 81,
+            "prevalence": 0.5364,
+            "mean_forecast": 0.4625,
+            "mean_obs": 0.5364,
+            "ece": 0.0739,
+            "reliable": true
+          },
+          {
+            "group": "Hamburgers",
+            "n": 143,
+            "positives": 38,
+            "prevalence": 0.2657,
+            "mean_forecast": 0.3112,
+            "mean_obs": 0.2657,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Korean",
+            "n": 140,
+            "positives": 62,
+            "prevalence": 0.4429,
+            "mean_forecast": 0.422,
+            "mean_obs": 0.4429,
+            "ece": 0.0917,
+            "reliable": true
+          },
+          {
+            "group": "Bagels/Pretzels",
+            "n": 132,
+            "positives": 49,
+            "prevalence": 0.3712,
+            "mean_forecast": 0.3779,
+            "mean_obs": 0.3712,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Middle Eastern",
+            "n": 128,
+            "positives": 55,
+            "prevalence": 0.4297,
+            "mean_forecast": 0.4201,
+            "mean_obs": 0.4297,
+            "ece": 0.0727,
+            "reliable": true
+          },
+          {
+            "group": "Bangladeshi",
+            "n": 125,
+            "positives": 90,
+            "prevalence": 0.72,
+            "mean_forecast": 0.5096,
+            "mean_obs": 0.72,
+            "ece": 0.2104,
+            "reliable": true
+          },
+          {
+            "group": "Frozen Desserts",
+            "n": 116,
+            "positives": 37,
+            "prevalence": 0.319,
+            "mean_forecast": 0.3554,
+            "mean_obs": 0.319,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Jewish/Kosher",
+            "n": 104,
+            "positives": 44,
+            "prevalence": 0.4231,
+            "mean_forecast": 0.3965,
+            "mean_obs": 0.4231,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Tex-Mex",
+            "n": 82,
+            "positives": 20,
+            "prevalence": 0.2439,
+            "mean_forecast": 0.3307,
+            "mean_obs": 0.2439,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Mediterranean",
+            "n": 77,
+            "positives": 32,
+            "prevalence": 0.4156,
+            "mean_forecast": 0.389,
+            "mean_obs": 0.4156,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "French",
+            "n": 71,
+            "positives": 16,
+            "prevalence": 0.2254,
+            "mean_forecast": 0.3478,
+            "mean_obs": 0.2254,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Other",
+            "n": 67,
+            "positives": 23,
+            "prevalence": 0.3433,
+            "mean_forecast": 0.3548,
+            "mean_obs": 0.3433,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Seafood",
+            "n": 65,
+            "positives": 24,
+            "prevalence": 0.3692,
+            "mean_forecast": 0.3596,
+            "mean_obs": 0.3692,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Sandwiches/Salads/Mixed Buffet",
+            "n": 63,
+            "positives": 22,
+            "prevalence": 0.3492,
+            "mean_forecast": 0.3891,
+            "mean_obs": 0.3492,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Eastern European",
+            "n": 54,
+            "positives": 21,
+            "prevalence": 0.3889,
+            "mean_forecast": 0.4008,
+            "mean_obs": 0.3889,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "African",
+            "n": 52,
+            "positives": 29,
+            "prevalence": 0.5577,
+            "mean_forecast": 0.455,
+            "mean_obs": 0.5577,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Irish",
+            "n": 48,
+            "positives": 21,
+            "prevalence": 0.4375,
+            "mean_forecast": 0.3486,
+            "mean_obs": 0.4375,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Greek",
+            "n": 40,
+            "positives": 16,
+            "prevalence": 0.4,
+            "mean_forecast": 0.4197,
+            "mean_obs": 0.4,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Southeast Asian",
+            "n": 38,
+            "positives": 13,
+            "prevalence": 0.3421,
+            "mean_forecast": 0.389,
+            "mean_obs": 0.3421,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Pakistani",
+            "n": 37,
+            "positives": 23,
+            "prevalence": 0.6216,
+            "mean_forecast": 0.4581,
+            "mean_obs": 0.6216,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Fusion",
+            "n": 35,
+            "positives": 11,
+            "prevalence": 0.3143,
+            "mean_forecast": 0.3779,
+            "mean_obs": 0.3143,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Peruvian",
+            "n": 32,
+            "positives": 15,
+            "prevalence": 0.4688,
+            "mean_forecast": 0.4272,
+            "mean_obs": 0.4688,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Soul Food",
+            "n": 30,
+            "positives": 16,
+            "prevalence": 0.5333,
+            "mean_forecast": 0.4234,
+            "mean_obs": 0.5333,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Filipino",
+            "n": 29,
+            "positives": 13,
+            "prevalence": 0.4483,
+            "mean_forecast": 0.4487,
+            "mean_obs": 0.4483,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Vegan",
+            "n": 28,
+            "positives": 6,
+            "prevalence": 0.2143,
+            "mean_forecast": 0.4603,
+            "mean_obs": 0.2143,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Salads",
+            "n": 28,
+            "positives": 3,
+            "prevalence": 0.1071,
+            "mean_forecast": 0.3132,
+            "mean_obs": 0.1071,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "New American",
+            "n": 27,
+            "positives": 6,
+            "prevalence": 0.2222,
+            "mean_forecast": 0.4,
+            "mean_obs": 0.2222,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Turkish",
+            "n": 27,
+            "positives": 19,
+            "prevalence": 0.7037,
+            "mean_forecast": 0.4052,
+            "mean_obs": 0.7037,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Steakhouse",
+            "n": 21,
+            "positives": 10,
+            "prevalence": 0.4762,
+            "mean_forecast": 0.3784,
+            "mean_obs": 0.4762,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Creole",
+            "n": 19,
+            "positives": 14,
+            "prevalence": 0.7368,
+            "mean_forecast": 0.5103,
+            "mean_obs": 0.7368,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Pancakes/Waffles",
+            "n": 18,
+            "positives": 8,
+            "prevalence": 0.4444,
+            "mean_forecast": 0.367,
+            "mean_obs": 0.4444,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Chinese/Japanese",
+            "n": 17,
+            "positives": 7,
+            "prevalence": 0.4118,
+            "mean_forecast": 0.4859,
+            "mean_obs": 0.4118,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Vegetarian",
+            "n": 16,
+            "positives": 3,
+            "prevalence": 0.1875,
+            "mean_forecast": 0.3562,
+            "mean_obs": 0.1875,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Australian",
+            "n": 16,
+            "positives": 9,
+            "prevalence": 0.5625,
+            "mean_forecast": 0.4139,
+            "mean_obs": 0.5625,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Russian",
+            "n": 16,
+            "positives": 5,
+            "prevalence": 0.3125,
+            "mean_forecast": 0.3793,
+            "mean_obs": 0.3125,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Barbecue",
+            "n": 14,
+            "positives": 7,
+            "prevalence": 0.5,
+            "mean_forecast": 0.395,
+            "mean_obs": 0.5,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Continental",
+            "n": 14,
+            "positives": 5,
+            "prevalence": 0.3571,
+            "mean_forecast": 0.3781,
+            "mean_obs": 0.3571,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Soups/Salads/Sandwiches",
+            "n": 14,
+            "positives": 6,
+            "prevalence": 0.4286,
+            "mean_forecast": 0.316,
+            "mean_obs": 0.4286,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Tapas",
+            "n": 10,
+            "positives": 3,
+            "prevalence": 0.3,
+            "mean_forecast": 0.3313,
+            "mean_obs": 0.3,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Hotdogs",
+            "n": 10,
+            "positives": 4,
+            "prevalence": 0.4,
+            "mean_forecast": 0.3647,
+            "mean_obs": 0.4,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Bottled Beverages",
+            "n": 10,
+            "positives": 2,
+            "prevalence": 0.2,
+            "mean_forecast": 0.311,
+            "mean_obs": 0.2,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Brazilian",
+            "n": 8,
+            "positives": 2,
+            "prevalence": 0.25,
+            "mean_forecast": 0.3677,
+            "mean_obs": 0.25,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Ethiopian",
+            "n": 8,
+            "positives": 2,
+            "prevalence": 0.25,
+            "mean_forecast": 0.3768,
+            "mean_obs": 0.25,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Chinese/Cuban",
+            "n": 7,
+            "positives": 3,
+            "prevalence": 0.4286,
+            "mean_forecast": 0.4332,
+            "mean_obs": 0.4286,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "New French",
+            "n": 7,
+            "positives": 3,
+            "prevalence": 0.4286,
+            "mean_forecast": 0.3321,
+            "mean_obs": 0.4286,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Hawaiian",
+            "n": 7,
+            "positives": 2,
+            "prevalence": 0.2857,
+            "mean_forecast": 0.2912,
+            "mean_obs": 0.2857,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Portuguese",
+            "n": 6,
+            "positives": 2,
+            "prevalence": 0.3333,
+            "mean_forecast": 0.418,
+            "mean_obs": 0.3333,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "German",
+            "n": 6,
+            "positives": 3,
+            "prevalence": 0.5,
+            "mean_forecast": 0.3306,
+            "mean_obs": 0.5,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "English",
+            "n": 5,
+            "positives": 1,
+            "prevalence": 0.2,
+            "mean_forecast": 0.3283,
+            "mean_obs": 0.2,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Polish",
+            "n": 5,
+            "positives": 4,
+            "prevalence": 0.8,
+            "mean_forecast": 0.4367,
+            "mean_obs": 0.8,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Hotdogs/Pretzels",
+            "n": 5,
+            "positives": 1,
+            "prevalence": 0.2,
+            "mean_forecast": 0.2735,
+            "mean_obs": 0.2,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Afghan",
+            "n": 4,
+            "positives": 1,
+            "prevalence": 0.25,
+            "mean_forecast": 0.2858,
+            "mean_obs": 0.25,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Moroccan",
+            "n": 4,
+            "positives": 2,
+            "prevalence": 0.5,
+            "mean_forecast": 0.3555,
+            "mean_obs": 0.5,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Cajun",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "mean_forecast": 0.3448,
+            "mean_obs": 0.3333,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Fruits/Vegetables",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "mean_forecast": 0.4163,
+            "mean_obs": 0.3333,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Creole/Cajun",
+            "n": 3,
+            "positives": 1,
+            "prevalence": 0.3333,
+            "mean_forecast": 0.3633,
+            "mean_obs": 0.3333,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Armenian",
+            "n": 2,
+            "positives": 1,
+            "prevalence": 0.5,
+            "mean_forecast": 0.3334,
+            "mean_obs": 0.5,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Scandinavian",
+            "n": 2,
+            "positives": 1,
+            "prevalence": 0.5,
+            "mean_forecast": 0.2792,
+            "mean_obs": 0.5,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Southwestern",
+            "n": 2,
+            "positives": 0,
+            "prevalence": 0.0,
+            "mean_forecast": 0.4424,
+            "mean_obs": 0.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Basque",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "mean_forecast": 0.3777,
+            "mean_obs": 1.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Californian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "mean_forecast": 0.279,
+            "mean_obs": 0.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Egyptian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "mean_forecast": 0.5536,
+            "mean_obs": 0.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Lebanese",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "mean_forecast": 0.3874,
+            "mean_obs": 1.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Iranian",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "mean_forecast": 0.1973,
+            "mean_obs": 0.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Indonesian",
+            "n": 1,
+            "positives": 1,
+            "prevalence": 1.0,
+            "mean_forecast": 0.5201,
+            "mean_obs": 1.0,
+            "ece": null,
+            "reliable": false
+          },
+          {
+            "group": "Soups",
+            "n": 1,
+            "positives": 0,
+            "prevalence": 0.0,
+            "mean_forecast": 0.2684,
+            "mean_obs": 0.0,
+            "ece": null,
+            "reliable": false
+          }
+        ]
+      },
+      "tenure": {
+        "column": "tenure_bucket",
+        "coverage": 1.0,
+        "ece_gap": 0.0544,
+        "ece_gap_ci": [
+          0.0324,
+          0.0754
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "established (1-3yr)",
+            "n": 7390,
+            "positives": 2886,
+            "prevalence": 0.3905,
+            "mean_forecast": 0.3815,
+            "mean_obs": 0.3905,
+            "ece": 0.022,
+            "reliable": true
+          },
+          {
+            "group": "new (<1yr)",
+            "n": 2561,
+            "positives": 1182,
+            "prevalence": 0.4615,
+            "mean_forecast": 0.4261,
+            "mean_obs": 0.4615,
+            "ece": 0.0763,
+            "reliable": true
+          }
+        ]
+      },
+      "facility_type": {
+        "column": "facility_type_norm",
+        "coverage": 1.0,
+        "ece_gap": null,
+        "ece_gap_ci": [
+          null,
+          null
+        ],
+        "finding": false,
+        "group_table": [
+          {
+            "group": "Restaurant",
+            "n": 9951,
+            "positives": 4068,
+            "prevalence": 0.4088,
+            "mean_forecast": 0.393,
+            "mean_obs": 0.4088,
+            "ece": 0.0198,
+            "reliable": true
+          }
+        ]
+      }
+    }
+  }
+}

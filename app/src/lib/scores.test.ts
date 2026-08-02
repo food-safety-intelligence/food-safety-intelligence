@@ -18,6 +18,9 @@ import {
   parseTiers,
   toPinDriver,
   trendDirection,
+  compareInspectionsNewestFirst,
+  inspectionAnchorId,
+  parseInspectionAnchor,
 } from "@/lib/scores";
 
 const driver = (over: Partial<Driver> = {}): Driver => ({
@@ -354,6 +357,41 @@ describe("computeHomeView", () => {
     ).toEqual(["a", "z", "s", "n"]);
   });
 
+  it("sorts out-of-business venues after actives in risk sorts, not in A–Z", () => {
+    const idx: SearchIndex = {
+      ...INDEX,
+      rows: [
+        // Closed venue with the HIGHEST score — must not lead the list/pins.
+        { ...mk("c", "Closed High", 0.95, "High", true), is_out_of_business: true },
+        mk("1", "Zeta Pizza", 0.9, "High", true),
+        mk("4", "Delta Diner", 0.1, "Low", true),
+      ],
+    };
+    // Risk sort: actives by score desc, then closed.
+    expect(ids(computeHomeView(idx, opts()).listRows)).toEqual(["1", "4", "c"]);
+    // Pins follow the same order — the map's zoom cap takes the FIRST N,
+    // so a closed venue must never crowd out live signal at city zoom.
+    expect(ids(computeHomeView(idx, opts()).pins)).toEqual(["1", "4", "c"]);
+    // Low-first sort: closed still last.
+    expect(ids(computeHomeView(idx, opts({ sort: "low" })).listRows)).toEqual([
+      "4",
+      "1",
+      "c",
+    ]);
+    // A–Z keeps pure alphabetical order — a closed venue is findable in place.
+    expect(ids(computeHomeView(idx, opts({ sort: "name" })).listRows)).toEqual([
+      "c",
+      "4",
+      "1",
+    ]);
+    // The flag rides through to the rows the UI renders.
+    const risk = computeHomeView(idx, opts());
+    expect(risk.listRows.find((r) => r.license_id === "c")?.is_out_of_business).toBe(
+      true,
+    );
+    expect(risk.pins.find((p) => p.license_id === "c")?.is_out_of_business).toBe(true);
+  });
+
   it("caps the list but keeps the true match count", () => {
     const v = computeHomeView(INDEX, opts({ listLimit: 2 }));
     expect(v.listRows).toHaveLength(2);
@@ -363,5 +401,42 @@ describe("computeHomeView", () => {
   it("drops rows without coordinates from the map pins", () => {
     const v = computeHomeView(INDEX, opts());
     expect(ids(v.pins)).toEqual(["1", "2", "4"]); // "3" has null lat/lon
+  });
+});
+
+describe("inspection anchors (trend-chart dot ↔ history row hardlink)", () => {
+  it("round-trips an id through parse", () => {
+    expect(parseInspectionAnchor(inspectionAnchorId(0))).toBe(0);
+    expect(parseInspectionAnchor(inspectionAnchorId(7))).toBe(7);
+  });
+
+  it("parses both the bare id and the URL-hash form", () => {
+    expect(parseInspectionAnchor("inspection-3")).toBe(3);
+    expect(parseInspectionAnchor("#inspection-3")).toBe(3);
+  });
+
+  it("rejects anything that isn't an inspection anchor", () => {
+    expect(parseInspectionAnchor("")).toBeNull();
+    expect(parseInspectionAnchor("#inspection-comments-2026-01-01-0")).toBeNull();
+    expect(parseInspectionAnchor("#section-2")).toBeNull();
+    expect(parseInspectionAnchor("inspection-")).toBeNull();
+  });
+
+  it("orders inspections newest-first", () => {
+    const events = [
+      { date: "2021-01-01" },
+      { date: "2026-06-01" },
+      { date: "2023-03-15" },
+    ];
+    const dates = [...events].sort(compareInspectionsNewestFirst).map((e) => e.date);
+    expect(dates).toEqual(["2026-06-01", "2023-03-15", "2021-01-01"]);
+  });
+
+  it("keeps same-date ties in input order so both sides index them identically", () => {
+    const a = { date: "2024-05-01", type: "Canvass" };
+    const b = { date: "2024-05-01", type: "Complaint" };
+    const sorted = [a, b].sort(compareInspectionsNewestFirst);
+    expect(sorted[0]).toBe(a);
+    expect(sorted[1]).toBe(b);
   });
 });

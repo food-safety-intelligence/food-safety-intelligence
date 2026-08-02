@@ -42,7 +42,7 @@ def test_handler_builds_links():
     assert out["name"] == "Joe's Diner"
     assert out["topics"] == ["pests"]
     sources = {link["source"] for link in out["review_links"]}
-    assert sources == {"Yelp", "Google", "Web"}
+    assert sources == {"Yelp", "Google", "TripAdvisor"}
     assert all(link["url"].startswith("http") for link in out["review_links"])
     assert out["disclaimer"] == DISCLAIMER
 
@@ -54,35 +54,24 @@ def test_handler_requires_name():
 
 
 def test_links_percent_encode_special_chars():
-    # Query-significant characters from the name must be percent-encoded so they
-    # can't inject params or path segments — in the DDG ?q= searches AND the
-    # Google Maps path.
+    # Query-significant characters from the name must be percent/plus-encoded so
+    # they can't inject params or path segments into any source's search URL.
     out = handler({"name": "Joe's & Co / Café ?q=evil", "address": "Chicago, IL"}, None)
     urls = {link["source"]: link["url"] for link in out["review_links"]}
-    for url in (urls["Yelp"], urls["Web"]):
-        q = url.split("?q=", 1)[1]
-        assert " " not in q and "/" not in q and "& Co" not in q
-    # Google is a direct Maps search; the place string is encoded in the path.
-    tail = urls["Google"].split("/maps/search/", 1)[1]
-    assert " " not in tail and "/" not in tail and "& Co" not in tail
+    for src in ("Yelp", "Google", "TripAdvisor"):
+        query = urls[src].split("?", 1)[1]
+        assert " " not in query  # spaces are '+'-encoded
+        assert "/" not in query  # the '/' in the name must not survive as a path sep
+        assert "& Co" not in query  # the literal '&' from the name must be encoded
 
 
-def test_topic_scoping_in_urls():
-    # A specific topic scopes Yelp (site: search) + Web; Google is a direct,
-    # general Maps link. All-topics uses a concise "food safety" term.
-    pests = {
-        link["source"]: link["url"]
-        for link in handler(
-            {"name": "Lou Malnati's", "address": "Chicago, IL", "topics": ["pests"]}, None
-        )["review_links"]
-    }
-    assert "site%3Ayelp.com" in pests["Yelp"] and "rodents" in pests["Yelp"]
-    assert pests["Google"].startswith("https://www.google.com/maps/search/")
-    assert "rodents" in pests["Web"]
-    allt = {
-        link["source"]: link["url"]
-        for link in handler({"name": "Lou Malnati's", "address": "Chicago, IL"}, None)[
-            "review_links"
-        ]
-    }
-    assert "food+safety" in allt["Web"] and "droppings" not in allt["Web"]
+def test_links_go_direct_to_each_source():
+    # Each link points at its named source's own domain (not a search-engine
+    # detour). Links are general — not topic-scoped — so a requested topic's
+    # synonyms (e.g. "rodents") must not leak into any URL.
+    out = handler({"name": "Lou Malnati's", "address": "Chicago, IL", "topics": ["pests"]}, None)
+    urls = {link["source"]: link["url"] for link in out["review_links"]}
+    assert urls["Yelp"].startswith("https://www.yelp.com/search?")
+    assert urls["Google"].startswith("https://www.google.com/maps/search/?api=1")
+    assert urls["TripAdvisor"].startswith("https://www.tripadvisor.com/Search?")
+    assert all("rodents" not in link["url"] for link in out["review_links"])

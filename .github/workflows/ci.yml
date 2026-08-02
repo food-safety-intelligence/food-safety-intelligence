@@ -79,7 +79,10 @@ jobs:
           done
           uv run coverage run -a agents/eval/run_eval.py --self-test
           uv run coverage run -a agents/eval/run_eval.py --faithfulness
+          uv run coverage run -a agents/eval/run_eval.py --identity
+          uv run coverage run -a agents/eval/run_eval.py --lookup
           uv run coverage run -a agents/eval/run_eval.py --citations
+          uv run coverage run -a agents/eval/run_eval.py --link-checks
           uv run coverage report -m
           uv run coverage xml
 
@@ -236,11 +239,14 @@ jobs:
           done
 
       # Deterministic eval gates only: the checker self-test, faithfulness vs the
-      # committed scores.json, and the citation allow-list. No Bedrock — the
+      # committed scores.json, the authoritative-address relay + name-lookup
+      # checks (anti-hallucination), and the citation allow-list. No Bedrock — the
       # --judge guardrail suite stays a manual, paid run via the eval-agent skill
       # — and no network (--links is opt-in; it hits external public-health sites).
       - name: Agent eval (deterministic gates)
         run: |
           uv run python agents/eval/run_eval.py --self-test
           uv run python agents/eval/run_eval.py --faithfulness
+          uv run python agents/eval/run_eval.py --identity
+          uv run python agents/eval/run_eval.py --lookup
           uv run python agents/eval/run_eval.py --citations

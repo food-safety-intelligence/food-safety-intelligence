@@ -1,21 +1,25 @@
 "use client";
 
 import {
+  Layer,
   Map,
+  type MapRef,
   Marker,
   Popup,
   NavigationControl,
+  Source,
   useMap,
 } from "react-map-gl/maplibre";
 import Link from "next/link";
 import { ArrowDown, ArrowUp, type LucideIcon } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 
 import type { PinDriver, PinSummary, RiskTier } from "@/lib/scores";
-import { TIER_HEX } from "@/lib/scores";
+import { CLOSED_HEX, TIER_HEX } from "@/lib/scores";
 import { iconForFeature } from "@/lib/driver-icons";
 import { cn } from "@/lib/utils";
+import { maskFromBoundary } from "@/lib/geo";
 
 /**
  * Render a feature's topic icon. The icon component is resolved by the caller
@@ -37,7 +41,7 @@ export function PinDriverLine({ driver }: { driver: PinDriver }) {
     <span
       // Direction is in the accessible name too — not just the arrow + colour —
       // so it isn't a colour-only signal (matches DriverList's row title).
-      title={`${driver.label} — ${driver.up ? "raises" : "lowers"} risk`}
+      title={`${driver.label}: ${driver.up ? "raises" : "lowers"} risk`}
       className={cn(
         "flex items-center gap-1 text-2xs",
         driver.up ? "text-terra-strong" : "text-sage-strong",
@@ -95,6 +99,12 @@ const VOYAGER_STYLE = {
   ],
 };
 
+// City-boundary GeoJSON, cached per URL for the session (same pattern as the
+// worklist's detail cache) — switching back to a city never refetches.
+// globalThis.Map (not the bare `Map`, which this file imports from
+// react-map-gl as the <Map> component and would otherwise shadow).
+const boundaryCache = new globalThis.Map<string, GeoJSON.GeoJSON>();
+
 /**
  * Zoom → density rule. The cap grows roughly geometrically with zoom; the
  * viewport-clip kicks in at zoom ≥ 13 so we stop drawing pins the user
@@ -111,24 +121,194 @@ function pinCapForZoom(zoom: number): number {
 export function MapView({
   pins,
   className = "",
+  center = CHICAGO_CENTER,
+  maxBounds,
+  minZoom,
+  boundaryUrl,
 }: {
   pins: PinSummary[];
   className?: string;
+  center?: { lat: number; lon: number; zoom: number };
+  /** Hard camera clamp [[west, south], [east, north]] (CITY_CONFIG.maxBounds). */
+  maxBounds?: [[number, number], [number, number]];
+  /** Zoom-out floor (CITY_CONFIG.minZoom). */
+  minZoom?: number;
+  /** Committed city-boundary GeoJSON to gray out everything outside of. */
+  boundaryUrl?: string;
 }) {
   const [selected, setSelected] = useState<PinSummary | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
+  // Recenter imperatively on city change — rather than remount the map via key,
+  // which races maplibre's container init. Two paths because the city can
+  // resolve either before OR after the map's tiles finish loading:
+  //   • already loaded  → flyTo when the center prop changes (e.g. a header toggle)
+  //   • not yet loaded  → onLoad jumps to whatever the latest center is (e.g. a
+  //     direct visit to /?city=nyc, where the flyTo would otherwise fire on an
+  //     unloaded map and be lost — leaving NYC data over a Chicago map).
+  const mapRef = useRef<MapRef>(null);
+  const loadedRef = useRef(false);
+  // Keep the latest center in a ref so `handleLoad` can read it without being
+  // re-created on every center change. Updated in an effect (not during render).
+  const centerRef = useRef(center);
+  useEffect(() => {
+    centerRef.current = center;
+  });
+  // Keep the latest clamp values in a ref too, so `handleLoad` (a stable
+  // callback) can read them. maxBounds/minZoom are no longer passed as <Map>
+  // props (see below) — the library's own reactive prop-diffing only ever
+  // re-applies the clamp correctly on the FIRST change; from the second city
+  // switch onward the enforced camera constraint stays pinned to whichever
+  // bounds were set first, so flyTo lands the data/sidebar on the new city
+  // while the camera itself stays stuck on the old one. Applying the clamp
+  // imperatively from the same app code that already drives the camera
+  // avoids that library-internal diffing path entirely.
+  const clampRef = useRef({ maxBounds, minZoom });
+  useEffect(() => {
+    clampRef.current = { maxBounds, minZoom };
+  });
+  useEffect(() => {
+    if (!loadedRef.current) return;
+    const m = mapRef.current?.getMap();
+    if (!m) return;
+    // maplibre clamps flyTo targets to the ACTIVE maxBounds, so the previous
+    // city's clamp must come off before flying to a center outside it; the
+    // new clamp goes on only when the camera lands (moveend), otherwise the
+    // flight itself gets clipped mid-animation.
+    m.setMaxBounds(null);
+    if (minZoom !== undefined) m.setMinZoom(minZoom);
+    const applyClamp = () => {
+      if (maxBounds) m.setMaxBounds(maxBounds);
+    };
+    // Register AFTER flyTo, not before: flyTo()'s first internal action is
+    // stop(), which — if a prior flight is still animating (rapid second
+    // city switch) — fires "moveend" SYNCHRONOUSLY inside the flyTo() call
+    // itself, for the interrupted OLD flight. A listener registered before
+    // flyTo would consume that premature event and clamp mid-flight (a
+    // visible snap to the new bounds while the camera is still mid-nowhere).
+    // Registered after, it can only fire for the NEW flight's own
+    // termination — whether that's a natural landing, or a user grabbing the
+    // map mid-flight (which also cancels the flight and fires "moveend"; the
+    // clamp still applies there, snapping the grabbed camera into the new
+    // city's bounds, which is correct since the app has already switched to
+    // that city's data).
+    mapRef.current?.flyTo({
+      center: [center.lon, center.lat],
+      zoom: center.zoom,
+      duration: 800,
+    });
+    // Reduced-motion: flyTo falls through to jumpTo, whose moveend has already
+    // fired synchronously inside the call above - the camera has landed, so
+    // clamp now. Otherwise the flight is running and the listener (registered
+    // AFTER flyTo so the interrupting stop's moveend cannot consume it) fires
+    // on this flight's own termination - natural or user-interrupted.
+    if (m.isMoving()) {
+      m.once("moveend", applyClamp);
+    } else {
+      applyClamp();
+    }
+    // A rapid second switch mid-flight must not let the OLD listener apply
+    // the OLD city's bounds after the NEW flight begins.
+    return () => {
+      m.off("moveend", applyClamp);
+    };
+  }, [center.lat, center.lon, center.zoom, maxBounds, minZoom]);
+  const handleLoad = useCallback(() => {
+    loadedRef.current = true;
+    const c = centerRef.current;
+    const m = mapRef.current?.getMap();
+    // Why setMaxBounds was inert while setMinZoom held: @vis.gl/react-maplibre
+    // unconditionally installs `map.transformCameraUpdate` (its _onCameraUpdate
+    // hook). That switches maplibre-gl into "dual transform" mode — pan/drag
+    // handlers accumulate into a private `_requestedCameraState` clone and each
+    // frame copies it back onto `map.transform`. `setMaxBounds()` writes the pan
+    // constraint (lng/lat range) ONLY to `map.transform`, so the very first drag
+    // runs against the unconstrained clone and then overwrites the constraint
+    // (getMaxBounds() reads back null after one drag). `setMinZoom()` instead goes
+    // through `_getTransformForUpdate()`, which writes the clone, so the zoom floor
+    // survives — that asymmetry is the whole bug. This map is uncontrolled
+    // (initialViewState only) and never reads e.viewState off camera events, so the
+    // hook buys nothing; clearing it returns maplibre to its standard single-
+    // transform path where setMaxBounds/setMinZoom/flyTo all act on the one
+    // transform the drag reads. react-maplibre sets the hook once at init and never
+    // again, so this stays cleared across re-renders and city switches.
+    // Revisit this override if this map ever becomes controlled (viewState/onMove)
+    // or on any react-map-gl / maplibre-gl upgrade - it depends on verified 8.1.1 /
+    // 5.24.0 internals.
+    if (m) m.transformCameraUpdate = null;
+    mapRef.current?.jumpTo({ center: [c.lon, c.lat], zoom: c.zoom });
+    const { maxBounds: mb, minZoom: mz } = clampRef.current;
+    if (m) {
+      if (mz !== undefined) m.setMinZoom(mz);
+      if (mb) m.setMaxBounds(mb);
+    }
+  }, []);
+
+  // The mask is decorative: on any failure the map still works and the clamp
+  // (config constants) still applies — so errors skip silently, no retry UI.
+  const [boundary, setBoundary] = useState<GeoJSON.GeoJSON | null>(
+    boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null,
+  );
+  // Reset synchronously when the boundary source changes — adjust-state-during-
+  // render (React's recommended alternative to a reset effect; same pattern as
+  // MapExplorer's resultKey), so the OLD city's mask never survives a city
+  // switch, without an effect-tick lag or a set-state-in-effect suppression.
+  const [prevBoundaryUrl, setPrevBoundaryUrl] = useState(boundaryUrl);
+  if (boundaryUrl !== prevBoundaryUrl) {
+    setPrevBoundaryUrl(boundaryUrl);
+    setBoundary(boundaryUrl ? (boundaryCache.get(boundaryUrl) ?? null) : null);
+  }
+  useEffect(() => {
+    if (!boundaryUrl || boundaryCache.has(boundaryUrl)) return;
+    let alive = true;
+    fetch(boundaryUrl)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((gj: GeoJSON.GeoJSON) => {
+        boundaryCache.set(boundaryUrl, gj);
+        if (alive) setBoundary(gj);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [boundaryUrl]);
+
+  const mask = useMemo(() => maskFromBoundary(boundary), [boundary]);
+
   return (
     <div className={className}>
       <Map
+        ref={mapRef}
+        onLoad={handleLoad}
         initialViewState={{
-          latitude: CHICAGO_CENTER.lat,
-          longitude: CHICAGO_CENTER.lon,
-          zoom: CHICAGO_CENTER.zoom,
+          latitude: center.lat,
+          longitude: center.lon,
+          zoom: center.zoom,
         }}
         mapStyle={VOYAGER_STYLE as never}
         style={{ width: "100%", height: "100%" }}
       >
+        {mask && (
+          <Source id="city-mask" type="geojson" data={mask}>
+            {/* Warm tint wash: outside stays faintly legible (roads leading
+                in) but reads unmistakably as out of scope. Colour is not the
+                only cue — the boundary line and the pan clamp carry it too. */}
+            <Layer
+              id="city-mask-fill"
+              type="fill"
+              paint={{ "fill-color": "#EDE6D8", "fill-opacity": 0.55 }}
+            />
+          </Source>
+        )}
+        {boundary && mask && (
+          <Source id="city-boundary" type="geojson" data={boundary}>
+            <Layer
+              id="city-boundary-line"
+              type="line"
+              paint={{ "line-color": "#6B7280", "line-width": 1.5, "line-opacity": 0.5 }}
+            />
+          </Source>
+        )}
         <NavigationControl position="bottom-right" showCompass={false} />
 
         <PinLayer
@@ -163,14 +343,25 @@ export function MapView({
               <div className="flex items-center gap-2 mb-1.5 pr-6">
                 <span
                   className="inline-block w-2 h-2 rounded-full"
-                  style={{ background: TIER_HEX[selected.risk_tier] }}
+                  style={{
+                    background: selected.is_out_of_business
+                      ? CLOSED_HEX
+                      : TIER_HEX[selected.risk_tier],
+                  }}
                 />
                 <span className="text-2xs uppercase tracking-[0.14em] text-muted font-medium">
-                  {selected.risk_tier}
+                  {selected.is_out_of_business
+                    ? "Out of business"
+                    : selected.risk_tier}
                 </span>
-                <span className="num text-base font-medium ml-auto">
-                  {selected.risk_score.toFixed(2)}
-                </span>
+                {/* No risk number for a closed venue — a fresh-looking score
+                    next to "out of business" invites misreading; the profile
+                    page carries the historical detail. */}
+                {!selected.is_out_of_business && (
+                  <span className="num text-base font-medium ml-auto">
+                    {selected.risk_score.toFixed(2)}
+                  </span>
+                )}
               </div>
               <div className="font-semibold text-base leading-tight">
                 {selected.dba_name}
@@ -178,7 +369,7 @@ export function MapView({
               <div className="text-xs text-muted mt-0.5">
                 {selected.address}
               </div>
-              {selected.top_driver && (
+              {selected.top_driver && !selected.is_out_of_business && (
                 <div className="mt-1.5">
                   <PinDriverLine driver={selected.top_driver} />
                 </div>
@@ -294,11 +485,16 @@ function PinLayer({
         >
           <TeardropPin
             tier={p.risk_tier}
+            closed={p.is_out_of_business ?? false}
             isHovered={hovered === p.license_id}
             isSelected={selected?.license_id === p.license_id}
             onMouseEnter={() => onHover(p.license_id)}
             onMouseLeave={() => onHover(null)}
-            label={`${p.dba_name} — ${p.risk_tier} risk`}
+            label={
+              p.is_out_of_business
+                ? `${p.dba_name}, out of business (was ${p.risk_tier} risk)`
+                : `${p.dba_name}, ${p.risk_tier} risk`
+            }
           />
         </Marker>
       ))}
@@ -313,6 +509,7 @@ function PinLayer({
  */
 function TeardropPin({
   tier,
+  closed,
   isHovered,
   isSelected,
   onMouseEnter,
@@ -320,13 +517,14 @@ function TeardropPin({
   label,
 }: {
   tier: RiskTier;
+  closed: boolean;
   isHovered: boolean;
   isSelected: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   label: string;
 }) {
-  const color = TIER_HEX[tier];
+  const color = closed ? CLOSED_HEX : TIER_HEX[tier];
   const active = isHovered || isSelected;
 
   return (
@@ -355,10 +553,22 @@ function TeardropPin({
         <path
           d="M12 0 C 17.5 0 22 4.5 22 10 C 22 17 13.5 26.5 12.7 29.2 C 12.4 30.2 11.6 30.2 11.3 29.2 C 10.5 26.5 2 17 2 10 C 2 4.5 6.5 0 12 0 Z"
           fill={color}
+          // Closed pins sit back: dimmed fill; the "×" centre (not colour
+          // alone) marks them, and the aria-label says "out of business".
+          fillOpacity={closed ? 0.62 : 1}
           stroke="#FFFFFF"
           strokeWidth={1.5}
         />
-        <circle cx={12} cy={10} r={3.5} fill="#FFFFFF" />
+        {closed ? (
+          <path
+            d="M9.5 7.5 L14.5 12.5 M14.5 7.5 L9.5 12.5"
+            stroke="#FFFFFF"
+            strokeWidth={2}
+            strokeLinecap="round"
+          />
+        ) : (
+          <circle cx={12} cy={10} r={3.5} fill="#FFFFFF" />
+        )}
       </svg>
     </button>
   );

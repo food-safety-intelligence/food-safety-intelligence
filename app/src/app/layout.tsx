@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { IBM_Plex_Sans, Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 import { ChatScopeProvider } from "@/components/ChatScopeContext";
+import { CityProvider } from "@/components/CityContext";
+import { CityEntryModal } from "@/components/CityPicker";
 import { FloatingChat } from "@/components/FloatingChat";
 
 // Body — distinctive sans, full weight range.
@@ -30,7 +32,7 @@ const plexSans = IBM_Plex_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Food Safety — Chicago",
+  title: "Eatelligence Food Safety",
   description:
     "Predicted 180-day food-safety risk for licensed Chicago food establishments. A research preview.",
 };
@@ -46,10 +48,13 @@ export default function RootLayout({
       className={`${manrope.variable} ${instrument.variable} ${plexSans.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ChatScopeProvider>
-          {children}
-          <FloatingChat />
-        </ChatScopeProvider>
+        <CityProvider>
+          <ChatScopeProvider>
+            {children}
+            <CityEntryModal />
+            <FloatingChat />
+          </ChatScopeProvider>
+        </CityProvider>
       </body>
     </html>
   );

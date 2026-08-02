@@ -1,0 +1,100 @@
+"use client";
+
+// Client-side city selection (DR 0016). Source of truth precedence:
+//   URL `?city=` → localStorage → DEFAULT_CITY.
+// The choice is mirrored back to both the URL (shareable links) and
+// localStorage (sticky across visits). `needsPick` is true on a first visit
+// with no stored/URL choice, so the entry popup can prompt once.
+
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { type City, DEFAULT_CITY, isCity } from "@/lib/city";
+import { safeGet, safeSet } from "@/lib/safe-storage";
+
+const STORAGE_KEY = "fsi.city";
+
+interface CityContextValue {
+  city: City;
+  setCity: (c: City) => void;
+  needsPick: boolean;
+  dismissPick: () => void;
+  requestPick: () => void;
+}
+
+const CityContext = createContext<CityContextValue | null>(null);
+
+function readInitial(): { city: City; needsPick: boolean } {
+  if (typeof window === "undefined") return { city: DEFAULT_CITY, needsPick: false };
+  const url = new URLSearchParams(window.location.search).get("city");
+  if (isCity(url)) return { city: url, needsPick: false };
+  const stored = safeGet("local", STORAGE_KEY);
+  if (isCity(stored)) return { city: stored, needsPick: false };
+  return { city: DEFAULT_CITY, needsPick: true };
+}
+
+export function CityProvider({ children }: { children: React.ReactNode }) {
+  // Server render + first client paint use DEFAULT_CITY so markup matches
+  // (no hydration mismatch); a mount effect then applies the real choice.
+  const [city, setCityState] = useState<City>(DEFAULT_CITY);
+  const [needsPick, setNeedsPick] = useState(false);
+
+  // Hydration read: URL/localStorage are browser-only, so the real choice can
+  // only be applied after mount (a lazy initializer would diverge from the
+  // server's DEFAULT_CITY paint and cause a hydration mismatch). This one-shot
+  // post-mount setState is the intended use, not a cascading-render smell.
+  useEffect(() => {
+    const { city: c, needsPick: np } = readInitial();
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setCityState(c);
+    setNeedsPick(np);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, []);
+
+  // Browser back/forward changes the URL but not React state, and the provider
+  // lives in the root layout so it never remounts to re-run the effect above.
+  // The URL `?city=` is the source of truth (precedence note at top), so on a
+  // history navigation re-read it and follow an explicit choice — otherwise the
+  // data, map, and copy would keep showing the city from before the back/forward
+  // while the URL says otherwise (and a refresh would then flip it). A URL with
+  // no `?city=` (a param-less page) leaves the current city as-is: localStorage
+  // is the tiebreaker there, matching what a refresh of that URL would resolve.
+  useEffect(() => {
+    const onPopState = () => {
+      const url = new URLSearchParams(window.location.search).get("city");
+      if (isCity(url)) {
+        setCityState(url);
+        setNeedsPick(false);
+      }
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  const setCity = useCallback((c: City) => {
+    setCityState(c);
+    setNeedsPick(false);
+    if (typeof window !== "undefined") {
+      safeSet("local", STORAGE_KEY, c);
+      const url = new URL(window.location.href);
+      url.searchParams.set("city", c);
+      window.history.replaceState(null, "", url.toString());
+    }
+  }, []);
+
+  const dismissPick = useCallback(() => setNeedsPick(false), []);
+
+  // Re-open the entry popup on demand (e.g. clicking the home logo), letting a
+  // returning visitor go back to the "choose a city" prompt.
+  const requestPick = useCallback(() => setNeedsPick(true), []);
+
+  return (
+    <CityContext.Provider value={{ city, setCity, needsPick, dismissPick, requestPick }}>
+      {children}
+    </CityContext.Provider>
+  );
+}
+
+export function useCity(): CityContextValue {
+  const ctx = useContext(CityContext);
+  if (!ctx) throw new Error("useCity must be used within <CityProvider>");
+  return ctx;
+}

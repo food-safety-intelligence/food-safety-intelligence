@@ -1,6 +1,6 @@
 ---
 name: verifier-app
-description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers npm ci, the static-export build served from out/ (next dev is not faithful), a Playwright screenshot recipe, and the key routes / test restaurants.
+description: Build, launch, and capture pixels for the Next.js web app in app/ so a code change can be verified by observing the running UI. The built-in `verify` skill auto-discovers this verifier-* skill as the web surface's evidence-capture protocol. Covers the fast `next dev` path for client-rendered pages, the static-export build served from out/ for the home/detail routes, a Playwright screenshot recipe, and the key routes / test restaurants.
 ---
 
 # verifier-app
@@ -11,7 +11,52 @@ web UI, so running `/verify` on an `app/` change picks it up automatically.
 Goal: get the changed page rendering and capture a screenshot a reviewer can
 look at, not just inspect HTML.
 
-## Build + launch
+## Pick the surface first: `next dev` (fast) vs static build (faithful)
+
+Two page classes, two verify paths. Choose by what your change touches — don't
+pay for the 2-min static build when the page is client-rendered.
+
+- **Client-rendered pages → `next dev` (fast, always fresh).** `/how-it-works`,
+  `/sources`, and `/chat` render entirely in the browser (they read
+  `useCity()` / `sessionStorage`, not build-time-injected props), so `next dev`
+  renders them faithfully — and it has **no static cache to go stale**, which is
+  the whole failure mode below. This is the default for a copy/layout/component
+  change on those routes.
+
+  ```bash
+  cd app
+  npm ci                         # once, if node_modules is missing
+  npx next dev -p 4142           # UNIQUE port (not the 3000 default); background it
+  # then screenshot http://localhost:4142/how-it-works/?city=la etc. (Playwright recipe below)
+  ```
+
+  City switch is a query string: `/how-it-works/?city=nyc`, `/sources/?city=la`,
+  Chicago is the bare route. Kill the dev server by **PID** when done.
+
+- **Home + detail pages → static build served from `out/`.** `/` and
+  `/restaurant/<id>/` depend on `output: "export"` behaviour (`searchParams`,
+  `generateStaticParams`) that `next dev` does NOT reproduce (see next section),
+  so these MUST be verified against a real build. The detail-bundle gen is the
+  slow part (~13 min for all licenses); if you only need the home page or a
+  handful of detail pages, set `FSI_DETAIL_ONLY` to skip the full bundle sweep.
+
+### EFS / NFS build gotchas (static path only)
+
+The static build writes `.next` on EFS, which bites in two ways — `next dev`
+avoids both:
+
+- **Stale webpack cache serves OLD content.** A rebuild can reuse a stale
+  `.next` cache and emit the *previous* version of a page (e.g. showing a
+  removed section). If a static build shows content you already changed,
+  `rm -rf app/.next` and rebuild.
+- **`.nfs*` silly-rename busy files block the delete.** `rm -rf app/.next` can
+  fail with `EBUSY: unlink '.next/.nfs…'` while a `next` process still holds the
+  file. Kill the holder **by PID** (`ps aux | grep next`, then `kill <pid>`) —
+  do **NOT** `pkill -f 'next build'` / `kill $(pgrep -f 'next build')`: that
+  pattern matches your own shell's command line and self-kills the shell (the
+  process dies with exit 144). After the holder is gone, the `rm -rf` succeeds.
+
+## Build + launch (static export)
 
 The app is a **static export** (`app/next.config.ts` → `output: "export"`): it reads
 its data from S3 at **build** time and emits a fully pre-rendered site in `out/`. Two
@@ -40,6 +85,36 @@ If `npm run build` runs **out of memory** (`heap out of memory` / `SIGABRT`), do
 raise `NODE_OPTIONS` — Next's static-gen workers don't inherit it (they cap at ~2 GB
 regardless). The cause is a server loader holding too much data per worker; fix the loader
 to read per-page slices.
+
+### Fast re-verify for a JS-only change (skip the ~13-min detail regen)
+
+`npm run build`'s `postbuild` regenerates **every** establishment's detail bundle
+(Chicago ~23.6k + NYC ~27.7k + LA ~43k tiny files). That dominates the build and is
+pure waste when you only changed client code (`.tsx`/`.ts`) and the data JSONs are
+unchanged. Two consequences on **this box specifically**: the worktree lives on
+**EFS/NFS**, so writing ~94k small files — and even Next's own "Collecting build
+traces" step reading `node_modules` — is pathologically slow (many minutes). On CI's
+local SSD the same build is far quicker, so this is a local-verify problem, not a CI one.
+
+For a UI-only change you need the rebuilt JS plus only the handful of test bundles you
+screenshot:
+
+```bash
+cd app
+rm -f .next/lock                     # a killed prior build can leave a stale lock
+npx next build --webpack             # JS + page shells only, no postbuild (~1 min)
+# generate ONLY the venues you screenshot (per city) — seconds, not minutes:
+FSI_DETAIL_ONLY="FA0275664,FA0222484" \
+  node scripts/build-detail-data.mjs public/data/la/scores.json \
+  public/data/la/inspection_history.json "" out/data/la
+python3 -m http.server 4137 --directory out   # unique port, isolated
+```
+
+`FSI_DETAIL_ONLY=<id,id,…>` writes just those bundles (+ `detail-globals.json` with
+percentiles still computed over the FULL population) into the target dir without wiping
+it. Do a full `npm run build` when you change the **data** or need every venue reachable;
+`--only` is for observing a code change. Note `next build` wipes `out/`, so run the
+`FSI_DETAIL_ONLY` step **after** it, and re-run it if you rebuild.
 
 ## Capture pixels
 
@@ -171,6 +246,36 @@ an unsafe-scheme link is NOT an anchor:
 ```js
 const anchors = await page.$$eval("a", (els) =>
   els.map((a) => ({ text: a.textContent, href: a.href, rel: a.rel })));
+```
+
+## The floating chat widget is its own surface — verify it separately
+
+The chat renders in two places from ONE component (`ChatInterface`): the full
+`/chat` page and the **floating widget** (`FloatingChat`, mounted in the root
+layout on every page except `/chat`, opened by the corner "Ask" button). The
+widget passes `compact`; verifying `/chat` alone hides two classes of bug that
+only surface in the widget:
+
+- **`sm:` / `md:` breakpoints key off the VIEWPORT, but the widget is a fixed
+  ~384px on any screen.** A control that fits at a 1280px viewport can overflow or
+  clip inside the widget. Anything that must adapt to the widget's width has to
+  key off a `compact`-style prop (or a container query), not a viewport
+  breakpoint — so screenshot the widget on a **desktop** viewport too, not only
+  mobile.
+- **The widget has its own document-level Escape-to-close.** A modal/overlay
+  opened from inside the widget must scope its own Escape (capture phase +
+  `stopPropagation`), or one Esc closes the whole chat. Assert that after Esc the
+  overlay is gone but the widget's content is still there.
+
+To exercise it, load a **non-`/chat`** client-rendered route (e.g.
+`/how-it-works/`) so the widget shows, click the corner "Ask" button, then drive
+the content. Seed the transcript the same way as `/chat` above (`fsi_chat_messages`
++ `fsi_chat_session` via `addInitScript`) — the widget reuses the same component
+and sessionStorage. If a first-visit **city-picker** modal intercepts clicks in a
+fresh context, pre-seed the city before load:
+
+```js
+await page.addInitScript(() => { try { localStorage.setItem("fsi.city", "chicago"); } catch {} });
 ```
 
 ## Put the screenshots in the PR (this repo is private)

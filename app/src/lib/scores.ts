@@ -44,6 +44,7 @@ export interface PinSummary {
   risk_score: number;
   risk_tier: RiskTier;
   top_driver?: PinDriver;
+  is_out_of_business?: boolean;
 }
 
 export interface Driver {
@@ -69,6 +70,14 @@ export interface RestaurantScore {
   trend_ci_low?: number | null;
   trend_ci_high?: number | null;
   top_drivers: Driver[];
+  /**
+   * Latest inspection event found the venue closed ("Out of Business" /
+   * "Business Not Located"). The score/tier are historical for these rows —
+   * the UI de-emphasises them and never presents the risk as current.
+   */
+  is_out_of_business?: boolean;
+  /** Date of the closing inspection event (ISO), when is_out_of_business. */
+  closed_since?: string | null;
   /**
    * Server-computed percentile rank of this restaurant's `risk_score` in the
    * full scored population (0–100). 100 = highest score in the dataset.
@@ -129,8 +138,8 @@ export interface ScoresPayload {
   totals: {
     establishments: number;
     tier_counts: Record<RiskTier, number>;
-    worsening_30d: number;
-    improving_30d: number;
+    worsening: number;
+    improving: number;
   };
   /** Absent in older JSON written before the per-profile waterfall was added. */
   calibration?: Calibration;
@@ -211,6 +220,30 @@ export const TIER_HEX: Record<RiskTier, string> = {
 };
 
 /**
+ * Tier foreground colours (the darker pill-text palette) as CSS-var references,
+ * for use as a raw colour value in contexts Tailwind classes can't reach — e.g.
+ * an SVG `fill`. This is the pill's `text-tier-*-fg` colour, not the lighter
+ * TIER_HEX arc-fill palette: TIER_HEX is tuned as a large fill and fails text
+ * contrast for Moderate/Elevated, whereas the `-fg` palette is tuned as text.
+ * Referenced as vars (not hard-coded hex) so globals.css stays the single
+ * source of truth and these can't drift from the pill.
+ */
+export const TIER_FG_VAR: Record<RiskTier, string> = {
+  Low: "var(--color-tier-low-fg)",
+  Moderate: "var(--color-tier-mod-fg)",
+  Elevated: "var(--color-tier-elev-fg)",
+  High: "var(--color-tier-high-fg)",
+};
+
+/**
+ * Pin/dot colour for out-of-business venues — a neutral warm grey so closed
+ * pins recede behind the tier palette. Colour is never the only cue: the pin
+ * swaps its centre dot for an "×" glyph and the accessible name says "out of
+ * business".
+ */
+export const CLOSED_HEX = "#A8A49A";
+
+/**
  * Reduce a full {@link Driver} to the compact {@link PinDriver} a map pin /
  * list row carries: keep the label + feature key (for the icon), and collapse
  * the signed `shap` to an `up` direction (true = raises risk). A zero `shap`
@@ -280,12 +313,53 @@ export type TrendDirection = "improving" | "stable" | "worsening";
  */
 export const TREND_STABLE_BAND = 0.0003;
 
-export function trendDirection(slope: number | null): TrendDirection {
+export function trendDirection(
+  slope: number | null,
+  band: number = TREND_STABLE_BAND,
+): TrendDirection {
   if (slope === null) return "stable";
-  if (slope > TREND_STABLE_BAND) return "worsening";
-  if (slope < -TREND_STABLE_BAND) return "improving";
+  if (slope > band) return "worsening";
+  if (slope < -band) return "improving";
   return "stable";
 }
+
+// ---------------------------------------------------------------------------
+// Inspection hardlinks — the trend-chart dots link to their matching row in the
+// inspection-history timeline. Both sides compute the same `inspection-<n>`
+// anchor from an inspection's position in NEWEST-FIRST order, so they agree on
+// which row a dot points at without sharing object references (the detail page
+// hands the timeline a comment-merged copy of the history, not the same array).
+// ---------------------------------------------------------------------------
+
+/**
+ * Newest-first order (and the basis for the anchor index). Same-date ties keep
+ * input order (returns 0) so the ordering is stable and both sides index it
+ * identically.
+ */
+export function compareInspectionsNewestFirst(
+  a: { date: string },
+  b: { date: string },
+): number {
+  return a.date < b.date ? 1 : a.date > b.date ? -1 : 0;
+}
+
+/** DOM id / URL fragment for the inspection row at newest-first position `n`. */
+export function inspectionAnchorId(n: number): string {
+  return `inspection-${n}`;
+}
+
+/** Newest-first index from an `inspection-<n>` id / `#inspection-<n>` fragment. */
+export function parseInspectionAnchor(hashOrId: string): number | null {
+  const m = /^#?inspection-(\d+)$/.exec(hashOrId);
+  return m ? Number(m[1]) : null;
+}
+
+/**
+ * In-tab jump signal. The inline trend chart dispatches this on `window` when a
+ * dot is clicked (updating the URL hash alone wouldn't re-fire for the same
+ * target); the timeline listens for it to scroll + highlight the row.
+ */
+export const INSPECTION_JUMP_EVENT = "fsi:inspection-jump";
 
 // ---------------------------------------------------------------------------
 // Home search/sort — shared between the server loader and the client shell.
@@ -304,6 +378,7 @@ export interface HomeListRow {
   risk_tier: RiskTier;
   trend_slope: number | null;
   top_driver?: PinDriver;
+  is_out_of_business?: boolean;
 }
 
 /**
@@ -373,6 +448,17 @@ export function parseSort(raw: string | null | undefined): HomeSort {
   return raw === "name" ? "name" : raw === "low" ? "low" : "risk";
 }
 
+/**
+ * Order closed venues after active ones (0 vs 1), before any score compare.
+ * Two reasons: the map's zoom-density budget takes the FIRST N pins, so closed
+ * venues must never crowd out live signal at city zoom; and a risk-sorted list
+ * shouldn't lead with establishments that no longer exist. Name sort is exempt
+ * (an A–Z lookup should find a closed venue in its alphabetical place).
+ */
+export function closedRank(r: { is_out_of_business?: boolean }): number {
+  return r.is_out_of_business ? 1 : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Client search index
 //
@@ -393,19 +479,41 @@ export interface SearchIndexRow {
   risk_score: number;
   risk_tier: RiskTier;
   trend_slope: number | null;
+  /** Latest scored inspection date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   top_driver: PinDriver | null;
+  /**
+   * DR 0014: the establishment's latest inspection event found it closed.
+   * Present (true) only on indexes built from scores.json 0.6.0+; absent
+   * means active. The inspectors worklist excludes these entirely — a closed
+   * venue must never appear on an inspection list.
+   */
+  is_out_of_business?: boolean;
+  /**
+   * Bitmask of violation categories observed at the latest scored inspection
+   * (bit i = VIOLATION_CATEGORIES[i] in lib/violations.ts). Omitted when the
+   * inspection was clean or the index was built without violation tagging —
+   * an index with NO vc on any row predates the feature, and the worklist
+   * hides the violation filter entirely.
+   */
+  vc?: number;
 }
 
 /** The whole `search-index.json` file the client fetches once. */
 export interface SearchIndex {
   schema_version: string;
   generated_at: string | null;
+  /** Payload-level as-of date (ISO). Optional: absent in older indexes. */
+  as_of_date?: string | null;
   total: number;
   tier_counts: Record<RiskTier, number>;
   rows: SearchIndexRow[];
 }
 
-function hasCoords(r: SearchIndexRow): boolean {
+/** Row has renderable map coordinates. Shared by the home + inspector maps. */
+export function hasCoords(
+  r: SearchIndexRow,
+): r is SearchIndexRow & { lat: number; lon: number } {
   return (
     r.lat != null &&
     r.lon != null &&
@@ -437,8 +545,8 @@ export function computeHomeView(
     sort === "name"
       ? compareByName(a.dba_name, b.dba_name)
       : sort === "low"
-        ? a.risk_score - b.risk_score
-        : b.risk_score - a.risk_score;
+        ? closedRank(a) - closedRank(b) || a.risk_score - b.risk_score
+        : closedRank(a) - closedRank(b) || b.risk_score - a.risk_score;
 
   const listRows: HomeListRow[] = matched
     .slice()
@@ -452,12 +560,17 @@ export function computeHomeView(
       risk_tier: r.risk_tier,
       trend_slope: r.trend_slope,
       top_driver: r.top_driver ?? undefined,
+      is_out_of_business: r.is_out_of_business,
     }));
 
   const pins: PinSummary[] = matched
     .filter(hasCoords)
-    .sort((a, b) =>
-      sort === "low" ? a.risk_score - b.risk_score : b.risk_score - a.risk_score,
+    .sort(
+      (a, b) =>
+        closedRank(a) - closedRank(b) ||
+        (sort === "low"
+          ? a.risk_score - b.risk_score
+          : b.risk_score - a.risk_score),
     )
     .map((r) => ({
       license_id: r.license_id,
@@ -468,6 +581,7 @@ export function computeHomeView(
       risk_score: r.risk_score,
       risk_tier: r.risk_tier,
       top_driver: r.top_driver ?? undefined,
+      is_out_of_business: r.is_out_of_business,
     }));
 
   return {

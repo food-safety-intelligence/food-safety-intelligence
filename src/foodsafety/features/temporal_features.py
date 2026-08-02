@@ -66,3 +66,31 @@ def add_temporal_features(
     )
 
     return out
+
+
+def override_scoring_month(df: pd.DataFrame, *, month: int) -> pd.DataFrame:
+    """Freeze the seasonal calendar features to one common month for SCORING.
+
+    Seasonality is a real population effect (late-year anchors have higher
+    forward-180d risk because the window runs into warm season), so we keep
+    `temporal_month` / `temporal_quarter` in the trained model. But the web app
+    anchors each venue at its MOST RECENT inspection and would otherwise freeze
+    the seasonal term at that venue's inspection month -- making otherwise
+    identical venues differ purely by inspection timing and presenting a stale
+    season (e.g. a venue last seen in December) as timeless risk. So at SCORING
+    time only -- never on train/val/test, which must evaluate on real months --
+    we override both seasonal columns to one common `month` (the as-of month).
+
+    Only `temporal_month` and `temporal_quarter` feed the model; `temporal_season`
+    / `temporal_year` / `temporal_dow` are excluded from the feature set, so those
+    two columns are all that need freezing. Returns a copy; input is untouched.
+    """
+    if not 1 <= month <= 12:
+        raise ValueError(f"month must be 1..12, got {month}")
+    out = df.copy()
+    quarter = (month - 1) // 3 + 1
+    # Preserve the Int8 dtype add_temporal_features produced so downstream
+    # prepare_xgb_features sees an unchanged schema.
+    out["temporal_month"] = pd.Series(month, index=out.index, dtype="Int8")
+    out["temporal_quarter"] = pd.Series(quarter, index=out.index, dtype="Int8")
+    return out

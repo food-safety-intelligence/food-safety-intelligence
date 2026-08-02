@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import { trendDirection } from "@/lib/scores";
+import { dateAxisTicks } from "@/lib/utils";
+import { DefineTerm } from "@/components/DefineTerm";
 
 /**
  * Detail-page trend chart. Plots the establishment's recent FORECAST-MODEL scores
@@ -20,6 +22,9 @@ import { trendDirection } from "@/lib/scores";
 
 // Neutral ink-muted — the drawn trajectory carries no direction meaning of its own.
 const LINE = "#6B7280";
+// Teal accent (--color-teal) for the headline risk-score reference line, set
+// apart from the grey trend line so the two models don't read as one.
+const REFERENCE = "#486073";
 
 export interface TrendPoint {
   /** ISO yyyy-mm-dd inspection date. */
@@ -34,6 +39,12 @@ export interface TrendPoint {
    * "what happened here," not "what the score predicted."
    */
   result?: string;
+  /**
+   * Anchor id of this inspection's row in the history timeline
+   * (`inspection-<n>`). When set and `onPointActivate` is provided, the dot
+   * becomes a link to that row. See {@link inspectionAnchorId}.
+   */
+  anchorId?: string;
 }
 
 export function TrendChart({
@@ -43,6 +54,9 @@ export function TrendChart({
   view,
   width = 320,
   height = 116,
+  onPointActivate,
+  activateHint,
+  referenceScore,
 }: {
   points: TrendPoint[];
   /** Trend slope — only used for the chart's `aria-label` direction word. */
@@ -63,6 +77,24 @@ export function TrendChart({
   view?: { start: number; end: number };
   width?: number;
   height?: number;
+  /**
+   * Called when a dot is clicked or activated by keyboard. Makes each dot a
+   * link to its inspection record; the caller decides where (same tab for the
+   * inline chart, a new tab for the enlarged modal).
+   */
+  onPointActivate?: (point: TrendPoint) => void;
+  /**
+   * Appended to a dot's accessible label to say what activating it does (e.g.
+   * "opens this inspection in a new tab"). Only used when `onPointActivate` is set.
+   */
+  activateHint?: string;
+  /**
+   * The headline production `risk_score` (Model 1). Drawn as a dashed reference
+   * line so the forecast trajectory (Model 2, which drops each visit's own
+   * result) can be read against the gauge value without mixing models into the
+   * line. Same 0..1 scale. Omitted = no marker.
+   */
+  referenceScore?: number;
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const clipId = useId();
@@ -116,10 +148,28 @@ export function TrendChart({
   const winStart = windowSize == null ? 0 : Math.max(0, pts.length - windowSize);
   const bandLeft = winStart > 0 ? (xy[winStart - 1].x + xy[winStart].x) / 2 : null;
 
-  // Axis labels come from the visible range edges (timestamps) so they read
-  // correctly when zoomed; UTC keeps them aligned with the yyyy-mm-dd dates.
-  const fmtAxis = (ms: number) =>
-    new Date(ms).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+  // x-axis ticks: aim for roughly one label per ~70px of plot width (so the
+  // wider enlarged view shows more), snap to round calendar dates, then drop any
+  // label sitting within a label-width of the previous one so they never touch.
+  const targetTicks = Math.max(2, Math.min(7, Math.round(w / 70)));
+  const MIN_LABEL_GAP = 46;
+  const axisTicks: {
+    ms: number;
+    label: string;
+    x: number;
+    lx: number;
+    anchor: "start" | "middle" | "end";
+  }[] = [];
+  for (const tk of dateAxisTicks(vStart, vEnd, targetTicks)) {
+    const x = xFor(tk.ms);
+    if (x < padL - 1 || x > padL + w + 1) continue;
+    if (axisTicks.length && x - axisTicks[axisTicks.length - 1].x < MIN_LABEL_GAP) continue;
+    // Keep edge labels inside the plot instead of overflowing the gutter.
+    const anchor = x <= padL + 18 ? "start" : x >= padL + w - 18 ? "end" : "middle";
+    const lx = x <= padL + 18 ? padL : x >= padL + w - 18 ? padL + w : x;
+    axisTicks.push({ ms: tk.ms, label: tk.label, x, lx, anchor });
+  }
+
   const fmtFull = (iso: string) =>
     new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
       month: "short",
@@ -134,11 +184,15 @@ export function TrendChart({
         height={height}
         viewBox={`0 0 ${width} ${height}`}
         role="img"
-        aria-label={`Predicted-risk trajectory across ${pts.length} inspections${
-          bandLeft !== null ? `, recent ${windowSize} highlighted as the trend window` : ""
-        }, ${direction}`}
+        aria-label={`Trend-estimate trajectory across ${pts.length} inspections${
+          bandLeft !== null ? `, recent ${windowSize} set the trend window` : ""
+        }, ${direction}${
+          referenceScore != null
+            ? `. Dashed line marks the headline risk score, ${Math.round(referenceScore * 100)}`
+            : ""
+        }`}
       >
-        {/* y-axis: 0..1 risk scale (most establishments sit low). */}
+        {/* y-axis: 0..100 to match the gauge's "/100" (most establishments sit low). */}
         {[0, 1].map((t) => (
           <text
             key={t}
@@ -149,7 +203,7 @@ export function TrendChart({
             fill="#6B7280"
             fontFamily="var(--font-manrope), 'Manrope', sans-serif"
           >
-            {t.toFixed(1)}
+            {t * 100}
           </text>
         ))}
         <text
@@ -199,7 +253,7 @@ export function TrendChart({
             />
             {/* Right-anchored so it always sits inside the band (which ends at
                 the right plot edge) — a centred label clips when the band is
-                narrow. The caption below the chart carries the full wording. */}
+                narrow. Names the K it covers; the caption carries the full wording. */}
             <text
               x={padL + w - 2}
               y={padTop + 7}
@@ -209,7 +263,7 @@ export function TrendChart({
               fillOpacity={0.55}
               fontFamily="var(--font-manrope), 'Manrope', sans-serif"
             >
-              trend
+              last {windowSize} visits
             </text>
           </>
         )}
@@ -224,6 +278,38 @@ export function TrendChart({
           strokeLinejoin="round"
         />
 
+        {/* Headline risk-score reference — a dashed teal line at the gauge's
+            Model-1 score, so the neutral forecast trajectory can be read against
+            it without the two being confused. Teal (the accent) sets it apart
+            from the grey trend line. */}
+        {referenceScore != null && (
+          <>
+            <line
+              x1={padL}
+              y1={yFor(referenceScore)}
+              x2={padL + w}
+              y2={yFor(referenceScore)}
+              stroke={REFERENCE}
+              strokeOpacity={0.55}
+              strokeWidth={1}
+              strokeDasharray="3 2"
+            />
+            <text
+              x={padL + 3}
+              // Sit the label above the line, but flip below when the line is
+              // near the top edge so it doesn't collide with the "100" tick or
+              // the band label (a high-risk establishment — the case to get right).
+              y={yFor(referenceScore) < padTop + 12 ? yFor(referenceScore) + 9 : yFor(referenceScore) - 3}
+              fontSize={7}
+              fill={REFERENCE}
+              fillOpacity={0.9}
+              fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+            >
+              risk score
+            </text>
+          </>
+        )}
+
         {/* Inspection dots — latest emphasised; hover/focus reveals the tooltip.
             When zoomed, dots outside the view are dropped (not just clipped) so
             there are no invisible keyboard-focus targets off-plot. */}
@@ -231,6 +317,10 @@ export function TrendChart({
           if (!inView(times[i])) return null;
           const isLast = i === xy.length - 1;
           const active = hover === i;
+          // A dot links to its inspection record only when the caller wants it
+          // to and the point carries an anchor.
+          const linkable = onPointActivate != null && pts[i].anchorId != null;
+          const activate = () => onPointActivate?.(pts[i]);
           return (
             <circle
               key={i}
@@ -242,40 +332,61 @@ export function TrendChart({
               stroke={isLast || active ? LINE : "none"}
               strokeWidth={2.5}
               tabIndex={0}
-              role="button"
-              aria-label={`${fmtFull(pts[i].date)}, predicted risk ${pts[i].score.toFixed(2)}${
-                pts[i].result ? `, inspection result ${pts[i].result}` : ""
+              role={linkable ? "link" : "button"}
+              aria-label={`${fmtFull(pts[i].date)}, trend estimate ${Math.round(pts[i].score * 100)}${
+                isLast ? " (latest: leaves out this visit's result, so it can differ from the risk score)" : ""
+              }${pts[i].result ? `, inspection result ${pts[i].result}` : ""}${
+                linkable && activateHint ? `, ${activateHint}` : ""
               }`}
               style={{ cursor: "pointer", outline: "none" }}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
               onFocus={() => setHover(i)}
               onBlur={() => setHover(null)}
+              onClick={linkable ? activate : undefined}
+              onKeyDown={
+                linkable
+                  ? (e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        activate();
+                      }
+                    }
+                  : undefined
+              }
             />
           );
         })}
         </g>
 
-        {/* x-axis — visible range edges (month + full year). */}
-        <text
-          x={padL}
-          y={height - 5}
-          fontSize={8.5}
-          fill="#6B7280"
-          fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-        >
-          {fmtAxis(vStart)}
-        </text>
-        <text
-          x={width - padR}
-          y={height - 5}
-          textAnchor="end"
-          fontSize={8.5}
-          fill="#6B7280"
-          fontFamily="var(--font-manrope), 'Manrope', sans-serif"
-        >
-          {fmtAxis(vEnd)}
-        </text>
+        {/* x-axis — "nice" calendar ticks across the visible range. The target
+            count scales with the plot width (so the enlarged view gets more
+            ticks) and the tick unit shrinks as the range narrows on zoom, so
+            you get denser, finer dates the further in you go. Adjacent labels
+            closer than one label-width are dropped so nothing collides. */}
+        {axisTicks.map((tk) => (
+          <g key={tk.ms}>
+            <line
+              x1={tk.x}
+              y1={padTop + h}
+              x2={tk.x}
+              y2={padTop + h + 3}
+              stroke="#6B7280"
+              strokeOpacity={0.4}
+              strokeWidth={1}
+            />
+            <text
+              x={tk.lx}
+              y={height - 5}
+              textAnchor={tk.anchor}
+              fontSize={8.5}
+              fill="#6B7280"
+              fontFamily="var(--font-manrope), 'Manrope', sans-serif"
+            >
+              {tk.label}
+            </text>
+          </g>
+        ))}
       </svg>
 
       {/* Hover/focus tooltip — makes clear the value is a model prediction. */}
@@ -291,11 +402,20 @@ export function TrendChart({
           }}
         >
           <div>
-            {fmtFull(pts[hover].date)} · predicted risk {pts[hover].score.toFixed(2)}
+            {fmtFull(pts[hover].date)} · trend estimate {Math.round(pts[hover].score * 100)}
           </div>
           {pts[hover].result && (
             <div className="opacity-70">
               At this inspection: {pts[hover].result}
+            </div>
+          )}
+          {/* Latest dot only: the one users compare to the gauge. Explain why it
+              can differ (the trend leaves out this visit's result; the gauge counts it).
+              whitespace-normal + max-width so the long note wraps instead of
+              widening the tooltip past the chart edge. */}
+          {hover === pts.length - 1 && (
+            <div className="opacity-70 whitespace-normal max-w-[190px] leading-tight mt-0.5">
+              Latest: leaves out this visit&apos;s result, so it can differ from the risk score.
             </div>
           )}
         </div>
@@ -308,4 +428,24 @@ function clamp01(v: number): number {
   if (v < 0) return 0;
   if (v > 1) return 1;
   return v;
+}
+
+/**
+ * The shared lead sentence for the chart caption — what a dot is (trend
+ * estimate) and what the dashed line is (risk score), each with an in-context
+ * definition. Rendered inline in a caption `<p>`; callers append their own
+ * action hint (inline: "jump to it below"; modal: zoom + new-tab). Kept in one
+ * place so the inline chart and the enlarge modal never drift.
+ */
+export function TrendCaptionLead() {
+  return (
+    <>
+      Each point is the trend estimate
+      <DefineTerm termKey="trend-estimate" className="align-middle mx-0.5" />: the model&apos;s read
+      with each visit&apos;s own result removed, so the line shows direction. The dashed line is the
+      risk score
+      <DefineTerm termKey="risk-score" className="align-middle mx-0.5" />, which counts the latest
+      result and can differ.
+    </>
+  );
 }

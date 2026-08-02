@@ -1,0 +1,168 @@
+{
+  "city": "nyc",
+  "baseline": {
+    "n_feat": 29,
+    "cv_pr": 0.48382,
+    "cv_p10": 0.52931,
+    "pr_folds": [
+      0.3799,
+      0.4751,
+      0.5965
+    ],
+    "p10_folds": [
+      0.3288,
+      0.5435,
+      0.7156
+    ]
+  },
+  "families": [
+    {
+      "family": "recent365",
+      "cols": [
+        "prior_insp_365d",
+        "prior_bad_365d",
+        "prior_bad_rate_365d"
+      ],
+      "d_pr": -0.00209,
+      "d_p10": -0.00262,
+      "cv_pr": 0.48172,
+      "cv_p10": 0.52669,
+      "both_gate": false,
+      "pr_folds": [
+        0.3799,
+        0.4742,
+        0.5911
+      ],
+      "p10_folds": [
+        0.3288,
+        0.5416,
+        0.7096
+      ]
+    },
+    {
+      "family": "recency_bad",
+      "cols": [
+        "days_since_last_bad"
+      ],
+      "d_pr": 0.00064,
+      "d_p10": 0.00482,
+      "cv_pr": 0.48445,
+      "cv_p10": 0.53413,
+      "both_gate": true,
+      "pr_folds": [
+        0.3799,
+        0.4755,
+        0.5979
+      ],
+      "p10_folds": [
+        0.3288,
+        0.552,
+        0.7216
+      ]
+    },
+    {
+      "family": "trend",
+      "cols": [
+        "bad_rate_recent3",
+        "bad_rate_trend"
+      ],
+      "d_pr": 0.00011,
+      "d_p10": -0.00201,
+      "cv_pr": 0.48393,
+      "cv_p10": 0.5273,
+      "both_gate": false,
+      "pr_folds": [
+        0.3799,
+        0.4784,
+        0.5936
+      ],
+      "p10_folds": [
+        0.3288,
+        0.5525,
+        0.7006
+      ]
+    },
+    {
+      "family": "calendar",
+      "cols": [
+        "insp_month",
+        "insp_quarter"
+      ],
+      "d_pr": -0.00171,
+      "d_p10": -0.00244,
+      "cv_pr": 0.48211,
+      "cv_p10": 0.52687,
+      "both_gate": false,
+      "pr_folds": [
+        0.3799,
+        0.475,
+        0.5914
+      ],
+      "p10_folds": [
+        0.3288,
+        0.5572,
+        0.6946
+      ]
+    },
+    {
+      "family": "tenure",
+      "cols": [
+        "tenure_days"
+      ],
+      "d_pr": 0.00611,
+      "d_p10": 0.01289,
+      "cv_pr": 0.48993,
+      "cv_p10": 0.5422,
+      "both_gate": true,
+      "pr_folds": [
+        0.3799,
+        0.4818,
+        0.6081
+      ],
+      "p10_folds": [
+        0.3288,
+        0.5642,
+        0.7335
+      ]
+    },
+    {
+      "family": "visit_type",
+      "cols": [
+        "cur_closed",
+        "prior_closures"
+      ],
+      "d_pr": 0.01044,
+      "d_p10": 0.01775,
+      "cv_pr": 0.49426,
+      "cv_p10": 0.54706,
+      "both_gate": true,
+      "pr_folds": [
+        0.3799,
+        0.4908,
+        0.6121
+      ],
+      "p10_folds": [
+        0.3288,
+        0.5788,
+        0.7335
+      ]
+    }
+  ],
+  "combined": {
+    "cols": [
+      "days_since_last_bad",
+      "tenure_days",
+      "cur_closed",
+      "prior_closures"
+    ],
+    "cv_pr": 0.49788,
+    "cv_p10": 0.54695,
+    "d_pr": 0.01407,
+    "d_p10": 0.01764
+  },
+  "fold_val_years": [
+    2023,
+    2024,
+    2025
+  ]
+}

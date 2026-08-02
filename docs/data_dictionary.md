@@ -1,10 +1,12 @@
 # Data dictionary
 
 Every dataset the pipeline pulls, where it comes from, and the columns that
-matter. All sources are the public **Chicago Open Data portal** (Socrata / SODA
-API, `https://data.cityofchicago.org/resource/<id>.json`); the four-by-four IDs
-live in `DATASETS` in `src/foodsafety/config.py`, and the loaders are in
-`src/foodsafety/io/soda.py`.
+matter. The core Chicago sources are on the public **Chicago Open Data portal**
+(Socrata / SODA API, `https://data.cityofchicago.org/resource/<id>.json`); the
+four-by-four IDs live in `DATASETS` in `src/foodsafety/config.py`, and the
+loaders are in `src/foodsafety/io/soda.py`. The second city (New York City, see
+below) is also on a Socrata portal but is pulled by its own self-contained
+producer script, not through `config.py` / `io/soda.py`.
 
 > Adding a dataset? Add its ID to `config.py`, document it here, and — if it
 > reaches the model — update `docs/interface_contracts.md` too.
@@ -25,6 +27,10 @@ The core dataset; one row per inspection. Drives the label and most features.
   labels non-comparable); pre-2019 inspections are burn-in only.
 - **Note:** no inspector identity is published in this feed (only
   `inspection_id` / `inspection_type` / `inspection_date`).
+- **Agent records link:** the chat agent's `find_inspection_records` tool builds a
+  user-facing deep link to this dataset's Socrata query grid (filtered by
+  `license_`, `zip`, or a lat/lon radius) so a user can verify the records behind a
+  score. It only builds the URL — nothing is fetched.
 
 ### 311 Service Requests — `v6vf-nfxy`
 Resident-reported issues. Only the food/sanitation-relevant `sr_type`s are
@@ -60,6 +66,73 @@ adjacent numbers).
   IDs are kept for resumability if a parcel-level (building-footprint) join ever
   becomes available.
 
+### NYC DOHMH Restaurant Inspections — `43nn-pn8j` (second city)
+New York City's food inspections, from the **NYC Open Data portal**
+(`https://data.cityofnewyork.us/resource/43nn-pn8j.json`). Pulled and cached by
+its own self-contained producer, `scripts/build_nyc_scores.py` — **not** through
+`config.py` / `io/soda.py`. One row per inspection-violation; the producer
+collapses to one row per `(camis, inspection_date)`.
+- **Key columns:** `camis` (establishment id, used as `license_id` in the served
+  JSON), `dba`, `boro`, `zipcode`, `latitude` / `longitude`, `cuisine_description`,
+  `inspection_date`, `action`, `violation_code` / `violation_description`,
+  `critical_flag`, `score` (numeric points — **higher is worse**), `grade`
+  (A / B / C; derived from `score` when the grade cell is blank).
+- **Label:** `y_next_bc` — 1 if the establishment's **next** inspection is graded
+  **B or C (score ≥ 14)**, else 0. This is a different target from Chicago's
+  `y_fail_or_critical_next_180d`; the two cities predict different things.
+- **Agent records link:** the chat agent's `find_inspection_records` tool deep-links
+  to this dataset's Socrata query grid too, filtered by `camis` / `zipcode` / radius.
+  (Los Angeles left Socrata for a bulk CSV with no queryable API, so for LA the tool
+  links to LA County Public Health's inspections page instead of a filtered grid.)
+- **Training window:** **2022-07-01 onward.** NYC halted inspections in March 2020
+  (COVID) and grades/scores only normalise from 2022 — the analog of Chicago's
+  2019 cutoff for the July-2018 procedure change.
+- **Served model:** XGBoost with Platt-on-margin calibration (`nyc_xgb_sigmoid`),
+  reusing Chicago's SHAP / calibration / risk-tier machinery. Output is written to
+  `app/public/data/nyc/{scores,inspection_history,methodology}.json` in the same
+  schema Chicago uses (decision record 0016). LA is the same shape
+  (`la_xgb_sigmoid`). Both served a calibrated logistic regression until
+  2026-07-06 (PR #165), when XGBoost cleared the gate on a deploy-realistic split.
+- **Violation vocabulary:** NYC's codes are mapped to the shared theme + severity
+  crosswalk in `reference/violation_crosswalk.csv` so the product describes
+  violations consistently across cities.
+
+### LA County Restaurant + Market Inspections and Violations (third city)
+Los Angeles County Environmental Health, published as **ArcGIS Hub bulk CSVs**,
+not Socrata: inspections item `19b6607a…` + violations item `5eaea9f8…`, covering
+**2023-04-01 → 2026-03-31**. LA County left Socrata (its SODA endpoint redirects
+to a dead page) and the surviving City-of-LA Socrata feed `29fd-3paw` is frozen at
+2018-07-31. Pulled by its own producer, `scripts/build_la_scores.py`, which joins
+violations to inspection headers on `serial_number`.
+- **Key columns (inspections):** `serial_number`, `facility_id`, `facility_name`,
+  `facility_address`, `facility_city`, `facility_zip`, `activity_date`,
+  `service_description` (routine vs owner-initiated), `score`, `grade`,
+  `pe_description` (program element).
+- **Key columns (violations):** `serial_number`, `violation_code`,
+  `violation_description`, `points`.
+- **Scope:** restaurants **and** retail food markets — ~75% / ~25% by facility
+  (32,208 / 10,831 of 43,053), a near-mirror of Chicago's 69/31. Unlike Chicago
+  there are effectively no institutional kitchens: only 14 facilities fall outside
+  those two categories, so LA has no school / daycare / hospital coverage.
+- **Grade direction is FLIPPED:** 0–100 where **higher is cleaner** (A = 90–100,
+  B = 80–89, C = 70–79), the opposite of Chicago and NYC. Label `y_next_bad` = the
+  next inspection scores **below 90**. Same-day collapse takes the **minimum**
+  (worst) score, where NYC takes the max.
+- **No coordinates in the feed.** Facilities are geocoded once via the free US
+  Census batch geocoder (95.7% matched, ZIP-centroid fallback) and cached in
+  `reference/la_facility_coords.csv` so rebuilds are offline. Coordinates are
+  therefore approximate — see the neighborhood false-positive finding in
+  `fairness_audit.md`.
+- **No burn-in cutoff needed:** the feed starts post-COVID (2023-04) and mean score
+  is flat ~94.5 across 2023–2026.
+- **`pe_description` is in the raw feed but NOT carried into the feature frame**
+  (`src/foodsafety/audit/adapters/la.py`). It encodes venue type, **seat count**,
+  and **LA County's own risk grade** in one string (e.g.
+  `RESTAURANT (0-30) SEATS HIGH RISK`) — 30 distinct values. The county risk grade
+  is the direct analog of Chicago's `static_risk_tier`, which **is** a kept model
+  feature, and unlike facility type it is not an ethnicity proxy. Untested lever in
+  the city that is furthest from its ceiling; see `model-experiments.md`.
+
 ## Data sources considered but NOT used
 
 ### Yelp — dead end for Chicago
@@ -93,10 +166,17 @@ neither available in the sandbox this was authored in. Promotion to
 `ALL_FEATURES` requires that A/B to clear the both-metrics gate (see
 `docs/model-experiments.md`).
 
-### Census (tract demographics)
-**Audit-only.** Reserved for the Phase-2 disparate-impact fairness audit
-(`docs/fairness_audit.md`) — never a model feature (it's a direct
-geographic/demographic proxy).
+### Census / ACS (tract demographics) — audit-only
+**Audit-only, never a model feature** (it's a direct geographic/demographic
+proxy — decisions 0004 / 0005). Now implemented for the disparate-impact fairness
+audit (`src/foodsafety/audit/census.py`, decision record 0018): each
+establishment's `lat/lon` is point-in-polygon joined to its **census tract**
+(TIGER/Line shapefiles) and then to **ACS 5-year** tract attributes (median income,
+race/ethnicity, poverty, foreign-born, limited-English, and secondary context).
+Used only to *measure* disparate impact — no column reaches `ALL_FEATURES`, the
+served parquet, the app, or CI. Needs a free `CENSUS_API_KEY` (the data API now
+requires one) and the `audit` optional dependency extra (geopandas). Results:
+`docs/fairness_audit.md`, `reports/fairness/fairness_audit_<city>.json`.
 
 ### Cuisine / menu type
 Not pursued: predictive but ≈ ethnicity (a fairness trap). Related:

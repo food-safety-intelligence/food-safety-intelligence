@@ -2,6 +2,7 @@ import { ArrowRight, Heart } from "lucide-react";
 import Link from "next/link";
 import { getHomeView, loadScores } from "@/lib/scores-server";
 import { ALL_TIERS, type HomeSort, type PinDriver } from "@/lib/scores";
+import { CityIntro } from "@/components/CityIntro";
 import { DemoBanner } from "@/components/DemoBanner";
 import { MapExplorer } from "@/components/MapExplorer";
 import { PinDriverLine } from "@/components/MapView";
@@ -63,53 +64,12 @@ export default async function HomePage() {
 
         {/* Below-the-fold supplementary content. Map-first means scroll for the rest. */}
         <section className="max-w-[1240px] mx-auto px-8 mt-16 w-full">
-          <div className="grid grid-cols-12 gap-6 items-end">
-            <div className="col-span-12 lg:col-span-7">
-              <p className="text-sage text-xs tracking-[0.18em] uppercase mb-3">
-                A risk signal, not a verdict
-              </p>
-              <h2 className="text-4xl font-light tracking-tight leading-[1.1]">
-                Why this exists
-              </h2>
-              <p className="text-lg text-muted leading-[1.6] mt-4 max-w-[58ch]">
-                Chicago publishes every food establishment inspection it
-                conducts. We
-                pair that record with nearby 311 complaints and license
-                history to estimate the chance a place will see a failed
-                inspection or priority violation in the next six months — and
-                show you exactly why.
-              </p>
-            </div>
-            <div className="col-span-12 lg:col-span-5 grid grid-cols-2 gap-3">
-              <div className="rounded-2xl bg-card p-5 soft-shadow border border-line">
-                <div className="text-2xs tracking-widest uppercase text-muted">
-                  In the index
-                </div>
-                <div className="num text-3xl font-medium mt-1 leading-none">
-                  {payload.totals.establishments.toLocaleString()}
-                </div>
-                <div className="text-xs text-muted mt-1">
-                  licensed establishments
-                </div>
-              </div>
-              <div className="rounded-2xl bg-card p-5 soft-shadow border border-line">
-                <div className="text-2xs tracking-widest uppercase text-muted">
-                  High tier today
-                </div>
-                <div className="num text-3xl font-medium mt-1 leading-none text-terra">
-                  {payload.totals.tier_counts.High.toLocaleString()}
-                </div>
-                <div className="text-xs text-muted mt-1">
-                  {(
-                    (payload.totals.tier_counts.High /
-                      payload.totals.establishments) *
-                    100
-                  ).toFixed(1)}
-                  % of all licenses
-                </div>
-              </div>
-            </div>
-          </div>
+          <CityIntro
+            initialTotals={{
+              establishments: payload.totals.establishments,
+              high: payload.totals.tier_counts.High,
+            }}
+          />
         </section>
 
         <section className="max-w-[1240px] mx-auto px-8 mt-12 w-full">
@@ -131,7 +91,7 @@ export default async function HomePage() {
               </h3>
               <p className="text-base text-muted leading-relaxed mt-3 max-w-[60ch]">
                 Two food establishments can share the same score for different
-                reasons — and for someone with a weakened immune system, the
+                reasons, and for someone with a weakened immune system, the
                 reason matters. We surface the top drivers, like temperature
                 abuse, cross-contamination, and handwashing lapses, so you can
                 match the data to the precautions your care team recommends.

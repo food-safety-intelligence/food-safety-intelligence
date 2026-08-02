@@ -1,19 +1,28 @@
-# Food Safety Intelligence — Capstone
+# Eatelligence: Food Safety Intelligence Platform
 
-Predicting forward-window food-safety risk for Chicago restaurants from public
-inspection, business-license, and 311-complaint data. UC Berkeley MIDS capstone.
+UC Berkeley Summer 2026 Capstone
+
+https://www.ischool.berkeley.edu/programs/mids/capstone/2026b-summer/eatelligence-food-safety-intelligence
+
+Predicting forward-window food-safety risk for Chicago, New York City, and Los Angeles restaurants 
+from public inspection data and business-license data. 
 
 **Team**: Jun Xu (PM), Arun Agarwal, Bella Davies, Deepak Srivastava, Aurelia Yang
-
-> **Latest status**: see [`docs/weekly/`](docs/weekly/) — newest dated file is
-> the current snapshot of what's built, what's open, and how to verify locally.
 
 ## What we're building this iteration
 
 1. A measured model (logistic regression baseline → calibrated XGBoost) with
    SHAP explainability.
-2. A Next.js web app that runs on a laptop and answers three questions for any
-   Chicago restaurant: *Is risk elevated? Improving or worsening? What's driving it?*
+2. A Next.js web app (and a conversational agent) that answer three questions for
+   any restaurant in a covered city — Chicago, New York City, or Los Angeles:
+   *Is risk elevated? Improving or worsening? What's driving it?*
+
+The web app and agent are **multi-city** (decision record 0016): **Chicago** is the
+primary, full pipeline; **New York City** and **Los Angeles** are scored by their
+own self-contained producers into the same JSON contract, one scored dataset per
+city. Each city predicts a different target and is framed in its own terms (Chicago
+pass/fail + violation codes; NYC/LA letter grades A/B/C — LA's 0-100 scale runs the
+opposite way to NYC).
 
 See `CLAUDE.md` for the full scope contract.
 
@@ -110,8 +119,12 @@ The fallback chain: remote `scores.json` via `DATA_BASE_URL` → local
 `public/data/scores.json` → committed `scores_mock.json` (which flips on a demo
 banner). There are **no API routes** — the app reads precomputed JSON only and
 never runs the model. Routes: the map home, restaurant detail (gauge + driver
-waterfall + inspection timeline), how-it-works (methodology), caregivers, and
-sources.
+waterfall + inspection timeline), how-it-works (methodology), caregivers,
+sources, and a feedback form. The app's one outbound write is that feedback
+form, which POSTs to an external Google Apps Script endpoint
+(`scripts/feedback-apps-script.gs` → a private Google Sheet + team email) — not
+model inference, so the batch-score-to-JSON contract still holds (decision
+record 0014).
 
 **The agent (`agents/`).** A standalone Strands agent on Amazon Nova 2 Lite
 (Bedrock) with three tools — find restaurants (OpenStreetMap/Overpass), score
@@ -238,7 +251,7 @@ when a change lands on `main`.
 | `app/` | Next.js web app (App Router + TypeScript + Tailwind + shadcn/ui). Reads `app/public/data/*.json` only |
 | `design/` | UI mockups + design references (pre-build exploration) |
 | `data/` | Local cache (gitignored). `raw/`, `interim/`, `processed/`, `models/`, `predictions/` |
-| `scripts/` | Python CLI entry points used by the Makefile |
+| `scripts/` | Python CLI entry points (Makefile) + ops/deploy scripts (`deploy_aws.sh`, `feedback-apps-script.gs`) |
 | `tests/` | pytest, mirrors `src/foodsafety/` |
 | `docs/` | Data dictionary, label definition, interface contracts, weekly check-ins |
 | `reports/` | Figures + per-run metrics JSON + final writeup |

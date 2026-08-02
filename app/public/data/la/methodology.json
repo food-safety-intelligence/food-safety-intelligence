@@ -1,0 +1,133 @@
+{
+  "generated_at": "2026-07-20T00:11:21.450806+00:00",
+  "model_version": "la_xgb_sigmoid",
+  "city": "la",
+  "data_source": "LA County Environmental Health Restaurant and Market Inspections (ArcGIS)",
+  "label": "Probability the establishment's NEXT inspection is graded B or C (score below 90)",
+  "train_window": "2023-04-01 onward (LA County's fresh feed is post-COVID)",
+  "provenance": {
+    "model_version": "la_xgb_sigmoid",
+    "note": "feasibility build, DR 0016"
+  },
+  "test": {
+    "n": 7197,
+    "prevalence": 0.0866,
+    "events": 623,
+    "split_from": "2025-01-01"
+  },
+  "windows": {
+    "train": {
+      "start": "2023-04-01",
+      "end": "2024-06-30",
+      "n": 36900
+    },
+    "val": {
+      "start": "2024-07-01",
+      "end": "2024-12-31",
+      "n": 7374
+    },
+    "test": {
+      "start": "2025-01-02",
+      "end": "2026-03-25",
+      "n": 7197
+    }
+  },
+  "headline": {
+    "pr_auc": 0.187,
+    "roc_auc": 0.7211,
+    "top_decile_lift": 2.52
+  },
+  "caveat": "LA is a coverage feature. Its grades run the opposite way to Chicago and NYC (A = 90-100, higher is cleaner), and the B/C base rate is low (~5%). Facility coordinates are geocoded from the address (the feed carries none).",
+  "risk_tiers": [
+    {
+      "label": "Low",
+      "min": 0.0,
+      "max": 0.0435,
+      "share": 0.3602
+    },
+    {
+      "label": "Moderate",
+      "min": 0.0435,
+      "max": 0.087,
+      "share": 0.292
+    },
+    {
+      "label": "Elevated",
+      "min": 0.087,
+      "max": 0.2628,
+      "share": 0.3278
+    },
+    {
+      "label": "High",
+      "min": 0.2628,
+      "max": null,
+      "share": 0.02
+    }
+  ],
+  "operating_points": [
+    {
+      "frac": 0.05,
+      "n_flagged": 360,
+      "precision": 0.2444,
+      "recall": 0.1413,
+      "lift": 2.8239,
+      "events_caught": 88
+    },
+    {
+      "frac": 0.1,
+      "n_flagged": 720,
+      "precision": 0.2181,
+      "recall": 0.252,
+      "lift": 2.519,
+      "events_caught": 157
+    },
+    {
+      "frac": 0.15,
+      "n_flagged": 1080,
+      "precision": 0.212,
+      "recall": 0.3676,
+      "lift": 2.4495,
+      "events_caught": 229
+    },
+    {
+      "frac": 0.2,
+      "n_flagged": 1440,
+      "precision": 0.1986,
+      "recall": 0.4591,
+      "lift": 2.2944,
+      "events_caught": 286
+    },
+    {
+      "frac": 0.25,
+      "n_flagged": 1800,
+      "precision": 0.1811,
+      "recall": 0.5233,
+      "lift": 2.0922,
+      "events_caught": 326
+    },
+    {
+      "frac": 0.3,
+      "n_flagged": 2160,
+      "precision": 0.1699,
+      "recall": 0.5891,
+      "lift": 1.9628,
+      "events_caught": 367
+    },
+    {
+      "frac": 0.4,
+      "n_flagged": 2879,
+      "precision": 0.1494,
+      "recall": 0.6902,
+      "lift": 1.7254,
+      "events_caught": 430
+    },
+    {
+      "frac": 0.5,
+      "n_flagged": 3599,
+      "precision": 0.1359,
+      "recall": 0.7849,
+      "lift": 1.5696,
+      "events_caught": 489
+    }
+  ]
+}

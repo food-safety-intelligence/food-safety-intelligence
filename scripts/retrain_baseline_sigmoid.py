@@ -39,6 +39,7 @@ from sklearn.frozen import FrozenEstimator
 
 from foodsafety.config import (
     FEATURES_PATH,
+    INSPECTIONS_LABELED_PATH,
     LABEL_WINDOW_DAYS,
     MODELS_DIR,
     PREDICTIONS_DIR,
@@ -54,6 +55,7 @@ from foodsafety.models.baseline import (
 from foodsafety.models.evaluate import evaluate
 from foodsafety.serve.predict_batch import (
     build_scores_table,
+    out_of_business_status,
     write_scores_json,
 )
 from foodsafety.tracking import provenance
@@ -223,9 +225,13 @@ def main() -> None:
     full_p = calibrated.predict_proba(features[ALL_FEATURES])[:, 1]
     print(f"Unique probability values across {len(full_p):,} rows: {len(np.unique(full_p)):,}")
 
-    # Score every restaurant + export JSON for the web app.
+    # Score every restaurant + export JSON for the web app. Closure status
+    # comes from the labeled all-events parquet (DR 0014).
+    closure = out_of_business_status(storage.read_parquet(INSPECTIONS_LABELED_PATH))
     print("Building scores table (per-license_id, anchored on latest inspection)")
-    scores = build_scores_table(calibrated, features, ALL_FEATURES, n_drivers=5)
+    scores = build_scores_table(
+        calibrated, features, ALL_FEATURES, n_drivers=5, closure_status=closure
+    )
 
     storage.write_parquet(scores, SCORES_PARQUET_PATH)
     print(f"Wrote {SCORES_PARQUET_PATH}: {len(scores):,} restaurants")
@@ -266,9 +272,12 @@ def main() -> None:
     write_scores_json(
         scores,
         SCORES_JSON_PATH,
-        schema_version="0.5.0",
+        # 0.6.0 adds is_out_of_business / closed_since (DR 0014).
+        schema_version="0.6.0",
         model_version=MODEL_VERSION,
         calibration=calibration,
+        # Unified tier cutoffs used this run (DR 0017) — Chicago base rate default.
+        risk_tier_thresholds=scores.attrs.get("risk_tier_thresholds"),
     )
     print(f"Wrote {SCORES_JSON_PATH}")
 

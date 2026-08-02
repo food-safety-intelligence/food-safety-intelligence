@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import type { HomeSort, HomeView, RiskTier, SearchIndex } from "@/lib/scores";
 import {
   ALL_TIERS,
+  CLOSED_HEX,
   computeHomeView,
   isAllTiers,
   parseSort,
@@ -14,9 +15,12 @@ import {
   TIER_HEX,
   TIER_TEXT_CLASS,
 } from "@/lib/scores";
-import { TierPill } from "@/components/TierPill";
+import { ClosedPill, TierPill } from "@/components/TierPill";
 import { TrendIndicator } from "@/components/TrendIndicator";
 import { MapView, PinDriverLine } from "@/components/MapView";
+import { useCity } from "@/components/CityContext";
+import { boundaryUrl, CITY_CONFIG, dataUrl } from "@/lib/city";
+import { fetchJson } from "@/lib/fetch-json";
 import { cn } from "@/lib/utils";
 
 // How long to wait after the last keystroke before pushing `?q=` to the URL.
@@ -67,25 +71,37 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
   // Fetch the slim index of every establishment ONCE, then filter client-side
   // (the page is statically exported, so the server can't filter per request).
   // Until it loads we render the server's default `initialView`.
-  const [index, setIndex] = useState<SearchIndex | null>(null);
+  const { city } = useCity();
+  // Refetch the selected city's index whenever the city changes. Tag the loaded
+  // index with its city so `index` derives to null until the new city's fetch
+  // resolves — we never render Chicago pins while NYC loads, without resetting
+  // state from the effect body.
+  const [loaded, setLoaded] = useState<{ city: string; index: SearchIndex } | null>(null);
+  // Distinguish "still loading" from "load failed": a failure means search /
+  // filter / sort would silently do nothing, so we surface a retry affordance
+  // instead of leaving the controls looking dead. `reloadKey` re-runs the fetch.
+  const [indexError, setIndexError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
-    let alive = true;
-    fetch("/data/search-index.json")
-      .then((r) =>
-        r.ok ? r.json() : Promise.reject(new Error(String(r.status))),
-      )
-      .then((d: SearchIndex) => {
-        if (alive) setIndex(d);
+    const controller = new AbortController();
+    fetchJson<SearchIndex>(dataUrl(city, "search-index.json"), {
+      signal: controller.signal,
+    })
+      .then((d) => {
+        setLoaded({ city, index: d });
+        setIndexError(false);
       })
       .catch(() => {
-        /* keep initialView as the fallback if the index can't load */
+        // Ignore aborts (unmount / city switch); a real failure — after the
+        // retries in fetchJson — surfaces the retry affordance below.
+        if (!controller.signal.aborted) setIndexError(true);
       });
-    return () => {
-      alive = false;
-    };
-  }, []);
+    return () => controller.abort();
+  }, [city, reloadKey]);
 
-  const indexLoading = index === null;
+  const index = loaded?.city === city ? loaded.index : null;
+  // Loading only while we don't yet have this city's index AND haven't given up.
+  const indexLoading = index === null && !indexError;
   const view = index
     ? computeHomeView(index, {
         q: query,
@@ -188,6 +204,11 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
     router.replace(hrefFor({ sort: s }), { scroll: false });
   };
 
+  const retryIndex = () => {
+    setIndexError(false);
+    setReloadKey((k) => k + 1);
+  };
+
   const { listRows, pins, matchCount, total, tierCounts } = view;
   const capped = matchCount > listRows.length;
   const visibleRows = listRows.slice(0, visibleCount);
@@ -229,7 +250,18 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
             "lg:block relative h-[calc(100vh-220px)] lg:h-[calc(100vh-140px)] min-h-[480px] rounded-3xl overflow-hidden border border-line bg-card soft-shadow",
           )}
         >
-          <MapView pins={pins} className="absolute inset-0" />
+          <MapView
+            pins={pins}
+            className="absolute inset-0"
+            center={{
+              lat: CITY_CONFIG[city].center.lat,
+              lon: CITY_CONFIG[city].center.lon,
+              zoom: CITY_CONFIG[city].zoom,
+            }}
+            maxBounds={CITY_CONFIG[city].maxBounds}
+            minZoom={CITY_CONFIG[city].minZoom}
+            boundaryUrl={boundaryUrl(city)}
+          />
 
           {/* Floating search + filter overlay */}
           <div className="absolute top-4 left-4 right-4 z-10 pointer-events-none">
@@ -264,12 +296,40 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   </button>
                 ))}
               </div>
+
+              {/* Load status for the client search index. Until it arrives,
+                  search / tier / sort filter the server's default view only, so
+                  a click can look like it did nothing — say so rather than leave
+                  the controls silently unresponsive. On failure, offer a retry:
+                  without the index those controls stay dead for the session. */}
+              {indexError ? (
+                <div
+                  role="status"
+                  className="flex items-center gap-2 px-2 pb-1 pt-0.5 text-2xs text-terra"
+                >
+                  <span>Couldn&apos;t load the full list.</span>
+                  <button
+                    onClick={retryIndex}
+                    className="underline underline-offset-2 font-medium hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
+                  >
+                    Retry
+                  </button>
+                </div>
+              ) : indexLoading ? (
+                <div
+                  role="status"
+                  className="flex items-center gap-1.5 px-2 pb-1 pt-0.5 text-2xs text-muted"
+                >
+                  <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+                  <span>Loading all establishments…</span>
+                </div>
+              ) : null}
             </div>
           </div>
 
           {/* Bottom-left attribution-ish chip */}
           <div className="absolute bottom-3 left-3 z-10 text-2xs text-muted/80 bg-card/80 backdrop-blur rounded px-2 py-1 pointer-events-none">
-            Chicago · 41.88, −87.63
+            {CITY_CONFIG[city].centerLabel}
           </div>
         </div>
 
@@ -339,7 +399,7 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                   </>
                 ) : sort === "low" ? (
                   <>
-                    Lowest {listRows.length.toLocaleString()} by risk — a weaker
+                    Lowest {listRows.length.toLocaleString()} by risk: a weaker
                     signal, not a safety guarantee
                   </>
                 ) : (
@@ -358,11 +418,20 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                 <li key={r.license_id}>
                   <Link
                     href={`/restaurant/?id=${r.license_id}`}
-                    className="flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors"
+                    className={cn(
+                      "flex items-start gap-3 px-5 py-3 hover:bg-cream/40 transition-colors",
+                      // Closed venues read as archival: dimmed row, neutral
+                      // pill below instead of tier/trend, no score number.
+                      r.is_out_of_business && "opacity-70",
+                    )}
                   >
                     <div
                       className="w-2.5 h-2.5 rounded-full mt-1.5 shrink-0"
-                      style={{ background: TIER_HEX[r.risk_tier] }}
+                      style={{
+                        background: r.is_out_of_business
+                          ? CLOSED_HEX
+                          : TIER_HEX[r.risk_tier],
+                      }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="font-semibold text-sm leading-tight truncate">
@@ -372,23 +441,31 @@ function MapExplorerInner({ initialView }: { initialView: HomeView }) {
                         {r.address}
                       </div>
                       <div className="flex items-center gap-2 mt-1.5">
-                        <TierPill tier={r.risk_tier} size="sm" />
-                        <TrendIndicator slope={r.trend_slope} />
+                        {r.is_out_of_business ? (
+                          <ClosedPill size="sm" />
+                        ) : (
+                          <>
+                            <TierPill tier={r.risk_tier} size="sm" />
+                            <TrendIndicator slope={r.trend_slope} />
+                          </>
+                        )}
                       </div>
-                      {r.top_driver && (
+                      {r.top_driver && !r.is_out_of_business && (
                         <div className="mt-1.5">
                           <PinDriverLine driver={r.top_driver} />
                         </div>
                       )}
                     </div>
-                    <div
-                      className={cn(
-                        "num text-lg font-medium tabular-nums leading-none",
-                        TIER_TEXT_CLASS[r.risk_tier],
-                      )}
-                    >
-                      {r.risk_score.toFixed(2)}
-                    </div>
+                    {!r.is_out_of_business && (
+                      <div
+                        className={cn(
+                          "num text-lg font-medium tabular-nums leading-none",
+                          TIER_TEXT_CLASS[r.risk_tier],
+                        )}
+                      >
+                        {r.risk_score.toFixed(2)}
+                      </div>
+                    )}
                   </Link>
                 </li>
               ))}
